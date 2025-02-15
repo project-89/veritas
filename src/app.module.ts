@@ -8,6 +8,7 @@ import { AnalysisModule } from "@/modules/analysis/analysis.module";
 import { ContentModule } from "@/modules/content/content.module";
 import { SourcesModule } from "@/modules/sources/sources.module";
 import { MonitoringModule } from "@/modules/monitoring/monitoring.module";
+import { IngestionModule } from "@/modules/ingestion/ingestion.module";
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { MonitoringModule } from "@/modules/monitoring/monitoring.module";
     DatabaseModule,
 
     // Feature Modules
+    IngestionModule,
     AnalysisModule,
     ContentModule,
     SourcesModule,
