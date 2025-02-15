@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - memgraph
+      - redis
+      - kafka
+    environment:
+      - NODE_ENV=development
+      - MEMGRAPH_HOST=memgraph
+      - REDIS_HOST=redis
+      - KAFKA_BROKERS=kafka:9092
+
+  memgraph:
+    image: memgraph/memgraph:latest
+    ports:
+      - "7687:7687"
+      - "7444:7444"
+    volumes:
+      - mg_data:/var/lib/memgraph
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  kafka:
+    image: vectorized/redpanda:latest
+    ports:
+      - "9092:9092"
+      - "9644:9644"
+    volumes:
+      - kafka_data:/var/lib/redpanda/data
+    command:
+      - redpanda
+      - start
+      - --smp
+      - '1'
+      - --reserve-memory
+      - 0M
+      - --overprovisioned
+      - --node-id
+      - '0'
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://kafka:9092
+
+volumes:
+  mg_data:
+  redis_data:
+  kafka_data: 
