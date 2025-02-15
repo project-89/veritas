@@ -1,0 +1,44 @@
+type DeviationMetrics {
+  baselineScore: Float!
+  deviationMagnitude: Float!
+  propagationVelocity: Float!
+  crossReferenceScore: Float!
+  sourceCredibility: Float!
+  impactScore: Float!
+}
+
+type Pattern {
+  id: ID!
+  type: String!
+  confidence: Float!
+  nodes: [ID!]!
+  edges: [ID!]!
+  timeframe: TimeFrame!
+}
+
+input TimeFrameInput {
+  start: DateTime!
+  end: DateTime!
+}
+
+type TimeFrame {
+  start: DateTime!
+  end: DateTime!
+}
+
+scalar DateTime
+
+type Query {
+  realityDeviation(narrativeId: ID!): DeviationMetrics!
+  patterns(timeframe: TimeFrameInput!): [Pattern!]!
+}
+
+type Mutation {
+  analyzeContent(content: String!): AnalysisResult!
+}
+
+type AnalysisResult {
+  status: String!
+  metrics: DeviationMetrics
+  patterns: [Pattern!]
+} 
