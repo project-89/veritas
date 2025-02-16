@@ -1,0 +1,40 @@
+import { ContentNode, SourceNode } from "@/schemas/base.schema";
+
+export interface SocialMediaPost {
+  id: string;
+  text: string;
+  timestamp: Date;
+  platform: string;
+  authorId: string;
+  authorName: string;
+  authorHandle?: string;
+  url: string;
+  engagement: {
+    likes: number;
+    shares: number;
+    comments: number;
+    reach: number;
+  };
+}
+
+export interface SocialMediaConnector {
+  platform: string;
+
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+
+  searchContent(
+    query: string,
+    options?: {
+      startDate?: Date;
+      endDate?: Date;
+      limit?: number;
+    }
+  ): Promise<SocialMediaPost[]>;
+
+  getAuthorDetails(authorId: string): Promise<Partial<SourceNode>>;
+
+  streamContent(keywords: string[]): AsyncGenerator<SocialMediaPost>;
+
+  validateCredentials(): Promise<boolean>;
+}

@@ -1,12 +1,12 @@
 import { Controller, Post, Put, Body, Param } from "@nestjs/common";
 import { ApiTags, ApiOperation } from "@nestjs/swagger";
-import { IngestionService } from "./ingestion.service";
+import { ContentStorageService } from "./content-storage.service";
 import { ContentNode, SourceNode } from "@/schemas/base.schema";
 
 @ApiTags("ingestion")
 @Controller("ingestion")
 export class IngestionController {
-  constructor(private readonly ingestionService: IngestionService) {}
+  constructor(private readonly storageService: ContentStorageService) {}
 
   @Post("content")
   @ApiOperation({ summary: "Ingest new content with its source" })
@@ -14,7 +14,7 @@ export class IngestionController {
     @Body("content") content: ContentNode,
     @Body("source") source: SourceNode
   ) {
-    return this.ingestionService.ingestContent(content, source);
+    return this.storageService.ingestContent(content, source);
   }
 
   @Put("content/:id")
@@ -23,7 +23,7 @@ export class IngestionController {
     @Param("id") contentId: string,
     @Body() updates: Partial<ContentNode>
   ) {
-    return this.ingestionService.updateContent(contentId, updates);
+    return this.storageService.updateContent(contentId, updates);
   }
 
   @Put("source/:id/verify")
@@ -32,6 +32,6 @@ export class IngestionController {
     @Param("id") sourceId: string,
     @Body("status") status: "verified" | "unverified" | "disputed"
   ) {
-    return this.ingestionService.verifySource(sourceId, status);
+    return this.storageService.verifySource(sourceId, status);
   }
 }

@@ -4,7 +4,7 @@ import { MemgraphService, RedisService } from "@/database";
 import { ContentNode, SourceNode } from "@/schemas/base.schema";
 
 @Injectable()
-export class IngestionService implements OnModuleInit {
+export class ContentStorageService implements OnModuleInit {
   constructor(
     @Inject("KAFKA_SERVICE") private readonly kafkaClient: ClientKafka,
     private readonly memgraphService: MemgraphService,
