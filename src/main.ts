@@ -2,9 +2,16 @@ import { NestFactory } from "@nestjs/core";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { AppModule } from "@/app.module";
 import { ValidationPipe } from "@nestjs/common";
+import { GlobalExceptionFilter } from "./filters/global-exception.filter";
+import { LoggingService } from "./services/logging.service";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+
+  const logger = app.get(LoggingService);
+  app.useLogger(logger);
 
   // Enable validation pipes globally
   app.useGlobalPipes(
@@ -14,6 +21,9 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     })
   );
+
+  // Use global exception filter
+  app.useGlobalFilters(new GlobalExceptionFilter());
 
   // Configure Swagger documentation
   const config = new DocumentBuilder()
@@ -37,7 +47,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
+  logger.info(`Application is running on: http://localhost:${port}`);
 }
 
 bootstrap();

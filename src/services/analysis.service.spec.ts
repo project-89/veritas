@@ -6,11 +6,40 @@ import {
   MockMemgraphService,
   mockContentNode,
   mockTimeFrame,
+  mockSourceNode,
 } from "../../test/test-utils";
+import {
+  ExtendedContentNode,
+  Pattern,
+  DeviationMetrics,
+} from "@/modules/analysis/analysis.types";
 
 describe("AnalysisService", () => {
   let service: AnalysisService;
   let memgraphService: MemgraphService;
+
+  const mockNodes = [
+    {
+      id: "1",
+      type: "content",
+      properties: { text: "test1", timestamp: new Date() },
+    },
+    {
+      id: "2",
+      type: "content",
+      properties: { text: "test2", timestamp: new Date() },
+    },
+  ];
+
+  const mockEdges = [
+    {
+      id: "e1",
+      type: "SHARED",
+      source: "1",
+      target: "2",
+      properties: { timestamp: new Date() },
+    },
+  ];
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -18,7 +47,9 @@ describe("AnalysisService", () => {
         AnalysisService,
         {
           provide: MemgraphService,
-          useClass: MockMemgraphService,
+          useValue: {
+            executeQuery: jest.fn(),
+          },
         },
       ],
     }).compile();
@@ -415,6 +446,77 @@ describe("AnalysisService", () => {
         await service.calculateSourceCredibility("source1");
       expect(credibilityScore).toBeGreaterThan(0);
       expect(credibilityScore).toBeLessThanOrEqual(1);
+    });
+  });
+
+  describe("detectPatternsForContent", () => {
+    it("should detect patterns related to specific content", async () => {
+      const mockContent: ExtendedContentNode = {
+        ...mockContentNode,
+        id: "content-1",
+      };
+
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce([{ nodes: mockNodes, edges: mockEdges }])
+        .mockResolvedValueOnce([{ nodes: [], edges: [] }])
+        .mockResolvedValueOnce([{ nodes: [], edges: [] }]);
+
+      const result = await service.detectPatternsForContent(mockContent);
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+      expect(memgraphService.executeQuery).toHaveBeenCalled();
+    });
+  });
+
+  describe("calculateContentDeviation", () => {
+    it("should calculate deviation metrics for content", async () => {
+      const mockContent: ExtendedContentNode = {
+        ...mockContentNode,
+        id: "content-1",
+      };
+
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce([{ metrics: { velocity: 0.5, reach: 1000 } }])
+        .mockResolvedValueOnce([
+          { metrics: { verifiedCount: 5, totalCount: 10 } },
+        ])
+        .mockResolvedValueOnce([{ sourceCredibility: 0.8 }]);
+
+      const result = await service.calculateContentDeviation(mockContent);
+
+      expect(result).toBeDefined();
+      expect(result.baselineScore).toBeDefined();
+      expect(result.deviationMagnitude).toBeDefined();
+      expect(result.propagationVelocity).toBeDefined();
+      expect(result.crossReferenceScore).toBeDefined();
+      expect(result.sourceCredibility).toBeDefined();
+      expect(result.impactScore).toBeDefined();
+    });
+  });
+
+  describe("findRelatedContent", () => {
+    it("should find content related to the input content", async () => {
+      const mockContent: ExtendedContentNode = {
+        ...mockContentNode,
+        id: "content-1",
+      };
+
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce([
+          { n: { ...mockContentNode, id: "related-1" } },
+          { n: { ...mockContentNode, id: "related-2" } },
+        ]);
+
+      const result = await service.findRelatedContent(mockContent);
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBeGreaterThan(0);
+      expect(memgraphService.executeQuery).toHaveBeenCalled();
     });
   });
 });

@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { GraphQLModule } from "@nestjs/graphql";
 import { ApolloDriver, ApolloDriverConfig } from "@nestjs/apollo";
@@ -10,6 +10,8 @@ import { SourcesModule } from "@/modules/sources/sources.module";
 import { MonitoringModule } from "@/modules/monitoring/monitoring.module";
 import { IngestionModule } from "@/modules/ingestion/ingestion.module";
 import { VisualizationModule } from "@/modules/visualization/visualization.module";
+import { LoggingService } from "./services/logging.service";
+import { LoggingMiddleware } from "./middleware/logging.middleware";
 
 @Module({
   imports: [
@@ -42,5 +44,10 @@ import { VisualizationModule } from "@/modules/visualization/visualization.modul
     MonitoringModule,
     VisualizationModule,
   ],
+  providers: [LoggingService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LoggingMiddleware).forRoutes("*");
+  }
+}
