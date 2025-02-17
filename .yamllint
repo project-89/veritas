@@ -1,0 +1,17 @@
+extends: default
+
+rules:
+  document-start: disable
+  line-length: disable
+  comments: disable
+  comments-indentation: disable
+  truthy: disable
+
+yaml-files:
+  - 'docker-compose.yml'
+  - 'docker-compose.test.yml'
+
+ignore: |
+  node_modules/
+  dist/
+  *.test.json 

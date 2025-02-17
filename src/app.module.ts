@@ -9,6 +9,7 @@ import { ContentModule } from "@/modules/content/content.module";
 import { SourcesModule } from "@/modules/sources/sources.module";
 import { MonitoringModule } from "@/modules/monitoring/monitoring.module";
 import { IngestionModule } from "@/modules/ingestion/ingestion.module";
+import { VisualizationModule } from "@/modules/visualization/visualization.module";
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { IngestionModule } from "@/modules/ingestion/ingestion.module";
     ContentModule,
     SourcesModule,
     MonitoringModule,
+    VisualizationModule,
   ],
 })
 export class AppModule {}

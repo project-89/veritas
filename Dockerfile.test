@@ -1,0 +1,28 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm install --legacy-peer-deps
+
+# Copy source code and test files
+COPY . .
+
+# Update test environment configuration
+COPY .env.test .env
+
+# Expose ports
+EXPOSE 3001
+
+# Set environment variables
+ENV NODE_ENV=test
+ENV MEMGRAPH_PORT=7687
+ENV REDIS_PORT=6379
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
+
+# Default command (can be overridden)
+CMD ["npm", "run", "test:e2e"] 

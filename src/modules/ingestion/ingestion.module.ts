@@ -9,6 +9,8 @@ import { RedditConnector } from "./services/reddit.connector";
 import { SocialMediaService } from "./services/social-media.service";
 import { ContentStorageService } from "./content-storage.service";
 import { IngestionController } from "./ingestion.controller";
+import { IngestionResolver } from "./resolvers/ingestion.resolver";
+import { ContentClassificationService } from "@/modules/content/services/content-classification.service";
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { IngestionController } from "./ingestion.controller";
     SocialMediaService,
     // Database and Event Services
     ContentStorageService,
+    IngestionResolver,
+    ContentClassificationService,
   ],
   controllers: [IngestionController],
   exports: [SocialMediaService, ContentStorageService],

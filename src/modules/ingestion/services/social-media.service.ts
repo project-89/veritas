@@ -6,7 +6,7 @@ import { SocialMediaPost } from "../interfaces/social-media-connector.interface"
 import { SourceNode } from "@/schemas/base.schema";
 import { EventEmitter } from "events";
 
-type SocialMediaPlatform = "twitter" | "facebook" | "reddit";
+export type SocialMediaPlatform = "twitter" | "facebook" | "reddit";
 
 @Injectable()
 export class SocialMediaService implements OnModuleInit, OnModuleDestroy {

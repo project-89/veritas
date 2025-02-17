@@ -1,11 +1,11 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // Base Schemas
 export const ActivityMetricsSchema = z.object({
   postFrequency: z.number(),
   engagementRate: z.number(),
   activeHours: z.array(z.number()),
-  interactionPattern: z.enum(['normal', 'automated', 'suspicious'])
+  interactionPattern: z.enum(["normal", "automated", "suspicious"]),
 });
 
 export const EngagementMetricsSchema = z.object({
@@ -13,31 +13,49 @@ export const EngagementMetricsSchema = z.object({
   shares: z.number(),
   comments: z.number(),
   reach: z.number(),
-  viralityScore: z.number()
+  viralityScore: z.number(),
 });
 
 // Node Schemas
 export const AccountNodeSchema = z.object({
   id: z.string().uuid(),
-  platform: z.enum(['twitter', 'facebook', 'reddit', 'other']),
+  platform: z.enum(["twitter", "facebook", "reddit", "other"]),
   creationDate: z.date(),
   activityMetrics: ActivityMetricsSchema,
-  credibilityScore: z.number().min(0).max(1)
+  credibilityScore: z.number().min(0).max(1),
 });
 
 export const ContentNodeSchema = z.object({
   id: z.string().uuid(),
   text: z.string(),
   timestamp: z.date(),
-  platform: z.enum(['twitter', 'facebook', 'reddit', 'other']),
-  engagementMetrics: EngagementMetricsSchema
+  platform: z.enum(["twitter", "facebook", "reddit", "other"]),
+  engagementMetrics: EngagementMetricsSchema,
+  classification: z.object({
+    categories: z.array(z.string()),
+    sentiment: z.enum(["positive", "negative", "neutral"]),
+    toxicity: z.number(),
+    subjectivity: z.number(),
+    language: z.string(),
+    topics: z.array(z.string()),
+    entities: z.array(
+      z.object({
+        text: z.string(),
+        type: z.string(),
+        confidence: z.number(),
+      })
+    ),
+  }),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 export const SourceNodeSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
+  platform: z.enum(["twitter", "facebook", "reddit", "other"]),
   credibilityScore: z.number().min(0).max(1),
-  verificationStatus: z.enum(['verified', 'unverified', 'disputed'])
+  verificationStatus: z.enum(["verified", "unverified", "disputed"]),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 // Edge Schemas
@@ -45,14 +63,14 @@ export const SharesEdgeSchema = z.object({
   from: z.string().uuid(),
   to: z.string().uuid(),
   timestamp: z.date(),
-  platform: z.enum(['twitter', 'facebook', 'reddit', 'other'])
+  platform: z.enum(["twitter", "facebook", "reddit", "other"]),
 });
 
 export const InteractsEdgeSchema = z.object({
   from: z.string().uuid(),
   to: z.string().uuid(),
-  type: z.enum(['reply', 'retweet', 'quote', 'mention']),
-  timestamp: z.date()
+  type: z.enum(["reply", "retweet", "quote", "mention"]),
+  timestamp: z.date(),
 });
 
 // Derive TypeScript types
@@ -62,4 +80,4 @@ export type AccountNode = z.infer<typeof AccountNodeSchema>;
 export type ContentNode = z.infer<typeof ContentNodeSchema>;
 export type SourceNode = z.infer<typeof SourceNodeSchema>;
 export type SharesEdge = z.infer<typeof SharesEdgeSchema>;
-export type InteractsEdge = z.infer<typeof InteractsEdgeSchema>; 
+export type InteractsEdge = z.infer<typeof InteractsEdgeSchema>;
