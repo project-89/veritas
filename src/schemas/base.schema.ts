@@ -37,6 +37,23 @@ export const ContentNodeSchema = z.object({
   sourceId: z.string().optional(),
   metadata: z.record(z.string(), z.any()).optional(),
   engagementMetrics: EngagementMetricsSchema.optional(),
+  classification: z
+    .object({
+      categories: z.array(z.string()),
+      sentiment: z.enum(["positive", "negative", "neutral"]),
+      toxicity: z.number(),
+      subjectivity: z.number(),
+      language: z.string(),
+      topics: z.array(z.string()),
+      entities: z.array(
+        z.object({
+          text: z.string(),
+          type: z.string(),
+          confidence: z.number(),
+        })
+      ),
+    })
+    .optional(),
 });
 
 export const SourceNodeSchema = z.object({

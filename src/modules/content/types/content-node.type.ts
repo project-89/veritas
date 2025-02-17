@@ -1,5 +1,6 @@
 import { Field, ObjectType, Float } from "@nestjs/graphql";
 import { ContentNode } from "@/schemas/base.schema";
+import { ContentClassification } from "../services/content-classification.service";
 
 @ObjectType("ContentNode")
 export class ContentNodeType implements ContentNode {
@@ -32,4 +33,7 @@ export class ContentNodeType implements ContentNode {
 
   @Field(() => Object, { nullable: true })
   metadata?: Record<string, any>;
+
+  @Field(() => Object, { nullable: true })
+  classification?: ContentClassification;
 }
