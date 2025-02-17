@@ -196,6 +196,10 @@ describe("ContentStorageService", () => {
       const sourceId = "test-source-id";
       const verificationStatus = "verified";
 
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce([{ s: mockSourceNode }]);
+
       const result = await service.verifySource(sourceId, verificationStatus);
 
       // Check graph database update
@@ -218,7 +222,7 @@ describe("ContentStorageService", () => {
         })
       );
 
-      expect(result).toEqual(mockContentNode);
+      expect(result).toEqual(mockSourceNode);
     });
 
     it("should handle verification errors", async () => {

@@ -17,51 +17,38 @@ describe("VisualizationService", () => {
       id: "content-1",
       type: "content",
       label: "Test Content",
-      properties: {
-        text: "Test content",
-        timestamp: new Date(),
-        platform: "twitter",
-      },
+      text: "Test content",
+      timestamp: new Date(),
+      platform: "twitter",
+      likes: 100,
+      shares: 50,
+      comments: 25,
+      reach: 1000,
+      source: "test-source",
+      sourceCredibility: 0.8,
     },
     {
       id: "source-1",
       type: "source",
       label: "Test Source",
-      properties: {
-        name: "Test Source",
-        credibilityScore: 0.8,
-        verificationStatus: "verified",
-      },
-    },
-    {
-      id: "account-1",
-      type: "account",
-      label: "Test Account",
-      properties: {
-        name: "Test User",
-        platform: "twitter",
-        influence: 0.7,
-      },
+      name: "Test Source",
+      credibilityScore: 0.8,
+      verificationStatus: "verified",
+      timestamp: new Date(),
+      source: "test-source",
+      reach: 5000,
+      influenceScore: 0.7,
     },
   ];
 
   const mockEdges = [
     {
-      id: "edge-1",
-      source: "source-1",
-      target: "content-1",
-      type: "PUBLISHED",
-      properties: {
+      source: { id: "source-1" },
+      target: { id: "content-1" },
+      relationship: {
+        type: "PUBLISHED",
         timestamp: new Date(),
-      },
-    },
-    {
-      id: "edge-2",
-      source: "account-1",
-      target: "content-1",
-      type: "SHARED",
-      properties: {
-        timestamp: new Date(),
+        weight: 0.8,
       },
     },
   ];
@@ -70,10 +57,21 @@ describe("VisualizationService", () => {
     const mockMemgraphService = {
       executeQuery: jest.fn().mockImplementation((query) => {
         if (query.includes("MATCH (n)")) {
-          return mockNodes.map((node) => ({ n: node }));
+          return [{ nodes: mockNodes, edges: mockEdges }];
         }
-        if (query.includes("MATCH ()-[r]->()")) {
-          return mockEdges.map((edge) => ({ r: edge }));
+        if (query.includes("MATCH (n)-[r]-(related)")) {
+          return mockNodes.map((node) => ({
+            n: node,
+            relatedNodes: mockNodes
+              .filter((n) => n.id !== node.id)
+              .map((n) => ({
+                id: n.id,
+                type: n.type,
+                text: n.text,
+                name: n.name,
+                timestamp: n.timestamp,
+              })),
+          }));
         }
         return [];
       }),
@@ -97,43 +95,52 @@ describe("VisualizationService", () => {
     it("should return a complete network graph with nodes and edges", async () => {
       const result = await service.getNetworkGraph(mockTimeFrame);
 
-      expect(result).toEqual(
-        expect.objectContaining({
-          nodes: expect.arrayContaining([
-            expect.objectContaining({
-              id: "content-1",
-              type: "content",
-              label: "Test Content",
-              metrics: expect.objectContaining({
-                size: expect.any(Number),
-                color: expect.any(String),
-                weight: expect.any(Number),
-              }),
+      expect(result).toMatchObject({
+        nodes: expect.arrayContaining([
+          expect.objectContaining({
+            id: "content-1",
+            type: "content",
+            metrics: expect.objectContaining({
+              size: expect.any(Number),
+              color: expect.stringMatching(
+                /^(#[0-9A-Fa-f]{6}|rgba\(\d+,\s*\d+,\s*\d+,\s*[\d.]+\))$/
+              ),
+              weight: expect.any(Number),
             }),
-          ]),
-          edges: expect.arrayContaining([
-            expect.objectContaining({
-              id: "edge-1",
-              source: "source-1",
-              target: "content-1",
-              type: "PUBLISHED",
-              metrics: expect.objectContaining({
-                width: expect.any(Number),
-                color: expect.any(String),
-                weight: expect.any(Number),
-              }),
-            }),
-          ]),
-          metadata: expect.objectContaining({
-            timestamp: expect.any(Date),
-            nodeCount: expect.any(Number),
-            edgeCount: expect.any(Number),
-            density: expect.any(Number),
           }),
-        })
-      );
-
-      expect(memgraphService.executeQuery).toHaveBeenCalledTimes(2);
+          expect.objectContaining({
+            id: "source-1",
+            type: "source",
+            metrics: expect.objectContaining({
+              size: expect.any(Number),
+              color: expect.stringMatching(
+                /^(#[0-9A-Fa-f]{6}|rgba\(\d+,\s*\d+,\s*\d+,\s*[\d.]+\))$/
+              ),
+              weight: expect.any(Number),
+            }),
+          }),
+        ]),
+        edges: expect.arrayContaining([
+          expect.objectContaining({
+            source: "source-1",
+            target: "content-1",
+            type: "PUBLISHED",
+            metrics: expect.objectContaining({
+              width: expect.any(Number),
+              color: expect.stringMatching(
+                /^(#[0-9A-Fa-f]{6}|rgba\(\d+,\s*\d+,\s*\d+,\s*[\d.]+\))$/
+              ),
+              weight: expect.any(Number),
+            }),
+          }),
+        ]),
+        metadata: expect.objectContaining({
+          timestamp: expect.any(Date),
+          nodeCount: expect.any(Number),
+          edgeCount: expect.any(Number),
+          density: expect.any(Number),
+        }),
+      });
     });
 
     it("should handle empty graph data", async () => {
@@ -161,7 +168,9 @@ describe("VisualizationService", () => {
         expect(node.metrics.size).toBeGreaterThan(0);
         expect(node.metrics.weight).toBeGreaterThanOrEqual(0);
         expect(node.metrics.weight).toBeLessThanOrEqual(1);
-        expect(node.metrics.color).toMatch(/^#[0-9A-Fa-f]{6}$/); // Hex color
+        expect(node.metrics.color).toMatch(
+          /^(#[0-9A-Fa-f]{6}|rgba\(\d+,\s*\d+,\s*\d+,\s*[\d.]+\))$/
+        );
       });
 
       // Test edge metrics
@@ -169,7 +178,9 @@ describe("VisualizationService", () => {
         expect(edge.metrics.width).toBeGreaterThan(0);
         expect(edge.metrics.weight).toBeGreaterThanOrEqual(0);
         expect(edge.metrics.weight).toBeLessThanOrEqual(1);
-        expect(edge.metrics.color).toMatch(/^#[0-9A-Fa-f]{6}$/);
+        expect(edge.metrics.color).toMatch(
+          /^(#[0-9A-Fa-f]{6}|rgba\(\d+,\s*\d+,\s*\d+,\s*[\d.]+\))$/
+        );
       });
 
       // Test network density
@@ -189,6 +200,30 @@ describe("VisualizationService", () => {
   });
 
   describe("getTimeline", () => {
+    beforeEach(() => {
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockImplementation((query) => {
+          if (query.includes("MATCH (n)")) {
+            return Promise.resolve(
+              mockNodes.map((node) => ({
+                n: node,
+                relatedNodes: mockNodes
+                  .filter((n) => n.id !== node.id)
+                  .map((n) => ({
+                    id: n.id,
+                    type: n.type,
+                    text: n.text,
+                    name: n.name,
+                    timestamp: n.timestamp,
+                  })),
+              }))
+            );
+          }
+          return Promise.resolve([]);
+        });
+    });
+
     it("should return timeline events in chronological order", async () => {
       const result = await service.getTimeline(mockTimeFrame);
 

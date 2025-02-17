@@ -106,14 +106,15 @@ export class SocialMediaService implements OnModuleInit, OnModuleDestroy {
     const streamKey = keywords.join(",");
 
     for (const connector of targetConnectors) {
-      const stream = connector.streamContent(keywords);
       (async () => {
         try {
+          const stream = connector.streamContent(keywords);
           for await (const post of stream) {
             emitter.emit("post", post);
           }
         } catch (error) {
           console.error(`Error in ${connector.platform} stream:`, error);
+          emitter.emit("error", error);
         }
       })();
     }
@@ -128,6 +129,7 @@ export class SocialMediaService implements OnModuleInit, OnModuleDestroy {
       }
     } catch (error) {
       console.error("Error in stream:", error);
+      throw error; // Re-throw the error to propagate it
     } finally {
       emitter.removeAllListeners();
     }
