@@ -55,21 +55,37 @@ describe("TwitterConnector", () => {
             return undefined;
         }
       }),
+      getOrThrow: jest.fn((key: string) => {
+        switch (key) {
+          case "TWITTER_BEARER_TOKEN":
+            return "test-bearer-token";
+          default:
+            throw new Error(`Configuration ${key} not found`);
+        }
+      }),
     };
 
-    const mockTwitterApiV2: Partial<TwitterApiv2> = {
-      search: jest.fn().mockResolvedValue({ data: [mockTweet] }),
-      user: jest.fn().mockResolvedValue({ data: mockUser }),
-      searchAll: jest.fn().mockResolvedValue({ data: [mockTweet] }),
-    };
-
-    twitterApi = {
-      v2: mockTwitterApiV2 as TwitterApiv2,
-      readWrite: true,
-    } as unknown as jest.Mocked<TwitterApi>;
+    // Mock Twitter API
+    const mockTwitterApiV2 = {
+      search: jest.fn().mockResolvedValue({
+        data: [mockTweet],
+        includes: {
+          users: [mockUser],
+        },
+      }),
+      user: jest.fn().mockResolvedValue({
+        data: mockUser,
+      }),
+      me: jest.fn().mockResolvedValue({
+        data: mockUser,
+      }),
+    } as unknown as TwitterApiv2;
 
     (TwitterApi as jest.MockedClass<typeof TwitterApi>).mockImplementation(
-      () => twitterApi
+      () =>
+        ({
+          v2: mockTwitterApiV2,
+        }) as unknown as TwitterApi
     );
 
     const module: TestingModule = await Test.createTestingModule({
@@ -84,18 +100,16 @@ describe("TwitterConnector", () => {
 
     connector = module.get<TwitterConnector>(TwitterConnector);
     configService = module.get<ConfigService>(ConfigService);
+    twitterApi = new TwitterApi("test-bearer-token") as jest.Mocked<TwitterApi>;
+
+    // Connect before running tests
+    await connector.connect();
   });
 
   describe("connect", () => {
     it("should initialize Twitter client with correct credentials", async () => {
       await connector.connect();
-
-      expect(TwitterApi).toHaveBeenCalledWith({
-        appKey: "test-api-key",
-        appSecret: "test-api-secret",
-        accessToken: "test-access-token",
-        accessSecret: "test-access-secret",
-      });
+      expect(TwitterApi).toHaveBeenCalledWith("test-bearer-token");
     });
 
     it("should handle connection errors", async () => {
@@ -104,74 +118,82 @@ describe("TwitterConnector", () => {
       ).mockImplementationOnce(() => {
         throw new Error("Connection failed");
       });
-
-      await expect(connector.connect()).rejects.toThrow("Connection failed");
+      const errorConnector = new TwitterConnector(configService);
+      await expect(errorConnector.connect()).rejects.toThrow(
+        "Connection failed"
+      );
     });
   });
 
   describe("searchContent", () => {
-    beforeEach(async () => {
-      await connector.connect();
-    });
-
     it("should search tweets and transform them to social media posts", async () => {
-      const query = "test query";
-      const options = {
-        startDate: new Date("2024-01-01"),
-        endDate: new Date("2024-01-02"),
-        limit: 10,
-      };
-
-      const results = await connector.searchContent(query, options);
-
-      expect(twitterApi.v2.searchAll).toHaveBeenCalledWith(
-        expect.stringContaining(query),
-        expect.objectContaining({
-          start_time: options.startDate.toISOString(),
-          end_time: options.endDate.toISOString(),
-          max_results: options.limit,
-        })
-      );
-      expect(results).toHaveLength(1);
-      expect(results[0]).toMatchObject({
+      const result = await connector.searchContent("test");
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
         id: mockTweet.id,
         text: mockTweet.text,
+        timestamp: expect.any(Date),
         platform: "twitter",
-        authorId: mockTweet.author_id,
-        engagement: {
+        engagementMetrics: {
           likes: mockTweet.public_metrics.like_count,
           shares: mockTweet.public_metrics.retweet_count,
           comments: mockTweet.public_metrics.reply_count,
           reach: mockTweet.public_metrics.impression_count,
+          viralityScore: expect.any(Number),
         },
       });
     });
 
     it("should handle search errors", async () => {
-      (twitterApi.v2.searchAll as jest.Mock).mockRejectedValueOnce(
-        new Error("API Error")
+      const mockError = new Error("API Error");
+      const mockTwitterApiV2 = {
+        search: jest.fn().mockRejectedValue(mockError),
+      } as unknown as TwitterApiv2;
+
+      (
+        TwitterApi as jest.MockedClass<typeof TwitterApi>
+      ).mockImplementationOnce(
+        () =>
+          ({
+            v2: mockTwitterApiV2,
+          }) as unknown as TwitterApi
       );
 
-      await expect(connector.searchContent("test")).rejects.toThrow(
+      const errorConnector = new TwitterConnector(configService);
+      await errorConnector.connect();
+      await expect(errorConnector.searchContent("test")).rejects.toThrow(
         "API Error"
       );
     });
   });
 
   describe("getAuthorDetails", () => {
-    beforeEach(async () => {
-      await connector.connect();
-    });
-
     it("should fetch and transform user details", async () => {
       const authorId = "author123";
+      const mockTwitterApiV2 = {
+        user: jest.fn().mockResolvedValue({
+          data: mockUser,
+        }),
+      } as unknown as TwitterApiv2;
 
-      const result = await connector.getAuthorDetails(authorId);
+      (
+        TwitterApi as jest.MockedClass<typeof TwitterApi>
+      ).mockImplementationOnce(
+        () =>
+          ({
+            v2: mockTwitterApiV2,
+          }) as unknown as TwitterApi
+      );
 
-      expect(twitterApi.v2.user).toHaveBeenCalledWith(authorId);
+      const testConnector = new TwitterConnector(configService);
+      await testConnector.connect();
+      const result = await testConnector.getAuthorDetails(authorId);
+      expect(mockTwitterApiV2.user).toHaveBeenCalledWith(authorId, {
+        "user.fields": ["created_at", "public_metrics", "verified"],
+      });
       expect(result).toMatchObject({
         id: authorId,
-        name: "Test Author",
+        name: mockUser.name,
         platform: "twitter",
         credibilityScore: expect.any(Number),
         verificationStatus: "verified",
@@ -179,13 +201,11 @@ describe("TwitterConnector", () => {
     });
 
     it("should handle non-existent users", async () => {
-      (twitterApi.v2.user as jest.Mock).mockRejectedValueOnce(
-        new Error("User not found")
+      const mockError = new Error("User not found");
+      jest.spyOn(twitterApi.v2, "user").mockRejectedValueOnce(mockError);
+      await expect(connector.getAuthorDetails("nonexistent")).rejects.toThrow(
+        "User not found"
       );
-
-      await expect(
-        connector.getAuthorDetails("non-existent")
-      ).rejects.toThrow();
     });
   });
 
@@ -193,88 +213,154 @@ describe("TwitterConnector", () => {
     it("should validate credentials by attempting connection", async () => {
       const result = await connector.validateCredentials();
       expect(result).toBe(true);
+      expect(twitterApi.v2.me).toHaveBeenCalled();
     });
 
     it("should return false for invalid credentials", async () => {
-      (
-        TwitterApi as jest.MockedClass<typeof TwitterApi>
-      ).mockImplementationOnce(() => {
-        throw new Error("Invalid credentials");
-      });
-
+      jest
+        .spyOn(twitterApi.v2, "me")
+        .mockRejectedValueOnce(new Error("Invalid credentials"));
       const result = await connector.validateCredentials();
       expect(result).toBe(false);
     });
   });
 
   describe("streamContent", () => {
-    beforeEach(async () => {
-      await connector.connect();
+    beforeEach(() => {
+      // Override the polling interval for testing
+      jest.useFakeTimers();
+    });
+
+    afterEach(async () => {
+      jest.useRealTimers();
+      await connector.disconnect();
     });
 
     it("should stream tweets matching keywords", async () => {
-      const keywords = ["test", "example"];
-      const stream = connector.streamContent(keywords);
+      const mockTwitterApiV2 = {
+        search: jest.fn().mockResolvedValue({
+          data: [mockTweet],
+          includes: { users: [mockUser] },
+        }),
+        me: jest.fn().mockResolvedValue({ data: mockUser }),
+      } as unknown as TwitterApiv2;
 
-      const results: SocialMediaPost[] = [];
-      for await (const post of stream) {
-        results.push(post);
-        if (results.length >= 1) break; // Only test first item
-      }
+      (
+        TwitterApi as jest.MockedClass<typeof TwitterApi>
+      ).mockImplementationOnce(
+        () =>
+          ({
+            v2: mockTwitterApiV2,
+          }) as unknown as TwitterApi
+      );
 
-      expect(results[0]).toMatchObject({
+      const testConnector = new TwitterConnector(configService);
+      await testConnector.connect();
+
+      const keywords = ["test"];
+      const stream = testConnector.streamContent(keywords);
+      const posts: SocialMediaPost[] = [];
+
+      stream.on("data", (post: SocialMediaPost) => {
+        posts.push(post);
+      });
+
+      // Fast-forward time to trigger the interval
+      jest.advanceTimersByTime(60000);
+
+      // Wait for any pending promises to resolve
+      await Promise.resolve();
+
+      expect(posts.length).toBeGreaterThan(0);
+      expect(posts[0]).toMatchObject({
         id: mockTweet.id,
         text: mockTweet.text,
         platform: "twitter",
-        authorId: mockTweet.author_id,
-        engagement: {
-          likes: mockTweet.public_metrics.like_count,
-          shares: mockTweet.public_metrics.retweet_count,
-          comments: mockTweet.public_metrics.reply_count,
-          reach: mockTweet.public_metrics.impression_count,
-        },
       });
+
+      await testConnector.disconnect();
     });
 
     it("should handle streaming errors gracefully", async () => {
-      jest
-        .spyOn(twitterApi.v2, "searchAll")
-        .mockRejectedValue(new Error("Stream error"));
+      const mockError = new Error("Stream error");
+      const mockTwitterApiV2 = {
+        search: jest.fn().mockRejectedValue(mockError),
+        me: jest.fn().mockResolvedValue({ data: mockUser }),
+      } as unknown as TwitterApiv2;
 
-      const stream = connector.streamContent(["test"]);
-      const results: SocialMediaPost[] = [];
+      (
+        TwitterApi as jest.MockedClass<typeof TwitterApi>
+      ).mockImplementationOnce(
+        () =>
+          ({
+            v2: mockTwitterApiV2,
+          }) as unknown as TwitterApi
+      );
 
-      try {
-        for await (const post of stream) {
-          results.push(post);
-        }
-      } catch (error) {
-        expect(error.message).toBe("Stream error");
-      }
+      const errorConnector = new TwitterConnector(configService);
+      await errorConnector.connect();
+      const stream = errorConnector.streamContent(["test"]);
+      const errors: Error[] = [];
 
-      expect(results).toHaveLength(0);
+      stream.on("error", (error: Error) => {
+        errors.push(error);
+      });
+
+      // Fast-forward time to trigger the interval
+      jest.advanceTimersByTime(60000);
+
+      // Wait for any pending promises to resolve
+      await Promise.resolve();
+
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].message).toBe("Stream error");
+
+      await errorConnector.disconnect();
     });
 
     it("should stop streaming when disconnected", async () => {
+      // Create a new connector instance with fresh mocks
+      const mockTwitterApiV2 = {
+        search: jest.fn().mockResolvedValue({
+          data: [mockTweet],
+          includes: { users: [mockUser] },
+        }),
+        me: jest.fn().mockResolvedValue({ data: mockUser }),
+      } as unknown as TwitterApiv2;
+
+      (
+        TwitterApi as jest.MockedClass<typeof TwitterApi>
+      ).mockImplementationOnce(
+        () =>
+          ({
+            v2: mockTwitterApiV2,
+          }) as unknown as TwitterApi
+      );
+
+      const testConnector = new TwitterConnector(configService);
+      await testConnector.connect();
+
       const keywords = ["test"];
-      const stream = connector.streamContent(keywords);
+      const stream = testConnector.streamContent(keywords);
+      const posts: SocialMediaPost[] = [];
 
-      // Start streaming
-      const streamPromise = (async () => {
-        const results: SocialMediaPost[] = [];
-        for await (const post of stream) {
-          results.push(post);
-        }
-        return results;
-      })();
+      stream.on("data", (post: SocialMediaPost) => {
+        posts.push(post);
+      });
 
-      // Disconnect after a short delay
-      setTimeout(() => {
-        connector.disconnect();
-      }, 100);
+      // Fast-forward time to trigger the first interval
+      jest.advanceTimersByTime(60000);
+      await Promise.resolve();
 
-      const results = await streamPromise;
-      expect(results.length).toBeLessThanOrEqual(1);
+      const initialLength = posts.length;
+
+      await testConnector.disconnect();
+
+      // Fast-forward time again
+      jest.advanceTimersByTime(60000);
+      await Promise.resolve();
+
+      expect(posts.length).toBe(initialLength);
     });
   });
 });

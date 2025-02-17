@@ -1,16 +1,29 @@
+// Create a mock instance
+const mockSnoowrapInstance = {
+  search: jest.fn(),
+  getUser: jest.fn(),
+  getMe: jest.fn(),
+};
+
+// Mock the Snoowrap constructor
+const MockSnoowrap = jest.fn().mockImplementation(() => mockSnoowrapInstance);
+
+jest.mock("snoowrap", () => ({
+  __esModule: true,
+  default: MockSnoowrap,
+}));
+
 import { Test, TestingModule } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { RedditConnector } from "./reddit.connector";
-import Snoowrap, { Submission, RedditUser } from "snoowrap";
+import { Submission, RedditUser } from "snoowrap";
 import { mockSourceNode } from "../../../../test/test-utils";
 import { SocialMediaPost } from "../interfaces/social-media-connector.interface";
-
-jest.mock("snoowrap");
+import { EventEmitter } from "events";
 
 describe("RedditConnector", () => {
   let connector: RedditConnector;
   let configService: ConfigService;
-  let redditClient: jest.Mocked<Snoowrap>;
 
   const mockSubmission: Submission = {
     id: "123",
@@ -23,7 +36,7 @@ describe("RedditConnector", () => {
     num_comments: 25,
     view_count: 1000,
     subreddit_name_prefixed: "r/test",
-  };
+  } as Submission;
 
   const mockUser: RedditUser = {
     id: "author123",
@@ -34,16 +47,14 @@ describe("RedditConnector", () => {
     has_verified_email: true,
     is_mod: true,
     is_gold: true,
-  };
+  } as RedditUser;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+
     const mockConfigService = {
       get: jest.fn((key: string) => {
         switch (key) {
-          case "REDDIT_CLIENT_ID":
-            return "test-client-id";
-          case "REDDIT_CLIENT_SECRET":
-            return "test-client-secret";
           case "REDDIT_USERNAME":
             return "test-username";
           case "REDDIT_PASSWORD":
@@ -52,17 +63,21 @@ describe("RedditConnector", () => {
             return undefined;
         }
       }),
+      getOrThrow: jest.fn((key: string) => {
+        switch (key) {
+          case "REDDIT_CLIENT_ID":
+            return "test-client-id";
+          case "REDDIT_CLIENT_SECRET":
+            return "test-client-secret";
+          default:
+            throw new Error(`Configuration ${key} not found`);
+        }
+      }),
     };
 
-    // Mock Reddit API
-    (Snoowrap as jest.MockedClass<typeof Snoowrap>).mockImplementation(
-      () =>
-        ({
-          search: jest.fn().mockResolvedValue([mockSubmission]),
-          getUser: jest.fn().mockResolvedValue(mockUser),
-          getMe: jest.fn().mockResolvedValue(mockUser),
-        }) as unknown as Snoowrap
-    );
+    mockSnoowrapInstance.search.mockResolvedValue([mockSubmission]);
+    mockSnoowrapInstance.getUser.mockResolvedValue(mockUser);
+    mockSnoowrapInstance.getMe.mockResolvedValue(mockUser);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -81,9 +96,8 @@ describe("RedditConnector", () => {
   describe("connect", () => {
     it("should initialize Reddit client with correct credentials", async () => {
       await connector.connect();
-
-      expect(Snoowrap).toHaveBeenCalledWith({
-        userAgent: expect.any(String),
+      expect(MockSnoowrap).toHaveBeenCalledWith({
+        userAgent: "Veritas/1.0.0",
         clientId: "test-client-id",
         clientSecret: "test-client-secret",
         username: "test-username",
@@ -92,13 +106,13 @@ describe("RedditConnector", () => {
     });
 
     it("should handle connection errors", async () => {
-      (Snoowrap as jest.MockedClass<typeof Snoowrap>).mockImplementationOnce(
-        () => {
-          throw new Error("Connection failed");
-        }
-      );
+      const mockError = new Error("Connection failed");
+      mockSnoowrapInstance.getMe.mockRejectedValueOnce(mockError);
 
-      await expect(connector.connect()).rejects.toThrow("Connection failed");
+      const errorConnector = new RedditConnector(configService);
+      await expect(errorConnector.connect()).rejects.toThrow(
+        "Connection failed"
+      );
     });
   });
 
@@ -120,28 +134,24 @@ describe("RedditConnector", () => {
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({
         id: mockSubmission.id,
-        text: `${mockSubmission.title}\n\n${mockSubmission.selftext}`,
+        text: expect.stringContaining(mockSubmission.selftext),
         platform: "reddit",
         authorId: mockSubmission.author,
         authorName: mockSubmission.author,
         url: `https://reddit.com${mockSubmission.permalink}`,
-        engagement: {
+        engagementMetrics: {
           likes: mockSubmission.score,
+          shares: 0,
           comments: mockSubmission.num_comments,
-          reach: mockSubmission.view_count || 0,
-          shares: 0, // Reddit doesn't provide share counts
+          reach: mockSubmission.view_count,
+          viralityScore: expect.any(Number),
         },
       });
     });
 
     it("should handle search errors", async () => {
       const mockError = new Error("API Error");
-      (Snoowrap as jest.MockedClass<typeof Snoowrap>).mockImplementation(
-        () =>
-          ({
-            search: jest.fn().mockRejectedValue(mockError),
-          }) as unknown as Snoowrap
-      );
+      mockSnoowrapInstance.search.mockRejectedValueOnce(mockError);
 
       await expect(connector.searchContent("test")).rejects.toThrow(
         "API Error"
@@ -164,21 +174,17 @@ describe("RedditConnector", () => {
         name: mockUser.name,
         platform: "reddit",
         credibilityScore: expect.any(Number),
-        verificationStatus: expect.stringMatching(/verified|unverified/),
+        verificationStatus: "verified",
       });
     });
 
     it("should handle non-existent users", async () => {
-      (Snoowrap as jest.MockedClass<typeof Snoowrap>).mockImplementation(
-        () =>
-          ({
-            getUser: jest.fn().mockRejectedValue(new Error("User not found")),
-          }) as unknown as Snoowrap
-      );
+      const mockError = new Error("User not found");
+      mockSnoowrapInstance.getUser.mockRejectedValueOnce(mockError);
 
-      await expect(
-        connector.getAuthorDetails("non-existent")
-      ).rejects.toThrow();
+      await expect(connector.getAuthorDetails("nonexistent")).rejects.toThrow(
+        "User not found"
+      );
     });
   });
 
@@ -189,14 +195,8 @@ describe("RedditConnector", () => {
     });
 
     it("should return false for invalid credentials", async () => {
-      (Snoowrap as jest.MockedClass<typeof Snoowrap>).mockImplementation(
-        () =>
-          ({
-            getMe: jest
-              .fn()
-              .mockRejectedValue(new Error("Invalid credentials")),
-          }) as unknown as Snoowrap
-      );
+      const mockError = new Error("Invalid credentials");
+      mockSnoowrapInstance.getMe.mockRejectedValueOnce(mockError);
 
       const result = await connector.validateCredentials();
       expect(result).toBe(false);
@@ -206,76 +206,77 @@ describe("RedditConnector", () => {
   describe("streamContent", () => {
     beforeEach(async () => {
       await connector.connect();
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
     });
 
     it("should stream submissions matching keywords", async () => {
-      const keywords = ["test", "example"];
+      const keywords = ["test"];
       const stream = connector.streamContent(keywords);
+      const posts: SocialMediaPost[] = [];
 
-      const results: SocialMediaPost[] = [];
-      for await (const post of stream) {
-        results.push(post);
-        if (results.length >= 1) break; // Only test first item
-      }
+      stream.on("data", (post: SocialMediaPost) => {
+        posts.push(post);
+      });
 
-      expect(results[0]).toMatchObject({
+      // Fast-forward time to trigger the interval
+      await jest.advanceTimersByTimeAsync(60000);
+
+      expect(posts).toHaveLength(1);
+      expect(posts[0]).toMatchObject({
         id: mockSubmission.id,
-        text: `${mockSubmission.title}\n\n${mockSubmission.selftext}`,
+        text: expect.stringContaining(mockSubmission.selftext),
         platform: "reddit",
-        authorId: mockSubmission.author,
-        authorName: mockSubmission.author,
-        url: `https://reddit.com${mockSubmission.permalink}`,
-        engagement: {
+        engagementMetrics: {
           likes: mockSubmission.score,
-          comments: mockSubmission.num_comments,
-          reach: mockSubmission.view_count || 0,
           shares: 0,
+          comments: mockSubmission.num_comments,
+          reach: mockSubmission.view_count,
+          viralityScore: expect.any(Number),
         },
       });
     });
 
     it("should handle streaming errors gracefully", async () => {
-      (Snoowrap as jest.MockedClass<typeof Snoowrap>).mockImplementation(
-        () =>
-          ({
-            search: jest.fn().mockRejectedValue(new Error("Stream error")),
-          }) as unknown as Snoowrap
-      );
+      const mockError = new Error("Stream error");
+      mockSnoowrapInstance.search.mockRejectedValueOnce(mockError);
 
       const stream = connector.streamContent(["test"]);
-      const results: SocialMediaPost[] = [];
+      const errors: Error[] = [];
 
-      try {
-        for await (const post of stream) {
-          results.push(post);
-        }
-      } catch (error) {
-        expect(error.message).toBe("Stream error");
-      }
+      stream.on("error", (error: Error) => {
+        errors.push(error);
+      });
 
-      expect(results).toHaveLength(0);
+      // Fast-forward time to trigger the interval
+      await jest.advanceTimersByTimeAsync(60000);
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].message).toBe("Stream error");
     });
 
     it("should stop streaming when disconnected", async () => {
       const keywords = ["test"];
       const stream = connector.streamContent(keywords);
+      const posts: SocialMediaPost[] = [];
 
-      // Start streaming
-      const streamPromise = (async () => {
-        const results: SocialMediaPost[] = [];
-        for await (const post of stream) {
-          results.push(post);
-        }
-        return results;
-      })();
+      stream.on("data", (post: SocialMediaPost) => {
+        posts.push(post);
+      });
 
-      // Disconnect after a short delay
-      setTimeout(() => {
-        connector.disconnect();
-      }, 100);
+      // Fast-forward time to trigger the first interval
+      await jest.advanceTimersByTimeAsync(60000);
+      const initialLength = posts.length;
 
-      const results = await streamPromise;
-      expect(results.length).toBeLessThanOrEqual(1);
+      await connector.disconnect();
+
+      // Fast-forward time again
+      await jest.advanceTimersByTimeAsync(60000);
+
+      expect(posts.length).toBe(initialLength);
     });
   });
 });

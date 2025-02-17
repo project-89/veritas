@@ -1,4 +1,5 @@
 import { ContentNode, SourceNode } from "@/schemas/base.schema";
+import { EventEmitter } from "events";
 
 export interface SocialMediaPost {
   id: string;
@@ -6,14 +7,15 @@ export interface SocialMediaPost {
   timestamp: Date;
   platform: string;
   authorId: string;
-  authorName: string;
+  authorName?: string;
   authorHandle?: string;
-  url: string;
-  engagement: {
+  url?: string;
+  engagementMetrics: {
     likes: number;
     shares: number;
     comments: number;
     reach: number;
+    viralityScore: number;
   };
 }
 
@@ -34,7 +36,7 @@ export interface SocialMediaConnector {
 
   getAuthorDetails(authorId: string): Promise<Partial<SourceNode>>;
 
-  streamContent(keywords: string[]): AsyncGenerator<SocialMediaPost>;
+  streamContent(keywords: string[]): EventEmitter;
 
   validateCredentials(): Promise<boolean>;
 }

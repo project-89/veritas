@@ -8,20 +8,54 @@ import {
 import { SourceNode } from "@/schemas/base.schema";
 import { EventEmitter } from "events";
 
+interface FacebookPost {
+  id: string;
+  message?: string;
+  created_time: string;
+  from?: {
+    id: string;
+    name: string;
+  };
+  reactions?: {
+    summary: {
+      total_count: number;
+    };
+  };
+  shares?: {
+    count: number;
+  };
+  comments?: {
+    summary: {
+      total_count: number;
+    };
+  };
+  insights?: {
+    data: Array<{
+      values: Array<{
+        value: number;
+      }>;
+    }>;
+  };
+  permalink_url?: string;
+}
+
+interface SearchOptions {
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+}
+
 @Injectable()
 export class FacebookConnector
   implements SocialMediaConnector, OnModuleInit, OnModuleDestroy
 {
   platform = "facebook" as const;
-  private api: FacebookAdsApi;
+  private api: FacebookAdsApi | null = null;
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 60000; // 1 minute
+  private interval: NodeJS.Timeout | null = null;
 
-  constructor(private configService: ConfigService) {
-    this.api = FacebookAdsApi.init(
-      this.configService.getOrThrow("FACEBOOK_ACCESS_TOKEN")
-    );
-  }
+  constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
     await this.validateCredentials();
@@ -32,39 +66,49 @@ export class FacebookConnector
   }
 
   async connect(): Promise<void> {
-    if (!this.api) {
-      this.api = FacebookAdsApi.init(
-        this.configService.getOrThrow("FACEBOOK_ACCESS_TOKEN")
+    try {
+      const accessToken = this.configService.getOrThrow<string>(
+        "FACEBOOK_ACCESS_TOKEN"
       );
+      this.api = FacebookAdsApi.init(accessToken);
+    } catch (error) {
+      console.error("Error connecting to Facebook:", error);
+      throw error;
     }
   }
 
   async disconnect(): Promise<void> {
-    // Clear all polling intervals
-    for (const [key, interval] of this.streamConnections) {
-      clearInterval(interval);
-      this.streamConnections.delete(key);
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
     }
+    this.api = null;
+    this.streamConnections.forEach((interval) => {
+      clearInterval(interval);
+    });
+    this.streamConnections.clear();
   }
 
   async searchContent(
     query: string,
-    options?: {
-      startDate?: Date;
-      endDate?: Date;
-      limit?: number;
-    }
+    options?: SearchOptions
   ): Promise<SocialMediaPost[]> {
+    if (!this.api) {
+      throw new Error("Facebook client not initialized");
+    }
+
     try {
       const pageId = this.configService.getOrThrow("FACEBOOK_PAGE_ID");
       const page = new Page(pageId);
 
       const params: {
+        q: string;
         fields: string[];
         limit: number;
         since?: number;
         until?: number;
       } = {
+        q: query,
         fields: [
           "id",
           "message",
@@ -86,8 +130,44 @@ export class FacebookConnector
         params.until = Math.floor(options.endDate.getTime() / 1000);
       }
 
-      const posts = await page.getPosts(params);
-      return this.transformPostsToSocialMediaPosts(posts.data);
+      const response = await page.getPosts(params);
+      if (!response || !response.data) {
+        return [];
+      }
+
+      return response.data.map((post: any) => {
+        const likes = post.reactions?.summary?.total_count || 0;
+        const shares = post.shares?.count || 0;
+        const comments = post.comments?.summary?.total_count || 0;
+        const reach =
+          post.insights?.data?.find(
+            (insight: any) => insight.name === "post_impressions"
+          )?.values[0]?.value || 0;
+        const viralityScore =
+          reach > 0 ? (likes + shares + comments) / reach : 0;
+
+        return {
+          id: post.id,
+          text: post.message,
+          platform: "facebook",
+          url: post.permalink_url || `https://facebook.com/${post.id}`,
+          authorId: post.from?.id,
+          createdAt: new Date(post.created_time),
+          timestamp: new Date(post.created_time),
+          engagementMetrics: {
+            likes,
+            shares,
+            comments,
+            reach,
+            viralityScore,
+          },
+          metadata: {
+            likes,
+            shares,
+            comments,
+          },
+        };
+      });
     } catch (error) {
       console.error("Error searching Facebook content:", error);
       throw error;
@@ -96,6 +176,10 @@ export class FacebookConnector
 
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
     try {
+      if (!this.api) {
+        throw new Error("Facebook client not initialized");
+      }
+
       const page = new Page(authorId);
       const pageData = await page.get([
         "id",
@@ -104,9 +188,14 @@ export class FacebookConnector
         "fan_count",
       ]);
 
+      if (!pageData || !pageData.id) {
+        throw new Error(`Page ${authorId} not found`);
+      }
+
       return {
         id: pageData.id,
         name: pageData.name,
+        platform: this.platform,
         credibilityScore: this.calculateCredibilityScore(pageData),
         verificationStatus:
           pageData.verification_status === "verified"
@@ -119,57 +208,51 @@ export class FacebookConnector
     }
   }
 
-  async *streamContent(keywords: string[]): AsyncGenerator<SocialMediaPost> {
+  streamContent(keywords: string[]): EventEmitter {
     const emitter = new EventEmitter();
-    const streamKey = keywords.join(",");
-    let lastPostTime = new Date();
+    const streamId = Math.random().toString(36).substring(7);
 
     const interval = setInterval(async () => {
       try {
+        if (!this.api) {
+          throw new Error("Facebook client not initialized");
+        }
+
         const posts = await this.searchContent(keywords.join(" OR "), {
-          startDate: lastPostTime,
+          startDate: new Date(Date.now() - 3600000), // Last hour
           limit: 100,
         });
 
         for (const post of posts) {
           if (this.postMatchesKeywords(post, keywords)) {
-            emitter.emit("post", post);
+            emitter.emit("data", post);
           }
         }
-
-        if (posts.length > 0) {
-          lastPostTime = posts[posts.length - 1].timestamp;
-        }
       } catch (error) {
-        console.error("Error in Facebook stream:", error);
         emitter.emit("error", error);
       }
     }, this.pollingInterval);
 
-    this.streamConnections.set(streamKey, interval);
+    this.streamConnections.set(streamId, interval);
+    this.interval = interval;
 
-    try {
-      while (true) {
-        const post = await new Promise<SocialMediaPost>((resolve, reject) => {
-          emitter.once("post", resolve);
-          emitter.once("error", reject);
-        });
-        yield post;
-      }
-    } catch (error) {
-      console.error("Error in stream:", error);
-    } finally {
+    // Clean up on end event
+    emitter.on("end", () => {
       clearInterval(interval);
-      this.streamConnections.delete(streamKey);
-      emitter.removeAllListeners();
-    }
+      this.streamConnections.delete(streamId);
+    });
+
+    return emitter;
   }
 
   async validateCredentials(): Promise<boolean> {
     try {
+      await this.connect();
       const pageId = this.configService.getOrThrow("FACEBOOK_PAGE_ID");
       const page = new Page(pageId);
-      await page.get(["id"]);
+
+      // Try to get basic page info to validate credentials
+      await page.get(["id", "name"]);
       return true;
     } catch (error) {
       console.error("Facebook credentials validation failed:", error);
@@ -177,7 +260,9 @@ export class FacebookConnector
     }
   }
 
-  private transformPostsToSocialMediaPosts(posts: Post[]): SocialMediaPost[] {
+  private transformPostsToSocialMediaPosts(
+    posts: FacebookPost[]
+  ): SocialMediaPost[] {
     return posts.map((post) => ({
       id: post.id,
       text: post.message || "",
@@ -186,13 +271,23 @@ export class FacebookConnector
       authorId: post.from?.id || "",
       authorName: post.from?.name || "",
       url: post.permalink_url || "",
-      engagement: {
+      engagementMetrics: {
         likes: post.reactions?.summary?.total_count || 0,
         shares: post.shares?.count || 0,
         comments: post.comments?.summary?.total_count || 0,
         reach: post.insights?.data?.[0]?.values?.[0]?.value || 0,
+        viralityScore: this.calculateViralityScore(post),
       },
     }));
+  }
+
+  private calculateViralityScore(post: FacebookPost): number {
+    const total =
+      (post.reactions?.summary?.total_count || 0) +
+      (post.shares?.count || 0) +
+      (post.comments?.summary?.total_count || 0);
+    const reach = post.insights?.data?.[0]?.values?.[0]?.value || 1;
+    return Math.min(total / reach, 1);
   }
 
   private postMatchesKeywords(

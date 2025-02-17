@@ -13,19 +13,12 @@ export class RedditConnector
   implements SocialMediaConnector, OnModuleInit, OnModuleDestroy
 {
   platform = "reddit" as const;
-  private client: Snoowrap;
+  private client: Snoowrap | null = null;
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 60000; // 1 minute
+  private interval: NodeJS.Timeout | null = null;
 
-  constructor(private configService: ConfigService) {
-    this.client = new Snoowrap({
-      userAgent: "Veritas/1.0.0",
-      clientId: this.configService.getOrThrow("REDDIT_CLIENT_ID"),
-      clientSecret: this.configService.getOrThrow("REDDIT_CLIENT_SECRET"),
-      username: this.configService.get("REDDIT_USERNAME"),
-      password: this.configService.get("REDDIT_PASSWORD"),
-    });
-  }
+  constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
     await this.validateCredentials();
@@ -36,7 +29,7 @@ export class RedditConnector
   }
 
   async connect(): Promise<void> {
-    if (!this.client) {
+    try {
       this.client = new Snoowrap({
         userAgent: "Veritas/1.0.0",
         clientId: this.configService.getOrThrow("REDDIT_CLIENT_ID"),
@@ -44,15 +37,21 @@ export class RedditConnector
         username: this.configService.get("REDDIT_USERNAME"),
         password: this.configService.get("REDDIT_PASSWORD"),
       });
+
+      // Verify connection by making a test call
+      await this.client.getMe();
+    } catch (error) {
+      this.client = null;
+      throw error;
     }
   }
 
   async disconnect(): Promise<void> {
-    // Clear all polling intervals
-    for (const [key, interval] of this.streamConnections) {
-      clearInterval(interval);
-      this.streamConnections.delete(key);
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
     }
+    this.client = null;
   }
 
   async searchContent(
@@ -64,6 +63,10 @@ export class RedditConnector
     }
   ): Promise<SocialMediaPost[]> {
     try {
+      if (!this.client) {
+        throw new Error("Reddit client not initialized");
+      }
+
       const response = await this.client.search({
         query,
         sort: "new",
@@ -80,11 +83,16 @@ export class RedditConnector
 
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
     try {
+      if (!this.client) {
+        throw new Error("Reddit client not initialized");
+      }
+
       const userData = await this.client.getUser(authorId);
 
       return {
         id: userData.id,
         name: userData.name,
+        platform: this.platform,
         credibilityScore: this.calculateCredibilityScore(userData),
         verificationStatus: userData.has_verified_email
           ? "verified"
@@ -96,54 +104,42 @@ export class RedditConnector
     }
   }
 
-  async *streamContent(keywords: string[]): AsyncGenerator<SocialMediaPost> {
+  streamContent(keywords: string[]): EventEmitter {
     const emitter = new EventEmitter();
-    const streamKey = keywords.join(",");
-    let lastPostTime = new Date();
 
-    const interval = setInterval(async () => {
+    this.interval = setInterval(async () => {
       try {
-        const posts = await this.searchContent(keywords.join(" OR "), {
-          startDate: lastPostTime,
-          limit: 100,
+        if (!this.client) {
+          throw new Error("Reddit client not initialized");
+        }
+
+        const query = keywords.join(" OR ");
+        const submissions = await this.client.search({
+          query,
+          sort: "new",
+          time: "hour",
         });
+        const posts = this.transformPostsToSocialMediaPosts(submissions);
 
         for (const post of posts) {
-          if (this.postMatchesKeywords(post, keywords)) {
-            emitter.emit("post", post);
-          }
-        }
-
-        if (posts.length > 0) {
-          lastPostTime = posts[posts.length - 1].timestamp;
+          emitter.emit("data", post);
         }
       } catch (error) {
-        console.error("Error in Reddit stream:", error);
         emitter.emit("error", error);
       }
-    }, this.pollingInterval);
+    }, 60000); // Poll every minute
 
-    this.streamConnections.set(streamKey, interval);
-
-    try {
-      while (true) {
-        const post = await new Promise<SocialMediaPost>((resolve, reject) => {
-          emitter.once("post", resolve);
-          emitter.once("error", reject);
-        });
-        yield post;
-      }
-    } catch (error) {
-      console.error("Error in stream:", error);
-    } finally {
-      clearInterval(interval);
-      this.streamConnections.delete(streamKey);
-      emitter.removeAllListeners();
-    }
+    return emitter;
   }
 
   async validateCredentials(): Promise<boolean> {
     try {
+      if (!this.client) {
+        await this.connect();
+      }
+      if (!this.client) {
+        return false;
+      }
       await this.client.getMe();
       return true;
     } catch (error) {
@@ -163,13 +159,20 @@ export class RedditConnector
       authorId: post.author,
       authorName: post.author,
       url: `https://reddit.com${post.permalink}`,
-      engagement: {
+      engagementMetrics: {
         likes: post.score || 0,
         shares: 0, // Reddit doesn't have direct share counts
         comments: post.num_comments || 0,
         reach: post.view_count || 0,
+        viralityScore: this.calculateViralityScore(post),
       },
     }));
+  }
+
+  private calculateViralityScore(post: Submission): number {
+    const total = (post.score || 0) + (post.num_comments || 0);
+    const reach = post.view_count || 1;
+    return Math.min(total / reach, 1);
   }
 
   private postMatchesKeywords(

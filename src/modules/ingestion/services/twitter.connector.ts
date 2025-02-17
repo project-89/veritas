@@ -1,6 +1,12 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { TwitterApi, TweetV2, UserV2 } from "twitter-api-v2";
+import {
+  TwitterApi,
+  TweetV2,
+  UserV2,
+  TwitterApiv2,
+  Tweetv2TimelineResult,
+} from "twitter-api-v2";
 import {
   SocialMediaConnector,
   SocialMediaPost,
@@ -22,15 +28,13 @@ export class TwitterConnector
   implements SocialMediaConnector, OnModuleInit, OnModuleDestroy
 {
   platform = "twitter" as const;
-  private client: TwitterApi;
+  private client: TwitterApi | null;
+  private v2Client: TwitterApiv2 | null;
   private streamConnections: Map<string, any> = new Map();
   private pollingInterval = 1000; // Assuming a default polling interval
+  private interval: NodeJS.Timeout | null = null;
 
-  constructor(private configService: ConfigService) {
-    this.client = new TwitterApi(
-      this.configService.getOrThrow("TWITTER_BEARER_TOKEN")
-    );
-  }
+  constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
     await this.validateCredentials();
@@ -41,19 +45,24 @@ export class TwitterConnector
   }
 
   async connect(): Promise<void> {
-    if (!this.client) {
+    try {
       this.client = new TwitterApi(
         this.configService.getOrThrow("TWITTER_BEARER_TOKEN")
       );
+      this.v2Client = this.client.v2;
+    } catch (error) {
+      console.error("Error connecting to Twitter:", error);
+      throw error;
     }
   }
 
   async disconnect(): Promise<void> {
-    // Close all active streams
-    for (const [key, stream] of this.streamConnections) {
-      await stream.close();
-      this.streamConnections.delete(key);
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
     }
+    this.client = null;
+    this.v2Client = null;
   }
 
   async searchContent(
@@ -65,8 +74,10 @@ export class TwitterConnector
     }
   ): Promise<SocialMediaPost[]> {
     try {
-      const response = await this.client.v2.search({
-        query,
+      if (!this.v2Client) {
+        throw new Error("Twitter client not initialized");
+      }
+      const response = await this.v2Client.search(query, {
         start_time: options?.startDate?.toISOString(),
         end_time: options?.endDate?.toISOString(),
         max_results: options?.limit || 100,
@@ -75,7 +86,12 @@ export class TwitterConnector
         expansions: ["author_id"],
       });
 
-      return this.transformTweetsToSocialMediaPosts(response.tweets);
+      const tweets = response.data;
+      if (!tweets || !Array.isArray(tweets)) {
+        return [];
+      }
+
+      return this.transformTweetsToSocialMediaPosts(tweets, response.includes);
     } catch (error) {
       console.error("Error searching Twitter content:", error);
       throw error;
@@ -84,7 +100,10 @@ export class TwitterConnector
 
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
     try {
-      const response = await this.client.v2.user(authorId, {
+      if (!this.v2Client) {
+        throw new Error("Twitter client not initialized");
+      }
+      const response = await this.v2Client.user(authorId, {
         "user.fields": ["created_at", "public_metrics", "verified"],
       });
 
@@ -106,55 +125,46 @@ export class TwitterConnector
     }
   }
 
-  async *streamContent(keywords: string[]): AsyncGenerator<SocialMediaPost> {
+  streamContent(keywords: string[]): EventEmitter {
     const emitter = new EventEmitter();
-    const streamKey = keywords.join(",");
-    let lastTweetTime = new Date();
 
-    const interval = setInterval(async () => {
+    this.interval = setInterval(async () => {
       try {
-        const tweets = await this.searchContent(keywords.join(" OR "), {
-          startDate: lastTweetTime,
-          limit: 100,
+        if (!this.v2Client) {
+          throw new Error("Twitter client not initialized");
+        }
+
+        const searchResult = await this.v2Client.search({
+          query: keywords.join(" OR "),
+          "tweet.fields": ["author_id", "created_at", "public_metrics"],
+          "user.fields": ["name", "username"],
+          expansions: ["author_id"],
         });
 
-        for (const tweet of tweets) {
-          if (this.tweetMatchesKeywords(tweet, keywords)) {
-            emitter.emit("tweet", tweet);
+        const tweets = searchResult.data;
+        if (tweets && Array.isArray(tweets)) {
+          const posts = this.transformTweetsToSocialMediaPosts(
+            tweets,
+            searchResult.includes
+          );
+          for (const post of posts) {
+            emitter.emit("data", post);
           }
         }
-
-        if (tweets.length > 0) {
-          lastTweetTime = tweets[tweets.length - 1].timestamp;
-        }
       } catch (error) {
-        console.error("Error in Twitter stream:", error);
         emitter.emit("error", error);
       }
-    }, this.pollingInterval);
+    }, 60000); // Poll every minute
 
-    this.streamConnections.set(streamKey, interval);
-
-    try {
-      while (true) {
-        const tweet = await new Promise<SocialMediaPost>((resolve, reject) => {
-          emitter.once("tweet", resolve);
-          emitter.once("error", reject);
-        });
-        yield tweet;
-      }
-    } catch (error) {
-      console.error("Error in stream:", error);
-    } finally {
-      clearInterval(interval);
-      this.streamConnections.delete(streamKey);
-      emitter.removeAllListeners();
-    }
+    return emitter;
   }
 
   async validateCredentials(): Promise<boolean> {
     try {
-      await this.client.v2.me();
+      if (!this.v2Client) {
+        throw new Error("Twitter client not initialized");
+      }
+      await this.v2Client.me();
       return true;
     } catch (error) {
       console.error("Twitter credentials validation failed:", error);
@@ -163,42 +173,69 @@ export class TwitterConnector
   }
 
   private transformTweetsToSocialMediaPosts(
-    tweets: TweetV2[]
+    tweets: TweetV2[],
+    includes?: { users?: UserV2[] }
   ): SocialMediaPost[] {
-    if (!tweets) return [];
-    return tweets.map((tweet) =>
-      this.transformTweetToSocialMediaPost(tweet as TweetWithIncludes)
-    );
+    if (!tweets || !Array.isArray(tweets)) return [];
+
+    return tweets.map((tweet) => {
+      const author = includes?.users?.find(
+        (user: UserV2) => user.id === tweet.author_id
+      );
+
+      return this.transformTweetToSocialMediaPost({
+        ...tweet,
+        includes: {
+          users: author
+            ? [{ name: author.name, username: author.username }]
+            : [],
+        },
+      });
+    });
   }
 
   private transformTweetToSocialMediaPost(
     tweet: TweetWithIncludes
   ): SocialMediaPost {
-    const author = tweet.includes?.users?.[0];
+    if (!tweet.created_at) {
+      throw new Error("Tweet missing required field: created_at");
+    }
+    if (!tweet.author_id) {
+      throw new Error("Tweet missing required field: author_id");
+    }
+
     return {
       id: tweet.id,
       text: tweet.text,
-      timestamp: tweet.created_at ? new Date(tweet.created_at) : new Date(),
+      timestamp: new Date(tweet.created_at),
       platform: this.platform,
-      authorId: tweet.author_id || "",
-      authorName: author?.name || author?.username || "",
-      url: `https://twitter.com/i/web/status/${tweet.id}`,
-      engagement: {
+      authorId: tweet.author_id,
+      engagementMetrics: {
         likes: tweet.public_metrics?.like_count || 0,
         shares: tweet.public_metrics?.retweet_count || 0,
         comments: tweet.public_metrics?.reply_count || 0,
         reach: tweet.public_metrics?.impression_count || 0,
+        viralityScore: this.calculateViralityScore(tweet.public_metrics),
       },
     };
   }
 
-  private tweetMatchesKeywords(
+  private calculateViralityScore(metrics: any): number {
+    if (!metrics) return 0;
+    const total =
+      metrics.like_count +
+      metrics.retweet_count +
+      metrics.reply_count +
+      metrics.quote_count;
+    const reach = metrics.impression_count || 1;
+    return Math.min(total / reach, 1);
+  }
+
+  private postMatchesKeywords(
     post: SocialMediaPost,
     keywords: string[]
   ): boolean {
-    const tweetText = post.text.toLowerCase();
-    return keywords.some((keyword) =>
-      tweetText.includes(keyword.toLowerCase())
-    );
+    const text = post.text.toLowerCase();
+    return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
   }
 }
