@@ -270,4 +270,151 @@ describe("AnalysisService", () => {
       expect(windows[1].end).toEqual(timeframe.end);
     });
   });
+
+  describe("calculateSourceCredibility", () => {
+    const mockContent = {
+      id: "content1",
+      text: "Test content with sufficient length to test content scoring",
+      classification: {
+        toxicity: 0.2,
+        sentiment: "neutral",
+      },
+      metadata: {
+        links: ["https://example.com"],
+        media: ["image.jpg"],
+        verified: true,
+      },
+    };
+
+    const mockInteractions = [
+      { type: "LIKED", userId: "user1" },
+      { type: "SHARED", userId: "user2" },
+      { type: "COMMENTED", userId: "user3" },
+      { type: "LIKED", userId: "user4" },
+    ];
+
+    it("should calculate credibility score for a source with content and interactions", async () => {
+      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([
+        {
+          c: mockContent,
+          interactions: mockInteractions,
+          uniqueUsers: 4,
+        },
+      ]);
+
+      const credibilityScore =
+        await service.calculateSourceCredibility("source1");
+
+      expect(credibilityScore).toBeGreaterThan(0);
+      expect(credibilityScore).toBeLessThanOrEqual(1);
+      expect(memgraphService.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining("MATCH (s:Source {id: $sourceId})"),
+        { sourceId: "source1" }
+      );
+    });
+
+    it("should handle source with no content", async () => {
+      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([]);
+
+      await expect(
+        service.calculateSourceCredibility("source1")
+      ).rejects.toThrow("Source not found or has no content");
+    });
+
+    it("should handle content with no interactions", async () => {
+      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([
+        {
+          c: mockContent,
+          interactions: [],
+          uniqueUsers: 0,
+        },
+      ]);
+
+      const credibilityScore =
+        await service.calculateSourceCredibility("source1");
+      expect(credibilityScore).toBeGreaterThan(0); // Should still have score from content and verification
+    });
+
+    it("should calculate higher score for verified content with quality interactions", async () => {
+      const highQualityContent = {
+        ...mockContent,
+        classification: {
+          toxicity: 0.1,
+          sentiment: "neutral",
+        },
+      };
+
+      const qualityInteractions = Array(10).fill({
+        type: "SHARED",
+        userId: "unique",
+      });
+
+      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([
+        {
+          c: highQualityContent,
+          interactions: qualityInteractions,
+          uniqueUsers: 8,
+        },
+      ]);
+
+      const highScore = await service.calculateSourceCredibility("source1");
+
+      // Reset mock for low quality content
+      const lowQualityContent = {
+        ...mockContent,
+        classification: {
+          toxicity: 0.8,
+          sentiment: "negative",
+        },
+        metadata: {
+          links: [],
+          media: [],
+          verified: false,
+        },
+      };
+
+      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([
+        {
+          c: lowQualityContent,
+          interactions: [],
+          uniqueUsers: 0,
+        },
+      ]);
+
+      const lowScore = await service.calculateSourceCredibility("source2");
+
+      expect(highScore).toBeGreaterThan(lowScore);
+    });
+
+    it("should handle multiple content items from the same source", async () => {
+      const multipleContent = [
+        {
+          c: mockContent,
+          interactions: mockInteractions,
+          uniqueUsers: 4,
+        },
+        {
+          c: {
+            ...mockContent,
+            id: "content2",
+            classification: {
+              toxicity: 0.3,
+              sentiment: "positive",
+            },
+          },
+          interactions: mockInteractions.slice(0, 2),
+          uniqueUsers: 2,
+        },
+      ];
+
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce(multipleContent);
+
+      const credibilityScore =
+        await service.calculateSourceCredibility("source1");
+      expect(credibilityScore).toBeGreaterThan(0);
+      expect(credibilityScore).toBeLessThanOrEqual(1);
+    });
+  });
 });

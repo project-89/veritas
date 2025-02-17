@@ -80,13 +80,16 @@ describe("IngestionResolver", () => {
         metadata: { verified: true },
       };
 
-      const expectedContentNode: ContentNode = {
+      const contentNode: ContentNode = {
         id: expect.any(String),
         text: contentInput.text,
         timestamp: expect.any(Date),
         platform: contentInput.platform,
+        toxicity: mockClassification.toxicity,
+        sentiment: mockClassification.sentiment,
+        categories: mockClassification.categories,
+        topics: mockClassification.topics,
         engagementMetrics: contentInput.engagementMetrics,
-        classification: mockClassification,
         metadata: contentInput.metadata,
       };
 
@@ -100,18 +103,18 @@ describe("IngestionResolver", () => {
       };
 
       storageService.ingestContent.mockResolvedValue({
-        contentNode: expectedContentNode,
+        contentNode: contentNode,
         sourceNode: expectedSourceNode,
       });
 
       const result = await resolver.ingestContent(contentInput, sourceInput);
 
-      expect(result).toEqual(expectedContentNode);
+      expect(result).toEqual(contentNode);
       expect(classificationService.classifyContent).toHaveBeenCalledWith(
         contentInput.text
       );
       expect(storageService.ingestContent).toHaveBeenCalledWith(
-        expect.objectContaining(expectedContentNode),
+        expect.objectContaining(contentNode),
         expect.objectContaining(expectedSourceNode)
       );
     });

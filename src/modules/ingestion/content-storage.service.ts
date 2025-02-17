@@ -102,7 +102,7 @@ export class ContentStorageService implements OnModuleInit {
 
   async verifySource(
     sourceId: string,
-    verificationStatus: "verified" | "unverified" | "disputed"
+    verificationStatus: "verified" | "unverified" | "suspicious"
   ) {
     try {
       // Update graph database

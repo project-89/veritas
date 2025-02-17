@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { MemgraphService } from "@/database";
 import { z } from "zod";
 import { ContentNode, SourceNode } from "@/schemas/base.schema";
+import { ExtendedContentNode } from "@/modules/analysis/analysis.types";
 
 const DeviationMetricsSchema = z.object({
   baselineScore: z.number().min(0).max(1),
@@ -42,6 +43,13 @@ interface CrossReferenceMetrics {
   contradictionCount: number;
   supportingEvidenceCount: number;
   totalReferences: number;
+}
+
+interface PatternBase {
+  id: string;
+  confidence: number;
+  nodes: string[];
+  edges: string[];
 }
 
 @Injectable()
@@ -122,21 +130,21 @@ export class AnalysisService {
     // Detect coordinated patterns
     const coordinatedPatterns = await this.detectCoordinatedPatterns(
       interactions,
-      timeframe
+      interactions
     );
     patterns.push(...coordinatedPatterns);
 
     // Detect automated patterns
     const automatedPatterns = await this.detectAutomatedPatterns(
       interactions,
-      timeframe
+      interactions
     );
     patterns.push(...automatedPatterns);
 
     // Detect organic patterns
     const organicPatterns = await this.detectOrganicPatterns(
       interactions,
-      timeframe
+      interactions
     );
     patterns.push(...organicPatterns);
 
@@ -216,30 +224,32 @@ export class AnalysisService {
   }
 
   private async detectCoordinatedPatterns(
-    interactions: any[],
-    timeframe: TimeFrame
+    nodes: any[],
+    edges: any[]
   ): Promise<Pattern[]> {
     const patterns: Pattern[] = [];
-    const timeWindows = this.createTimeWindows(timeframe, 3600000); // 1-hour windows
+    const timeframe = {
+      start: new Date(
+        Math.min(...edges.map((e) => new Date(e.timestamp).getTime()))
+      ),
+      end: new Date(
+        Math.max(...edges.map((e) => new Date(e.timestamp).getTime()))
+      ),
+    };
 
-    for (const window of timeWindows) {
-      const windowInteractions = interactions.filter(
-        (i) => i.timestamp >= window.start && i.timestamp <= window.end
-      );
+    const interactions = this.groupInteractions(edges);
+    const clusters = this.findInteractionClusters(interactions);
 
-      const clusters = this.findInteractionClusters(windowInteractions);
-
-      for (const cluster of clusters) {
-        if (this.isCoordinatedPattern(cluster)) {
-          patterns.push({
-            id: crypto.randomUUID(),
-            type: "coordinated",
-            confidence: this.calculatePatternConfidence(cluster),
-            nodes: cluster.nodes,
-            edges: cluster.edges,
-            timeframe: window,
-          });
-        }
+    for (const cluster of clusters) {
+      if (this.isCoordinatedPattern(cluster)) {
+        patterns.push({
+          id: crypto.randomUUID(),
+          type: "coordinated",
+          confidence: this.calculatePatternConfidence(cluster),
+          nodes: cluster.nodes,
+          edges: cluster.edges,
+          timeframe,
+        });
       }
     }
 
@@ -247,14 +257,22 @@ export class AnalysisService {
   }
 
   private async detectAutomatedPatterns(
-    interactions: any[],
-    timeframe: TimeFrame
+    nodes: any[],
+    edges: any[]
   ): Promise<Pattern[]> {
     const patterns: Pattern[] = [];
-    const accounts = this.extractUniqueAccounts(interactions);
+    const accounts = this.extractUniqueAccounts(edges);
+    const timeframe = {
+      start: new Date(
+        Math.min(...edges.map((e) => new Date(e.timestamp).getTime()))
+      ),
+      end: new Date(
+        Math.max(...edges.map((e) => new Date(e.timestamp).getTime()))
+      ),
+    };
 
     for (const account of accounts) {
-      const accountInteractions = interactions.filter(
+      const accountInteractions = edges.filter(
         (i) => i.source === account || i.target === account
       );
 
@@ -274,11 +292,20 @@ export class AnalysisService {
   }
 
   private async detectOrganicPatterns(
-    interactions: any[],
-    timeframe: TimeFrame
+    nodes: any[],
+    edges: any[]
   ): Promise<Pattern[]> {
     const patterns: Pattern[] = [];
-    const contentGroups = this.groupInteractionsByContent(interactions);
+    const timeframe = {
+      start: new Date(
+        Math.min(...edges.map((e) => new Date(e.timestamp).getTime()))
+      ),
+      end: new Date(
+        Math.max(...edges.map((e) => new Date(e.timestamp).getTime()))
+      ),
+    };
+
+    const contentGroups = this.groupInteractionsByContent(edges);
 
     for (const [contentId, group] of contentGroups.entries()) {
       if (this.isOrganicSpread(group)) {
@@ -354,33 +381,6 @@ export class AnalysisService {
 
     return (
       verifiedRatio * 0.4 + (1 - contradictionRatio) * 0.4 + supportRatio * 0.2
-    );
-  }
-
-  private calculateImpactScore(
-    deviationMagnitude: number,
-    propagationMetrics: PropagationMetrics,
-    temporalPatterns: Map<string, number>
-  ): number {
-    const reachFactor = Math.min(1, propagationMetrics.reach / 1000000);
-    const engagementFactor = Math.min(1, propagationMetrics.engagement / 10000);
-    const spreadFactor = Math.min(
-      1,
-      propagationMetrics.crossPlatformSpread / 5
-    );
-
-    const temporalImpact =
-      Array.from(temporalPatterns.values()).reduce(
-        (sum, value) => sum + value,
-        0
-      ) / temporalPatterns.size;
-
-    return (
-      deviationMagnitude * 0.3 +
-      reachFactor * 0.25 +
-      engagementFactor * 0.25 +
-      spreadFactor * 0.1 +
-      temporalImpact * 0.1
     );
   }
 
@@ -573,12 +573,110 @@ export class AnalysisService {
     return Array.from(nodes);
   }
 
-  private async calculateSourceCredibility(sourceId: string): Promise<number> {
-    // TODO: Implement source credibility calculation
-    // 1. Historical accuracy analysis
-    // 2. Expert verification status
-    // 3. Cross-reference frequency
-    return 0.9;
+  async calculateSourceCredibility(sourceId: string): Promise<number> {
+    // Get source content and interactions
+    const query = `
+      MATCH (s:Source {id: $sourceId})-[:PUBLISHED]->(c:Content)
+      OPTIONAL MATCH (c)<-[i:INTERACTED]-(u:User)
+      RETURN c, collect(i) as interactions, count(DISTINCT u) as uniqueUsers
+    `;
+
+    const results = await this.memgraphService.executeQuery(query, {
+      sourceId,
+    });
+
+    if (!results.length) {
+      throw new Error("Source not found or has no content");
+    }
+
+    let totalScore = 0;
+    let contentCount = 0;
+
+    for (const result of results) {
+      const content = result.c;
+      const interactions = result.interactions;
+      const uniqueUsers = result.uniqueUsers;
+
+      // Calculate content-specific metrics
+      const contentScore = this.calculateContentScore(content);
+      const interactionScore = this.calculateInteractionScore(
+        interactions,
+        uniqueUsers
+      );
+      const verificationScore = this.calculateVerificationScore(content);
+
+      // Weighted average of different factors
+      const weightedScore =
+        contentScore * 0.4 + // Content quality
+        interactionScore * 0.3 + // User engagement
+        verificationScore * 0.3; // Verification status
+
+      totalScore += weightedScore;
+      contentCount++;
+    }
+
+    // Normalize final score between 0 and 1
+    return contentCount > 0
+      ? Math.min(Math.max(totalScore / contentCount, 0), 1)
+      : 0;
+  }
+
+  private calculateContentScore(content: any): number {
+    const factors = {
+      classification: content.classification?.toxicity || 0,
+      sentiment: this.getSentimentScore(content.classification?.sentiment),
+      length: Math.min(content.text.length / 1000, 1), // Normalize length, cap at 1000 chars
+    };
+
+    return (
+      (1 - factors.classification) * 0.4 + // Lower toxicity is better
+      factors.sentiment * 0.3 + // Balanced sentiment is better
+      factors.length * 0.3 // Longer content (up to a point) is better
+    );
+  }
+
+  private calculateInteractionScore(
+    interactions: any[],
+    uniqueUsers: number
+  ): number {
+    if (!interactions.length) return 0;
+
+    const metrics = {
+      engagement: interactions.length / uniqueUsers, // Interactions per unique user
+      diversity: uniqueUsers / interactions.length, // Ratio of unique users to total interactions
+      quality:
+        interactions.filter((i) => i.type === "LIKED" || i.type === "SHARED")
+          .length / interactions.length,
+    };
+
+    return (
+      (Math.min(metrics.engagement, 5) * 0.4 + // Cap engagement at 5 interactions per user
+        metrics.diversity * 0.3 + // Higher diversity is better
+        metrics.quality * 0.3) / // Quality interactions weighted more
+      1.7
+    ); // Normalize to 0-1 range
+  }
+
+  private calculateVerificationScore(content: any): number {
+    const factors = {
+      hasLinks: content.metadata?.links?.length > 0 ? 0.3 : 0,
+      hasMedia: content.metadata?.media?.length > 0 ? 0.2 : 0,
+      isVerified: content.metadata?.verified ? 0.5 : 0,
+    };
+
+    return factors.hasLinks + factors.hasMedia + factors.isVerified;
+  }
+
+  private getSentimentScore(sentiment: string): number {
+    switch (sentiment) {
+      case "neutral":
+        return 1.0; // Neutral content is considered most credible
+      case "positive":
+      case "negative":
+        return 0.7; // Strong sentiment in either direction reduces credibility
+      default:
+        return 0.5; // Unknown sentiment gets a middle score
+    }
   }
 
   private async analyzeTemporalPatterns(
@@ -717,5 +815,226 @@ export class AnalysisService {
     }
 
     return intervals;
+  }
+
+  async getContentById(contentId: string): Promise<ExtendedContentNode | null> {
+    const query = `
+      MATCH (c:Content {id: $contentId})
+      RETURN c
+    `;
+
+    const result = await this.memgraphService.executeQuery(query, {
+      contentId,
+    });
+    return result.length > 0 ? result[0].c : null;
+  }
+
+  async detectPatternsForContent(
+    content: ExtendedContentNode
+  ): Promise<Pattern[]> {
+    const timeframe = {
+      start: new Date(content.timestamp.getTime() - 7 * 24 * 60 * 60 * 1000),
+      end: new Date(content.timestamp.getTime() + 7 * 24 * 60 * 60 * 1000),
+    };
+
+    const query = `
+      MATCH (c:Content {id: $contentId})
+      MATCH (c)-[r]-(n)
+      WHERE r.timestamp >= $startTime AND r.timestamp <= $endTime
+      WITH collect(DISTINCT n) as nodes, collect(DISTINCT r) as edges
+      RETURN nodes, edges
+    `;
+
+    const result = await this.memgraphService.executeQuery(query, {
+      contentId: content.id,
+      startTime: timeframe.start,
+      endTime: timeframe.end,
+    });
+
+    if (!result.length) return [];
+
+    const { nodes, edges } = result[0];
+    const patterns: Pattern[] = [];
+
+    // Detect all pattern types
+    const detectedPatterns = [
+      ...(await this.detectCoordinatedPatterns(nodes, edges)),
+      ...(await this.detectAutomatedPatterns(nodes, edges)),
+    ];
+
+    // Add detected patterns
+    patterns.push(...detectedPatterns);
+
+    // Add organic pattern if no other patterns detected
+    if (patterns.length === 0) {
+      patterns.push({
+        id: `pattern-${content.id}-organic`,
+        type: "organic",
+        confidence: 0.9,
+        nodes: nodes.map((n: any) => n.id),
+        edges: edges.map((e: any) => e.id),
+        timeframe,
+      });
+    }
+
+    return patterns;
+  }
+
+  async calculateContentDeviation(
+    content: ExtendedContentNode
+  ): Promise<DeviationMetrics> {
+    // Calculate factual accuracy based on source credibility and content classification
+    const sourceCredibility = await this.calculateSourceCredibility(
+      content.sourceId || ""
+    );
+    const baselineScore =
+      (1 - (content.toxicity || 0)) * 0.3 + sourceCredibility * 0.7;
+
+    // Calculate narrative consistency by comparing with related content
+    const relatedContent = await this.findRelatedContent(content);
+    const crossReferenceScore = await this.calculateNarrativeConsistency(
+      content,
+      relatedContent
+    );
+
+    // Calculate propagation metrics
+    const propagationMetrics = await this.analyzePropagation(content);
+    const temporalPatterns = await this.analyzeTemporalPatterns({
+      start: new Date(content.timestamp),
+      end: new Date(),
+    });
+
+    // Calculate overall deviation
+    const deviationMagnitude =
+      (1 - baselineScore) * 0.4 +
+      (1 - sourceCredibility) * 0.3 +
+      (1 - crossReferenceScore) * 0.3;
+
+    const impactScore = this.calculateImpactScore(
+      deviationMagnitude,
+      propagationMetrics,
+      temporalPatterns
+    );
+    const propagationVelocity =
+      await this.calculatePropagationVelocity(content);
+
+    return {
+      baselineScore,
+      deviationMagnitude,
+      propagationVelocity,
+      crossReferenceScore,
+      sourceCredibility,
+      impactScore,
+    };
+  }
+
+  private calculateImpactScore(
+    deviationMagnitude: number,
+    propagationMetrics: PropagationMetrics,
+    temporalPatterns?: Map<string, number>
+  ): number {
+    const propagationScore =
+      propagationMetrics.velocity * 0.6 + propagationMetrics.reach * 0.4;
+    return deviationMagnitude * 0.4 + propagationScore * 0.6;
+  }
+
+  private async calculatePropagationVelocity(
+    content: ExtendedContentNode
+  ): Promise<number> {
+    const query = `
+      MATCH (c:Content {id: $contentId})<-[r:SHARES|REFERENCES]-()
+      WITH r.timestamp as timestamp
+      ORDER BY timestamp
+      RETURN collect(timestamp) as timestamps
+    `;
+
+    const result = await this.memgraphService.executeQuery(query, {
+      contentId: content.id,
+    });
+    if (!result.length || !result[0].timestamps.length) return 0;
+
+    const timestamps = result[0].timestamps;
+    const timeSpan = Math.max(
+      (new Date(timestamps[timestamps.length - 1]).getTime() -
+        new Date(timestamps[0]).getTime()) /
+        (1000 * 60 * 60),
+      1
+    ); // Time span in hours, minimum 1 hour
+    return Math.min(timestamps.length / timeSpan, 1); // Normalize to 0-1 range
+  }
+
+  async findRelatedContent(
+    content: ExtendedContentNode
+  ): Promise<ExtendedContentNode[]> {
+    const query = `
+      MATCH (c:Content {id: $contentId})
+      MATCH (c)-[:SHARES_TOPIC|REFERENCES]-(related:Content)
+      WHERE related.id <> $contentId
+      RETURN DISTINCT related
+      LIMIT 10
+    `;
+
+    const results = await this.memgraphService.executeQuery(query, {
+      contentId: content.id,
+    });
+    return results.map((r) => r.related);
+  }
+
+  private async calculateNarrativeConsistency(
+    content: ExtendedContentNode,
+    relatedContent: ExtendedContentNode[]
+  ): Promise<number> {
+    if (!relatedContent.length) return 1;
+
+    const consistencyScores = relatedContent.map((related) => {
+      const topicOverlap = this.calculateTopicOverlap(
+        content.topics,
+        related.topics
+      );
+      const sentimentAlignment = this.calculateSentimentAlignment(
+        content.sentiment,
+        related.sentiment
+      );
+      return topicOverlap * 0.7 + sentimentAlignment * 0.3;
+    });
+
+    return (
+      consistencyScores.reduce((sum, score) => sum + score, 0) /
+      consistencyScores.length
+    );
+  }
+
+  private calculateTopicOverlap(
+    topics1: string[] = [],
+    topics2: string[] = []
+  ): number {
+    if (!topics1.length || !topics2.length) return 0;
+    const intersection = topics1.filter((t) => topics2.includes(t));
+    return intersection.length / Math.max(topics1.length, topics2.length);
+  }
+
+  private calculateSentimentAlignment(
+    sentiment1: string = "neutral",
+    sentiment2: string = "neutral"
+  ): number {
+    if (sentiment1 === sentiment2) return 1;
+    if (
+      (sentiment1 === "positive" && sentiment2 === "negative") ||
+      (sentiment1 === "negative" && sentiment2 === "positive")
+    )
+      return 0;
+    return 0.5; // One neutral, one polarized
+  }
+
+  private identifyDeviatingFactors(
+    factualAccuracy: number,
+    sourceReliability: number,
+    narrativeConsistency: number
+  ): string[] {
+    const factors: string[] = [];
+    if (factualAccuracy < 0.5) factors.push("Low factual accuracy");
+    if (sourceReliability < 0.5) factors.push("Unreliable source");
+    if (narrativeConsistency < 0.5) factors.push("Inconsistent narrative");
+    return factors;
   }
 }

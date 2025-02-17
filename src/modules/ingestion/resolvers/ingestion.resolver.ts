@@ -17,20 +17,32 @@ export class IngestionResolver {
     private readonly classificationService: ContentClassificationService
   ) {}
 
+  private mapVerificationStatus(
+    status: VerificationStatus
+  ): "verified" | "unverified" | "suspicious" {
+    return status.toLowerCase() as "verified" | "unverified" | "suspicious";
+  }
+
   @Mutation(() => ContentType)
   async ingestContent(
     @Args("content") content: ContentIngestionInput,
     @Args("source") source: SourceIngestionInput
   ): Promise<ContentNode> {
+    // Get classification results
+    const classification = await this.classificationService.classifyContent(
+      content.text
+    );
+
     const contentNode: ContentNode = {
       id: crypto.randomUUID(),
       text: content.text,
       timestamp: new Date(),
       platform: content.platform,
+      toxicity: classification.toxicity,
+      sentiment: classification.sentiment,
+      categories: classification.categories,
+      topics: classification.topics,
       engagementMetrics: content.engagementMetrics,
-      classification: await this.classificationService.classifyContent(
-        content.text
-      ),
       metadata: content.metadata,
     };
 
@@ -39,7 +51,7 @@ export class IngestionResolver {
       name: source.name,
       platform: source.platform,
       credibilityScore: source.credibilityScore,
-      verificationStatus: source.verificationStatus,
+      verificationStatus: this.mapVerificationStatus(source.verificationStatus),
       metadata: source.metadata,
     };
 
@@ -55,6 +67,9 @@ export class IngestionResolver {
     @Args("sourceId") sourceId: string,
     @Args("status") status: VerificationStatus
   ): Promise<SourceNode> {
-    return this.storageService.verifySource(sourceId, status);
+    return this.storageService.verifySource(
+      sourceId,
+      this.mapVerificationStatus(status)
+    );
   }
 }

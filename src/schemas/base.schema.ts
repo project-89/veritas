@@ -9,20 +9,20 @@ export const ActivityMetricsSchema = z.object({
 });
 
 export const EngagementMetricsSchema = z.object({
-  likes: z.number(),
-  shares: z.number(),
-  comments: z.number(),
-  reach: z.number(),
-  viralityScore: z.number(),
+  likes: z.number().min(0),
+  shares: z.number().min(0),
+  comments: z.number().min(0),
+  reach: z.number().min(0),
+  viralityScore: z.number().min(0).max(1),
 });
 
 // Node Schemas
 export const AccountNodeSchema = z.object({
   id: z.string().uuid(),
+  name: z.string(),
   platform: z.enum(["twitter", "facebook", "reddit", "other"]),
-  creationDate: z.date(),
-  activityMetrics: ActivityMetricsSchema,
-  credibilityScore: z.number().min(0).max(1),
+  influence: z.number().min(0).max(1),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 export const ContentNodeSchema = z.object({
@@ -30,23 +30,13 @@ export const ContentNodeSchema = z.object({
   text: z.string(),
   timestamp: z.date(),
   platform: z.enum(["twitter", "facebook", "reddit", "other"]),
-  engagementMetrics: EngagementMetricsSchema,
-  classification: z.object({
-    categories: z.array(z.string()),
-    sentiment: z.enum(["positive", "negative", "neutral"]),
-    toxicity: z.number(),
-    subjectivity: z.number(),
-    language: z.string(),
-    topics: z.array(z.string()),
-    entities: z.array(
-      z.object({
-        text: z.string(),
-        type: z.string(),
-        confidence: z.number(),
-      })
-    ),
-  }),
+  toxicity: z.number().optional(),
+  sentiment: z.enum(["positive", "negative", "neutral"]).optional(),
+  categories: z.array(z.string()).optional(),
+  topics: z.array(z.string()).optional(),
+  sourceId: z.string().optional(),
   metadata: z.record(z.string(), z.any()).optional(),
+  engagementMetrics: EngagementMetricsSchema.optional(),
 });
 
 export const SourceNodeSchema = z.object({
@@ -54,7 +44,7 @@ export const SourceNodeSchema = z.object({
   name: z.string(),
   platform: z.enum(["twitter", "facebook", "reddit", "other"]),
   credibilityScore: z.number().min(0).max(1),
-  verificationStatus: z.enum(["verified", "unverified", "disputed"]),
+  verificationStatus: z.enum(["verified", "unverified", "suspicious"]),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
@@ -81,3 +71,27 @@ export type ContentNode = z.infer<typeof ContentNodeSchema>;
 export type SourceNode = z.infer<typeof SourceNodeSchema>;
 export type SharesEdge = z.infer<typeof SharesEdgeSchema>;
 export type InteractsEdge = z.infer<typeof InteractsEdgeSchema>;
+
+export const ContentValidationSchema = z.object({
+  id: z.string().uuid(),
+  text: z.string(),
+  timestamp: z.date(),
+  platform: z.enum(["twitter", "facebook", "reddit", "other"]),
+  engagementMetrics: EngagementMetricsSchema,
+  classification: z.object({
+    categories: z.array(z.string()),
+    sentiment: z.enum(["positive", "negative", "neutral"]),
+    toxicity: z.number(),
+    subjectivity: z.number(),
+    language: z.string(),
+    topics: z.array(z.string()),
+    entities: z.array(
+      z.object({
+        text: z.string(),
+        type: z.string(),
+        confidence: z.number(),
+      })
+    ),
+  }),
+  metadata: z.record(z.string(), z.any()).optional(),
+});

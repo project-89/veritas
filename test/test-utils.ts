@@ -13,6 +13,12 @@ export const mockContentNode: ContentNode = {
   text: "Test content",
   timestamp: new Date(),
   platform: "twitter",
+  toxicity: 0.1,
+  sentiment: "neutral",
+  categories: ["test"],
+  topics: ["test"],
+  sourceId: "123e4567-e89b-12d3-a456-426614174001",
+  metadata: {},
   engagementMetrics: {
     likes: 100,
     shares: 50,
@@ -20,22 +26,6 @@ export const mockContentNode: ContentNode = {
     reach: 1000,
     viralityScore: 0.75,
   },
-  classification: {
-    categories: ["test"],
-    sentiment: "neutral",
-    toxicity: 0.1,
-    subjectivity: 0.5,
-    language: "en",
-    topics: ["test"],
-    entities: [
-      {
-        text: "test",
-        type: "keyword",
-        confidence: 0.9,
-      },
-    ],
-  },
-  metadata: {},
 };
 
 export const mockSourceNode: SourceNode = {

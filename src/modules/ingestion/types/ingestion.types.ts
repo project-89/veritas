@@ -1,9 +1,10 @@
-import { InputType, Field, registerEnumType } from "@nestjs/graphql";
+import { Field, InputType, registerEnumType } from "@nestjs/graphql";
+import { EngagementMetrics } from "@/schemas/base.schema";
 
 export enum VerificationStatus {
   VERIFIED = "verified",
   UNVERIFIED = "unverified",
-  DISPUTED = "disputed",
+  SUSPICIOUS = "suspicious",
 }
 
 export enum Platform {
@@ -15,6 +16,7 @@ export enum Platform {
 
 registerEnumType(VerificationStatus, {
   name: "VerificationStatus",
+  description: "The verification status of a source",
 });
 
 registerEnumType(Platform, {
@@ -23,19 +25,19 @@ registerEnumType(Platform, {
 
 @InputType()
 export class EngagementMetricsInput {
-  @Field(() => Number)
+  @Field()
   likes: number;
 
-  @Field(() => Number)
+  @Field()
   shares: number;
 
-  @Field(() => Number)
+  @Field()
   comments: number;
 
-  @Field(() => Number)
+  @Field()
   reach: number;
 
-  @Field(() => Number)
+  @Field()
   viralityScore: number;
 }
 
@@ -44,11 +46,11 @@ export class ContentIngestionInput {
   @Field()
   text: string;
 
-  @Field(() => Platform)
-  platform: Platform;
+  @Field()
+  platform: "twitter" | "facebook" | "reddit" | "other";
 
-  @Field(() => EngagementMetricsInput)
-  engagementMetrics: EngagementMetricsInput;
+  @Field(() => EngagementMetricsInput, { nullable: true })
+  engagementMetrics?: EngagementMetrics;
 
   @Field(() => Object, { nullable: true })
   metadata?: Record<string, any>;
@@ -59,10 +61,10 @@ export class SourceIngestionInput {
   @Field()
   name: string;
 
-  @Field(() => Platform)
-  platform: Platform;
+  @Field()
+  platform: "twitter" | "facebook" | "reddit" | "other";
 
-  @Field(() => Number)
+  @Field()
   credibilityScore: number;
 
   @Field(() => VerificationStatus)

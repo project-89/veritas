@@ -1,32 +1,86 @@
-import { Resolver, Query, Args, Mutation } from "@nestjs/graphql";
-import { AnalysisService } from "@/services/analysis.service";
-import { TimeFrame, DeviationMetrics, Pattern, AnalysisResult } from "./dto";
+import { Resolver, Query, Mutation, Args } from "@nestjs/graphql";
+import { AnalysisService } from "../../services/analysis.service";
+import {
+  DeviationMetrics,
+  Pattern,
+  TimeFrame,
+  ExtendedContentNode,
+} from "./analysis.types";
+import { ContentAnalysisInput } from "./dto/content-analysis.input";
+import {
+  ContentAnalysisResult,
+  RelatedContent,
+} from "./dto/content-analysis.result";
 
-@Resolver("Analysis")
+@Resolver()
 export class AnalysisResolver {
   constructor(private readonly analysisService: AnalysisService) {}
 
-  @Query(() => DeviationMetrics)
-  async realityDeviation(
-    @Args("narrativeId") narrativeId: string
-  ): Promise<DeviationMetrics> {
-    return this.analysisService.measureRealityDeviation(narrativeId);
-  }
-
   @Query(() => [Pattern])
-  async patterns(@Args("timeframe") timeframe: TimeFrame): Promise<Pattern[]> {
+  async detectPatterns(
+    @Args("timeframe") timeframe: TimeFrame
+  ): Promise<Pattern[]> {
     return this.analysisService.detectPatterns(timeframe);
   }
 
-  @Mutation(() => AnalysisResult)
+  @Query(() => DeviationMetrics)
+  async getRealityDeviation(
+    @Args("narrativeId") narrativeId: string
+  ): Promise<DeviationMetrics> {
+    const metrics =
+      await this.analysisService.measureRealityDeviation(narrativeId);
+    return { ...metrics, timeframe: { start: new Date(), end: new Date() } };
+  }
+
+  @Mutation(() => ContentAnalysisResult)
   async analyzeContent(
-    @Args("content") content: string
-  ): Promise<AnalysisResult> {
-    // TODO: Implement content analysis
+    @Args("input") input: ContentAnalysisInput
+  ): Promise<ContentAnalysisResult> {
+    const content = await this.analysisService.getContentById(input.contentId);
+    if (!content) {
+      throw new Error("Content not found");
+    }
+
+    const [patterns, metrics] = await Promise.all([
+      this.analysisService.detectPatternsForContent(content),
+      this.analysisService.calculateContentDeviation(content),
+    ]);
+
+    const deviationMetrics = {
+      ...metrics,
+      timeframe: { start: new Date(), end: new Date() },
+    };
+
+    const relatedContent = (
+      await this.analysisService.findRelatedContent(content)
+    ).map((node) => ({
+      id: node.id,
+      text: node.text,
+      timestamp: node.timestamp,
+      platform: node.platform,
+      sourceId: node.sourceId,
+      toxicity: node.toxicity,
+      sentiment: node.sentiment,
+      categories: node.categories,
+      topics: node.topics,
+      metadata: node.metadata,
+    }));
+
+    const sourceCredibility =
+      await this.analysisService.calculateSourceCredibility(
+        content.sourceId || ""
+      );
+    const trustScore =
+      sourceCredibility * 0.8 + (1 - (content.toxicity || 0)) * 0.2;
+
     return {
-      status: "Analysis completed",
-      metrics: undefined,
-      patterns: [],
+      contentId: content.id,
+      patterns,
+      deviationMetrics,
+      relatedContent,
+      sourceCredibility,
+      trustScore,
+      analysisTimestamp: new Date(),
     };
   }
 }
