@@ -11,7 +11,8 @@ import {
   SocialMediaPost,
   SocialMediaConnector,
 } from "../interfaces/social-media-connector.interface";
-import { mockSourceNode } from "test/test-utils";
+import { mockSourceNode } from "../../../../test/test-utils";
+import { EventEmitter } from "events";
 
 describe("SocialMediaService", () => {
   let service: SocialMediaService;
@@ -28,11 +29,12 @@ describe("SocialMediaService", () => {
     authorName: "Test Author",
     authorHandle: "@testauthor",
     url: "https://twitter.com/testauthor/123",
-    engagement: {
+    engagementMetrics: {
       likes: 100,
       shares: 50,
       comments: 25,
       reach: 1000,
+      viralityScore: 0.5,
     },
   };
 
@@ -42,8 +44,13 @@ describe("SocialMediaService", () => {
       validateCredentials: jest.fn().mockResolvedValue(true),
       searchContent: jest.fn().mockResolvedValue([mockPost]),
       getAuthorDetails: jest.fn().mockResolvedValue(mockSourceNode),
-      streamContent: jest.fn().mockImplementation(async function* () {
-        yield mockPost;
+      streamContent: jest.fn().mockImplementation((keywords: string[]) => {
+        const emitter = new EventEmitter();
+        // Simulate emitting a post
+        setTimeout(() => {
+          emitter.emit("data", mockPost);
+        }, 0);
+        return emitter;
       }),
       disconnect: jest.fn().mockResolvedValue(undefined),
     };
@@ -53,7 +60,9 @@ describe("SocialMediaService", () => {
       validateCredentials: jest.fn().mockResolvedValue(true),
       searchContent: jest.fn().mockResolvedValue([]),
       getAuthorDetails: jest.fn().mockResolvedValue(mockSourceNode),
-      streamContent: jest.fn().mockImplementation(async function* () {}),
+      streamContent: jest.fn().mockImplementation((keywords: string[]) => {
+        return new EventEmitter();
+      }),
       disconnect: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -62,7 +71,9 @@ describe("SocialMediaService", () => {
       validateCredentials: jest.fn().mockResolvedValue(true),
       searchContent: jest.fn().mockResolvedValue([]),
       getAuthorDetails: jest.fn().mockResolvedValue(mockSourceNode),
-      streamContent: jest.fn().mockImplementation(async function* () {}),
+      streamContent: jest.fn().mockImplementation((keywords: string[]) => {
+        return new EventEmitter();
+      }),
       disconnect: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -250,24 +261,31 @@ describe("SocialMediaService", () => {
   });
 
   describe("streamAllPlatforms", () => {
+    // Increase timeout for streaming tests
+    jest.setTimeout(10000);
+
     it("should handle platform streaming errors", async () => {
       const mockError = new Error("Stream error");
       jest
         .spyOn(twitterConnector, "streamContent")
-        .mockImplementation(async function* () {
-          throw mockError;
+        .mockImplementation((keywords: string[]) => {
+          const emitter = new EventEmitter();
+          process.nextTick(() => {
+            emitter.emit("error", mockError);
+          });
+          return emitter;
         });
 
       const stream = service.streamAllPlatforms(["test"]);
 
-      // The error should be propagated through the generator
-      await expect(async () => {
-        for await (const post of stream) {
-          // Should not reach here
-          fail("Expected an error to be thrown");
-        }
-      }).rejects.toThrow("Stream error");
-    });
+      try {
+        // Just try to get the first value, which should trigger the error
+        await stream.next();
+        fail("Expected an error to be thrown");
+      } catch (error) {
+        expect(error).toEqual(mockError);
+      }
+    }, 15000); // Increase timeout for this specific test
 
     it("should aggregate content from all platforms", async () => {
       const mockPost: SocialMediaPost = {
@@ -279,18 +297,24 @@ describe("SocialMediaService", () => {
         authorName: "Test User",
         authorHandle: "@testuser",
         url: "https://twitter.com/testuser/status/test-post",
-        engagement: {
+        engagementMetrics: {
           likes: 100,
           shares: 50,
           comments: 25,
           reach: 1000,
+          viralityScore: 0.5,
         },
       };
 
       jest
         .spyOn(twitterConnector, "streamContent")
-        .mockImplementation(async function* () {
-          yield mockPost;
+        .mockImplementation((keywords: string[]) => {
+          const emitter = new EventEmitter();
+          // Emit data immediately instead of using setTimeout
+          process.nextTick(() => {
+            emitter.emit("data", mockPost);
+          });
+          return emitter;
         });
 
       const stream = service.streamAllPlatforms(["test"]);

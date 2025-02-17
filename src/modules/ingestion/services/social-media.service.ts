@@ -112,23 +112,30 @@ export class SocialMediaService implements OnModuleInit, OnModuleDestroy {
       : this.connectors;
 
     const emitter = new EventEmitter();
+    let hasError = false;
 
     for (const connector of targetConnectors) {
       try {
         const stream = connector.streamContent(keywords);
         stream.on("data", (post: SocialMediaPost) => {
-          emitter.emit("data", post);
+          if (!hasError) {
+            emitter.emit("data", post);
+          }
         });
         stream.on("error", (error: Error) => {
+          hasError = true;
           console.error(`Error in ${connector.platform} stream:`, error);
+          emitter.emit("error", error);
         });
       } catch (error) {
+        hasError = true;
         console.error(`Error setting up ${connector.platform} stream:`, error);
+        emitter.emit("error", error);
       }
     }
 
     try {
-      while (true) {
+      while (!hasError) {
         const post: SocialMediaPost = await new Promise((resolve, reject) => {
           emitter.once("data", resolve);
           emitter.once("error", reject);
