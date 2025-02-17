@@ -39,7 +39,16 @@ export class SocialMediaService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     await Promise.all(
-      this.connectors.map((connector) => connector.disconnect())
+      this.connectors.map(async (connector) => {
+        try {
+          await connector.disconnect();
+        } catch (error) {
+          console.error(
+            `Failed to disconnect from ${connector.platform}:`,
+            error
+          );
+        }
+      })
     );
   }
 

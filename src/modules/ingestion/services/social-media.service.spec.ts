@@ -90,7 +90,94 @@ describe("SocialMediaService", () => {
     redditConnector = module.get<RedditConnector>(RedditConnector);
   });
 
+  describe("Module Lifecycle", () => {
+    describe("onModuleInit", () => {
+      it("should validate credentials for all platforms", async () => {
+        await service.onModuleInit();
+
+        expect(twitterConnector.validateCredentials).toHaveBeenCalled();
+        expect(facebookConnector.validateCredentials).toHaveBeenCalled();
+        expect(redditConnector.validateCredentials).toHaveBeenCalled();
+      });
+
+      it("should handle validation failures gracefully", async () => {
+        const validationError = new Error("Invalid credentials");
+        jest
+          .spyOn(twitterConnector, "validateCredentials")
+          .mockRejectedValueOnce(validationError);
+
+        await expect(service.onModuleInit()).resolves.not.toThrow();
+      });
+    });
+
+    describe("onModuleDestroy", () => {
+      it("should disconnect from all platforms", async () => {
+        await service.onModuleDestroy();
+
+        expect(twitterConnector.disconnect).toHaveBeenCalled();
+        expect(facebookConnector.disconnect).toHaveBeenCalled();
+        expect(redditConnector.disconnect).toHaveBeenCalled();
+      });
+
+      it("should handle disconnection errors gracefully", async () => {
+        const disconnectError = new Error("Disconnect failed");
+        jest
+          .spyOn(twitterConnector, "disconnect")
+          .mockRejectedValueOnce(disconnectError);
+
+        await expect(service.onModuleDestroy()).resolves.not.toThrow();
+      });
+    });
+  });
+
   describe("searchAllPlatforms", () => {
+    it("should search with date range options", async () => {
+      const startDate = new Date("2024-01-01");
+      const endDate = new Date("2024-01-31");
+
+      await service.searchAllPlatforms("test", { startDate, endDate });
+
+      expect(twitterConnector.searchContent).toHaveBeenCalledWith(
+        "test",
+        expect.objectContaining({
+          startDate,
+          endDate,
+        })
+      );
+    });
+
+    it("should search with limit option", async () => {
+      const limit = 10;
+
+      await service.searchAllPlatforms("test", { limit });
+
+      expect(twitterConnector.searchContent).toHaveBeenCalledWith(
+        "test",
+        expect.objectContaining({ limit })
+      );
+    });
+
+    it("should handle empty results from all platforms", async () => {
+      jest.spyOn(twitterConnector, "searchContent").mockResolvedValue([]);
+
+      const results = await service.searchAllPlatforms("test");
+
+      expect(results).toEqual([]);
+    });
+
+    it("should handle mixed success and failure across platforms", async () => {
+      jest
+        .spyOn(twitterConnector, "searchContent")
+        .mockRejectedValue(new Error("API Error"));
+      jest
+        .spyOn(facebookConnector, "searchContent")
+        .mockResolvedValue([mockPost]);
+
+      const results = await service.searchAllPlatforms("test");
+
+      expect(results).toEqual([mockPost]);
+    });
+
     it("should search content across all platforms", async () => {
       const query = "test query";
       const options = {
