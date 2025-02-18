@@ -97,12 +97,18 @@ describe("ContentService", () => {
     };
 
     it("should update existing content", async () => {
+      const updatedContent = {
+        ...mockContentNode,
+        text: updateInput.text,
+        metadata: updateInput.metadata,
+      };
       jest
         .spyOn(validationService, "validateContentUpdate")
         .mockResolvedValueOnce();
       jest
         .spyOn(memgraphService, "executeQuery")
-        .mockResolvedValueOnce([{ n: mockContentNode }]);
+        .mockResolvedValueOnce([{ c: mockContentNode }])
+        .mockResolvedValueOnce([{ c: updatedContent }]);
 
       const result = await service.updateContent("123", updateInput);
 
@@ -130,7 +136,7 @@ describe("ContentService", () => {
     it("should return search results", async () => {
       jest
         .spyOn(memgraphService, "executeQuery")
-        .mockResolvedValueOnce([{ n: mockContentNode }]);
+        .mockResolvedValueOnce([{ c: mockContentNode }]);
 
       const results = await service.searchContent(searchParams);
 
@@ -156,7 +162,7 @@ describe("ContentService", () => {
     it("should return content by id", async () => {
       jest
         .spyOn(memgraphService, "executeQuery")
-        .mockResolvedValueOnce([{ n: mockContentNode }]);
+        .mockResolvedValueOnce([{ c: mockContentNode }]);
 
       const result = await service.getContentById("123");
 
@@ -177,7 +183,7 @@ describe("ContentService", () => {
     it("should delete content successfully", async () => {
       jest
         .spyOn(memgraphService, "executeQuery")
-        .mockResolvedValueOnce([{ n: mockContentNode }]);
+        .mockResolvedValueOnce([{ deleted: 1 }]);
 
       const result = await service.deleteContent("123");
 
@@ -185,7 +191,9 @@ describe("ContentService", () => {
     });
 
     it("should return false when content not found", async () => {
-      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([]);
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce([{ deleted: 0 }]);
 
       const result = await service.deleteContent("123");
 
@@ -197,7 +205,7 @@ describe("ContentService", () => {
     it("should return related content", async () => {
       jest
         .spyOn(memgraphService, "executeQuery")
-        .mockResolvedValueOnce([{ n: mockContentNode }]);
+        .mockResolvedValueOnce([{ related: mockContentNode }]);
 
       const results = await service.getRelatedContent("123");
 
@@ -219,12 +227,17 @@ describe("ContentService", () => {
     };
 
     it("should update engagement metrics", async () => {
+      const updatedContent = {
+        ...mockContentNode,
+        engagementMetrics: metrics,
+      };
       jest
         .spyOn(validationService, "validateEngagementMetrics")
         .mockReturnValueOnce();
       jest
         .spyOn(memgraphService, "executeQuery")
-        .mockResolvedValueOnce([{ n: mockContentNode }]);
+        .mockResolvedValueOnce([{ c: mockContentNode }])
+        .mockResolvedValueOnce([{ c: updatedContent }]);
 
       const result = await service.updateEngagementMetrics("123", metrics);
 

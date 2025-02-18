@@ -85,7 +85,7 @@ export class ContentService {
     // Get existing content
     const existingContent = await this.getContentById(id);
     if (!existingContent) {
-      throw new Error(`Content with id ${id} not found`);
+      throw new Error("Content not found");
     }
 
     // If text is updated, reclassify
@@ -208,6 +208,11 @@ export class ContentService {
     id: string,
     metrics: ContentUpdateInput["engagementMetrics"]
   ): Promise<ContentNode> {
+    const existingContent = await this.getContentById(id);
+    if (!existingContent) {
+      throw new Error("Content not found");
+    }
+
     const query = `
       MATCH (c:Content)
       WHERE c.id = $id

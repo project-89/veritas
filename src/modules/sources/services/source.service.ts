@@ -60,7 +60,7 @@ export class SourceService {
     // Get existing source
     const existingSource = await this.getSourceById(id);
     if (!existingSource) {
-      throw new Error(`Source with id ${id} not found`);
+      throw new Error("Source not found");
     }
 
     // Update source node
@@ -162,6 +162,11 @@ export class SourceService {
   async updateCredibilityScore(id: string, score: number): Promise<SourceNode> {
     if (score < 0 || score > 1) {
       throw new Error("Credibility score must be between 0 and 1");
+    }
+
+    const existingSource = await this.getSourceById(id);
+    if (!existingSource) {
+      throw new Error("Source not found");
     }
 
     const query = `
