@@ -64,15 +64,19 @@ describe("Ingestion Types", () => {
       const input = new ContentIngestionInput();
       input.text = "Valid content";
       input.platform = Platform.TWITTER;
-      input.engagementMetrics = {
-        likes: -1, // Invalid negative value
-        shares: 50,
-        comments: 25,
-        reach: 1000,
-        viralityScore: 0.75,
-      };
 
-      const errors = await validate(input);
+      const metrics = new EngagementMetricsInput();
+      metrics.likes = -1; // Invalid negative value
+      metrics.shares = 50;
+      metrics.comments = 25;
+      metrics.reach = 1000;
+      metrics.viralityScore = 0.75;
+
+      input.engagementMetrics = metrics;
+
+      const errors = await validate(input, {
+        validationError: { target: false },
+      });
       expect(errors).toHaveLength(1);
       expect(errors[0].property).toBe("engagementMetrics");
     });

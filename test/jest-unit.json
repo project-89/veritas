@@ -18,5 +18,6 @@
     "<rootDir>/src/",
     "<rootDir>/test/"
   ],
-  "testTimeout": 10000
+  "testTimeout": 10000,
+  "moduleDirectories": ["node_modules", "<rootDir>"]
 } 
