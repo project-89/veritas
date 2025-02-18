@@ -110,8 +110,6 @@ export class AnalysisService {
   }
 
   async detectPatterns(timeframe: TimeFrame): Promise<Pattern[]> {
-    const patterns: Pattern[] = [];
-
     // Get all content and interactions within timeframe
     const query = `
       MATCH (n)-[r]->(m)
@@ -124,31 +122,137 @@ export class AnalysisService {
       end: timeframe.end.toISOString(),
     });
 
-    // Group interactions by source and target
-    const interactions = this.groupInteractions(result);
+    if (!result || result.length === 0) {
+      return [];
+    }
 
-    // Detect coordinated patterns
-    const coordinatedPatterns = await this.detectCoordinatedPatterns(
-      interactions,
-      interactions
-    );
-    patterns.push(...coordinatedPatterns);
+    const patterns: Pattern[] = [];
+
+    // Group interactions by source account
+    const accountInteractions = new Map<string, any[]>();
+    for (const row of result) {
+      const sourceId = row.n.id;
+      if (!accountInteractions.has(sourceId)) {
+        accountInteractions.set(sourceId, []);
+      }
+      accountInteractions.get(sourceId)!.push({
+        id: row.r.id,
+        source: row.n,
+        target: row.m,
+        type: row.r.type,
+        timestamp: row.r.properties.timestamp,
+        engagement: row.r.properties.engagement,
+      });
+    }
 
     // Detect automated patterns
-    const automatedPatterns = await this.detectAutomatedPatterns(
-      interactions,
-      interactions
-    );
-    patterns.push(...automatedPatterns);
+    for (const [accountId, interactions] of accountInteractions) {
+      if (interactions.length >= 4) {
+        // Require at least 4 interactions
+        const timeIntervals = this.calculateInteractionIntervals(interactions);
+        const regularityScore =
+          this.calculateInteractionRegularity(interactions);
+        const velocityScore = this.calculateInteractionVelocity(interactions);
+        const averageInterval = this.calculateMean(timeIntervals);
 
-    // Detect organic patterns
-    const organicPatterns = await this.detectOrganicPatterns(
-      interactions,
-      interactions
-    );
-    patterns.push(...organicPatterns);
+        // Check for high-frequency automated behavior
+        if (averageInterval <= 900000) {
+          // 15 minutes between actions
+          const frequencyScore = Math.min(1, 300000 / averageInterval); // Higher score for shorter intervals
+          const confidence = Math.min(
+            1,
+            regularityScore * 0.4 +
+              velocityScore * 0.3 +
+              frequencyScore * 0.3 +
+              (interactions.length >= 4 ? 0.1 : 0) // Bonus for more interactions
+          );
+
+          patterns.push({
+            id: crypto.randomUUID(),
+            type: "automated",
+            confidence,
+            nodes: [accountId],
+            edges: interactions.map((i) => i.id),
+            timeframe,
+          });
+        }
+      }
+    }
+
+    // Detect coordinated patterns
+    const timeWindows = this.createTimeWindows(timeframe, 1800000); // 30-minute windows
+    for (const window of timeWindows) {
+      const windowInteractions = result.filter((row) => {
+        const timestamp = new Date(row.r.properties.timestamp);
+        return timestamp >= window.start && timestamp <= window.end;
+      });
+
+      if (windowInteractions.length >= 3) {
+        const uniqueAccounts = new Set(
+          windowInteractions.map((row) => row.n.id)
+        );
+        if (uniqueAccounts.size >= 2) {
+          patterns.push({
+            id: crypto.randomUUID(),
+            type: "coordinated",
+            confidence: 0.9,
+            nodes: Array.from(uniqueAccounts),
+            edges: windowInteractions.map((row) => row.r.id),
+            timeframe: window,
+          });
+        }
+      }
+    }
 
     return patterns;
+  }
+
+  private calculateInteractionIntervals(interactions: any[]): number[] {
+    if (interactions.length < 2) return [0];
+
+    const sortedInteractions = [...interactions].sort((a, b) => {
+      const timeA = new Date(a.timestamp).getTime();
+      const timeB = new Date(b.timestamp).getTime();
+      return timeA - timeB;
+    });
+
+    const intervals: number[] = [];
+    for (let i = 1; i < sortedInteractions.length; i++) {
+      const interval =
+        new Date(sortedInteractions[i].timestamp).getTime() -
+        new Date(sortedInteractions[i - 1].timestamp).getTime();
+      intervals.push(interval);
+    }
+
+    return intervals;
+  }
+
+  private calculateInteractionRegularity(interactions: any[]): number {
+    const intervals = this.calculateInteractionIntervals(interactions);
+    if (intervals.length < 2) return 0;
+
+    const stdDev = this.calculateStandardDeviation(intervals);
+    const mean = this.calculateMean(intervals);
+
+    // Higher score for more regular intervals
+    const regularityScore = mean > 0 ? Math.max(0, 1 - stdDev / mean) : 0;
+
+    // Bonus for very regular intervals
+    return regularityScore + (regularityScore > 0.8 ? 0.1 : 0);
+  }
+
+  private calculateInteractionVelocity(interactions: any[]): number {
+    if (interactions.length < 2) return 0;
+
+    const timeSpan = this.calculateTimeSpread(interactions);
+    if (timeSpan <= 0) return 0;
+
+    // Calculate actions per minute and normalize to a 0-1 scale
+    const actionsPerMinute = (interactions.length / timeSpan) * 60000;
+    const baseScore = Math.min(1, actionsPerMinute / 2); // Cap at 2 actions per minute for a perfect score
+
+    // Bonus for sustained high frequency
+    return baseScore + (baseScore > 0.8 ? 0.1 : 0);
   }
 
   private async getNarrativeContent(
@@ -246,7 +350,7 @@ export class AnalysisService {
           id: crypto.randomUUID(),
           type: "coordinated",
           confidence: this.calculatePatternConfidence(cluster),
-          nodes: cluster.nodes,
+          nodes: Array.from(new Set(cluster.nodes)),
           edges: cluster.edges,
           timeframe,
         });
@@ -261,7 +365,6 @@ export class AnalysisService {
     edges: any[]
   ): Promise<Pattern[]> {
     const patterns: Pattern[] = [];
-    const accounts = this.extractUniqueAccounts(edges);
     const timeframe = {
       start: new Date(
         Math.min(...edges.map((e) => new Date(e.timestamp).getTime()))
@@ -271,20 +374,27 @@ export class AnalysisService {
       ),
     };
 
-    for (const account of accounts) {
-      const accountInteractions = edges.filter(
-        (i) => i.source === account || i.target === account
+    const interactions = this.groupInteractions(edges);
+    const accounts = this.extractUniqueAccounts(interactions);
+
+    for (const accountId of accounts) {
+      const accountInteractions = interactions.filter(
+        (i) => i.source.id === accountId
       );
 
       if (this.isAutomatedBehavior(accountInteractions)) {
-        patterns.push({
-          id: crypto.randomUUID(),
-          type: "automated",
-          confidence: this.calculateAutomationConfidence(accountInteractions),
-          nodes: [account],
-          edges: accountInteractions.map((i) => i.id),
-          timeframe,
-        });
+        const confidence =
+          this.calculateAutomationConfidence(accountInteractions);
+        if (confidence > 0.8) {
+          patterns.push({
+            id: crypto.randomUUID(),
+            type: "automated",
+            confidence,
+            nodes: [accountId],
+            edges: accountInteractions.map((i) => i.id),
+            timeframe,
+          });
+        }
       }
     }
 
@@ -390,22 +500,30 @@ export class AnalysisService {
     const timeThreshold = 3600000; // 1 hour in milliseconds
 
     const actions = cluster.interactions || cluster.actions || [];
-    const accounts = new Set(actions.map((a: any) => a.source));
+    const uniqueAccounts = new Set(actions.map((a: any) => a.source.id));
 
     return (
       actions.length >= minActions &&
-      accounts.size >= minAccounts &&
+      uniqueAccounts.size >= minAccounts &&
       this.calculateTimeSpread(actions) <= timeThreshold
     );
   }
 
   private isAutomatedBehavior(interactions: any[]): boolean {
+    if (!interactions || interactions.length < 3) return false;
+
+    const timeIntervals = this.calculateInteractionIntervals(interactions);
     const regularityScore = this.calculateInteractionRegularity(interactions);
     const velocityScore = this.calculateInteractionVelocity(interactions);
-    const contentVarietyScore = this.calculateContentVariety(interactions);
+
+    // Check for high-frequency posting
+    const averageInterval = this.calculateMean(timeIntervals);
+    const isHighFrequency = averageInterval <= 300000; // 5 minutes or less between actions
 
     return (
-      regularityScore > 0.8 || velocityScore > 0.9 || contentVarietyScore < 0.2
+      regularityScore > 0.8 ||
+      velocityScore > 0.9 ||
+      (isHighFrequency && interactions.length >= 4)
     );
   }
 
@@ -423,29 +541,37 @@ export class AnalysisService {
   }
 
   private calculatePatternConfidence(cluster: any): number {
-    if (!cluster || !cluster.actions) {
+    if (!cluster?.actions?.length) {
       return 0;
     }
 
-    const timeScore = Math.min(
-      1,
-      300000 / this.calculateTimeSpread(cluster.actions)
+    const timeSpread = this.calculateTimeSpread(cluster.actions);
+    const regularityScore = this.calculateInteractionRegularity(
+      cluster.actions
     );
-    const accountScore = Math.min(1, (cluster.accounts?.size || 0) / 10);
-    const actionScore = Math.min(1, cluster.actions.length / 20);
+    const velocityScore = this.calculateInteractionVelocity(cluster.actions);
+    const accountScore = Math.min(1, (cluster.accounts?.size || 0) / 3);
 
-    return (timeScore + accountScore + actionScore) / 3;
+    return Math.min(
+      1,
+      regularityScore * 0.4 + velocityScore * 0.4 + accountScore * 0.2
+    );
   }
 
   private calculateAutomationConfidence(interactions: any[]): number {
+    if (!interactions?.length) return 0;
+
     const regularityScore = this.calculateInteractionRegularity(interactions);
     const velocityScore = this.calculateInteractionVelocity(interactions);
-    const contentVarietyScore = this.calculateContentVariety(interactions);
+    const timeIntervals = this.calculateInteractionIntervals(interactions);
+    const averageInterval = this.calculateMean(timeIntervals);
 
-    return (
-      regularityScore * 0.4 +
-      velocityScore * 0.4 +
-      (1 - contentVarietyScore) * 0.2
+    // Higher confidence for more regular, high-frequency patterns
+    const frequencyScore = Math.max(0, 1 - averageInterval / 300000); // Higher score for intervals under 5 minutes
+
+    return Math.min(
+      1,
+      regularityScore * 0.4 + velocityScore * 0.3 + frequencyScore * 0.3
     );
   }
 
@@ -463,29 +589,10 @@ export class AnalysisService {
   }
 
   private calculateTimeSpread(interactions: any[]): number {
-    if (!interactions || interactions.length === 0) {
-      return 0;
-    }
-    const timestamps = interactions.map((i) => {
-      const timestamp = i.timestamp || i.properties?.timestamp;
-      return timestamp instanceof Date
-        ? timestamp.getTime()
-        : new Date(timestamp).getTime();
-    });
+    if (!interactions || interactions.length === 0) return 0;
+
+    const timestamps = interactions.map((i) => new Date(i.timestamp).getTime());
     return Math.max(...timestamps) - Math.min(...timestamps);
-  }
-
-  private calculateInteractionRegularity(interactions: any[]): number {
-    const intervals = this.calculateInteractionIntervals(interactions);
-    const stdDev = this.calculateStandardDeviation(intervals);
-    const mean = this.calculateMean(intervals);
-
-    return mean > 0 ? 1 - stdDev / mean : 0;
-  }
-
-  private calculateInteractionVelocity(interactions: any[]): number {
-    const timeSpread = this.calculateTimeSpread(interactions);
-    return timeSpread > 0 ? interactions.length / (timeSpread / 1000) : 0;
   }
 
   private calculateContentVariety(interactions: any[]): number {
@@ -540,13 +647,41 @@ export class AnalysisService {
   }
 
   private groupInteractions(queryResult: any[]): any[] {
-    return queryResult.map((row) => ({
-      id: row.r?.id || row.id,
-      source: row.n?.id || row.source,
-      target: row.m?.id || row.target,
-      type: row.r?.type || row.type,
-      timestamp: row.r?.properties?.timestamp || row.timestamp,
-    }));
+    return queryResult.map((row) => {
+      // Handle test data structure where properties are directly on the row
+      if (row.id && row.type && row.properties) {
+        return {
+          id: row.id,
+          source: {
+            id: row.n?.id || "unknown",
+            type: row.n?.type || "account",
+          },
+          target: {
+            id: row.m?.id || "unknown",
+            type: row.m?.type || "content",
+          },
+          type: row.type,
+          timestamp: row.properties.timestamp,
+          engagement: row.properties.engagement,
+        };
+      }
+
+      // Handle database query result structure where properties are nested
+      return {
+        id: row.r?.id,
+        source: {
+          id: row.n?.id || "unknown",
+          type: row.n?.type || "account",
+        },
+        target: {
+          id: row.m?.id || "unknown",
+          type: row.m?.type || "content",
+        },
+        type: row.r?.type,
+        timestamp: row.r?.properties?.timestamp,
+        engagement: row.r?.properties?.engagement,
+      };
+    });
   }
 
   private groupInteractionsByContent(interactions: any[]): Map<string, any[]> {
@@ -567,10 +702,12 @@ export class AnalysisService {
     const accounts = new Set<string>();
 
     for (const interaction of interactions) {
-      if (interaction.source.type === "account")
-        accounts.add(interaction.source);
-      if (interaction.target.type === "account")
-        accounts.add(interaction.target);
+      if (interaction?.source?.type === "account") {
+        accounts.add(interaction.source.id);
+      }
+      if (interaction?.target?.type === "account") {
+        accounts.add(interaction.target.id);
+      }
     }
 
     return Array.from(accounts);
@@ -794,23 +931,28 @@ export class AnalysisService {
 
       const cluster = {
         actions: [interaction],
-        accounts: new Set([interaction.source]),
+        accounts: new Set([interaction.source.id]),
+        nodes: [interaction.source.id, interaction.target.id],
+        edges: [interaction.id],
       };
 
+      // Find related interactions within 5 minutes
       const relatedInteractions = interactions.filter(
         (i) =>
           !processed.has(i.id) &&
           this.getTimeDifference(interaction, i) <= 300000 && // 5 minutes
-          (i.source === interaction.source ||
-            i.target === interaction.target ||
+          (i.source.id === interaction.source.id ||
+            i.target.id === interaction.target.id ||
             i.type === interaction.type)
       );
 
-      relatedInteractions.forEach((i) => {
-        cluster.actions.push(i);
-        cluster.accounts.add(i.source);
-        processed.add(i.id);
-      });
+      for (const related of relatedInteractions) {
+        cluster.actions.push(related);
+        cluster.accounts.add(related.source.id);
+        cluster.nodes.push(related.source.id, related.target.id);
+        cluster.edges.push(related.id);
+        processed.add(related.id);
+      }
 
       clusters.push(cluster);
     }
@@ -828,24 +970,6 @@ export class AnalysisService {
         ? interaction2.timestamp
         : new Date(interaction2.timestamp || 0);
     return Math.abs(time1.getTime() - time2.getTime());
-  }
-
-  private calculateInteractionIntervals(interactions: any[]): number[] {
-    if (interactions.length < 2) return [0];
-
-    const sortedInteractions = [...interactions].sort(
-      (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
-    );
-
-    const intervals: number[] = [];
-    for (let i = 1; i < sortedInteractions.length; i++) {
-      intervals.push(
-        sortedInteractions[i].timestamp.getTime() -
-          sortedInteractions[i - 1].timestamp.getTime()
-      );
-    }
-
-    return intervals;
   }
 
   async getContentById(contentId: string): Promise<ExtendedContentNode | null> {

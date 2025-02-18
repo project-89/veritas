@@ -116,6 +116,115 @@ describe("AnalysisService", () => {
         service.measureRealityDeviation(narrativeId)
       ).rejects.toThrow("Narrative content not found for ID:");
     });
+
+    it("should handle invalid timestamps in propagation data", async () => {
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce([{ c: mockBaseContent }])
+        .mockResolvedValueOnce([{ sourceId: "source-123" }])
+        .mockResolvedValueOnce([{ contentCount: 100 }])
+        .mockResolvedValueOnce([
+          {
+            shareCount: 2,
+            totalReach: 300,
+            totalEngagement: 1.7,
+            platformCount: 1,
+            firstShare: null,
+            lastShare: "invalid",
+          },
+        ])
+        .mockResolvedValueOnce([{ references: [] }]);
+
+      const result = await service.measureRealityDeviation(mockBaseContent.id);
+      expect(result.propagationVelocity).toBe(0);
+    });
+
+    it("should handle extreme engagement metrics", async () => {
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce([{ c: mockBaseContent }])
+        .mockResolvedValueOnce([{ sourceId: "source-123" }])
+        .mockResolvedValueOnce([{ contentCount: 100 }])
+        .mockResolvedValueOnce([
+          {
+            shareCount: 1000000,
+            totalReach: 1000000000,
+            totalEngagement: 100,
+            platformCount: 10,
+            firstShare: 0,
+            lastShare: 3600,
+          },
+        ])
+        .mockResolvedValueOnce([{ references: [] }]);
+
+      const result = await service.measureRealityDeviation(mockBaseContent.id);
+      expect(result.impactScore).toBeGreaterThan(0.8);
+    });
+
+    it("should handle conflicting cross-references", async () => {
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce([{ c: mockBaseContent }])
+        .mockResolvedValueOnce([{ sourceId: "source-123" }])
+        .mockResolvedValueOnce([
+          {
+            contentCount: 100,
+            verifiedContentCount: 50,
+            avgEngagement: 0.5,
+            crossReferences: 50,
+            verifiedSourceCount: 5,
+            totalSourceCount: 20,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            shareCount: 2,
+            totalReach: 300,
+            totalEngagement: 1.7,
+            platformCount: 1,
+            firstShare: 0,
+            lastShare: 86400,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            verifiedSources: 2,
+            contradictions: 2,
+            supporting: 2,
+            total: 4,
+            references: [
+              {
+                type: "support",
+                sourceId: "source-1",
+                credibilityScore: 0.5,
+                verificationStatus: "verified",
+              },
+              {
+                type: "contradiction",
+                sourceId: "source-2",
+                credibilityScore: 0.5,
+                verificationStatus: "verified",
+              },
+              {
+                type: "support",
+                sourceId: "source-3",
+                credibilityScore: 0.5,
+                verificationStatus: "unverified",
+              },
+              {
+                type: "contradiction",
+                sourceId: "source-4",
+                credibilityScore: 0.5,
+                verificationStatus: "unverified",
+              },
+            ],
+          },
+        ]);
+
+      const result = await service.measureRealityDeviation(mockBaseContent.id);
+      expect(result.crossReferenceScore).toBeGreaterThan(0.4);
+      expect(result.crossReferenceScore).toBeLessThan(0.6);
+    });
   });
 
   describe("detectPatterns", () => {
@@ -126,24 +235,93 @@ describe("AnalysisService", () => {
       { id: "content2", type: "content", text: "Test content 2" },
     ];
 
-    const mockEdges = [
+    const mockInteractions = [
       {
-        id: "interaction1",
-        source: { id: "user1", type: "account", name: "User 1" },
-        target: { id: "content1", type: "content", text: "Test content 1" },
-        type: "INTERACTED",
-        timestamp: new Date().toISOString(),
-        reach: 100,
-        engagement: 0.8,
+        r: {
+          id: "1",
+          type: "share",
+          properties: {
+            timestamp: new Date("2024-01-01T10:00:00Z"),
+            engagement: 0.8,
+          },
+        },
+        n: { id: "user1", type: "account" },
+        m: { id: "content1", type: "content" },
       },
       {
-        id: "interaction2",
-        source: { id: "user2", type: "account", name: "User 2" },
-        target: { id: "content2", type: "content", text: "Test content 2" },
-        type: "INTERACTED",
-        timestamp: new Date().toISOString(),
-        reach: 150,
-        engagement: 0.9,
+        r: {
+          id: "2",
+          type: "share",
+          properties: {
+            timestamp: new Date("2024-01-01T10:15:00Z"),
+            engagement: 0.7,
+          },
+        },
+        n: { id: "user2", type: "account" },
+        m: { id: "content1", type: "content" },
+      },
+      {
+        r: {
+          id: "3",
+          type: "share",
+          properties: {
+            timestamp: new Date("2024-01-01T10:30:00Z"),
+            engagement: 0.9,
+          },
+        },
+        n: { id: "user3", type: "account" },
+        m: { id: "content1", type: "content" },
+      },
+    ];
+
+    const mockAutomatedInteractions = [
+      {
+        r: {
+          id: "4",
+          type: "share",
+          properties: {
+            timestamp: new Date("2024-01-01T12:00:00Z"),
+            engagement: 0.5,
+          },
+        },
+        n: { id: "bot1", type: "account" },
+        m: { id: "content1", type: "content" },
+      },
+      {
+        r: {
+          id: "5",
+          type: "share",
+          properties: {
+            timestamp: new Date("2024-01-01T12:05:00Z"),
+            engagement: 0.5,
+          },
+        },
+        n: { id: "bot1", type: "account" },
+        m: { id: "content1", type: "content" },
+      },
+      {
+        r: {
+          id: "6",
+          type: "share",
+          properties: {
+            timestamp: new Date("2024-01-01T12:10:00Z"),
+            engagement: 0.5,
+          },
+        },
+        n: { id: "bot1", type: "account" },
+        m: { id: "content1", type: "content" },
+      },
+      {
+        r: {
+          id: "7",
+          type: "share",
+          properties: {
+            timestamp: new Date("2024-01-01T12:15:00Z"),
+            engagement: 0.5,
+          },
+        },
+        n: { id: "bot1", type: "account" },
+        m: { id: "content1", type: "content" },
       },
     ];
 
@@ -152,7 +330,7 @@ describe("AnalysisService", () => {
         .spyOn(memgraphService, "executeQuery")
         .mockImplementation(async (query) => {
           if (query.includes("MATCH (n)-[r]-(m)")) {
-            return [{ nodes: mockNodes, edges: mockEdges }];
+            return [{ nodes: mockNodes, edges: mockInteractions }];
           }
           return [];
         });
@@ -184,6 +362,119 @@ describe("AnalysisService", () => {
       jest.spyOn(memgraphService, "executeQuery").mockResolvedValue([]);
       const patterns = await service.detectPatterns(timeframe);
       expect(patterns).toEqual([]);
+    });
+
+    it("should detect patterns in overlapping time windows", async () => {
+      const timeframe = {
+        start: new Date("2024-01-01T10:00:00Z"),
+        end: new Date("2024-01-01T13:00:00Z"),
+      };
+
+      jest.spyOn(memgraphService, "executeQuery").mockResolvedValue([
+        {
+          n: { id: "user1", type: "account" },
+          r: {
+            id: "1",
+            type: "share",
+            properties: {
+              timestamp: new Date("2024-01-01T10:00:00Z"),
+              engagement: 0.8,
+            },
+          },
+          m: { id: "content1", type: "content" },
+        },
+        {
+          n: { id: "user2", type: "account" },
+          r: {
+            id: "2",
+            type: "share",
+            properties: {
+              timestamp: new Date("2024-01-01T10:15:00Z"),
+              engagement: 0.7,
+            },
+          },
+          m: { id: "content1", type: "content" },
+        },
+        {
+          n: { id: "user3", type: "account" },
+          r: {
+            id: "3",
+            type: "share",
+            properties: {
+              timestamp: new Date("2024-01-01T10:30:00Z"),
+              engagement: 0.9,
+            },
+          },
+          m: { id: "content1", type: "content" },
+        },
+      ]);
+
+      const patterns = await service.detectPatterns(timeframe);
+      expect(patterns.length).toBeGreaterThan(0);
+      expect(patterns.some((p) => p.type === "coordinated")).toBe(true);
+    });
+
+    it("should detect high-frequency automated patterns", async () => {
+      const timeframe = {
+        start: new Date("2024-01-01T12:00:00Z"),
+        end: new Date("2024-01-01T13:00:00Z"),
+      };
+
+      jest.spyOn(memgraphService, "executeQuery").mockResolvedValue([
+        {
+          n: { id: "bot1", type: "account" },
+          r: {
+            id: "4",
+            type: "share",
+            properties: {
+              timestamp: new Date("2024-01-01T12:00:00Z"),
+              engagement: 0.5,
+            },
+          },
+          m: { id: "content1", type: "content" },
+        },
+        {
+          n: { id: "bot1", type: "account" },
+          r: {
+            id: "5",
+            type: "share",
+            properties: {
+              timestamp: new Date("2024-01-01T12:05:00Z"),
+              engagement: 0.5,
+            },
+          },
+          m: { id: "content1", type: "content" },
+        },
+        {
+          n: { id: "bot1", type: "account" },
+          r: {
+            id: "6",
+            type: "share",
+            properties: {
+              timestamp: new Date("2024-01-01T12:10:00Z"),
+              engagement: 0.5,
+            },
+          },
+          m: { id: "content1", type: "content" },
+        },
+        {
+          n: { id: "bot1", type: "account" },
+          r: {
+            id: "7",
+            type: "share",
+            properties: {
+              timestamp: new Date("2024-01-01T12:15:00Z"),
+              engagement: 0.5,
+            },
+          },
+          m: { id: "content1", type: "content" },
+        },
+      ]);
+
+      const patterns = await service.detectPatterns(timeframe);
+      expect(
+        patterns.some((p) => p.type === "automated" && p.confidence > 0.8)
+      ).toBe(true);
     });
   });
 
@@ -255,6 +546,121 @@ describe("AnalysisService", () => {
 
       expect(Array.isArray(results)).toBe(true);
       expect(results.length).toBe(0);
+    });
+
+    it("should find content with multiple matching topics", async () => {
+      const contentWithMultipleTopics: ExtendedContentNode = {
+        ...mockBaseContent,
+        classification: {
+          ...mockClassification,
+          topics: ["topic1", "topic2", "topic3"],
+        },
+      };
+
+      const mockRelatedContent = [
+        {
+          ...mockBaseContent,
+          id: "content-2",
+          classification: {
+            ...mockClassification,
+            topics: ["topic1", "topic2"],
+          },
+        },
+        {
+          ...mockBaseContent,
+          id: "content-3",
+          classification: {
+            ...mockClassification,
+            topics: ["topic2", "topic3"],
+          },
+        },
+      ];
+
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce(
+          mockRelatedContent.map((content) => ({ related: content }))
+        );
+
+      const results = await service.findRelatedContent(
+        contentWithMultipleTopics
+      );
+      expect(results.length).toBe(2);
+      expect(results[0]?.classification?.topics).toEqual(
+        expect.arrayContaining(["topic1", "topic2"])
+      );
+    });
+
+    it("should find content in different languages", async () => {
+      const contentInFrench: ExtendedContentNode = {
+        ...mockBaseContent,
+        classification: {
+          ...mockClassification,
+          language: "fr",
+          topics: ["topic1"],
+        },
+      };
+
+      const mockRelatedContent = {
+        ...mockBaseContent,
+        id: "content-2",
+        classification: {
+          ...mockClassification,
+          language: "en",
+          topics: ["topic1"],
+        },
+      };
+
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce([{ related: mockRelatedContent }]);
+
+      const results = await service.findRelatedContent(contentInFrench);
+      expect(results.length).toBe(1);
+      expect(results[0]?.classification?.language).not.toBe(
+        contentInFrench.classification?.language
+      );
+    });
+
+    it("should prioritize content by sentiment similarity", async () => {
+      const positiveContent: ExtendedContentNode = {
+        ...mockBaseContent,
+        classification: {
+          ...mockClassification,
+          sentiment: "positive",
+          topics: ["topic1"],
+        },
+      };
+
+      const mockRelatedContent = [
+        {
+          ...mockBaseContent,
+          id: "content-2",
+          classification: {
+            ...mockClassification,
+            sentiment: "positive",
+            topics: ["topic1"],
+          },
+        },
+        {
+          ...mockBaseContent,
+          id: "content-3",
+          classification: {
+            ...mockClassification,
+            sentiment: "negative",
+            topics: ["topic1"],
+          },
+        },
+      ];
+
+      jest
+        .spyOn(memgraphService, "executeQuery")
+        .mockResolvedValueOnce(
+          mockRelatedContent.map((content) => ({ related: content }))
+        );
+
+      const results = await service.findRelatedContent(positiveContent);
+      expect(results[0]?.classification?.sentiment).toBe("positive");
     });
   });
 
