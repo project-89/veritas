@@ -100,7 +100,7 @@ export class AnalysisService {
     return {
       baselineScore,
       deviationMagnitude,
-      propagationVelocity: propagationMetrics.velocity,
+      propagationVelocity: propagationMetrics?.velocity || 0,
       crossReferenceScore: this.calculateCrossReferenceScore(
         crossReferenceMetrics
       ),
@@ -385,14 +385,17 @@ export class AnalysisService {
   }
 
   private isCoordinatedPattern(cluster: any): boolean {
-    const timeThreshold = 300000; // 5 minutes
-    const minActions = 5;
-    const minAccounts = 3;
+    const minActions = 3;
+    const minAccounts = 2;
+    const timeThreshold = 3600000; // 1 hour in milliseconds
+
+    const actions = cluster.interactions || cluster.actions || [];
+    const accounts = new Set(actions.map((a: any) => a.source));
 
     return (
-      cluster.actions.length >= minActions &&
-      cluster.accounts.size >= minAccounts &&
-      this.calculateTimeSpread(cluster.actions) <= timeThreshold
+      actions.length >= minActions &&
+      accounts.size >= minAccounts &&
+      this.calculateTimeSpread(actions) <= timeThreshold
     );
   }
 
@@ -420,11 +423,15 @@ export class AnalysisService {
   }
 
   private calculatePatternConfidence(cluster: any): number {
+    if (!cluster || !cluster.actions) {
+      return 0;
+    }
+
     const timeScore = Math.min(
       1,
       300000 / this.calculateTimeSpread(cluster.actions)
     );
-    const accountScore = Math.min(1, cluster.accounts.size / 10);
+    const accountScore = Math.min(1, (cluster.accounts?.size || 0) / 10);
     const actionScore = Math.min(1, cluster.actions.length / 20);
 
     return (timeScore + accountScore + actionScore) / 3;
@@ -456,7 +463,15 @@ export class AnalysisService {
   }
 
   private calculateTimeSpread(interactions: any[]): number {
-    const timestamps = interactions.map((i) => new Date(i.timestamp).getTime());
+    if (!interactions || interactions.length === 0) {
+      return 0;
+    }
+    const timestamps = interactions.map((i) => {
+      const timestamp = i.timestamp || i.properties?.timestamp;
+      return timestamp instanceof Date
+        ? timestamp.getTime()
+        : new Date(timestamp).getTime();
+    });
     return Math.max(...timestamps) - Math.min(...timestamps);
   }
 
@@ -526,12 +541,11 @@ export class AnalysisService {
 
   private groupInteractions(queryResult: any[]): any[] {
     return queryResult.map((row) => ({
-      id: row.r.id,
-      source: row.n.id,
-      target: row.m.id,
-      type: row.r.type,
-      timestamp: new Date(row.r.timestamp),
-      properties: row.r.properties,
+      id: row.r?.id || row.id,
+      source: row.n?.id || row.source,
+      target: row.m?.id || row.target,
+      type: row.r?.type || row.type,
+      timestamp: row.r?.properties?.timestamp || row.timestamp,
     }));
   }
 
@@ -622,49 +636,63 @@ export class AnalysisService {
   }
 
   private calculateContentScore(content: any): number {
+    if (!content) return 0;
+
     const factors = {
-      classification: content.classification?.toxicity || 0,
-      sentiment: this.getSentimentScore(content.classification?.sentiment),
-      length: Math.min(content.text.length / 1000, 1), // Normalize length, cap at 1000 chars
+      toxicity: content?.toxicity || content?.classification?.toxicity || 0,
+      sentiment: this.getSentimentScore(
+        content?.sentiment || content?.classification?.sentiment
+      ),
+      length: content?.text ? Math.min(content.text.length / 1000, 1) : 0, // Normalize length, cap at 1000 chars
+    };
+
+    // Weight factors
+    const weights = {
+      toxicity: 0.4,
+      sentiment: 0.3,
+      length: 0.3,
     };
 
     return (
-      (1 - factors.classification) * 0.4 + // Lower toxicity is better
-      factors.sentiment * 0.3 + // Balanced sentiment is better
-      factors.length * 0.3 // Longer content (up to a point) is better
+      (1 - factors.toxicity) * weights.toxicity +
+      factors.sentiment * weights.sentiment +
+      factors.length * weights.length
     );
   }
 
   private calculateInteractionScore(
-    interactions: any[],
-    uniqueUsers: number
+    interactions: any[] = [],
+    uniqueUsers: number = 0
   ): number {
-    if (!interactions.length) return 0;
+    if (!Array.isArray(interactions) || !interactions.length || !uniqueUsers) {
+      return 0;
+    }
 
     const metrics = {
       engagement: interactions.length / uniqueUsers, // Interactions per unique user
+      frequency: interactions.length / (24 * 60 * 60 * 1000), // Interactions per day
       diversity: uniqueUsers / interactions.length, // Ratio of unique users to total interactions
-      quality:
-        interactions.filter((i) => i.type === "LIKED" || i.type === "SHARED")
-          .length / interactions.length,
     };
 
+    // Weight the metrics
     return (
-      (Math.min(metrics.engagement, 5) * 0.4 + // Cap engagement at 5 interactions per user
-        metrics.diversity * 0.3 + // Higher diversity is better
-        metrics.quality * 0.3) / // Quality interactions weighted more
-      1.7
-    ); // Normalize to 0-1 range
+      metrics.engagement * 0.4 +
+      metrics.frequency * 0.3 +
+      metrics.diversity * 0.3
+    );
   }
 
   private calculateVerificationScore(content: any): number {
+    if (!content) return 0;
+
+    const metadata = content.metadata || {};
     const factors = {
-      hasLinks: content.metadata?.links?.length > 0 ? 0.3 : 0,
-      hasMedia: content.metadata?.media?.length > 0 ? 0.2 : 0,
-      isVerified: content.metadata?.verified ? 0.5 : 0,
+      hasLinks: metadata.links?.length > 0 ? 0.3 : 0,
+      hasMedia: metadata.media?.length > 0 ? 0.2 : 0,
+      isVerified: metadata.verified ? 0.5 : 0,
     };
 
-    return factors.hasLinks + factors.hasMedia + factors.isVerified;
+    return Object.values(factors).reduce((sum, value) => sum + value, 0);
   }
 
   private getSentimentScore(sentiment: string): number {
@@ -682,29 +710,27 @@ export class AnalysisService {
   private async analyzeTemporalPatterns(
     timeframe: TimeFrame
   ): Promise<Map<string, number>> {
-    const query = `
-      MATCH (c:Content)-[r]-(n)
-      WHERE r.timestamp >= $start AND r.timestamp <= $end
-      WITH c, r, n,
-           duration.between(c.timestamp, r.timestamp) as timeDiff,
-           datetime($start) as startTime,
-           datetime($end) as endTime
-      WITH c,
+    const result = await this.memgraphService.executeQuery(
+      `
+      MATCH (n)-[r]-(m)
+      WHERE r.timestamp >= $startTime AND r.timestamp <= $endTime
+      WITH n.id as nodeId,
            count(r) as interactionCount,
-           avg(timeDiff) as avgTimeDiff,
-           stddev(timeDiff) as stdDevTimeDiff
-      RETURN c.id as contentId,
-             interactionCount,
-             avgTimeDiff,
-             stdDevTimeDiff
-    `;
-
-    const result = await this.memgraphService.executeQuery(query, {
-      start: timeframe.start.toISOString(),
-      end: timeframe.end.toISOString(),
-    });
+           avg(duration.between(datetime(r.timestamp), datetime(r.timestamp))) as avgTimeDiff,
+           stDev(duration.between(datetime(r.timestamp), datetime(r.timestamp))) as stdDevTimeDiff
+      RETURN nodeId, interactionCount, avgTimeDiff, stdDevTimeDiff
+      `,
+      {
+        startTime: timeframe.start.toISOString(),
+        endTime: timeframe.end.toISOString(),
+      }
+    );
 
     const patterns = new Map<string, number>();
+
+    if (!result || !Array.isArray(result)) {
+      return patterns;
+    }
 
     for (const row of result) {
       const temporalScore = this.calculateTemporalScore(
@@ -712,7 +738,7 @@ export class AnalysisService {
         row.avgTimeDiff,
         row.stdDevTimeDiff
       );
-      patterns.set(row.contentId, temporalScore);
+      patterns.set(row.nodeId, temporalScore);
     }
 
     return patterns;
@@ -747,56 +773,61 @@ export class AnalysisService {
   }
 
   private async getContentSourceId(contentId: string): Promise<string | null> {
-    const query = `
-      MATCH (c:Content {id: $contentId})<-[:PUBLISHED]-(s:Source)
+    const result = await this.memgraphService.executeQuery(
+      `
+      MATCH (c:Content {id: $contentId})<-[:CREATED]-(s:Source)
       RETURN s.id as sourceId
-    `;
-    const result = await this.memgraphService.executeQuery(query, {
-      contentId,
-    });
-    return result[0]?.sourceId || null;
+    `,
+      {
+        contentId,
+      }
+    );
+    return result?.[0]?.sourceId || null;
   }
 
   private findInteractionClusters(interactions: any[]): any[] {
-    const clusters: any[] = [];
     const processed = new Set<string>();
+    const clusters: any[] = [];
 
     for (const interaction of interactions) {
       if (processed.has(interaction.id)) continue;
 
       const cluster = {
         actions: [interaction],
-        accounts: new Set([interaction.source, interaction.target]),
-        nodes: [interaction.source, interaction.target],
-        edges: [interaction.id],
+        accounts: new Set([interaction.source]),
       };
 
-      // Find related interactions within time window
       const relatedInteractions = interactions.filter(
         (i) =>
           !processed.has(i.id) &&
-          Math.abs(i.timestamp.getTime() - interaction.timestamp.getTime()) <=
-            300000 && // 5 minutes
+          this.getTimeDifference(interaction, i) <= 300000 && // 5 minutes
           (i.source === interaction.source ||
             i.target === interaction.target ||
-            i.source === interaction.target ||
-            i.target === interaction.source)
+            i.type === interaction.type)
       );
 
-      for (const related of relatedInteractions) {
-        cluster.actions.push(related);
-        cluster.accounts.add(related.source);
-        cluster.accounts.add(related.target);
-        cluster.nodes.push(related.source, related.target);
-        cluster.edges.push(related.id);
-        processed.add(related.id);
-      }
+      relatedInteractions.forEach((i) => {
+        cluster.actions.push(i);
+        cluster.accounts.add(i.source);
+        processed.add(i.id);
+      });
 
       clusters.push(cluster);
-      processed.add(interaction.id);
     }
 
     return clusters;
+  }
+
+  private getTimeDifference(interaction1: any, interaction2: any): number {
+    const time1 =
+      interaction1.timestamp instanceof Date
+        ? interaction1.timestamp
+        : new Date(interaction1.timestamp || 0);
+    const time2 =
+      interaction2.timestamp instanceof Date
+        ? interaction2.timestamp
+        : new Date(interaction2.timestamp || 0);
+    return Math.abs(time1.getTime() - time2.getTime());
   }
 
   private calculateInteractionIntervals(interactions: any[]): number[] {
@@ -853,8 +884,12 @@ export class AnalysisService {
 
     if (!result.length) return [];
 
-    const { nodes, edges } = result[0];
+    const { nodes = [], edges = [] } = result[0] || {};
     const patterns: Pattern[] = [];
+
+    if (nodes.length === 0 || edges.length === 0) {
+      return patterns;
+    }
 
     // Detect all pattern types
     const detectedPatterns = [
@@ -871,8 +906,12 @@ export class AnalysisService {
         id: `pattern-${content.id}-organic`,
         type: "organic",
         confidence: 0.9,
-        nodes: nodes.map((n: any) => n.id),
-        edges: edges.map((e: any) => e.id),
+        nodes: nodes.map(
+          (n: any) => n.id || n.properties?.id || crypto.randomUUID()
+        ),
+        edges: edges.map(
+          (e: any) => e.id || e.properties?.id || crypto.randomUUID()
+        ),
         timeframe,
       });
     }
@@ -887,8 +926,10 @@ export class AnalysisService {
     const sourceCredibility = await this.calculateSourceCredibility(
       content.sourceId || ""
     );
-    const baselineScore =
-      (1 - (content.toxicity || 0)) * 0.3 + sourceCredibility * 0.7;
+
+    // Use toxicity from content or classification, defaulting to 0
+    const toxicity = content.toxicity || content.classification?.toxicity || 0;
+    const baselineScore = (1 - toxicity) * 0.3 + sourceCredibility * 0.7;
 
     // Calculate narrative consistency by comparing with related content
     const relatedContent = await this.findRelatedContent(content);
@@ -921,7 +962,7 @@ export class AnalysisService {
     return {
       baselineScore,
       deviationMagnitude,
-      propagationVelocity,
+      propagationVelocity: propagationVelocity || 0,
       crossReferenceScore,
       sourceCredibility,
       impactScore,
@@ -930,37 +971,55 @@ export class AnalysisService {
 
   private calculateImpactScore(
     deviationMagnitude: number,
-    propagationMetrics: PropagationMetrics,
-    temporalPatterns?: Map<string, number>
+    propagationMetrics: any,
+    temporalPatterns: Map<string, number>
   ): number {
-    const propagationScore =
-      propagationMetrics.velocity * 0.6 + propagationMetrics.reach * 0.4;
-    return deviationMagnitude * 0.4 + propagationScore * 0.6;
+    const velocityWeight = 0.3;
+    const reachWeight = 0.2;
+    const engagementWeight = 0.2;
+    const spreadWeight = 0.1;
+    const patternWeight = 0.2;
+
+    const normalizedReach = Math.min(propagationMetrics.reach / 10000, 1); // Normalize reach to max of 10000
+    const patternScore =
+      Array.from(temporalPatterns.values()).reduce((acc, val) => acc + val, 0) /
+      Math.max(temporalPatterns.size, 1);
+
+    const score =
+      deviationMagnitude *
+      (velocityWeight * (propagationMetrics.velocity || 0) +
+        reachWeight * normalizedReach +
+        engagementWeight * (propagationMetrics.engagement || 0) +
+        spreadWeight * (propagationMetrics.crossPlatformSpread || 0) +
+        patternWeight * patternScore);
+
+    return Math.min(Math.max(score, 0), 1); // Ensure score is between 0 and 1
   }
 
   private async calculatePropagationVelocity(
     content: ExtendedContentNode
   ): Promise<number> {
-    const query = `
-      MATCH (c:Content {id: $contentId})<-[r:SHARES|REFERENCES]-()
-      WITH r.timestamp as timestamp
-      ORDER BY timestamp
-      RETURN collect(timestamp) as timestamps
-    `;
+    const result = await this.memgraphService.executeQuery(
+      `
+      MATCH (c:Content {id: $contentId})-[r]-(n)
+      WITH collect(r.timestamp) as timestamps
+      RETURN timestamps
+      `,
+      {
+        contentId: content.id,
+      }
+    );
 
-    const result = await this.memgraphService.executeQuery(query, {
-      contentId: content.id,
-    });
-    if (!result.length || !result[0].timestamps.length) return 0;
+    if (!result || !Array.isArray(result) || !result[0]?.timestamps?.length) {
+      return 0;
+    }
 
     const timestamps = result[0].timestamps;
-    const timeSpan = Math.max(
-      (new Date(timestamps[timestamps.length - 1]).getTime() -
-        new Date(timestamps[0]).getTime()) /
-        (1000 * 60 * 60),
-      1
-    ); // Time span in hours, minimum 1 hour
-    return Math.min(timestamps.length / timeSpan, 1); // Normalize to 0-1 range
+    const timeSpan = Math.max(...timestamps) - Math.min(...timestamps);
+    const interactionCount = timestamps.length;
+
+    // Calculate velocity as interactions per hour
+    return timeSpan > 0 ? (interactionCount / timeSpan) * 3600000 : 0;
   }
 
   async findRelatedContent(
@@ -984,18 +1043,21 @@ export class AnalysisService {
     content: ExtendedContentNode,
     relatedContent: ExtendedContentNode[]
   ): Promise<number> {
-    if (!relatedContent.length) return 1;
+    if (!content || !relatedContent || relatedContent.length === 0) {
+      return 0;
+    }
 
     const consistencyScores = relatedContent.map((related) => {
       const topicOverlap = this.calculateTopicOverlap(
-        content.topics,
-        related.topics
+        content.topics || [],
+        related?.topics || []
       );
       const sentimentAlignment = this.calculateSentimentAlignment(
-        content.sentiment,
-        related.sentiment
+        content.sentiment || "neutral",
+        related?.sentiment || "neutral"
       );
-      return topicOverlap * 0.7 + sentimentAlignment * 0.3;
+
+      return (topicOverlap + sentimentAlignment) / 2;
     });
 
     return (

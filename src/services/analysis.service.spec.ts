@@ -65,29 +65,33 @@ describe("AnalysisService", () => {
   describe("measureRealityDeviation", () => {
     it("should calculate reality deviation metrics for a narrative", async () => {
       const narrativeId = "test-narrative-id";
-      const mockContent = { ...mockContentNode };
-      const mockPropagation = {
+      const mockContent = {
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        text: "Test content",
+        timestamp: new Date(),
+        platform: "twitter",
+      };
+      const mockSourceId = "source-123";
+
+      jest
+        .spyOn(service as any, "getContentSourceId")
+        .mockResolvedValue(mockSourceId);
+      jest
+        .spyOn(service as any, "getNarrativeContent")
+        .mockResolvedValue(mockContent);
+      jest.spyOn(service, "calculateSourceCredibility").mockResolvedValue(0.8);
+      jest.spyOn(service as any, "analyzePropagation").mockResolvedValue({
         velocity: 0.8,
         reach: 1000,
         engagement: 0.7,
         crossPlatformSpread: 0.5,
-      };
-      const mockCrossReference = {
+      });
+      jest.spyOn(service as any, "analyzeCrossReferences").mockResolvedValue({
         verifiedSourceCount: 5,
         contradictionCount: 1,
         supportingEvidenceCount: 10,
         totalReferences: 15,
-      };
-
-      jest
-        .spyOn(service as any, "getNarrativeContent")
-        .mockResolvedValue(mockContent);
-      jest
-        .spyOn(service as any, "analyzePropagation")
-        .mockResolvedValue(mockPropagation);
-      jest
-        .spyOn(service as any, "analyzeCrossReferences")
-        .mockResolvedValue(mockCrossReference);
+      });
 
       const result = await service.measureRealityDeviation(narrativeId);
 

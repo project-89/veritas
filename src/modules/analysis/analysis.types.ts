@@ -101,4 +101,19 @@ export class ExtendedContentNode implements ContentNode {
 
   @Field(() => ContentMetadata, { nullable: true })
   metadata?: ContentMetadata;
+
+  @Field(() => Object, { nullable: true })
+  classification?: {
+    categories: string[];
+    sentiment: "positive" | "negative" | "neutral";
+    toxicity: number;
+    subjectivity: number;
+    language: string;
+    topics: string[];
+    entities: Array<{
+      text: string;
+      type: string;
+      confidence: number;
+    }>;
+  };
 }
