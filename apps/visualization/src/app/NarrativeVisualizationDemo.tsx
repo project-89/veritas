@@ -1,17 +1,17 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   RealityTunnelVisualization,
   generateSampleData as generateRealityTunnelData,
-} from "./RealityTunnelVisualization";
+} from './RealityTunnelVisualization';
 import {
   TemporalNarrativeVisualization,
   generateSampleData as generateTemporalData,
-} from "./TemporalNarrativeVisualization";
-import "./NarrativeVisualizationDemo.css"; // We'll create this CSS file next
+} from './TemporalNarrativeVisualization';
+import './NarrativeVisualizationDemo.css'; // We'll create this CSS file next
 
 const NarrativeVisualizationDemo: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"reality-tunnel" | "temporal">(
-    "reality-tunnel"
+  const [activeTab, setActiveTab] = useState<'reality-tunnel' | 'temporal'>(
+    'reality-tunnel',
   );
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
@@ -33,21 +33,21 @@ const NarrativeVisualizationDemo: React.FC = () => {
 
       <div className="tab-navigation">
         <button
-          className={activeTab === "reality-tunnel" ? "active" : ""}
-          onClick={() => setActiveTab("reality-tunnel")}
+          className={activeTab === 'reality-tunnel' ? 'active' : ''}
+          onClick={() => setActiveTab('reality-tunnel')}
         >
           Reality Tunnel Visualization
         </button>
         <button
-          className={activeTab === "temporal" ? "active" : ""}
-          onClick={() => setActiveTab("temporal")}
+          className={activeTab === 'temporal' ? 'active' : ''}
+          onClick={() => setActiveTab('temporal')}
         >
           Temporal Narrative Evolution
         </button>
       </div>
 
       <div className="visualization-container">
-        {activeTab === "reality-tunnel" && (
+        {activeTab === 'reality-tunnel' && (
           <div className="reality-tunnel-container">
             <div className="visualization-description">
               <h2>Reality Tunnel Visualization</h2>
@@ -76,11 +76,11 @@ const NarrativeVisualizationDemo: React.FC = () => {
                   <strong>Content:</strong> {selectedNode.content}
                 </p>
                 <p>
-                  <strong>Timestamp:</strong>{" "}
+                  <strong>Timestamp:</strong>{' '}
                   {selectedNode.timestamp.toLocaleString()}
                 </p>
                 <p>
-                  <strong>Deviation Score:</strong>{" "}
+                  <strong>Deviation Score:</strong>{' '}
                   {selectedNode.deviationScore.toFixed(2)}
                 </p>
                 <p>
@@ -92,7 +92,7 @@ const NarrativeVisualizationDemo: React.FC = () => {
           </div>
         )}
 
-        {activeTab === "temporal" && (
+        {activeTab === 'temporal' && (
           <div className="temporal-container">
             <div className="visualization-description">
               <h2>Temporal Narrative Evolution</h2>
@@ -121,7 +121,7 @@ const NarrativeVisualizationDemo: React.FC = () => {
                   <strong>Content:</strong> {selectedEvent.content}
                 </p>
                 <p>
-                  <strong>Timestamp:</strong>{" "}
+                  <strong>Timestamp:</strong>{' '}
                   {selectedEvent.timestamp.toLocaleString()}
                 </p>
                 <p>
