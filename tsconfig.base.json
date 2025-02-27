@@ -1,0 +1,32 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "es2015",
+    "module": "esnext",
+    "lib": ["es2020", "dom"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@veritas/analysis": ["libs/analysis/src/index.ts"],
+      "@veritas/content": ["libs/content/src/index.ts"],
+      "@veritas/ingestion": ["libs/ingestion/src/index.ts"],
+      "@veritas/monitoring": ["libs/monitoring/src/index.ts"],
+      "@veritas/sources": ["libs/sources/src/index.ts"],
+      "@veritas/shared/types": ["libs/shared/types/src/index.ts"],
+      "@veritas/shared/utils": ["libs/shared/utils/src/index.ts"],
+      "@veritas/visualization/network-graph": ["libs/visualization/network-graph/src/index.ts"],
+      "@veritas/visualization/reality-tunnel": ["libs/visualization/reality-tunnel/src/index.ts"],
+      "@veritas/visualization/temporal-narrative": ["libs/visualization/temporal-narrative/src/index.ts"],
+      "@veritas/visualization/shared": ["libs/visualization/shared/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "tmp"]
+}
