@@ -62,7 +62,7 @@ import {
   generateNetworkData,
   generateRealityTunnelData,
   generateTemporalData
-} from '@veritas/visualization-components';
+} from '@veritas/visualization';
 
 // Network Graph Example
 const MyNetworkGraph = () => {
@@ -98,7 +98,7 @@ const MyTemporalNarrative = () => {
 Run tests with:
 
 ```bash
-nx test visualization-components
+nx test visualization
 ```
 
 ### Building
@@ -106,7 +106,7 @@ nx test visualization-components
 Build the library with:
 
 ```bash
-nx build visualization-components
+nx build visualization
 ```
 
 ## Dependencies

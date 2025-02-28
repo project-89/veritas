@@ -17,8 +17,8 @@
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "paths": {
-      "@veritas-nx/visualization-components": [
-        "libs/visualization-components/src/index.ts"
+      "@veritas-nx/visualization": [
+        "libs/visualization/src/index.ts"
       ],
       "@veritas/analysis": ["libs/analysis/src/index.ts"],
       "@veritas/content": ["libs/content/src/index.ts"],

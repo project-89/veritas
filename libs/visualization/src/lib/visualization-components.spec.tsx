@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 
-import VisualizationComponents from './visualization-components';
+import VisualizationComponents from './visualization';
 
 describe('VisualizationComponents', () => {
   it('should render successfully', () => {
