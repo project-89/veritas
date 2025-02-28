@@ -2,7 +2,26 @@
   "name": "@veritas-nx/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "test": "nx run-many --target=test --all",
+    "test:visualization": "nx test visualization",
+    "test:api": "nx test api",
+    "test:analysis": "nx test analysis",
+    "test:types": "nx test types",
+    "test:utils": "nx test utils",
+    "test:data-access": "nx test data-access",
+    "test:watch": "nx run-many --target=test --all --watch",
+    "test:coverage": "nx run-many --target=test --all --coverage",
+    "test:affected": "nx affected --target=test",
+    "build": "nx run-many --target=build --all",
+    "build:visualization": "nx build visualization",
+    "build:api": "nx build api",
+    "lint": "nx run-many --target=lint --all",
+    "lint:fix": "nx run-many --target=lint --all --fix",
+    "serve:api": "nx serve api",
+    "serve:visualization": "nx serve visualization",
+    "dev": "nx run-many --target=serve --projects=api,visualization --parallel=2"
+  },
   "private": true,
   "devDependencies": {
     "@babel/core": "^7.14.5",
@@ -76,7 +95,8 @@
     "react-dom": "19.0.0",
     "react-router-dom": "^6.29.0",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.0"
+    "rxjs": "^7.8.0",
+    "zod": "^3.24.2"
   },
   "nx": {
     "includedScripts": []

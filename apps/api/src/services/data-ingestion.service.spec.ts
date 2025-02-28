@@ -1,14 +1,14 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { DataIngestionService } from "./data-ingestion.service";
-import { z } from "zod";
+import { Test, TestingModule } from '@nestjs/testing';
+import { DataIngestionService } from './data-ingestion.service';
+import { z } from 'zod';
 import {
   ContentNode,
   SourceNode,
   ContentNodeSchema,
   SourceNodeSchema,
-} from "../schemas/base.schema";
+} from '../schemas/base.schema';
 
-describe("DataIngestionService", () => {
+describe('DataIngestionService', () => {
   let service: DataIngestionService;
 
   beforeEach(async () => {
@@ -19,106 +19,115 @@ describe("DataIngestionService", () => {
     service = module.get<DataIngestionService>(DataIngestionService);
   });
 
-  it("should be defined", () => {
+  it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
-  describe("ingestContent", () => {
+  describe('ingestContent', () => {
     const mockSource: SourceNode = {
-      id: "123e4567-e89b-12d3-a456-426614174000",
-      name: "Test Source",
-      platform: "twitter",
-      credibilityScore: 0.8,
-      verificationStatus: "verified",
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      type: 'source',
+      name: 'Test Source',
     };
 
     const mockContent: ContentNode = {
-      id: "123e4567-e89b-12d3-a456-426614174001",
-      text: "Test content",
-      timestamp: new Date(),
-      platform: "twitter",
-      sourceId: "123e4567-e89b-12d3-a456-426614174000",
-      toxicity: 0.1,
-      sentiment: "neutral",
-      categories: ["test"],
-      topics: ["test"],
+      id: '123e4567-e89b-12d3-a456-426614174001',
+      type: 'content',
+      content: 'Test content',
+      timestamp: Date.now(),
+      source: '123e4567-e89b-12d3-a456-426614174000',
+      sentiment: 0.5,
+      topics: ['test'],
     };
 
-    it("should successfully ingest valid content and source", async () => {
-      const consoleSpy = jest.spyOn(console, "log").mockImplementation();
+    it('should successfully ingest valid content', async () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
-      await expect(
-        service.ingestContent(mockSource, mockContent)
-      ).resolves.not.toThrow();
+      await expect(service.ingestContent(mockContent)).resolves.not.toThrow();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "Ingesting content:",
-        expect.objectContaining({
-          source: mockSource,
-          content: mockContent,
-        })
-      );
+      expect(service.getContentById(mockContent.id)).toBeDefined();
     });
 
-    it("should throw error for invalid source", async () => {
-      const invalidSource = { ...mockSource, platform: "invalid" };
+    it('should throw error for invalid content', async () => {
+      const invalidContent = { ...mockContent, sentiment: 'invalid' };
 
       await expect(
-        service.ingestContent(invalidSource as SourceNode, mockContent)
-      ).rejects.toThrow("Validation error");
+        service.ingestContent(invalidContent as any)
+      ).rejects.toThrow('Validation error');
     });
 
-    it("should throw error for invalid content", async () => {
-      const invalidContent = { ...mockContent, sentiment: "invalid" };
-
-      await expect(
-        service.ingestContent(mockSource, invalidContent as ContentNode)
-      ).rejects.toThrow("Validation error");
-    });
-
-    it("should handle non-validation errors", async () => {
-      const error = new Error("Test error");
-      jest.spyOn(SourceNodeSchema, "parse").mockImplementation(() => {
+    it('should handle non-validation errors', async () => {
+      const error = new Error('Test error');
+      jest.spyOn(ContentNodeSchema, 'parse').mockImplementation(() => {
         throw error;
       });
 
-      await expect(
-        service.ingestContent(mockSource, mockContent)
-      ).rejects.toThrow(error);
+      await expect(service.ingestContent(mockContent)).rejects.toThrow(error);
     });
   });
 
-  describe("validateData", () => {
+  describe('ingestSource', () => {
+    const mockSource: SourceNode = {
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      type: 'source',
+      name: 'Test Source',
+    };
+
+    it('should successfully ingest valid source', async () => {
+      await expect(service.ingestSource(mockSource)).resolves.not.toThrow();
+
+      expect(service.getSourceById(mockSource.id)).toBeDefined();
+    });
+
+    it('should throw error for invalid source', async () => {
+      const invalidSource = { id: '123', name: 'Test' }; // Missing type field
+
+      await expect(service.ingestSource(invalidSource as any)).rejects.toThrow(
+        'Validation error'
+      );
+    });
+
+    it('should handle non-validation errors', async () => {
+      const error = new Error('Test error');
+      jest.spyOn(SourceNodeSchema, 'parse').mockImplementation(() => {
+        throw error;
+      });
+
+      await expect(service.ingestSource(mockSource)).rejects.toThrow(error);
+    });
+  });
+
+  describe('validateData', () => {
     const TestSchema = z.object({
       name: z.string(),
       value: z.number(),
     });
 
-    it("should validate correct data", async () => {
-      const validData = { name: "test", value: 123 };
+    it('should validate correct data', async () => {
+      const validData = { name: 'test', value: 123 };
 
       const result = await service.validateData(TestSchema, validData);
       expect(result).toEqual(validData);
     });
 
-    it("should throw error for invalid data", async () => {
-      const invalidData = { name: "test", value: "not a number" };
+    it('should throw error for invalid data', async () => {
+      const invalidData = { name: 'test', value: 'not a number' };
 
       await expect(
         service.validateData(TestSchema, invalidData)
-      ).rejects.toThrow("Validation error");
+      ).rejects.toThrow('Validation error');
     });
 
-    it("should handle non-validation errors", async () => {
-      const error = new Error("Test error");
-      jest.spyOn(TestSchema, "parse").mockImplementation(() => {
+    it('should handle non-validation errors', async () => {
+      const error = new Error('Test error');
+      jest.spyOn(TestSchema, 'parse').mockImplementation(() => {
         throw error;
       });
 
       await expect(service.validateData(TestSchema, {})).rejects.toThrow(error);
     });
 
-    it("should validate complex nested data", async () => {
+    it('should validate complex nested data', async () => {
       const ComplexSchema = z.object({
         name: z.string(),
         nested: z.object({
@@ -128,10 +137,10 @@ describe("DataIngestionService", () => {
       });
 
       const validData = {
-        name: "test",
+        name: 'test',
         nested: {
           array: [1, 2, 3],
-          optional: "value",
+          optional: 'value',
         },
       };
 
