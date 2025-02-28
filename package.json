@@ -16,11 +16,14 @@
     "build": "nx run-many --target=build --all",
     "build:visualization": "nx build visualization",
     "build:api": "nx build api",
+    "build:visualization-showcase": "nx build visualization-showcase",
     "lint": "nx run-many --target=lint --all",
     "lint:fix": "nx run-many --target=lint --all --fix",
     "serve:api": "nx serve api",
     "serve:visualization": "nx serve visualization",
-    "dev": "nx run-many --target=serve --projects=api,visualization --parallel=2"
+    "serve:visualization-showcase": "nx serve visualization-showcase",
+    "dev": "nx run-many --target=serve --projects=api,visualization --parallel=2",
+    "dev:showcase": "nx run-many --target=serve --projects=api,visualization-showcase --parallel=2"
   },
   "private": true,
   "devDependencies": {
