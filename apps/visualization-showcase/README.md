@@ -16,6 +16,22 @@ A visualization that represents how narratives and perspectives evolve and diver
 
 A time-series visualization showing how multiple narratives evolve in strength and relationship over time.
 
+### Narrative Mycelium Visualization
+
+An organic visualization that represents narratives as interconnected mycelium-like structures, highlighting nodes of strength and rhizome-like connections.
+
+### Narrative Landscape Visualization
+
+A topographical landscape visualization where elevation indicates narrative strength and proximity indicates similarity between narratives.
+
+### Enhanced Reality Tunnel Visualization
+
+An advanced version of the Reality Tunnel visualization with additional features for deeper narrative analysis and exploration.
+
+### All Visualizations Demo
+
+An interactive demo that allows you to switch between all visualization types in one place, making it easy to compare their features and capabilities.
+
 ## Development
 
 ### Running the app

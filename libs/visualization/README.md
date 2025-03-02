@@ -1,112 +1,106 @@
 # Visualization Components Library
 
-This library contains a collection of visualization components for data analysis and narrative exploration. It consolidates visualization-specific components, types, and utilities that were previously spread across multiple packages.
+This library contains a set of visualization components for the Veritas project.
 
 ## Components
 
-### NetworkGraphVisualization
-
-A force-directed graph visualization for displaying network relationships between entities. Useful for showing connections, clusters, and influence patterns.
-
-**Features:**
-- Interactive node and edge display
-- Zoom and pan capabilities
-- Node selection and highlighting
-- Customizable node and edge styling
-
-### RealityTunnelVisualization
-
-A visualization that represents how narratives and perspectives evolve and diverge over time, creating "reality tunnels" that shape perception.
-
-**Features:**
-- Tunnel-like visualization of narrative evolution
-- Interactive selection of tunnels
-- Timeline-based exploration
-- Event markers at significant points
-
-### TemporalNarrativeVisualization
-
-A time-series visualization showing how multiple narratives evolve in strength and relationship over time.
-
-**Features:**
-- Stream-based visualization of narrative strength
-- Event markers for significant moments
-- Interactive selection of narrative streams
-- External event indicators
+- **NetworkGraphVisualization**: A force-directed graph visualization for displaying network relationships. [Documentation](../../docs/visualization/network-graph.md)
+- **RealityTunnelVisualization**: A visualization for representing how narratives and perspectives evolve over time. [Documentation](../../docs/visualization/reality-tunnel.md)
+- **TemporalNarrativeVisualization**: A visualization for representing how multiple narratives evolve in strength. [Documentation](../../docs/visualization/temporal-narrative.md)
+- **NarrativeMyceliumVisualization**: An organic visualization that represents narratives as interconnected mycelium-like structures. [Documentation](../../docs/visualization/narrative-mycelium.md)
+- **NarrativeLandscapeVisualization**: A topographical landscape visualization where elevation indicates narrative strength. [Documentation](../../docs/visualization/narrative-landscape.md)
+- **EnhancedRealityTunnelVisualization**: An advanced version of the Reality Tunnel visualization with additional features. [Documentation](../../docs/visualization/enhanced-reality-tunnel.md)
+- **VisualizationDemo**: A component that showcases all visualization types in one place. [Documentation](../../docs/visualization/visualization-demo.md)
 
 ## Types
 
-The library includes TypeScript interfaces for:
-
-- Network data structures (nodes, edges, graphs)
-- Narrative data structures
-- Temporal data structures
-- Visualization configuration options
+- **NetworkGraph**: TypeScript interface for network graph data
+- **RealityTunnelData**: TypeScript interface for reality tunnel data
+- **TemporalNarrativeData**: TypeScript interface for temporal narrative data
+- **MyceliumData**: TypeScript interface for narrative mycelium data
+- **LandscapeData**: TypeScript interface for narrative landscape data
+- **EnhancedTunnelData**: TypeScript interface for enhanced reality tunnel data
 
 ## Utilities
 
-Helper functions for:
-
-- Color manipulation and generation
-- Data transformation and normalization
-- Network metrics calculation
-- Sample data generation for testing and demos
+- **colorUtils**: Helper functions for color manipulation
+- **dataTransformers**: Functions for transforming data into visualization-ready formats
+- **networkMetrics**: Functions for calculating network metrics
+- **sampleDataGenerators**: Functions for generating sample data for each visualization
 
 ## Usage
 
 ```tsx
 import { 
-  NetworkGraphVisualization,
+  NetworkGraphVisualization, 
   RealityTunnelVisualization, 
   TemporalNarrativeVisualization,
-  generateNetworkData,
+  NarrativeMyceliumVisualization,
+  NarrativeLandscapeVisualization,
+  EnhancedRealityTunnelVisualization,
+  VisualizationDemo,
+  generateSampleNetworkData,
   generateRealityTunnelData,
-  generateTemporalData
-} from '@veritas/visualization';
+  generateTemporalData,
+  generateMyceliumData,
+  generateLandscapeData,
+  generateEnhancedTunnelData
+} from '@veritas-nx/visualization';
 
-// Network Graph Example
-const MyNetworkGraph = () => {
-  const data = generateNetworkData();
-  return <NetworkGraphVisualization data={data} width={800} height={600} />;
-};
+// Using with sample data
+const networkData = generateSampleNetworkData();
+const realityTunnelData = generateRealityTunnelData();
+const temporalNarrativeData = generateTemporalData();
+const myceliumData = generateMyceliumData();
+const landscapeData = generateLandscapeData();
+const enhancedTunnelData = generateEnhancedTunnelData();
 
-// Reality Tunnel Example
-const MyRealityTunnel = () => {
-  const data = generateRealityTunnelData();
-  return <RealityTunnelVisualization data={data} width={800} height={600} />;
-};
-
-// Temporal Narrative Example
-const MyTemporalNarrative = () => {
-  const data = generateTemporalData();
-  return <TemporalNarrativeVisualization data={data} width={800} height={600} />;
-};
+// In your component
+return (
+  <div>
+    <NetworkGraphVisualization data={networkData} width={800} height={600} />
+    <RealityTunnelVisualization data={realityTunnelData} width={800} height={600} />
+    <TemporalNarrativeVisualization data={temporalNarrativeData} width={800} height={400} />
+    <NarrativeMyceliumVisualization data={myceliumData} width={800} height={600} />
+    <NarrativeLandscapeVisualization data={landscapeData} width={800} height={600} />
+    <EnhancedRealityTunnelVisualization data={enhancedTunnelData} width={800} height={600} />
+    
+    {/* Or use the all-in-one demo component */}
+    <VisualizationDemo />
+  </div>
+);
 ```
+
+## Showcase Application
+
+To see all visualization components in action, you can run the **visualization-showcase** application:
+
+```bash
+npm run serve:visualization-showcase
+```
+
+This showcase demonstrates all components with interactive examples and sample data.
 
 ## Development
 
-### Adding New Components
+### Adding a new component
 
-1. Create a new component file in `src/lib/components/`
-2. Add necessary types to `src/lib/types/`
-3. Add utility functions to `src/lib/utils/` if needed
-4. Export the component in the appropriate index files
-5. Add tests in a `.spec.tsx` file
+1. Create a new component in `libs/visualization/src/lib/components`
+2. Export the component in `libs/visualization/src/index.ts`
+3. Add tests in `libs/visualization/src/lib/components/__tests__`
+4. Add documentation in `docs/visualization/`
+5. Add the component to the showcase application
 
 ### Testing
 
-Run tests with:
-
 ```bash
-nx test visualization
+npm run test:visualization
 ```
 
 ### Building
 
-Build the library with:
-
 ```bash
-nx build visualization
+npm run build:visualization
 ```
 
 ## Dependencies
@@ -117,4 +111,4 @@ nx build visualization
 
 ## Notes
 
-This library is part of the Veritas project's visualization system. It's designed to work with the data structures and APIs provided by the Veritas data access libraries.
+This library is part of the Veritas project's visualization system, designed to help users understand complex information networks, narrative evolution, and temporal patterns in content.
