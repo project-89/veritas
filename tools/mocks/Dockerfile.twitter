@@ -1,0 +1,22 @@
+FROM node:16-alpine
+
+WORKDIR /app
+
+# Create app directory
+RUN mkdir -p /app/tools/mocks
+
+# Copy package files
+COPY tools/mocks/package.json /app/tools/mocks/
+
+# Install dependencies
+WORKDIR /app/tools/mocks
+RUN npm install
+
+# Copy the mock service code
+COPY tools/mocks/twitter-mock.js /app/tools/mocks/
+
+# Expose the service port
+EXPOSE 4001
+
+# Command to run the mock service
+CMD ["node", "twitter-mock.js"] 

@@ -1,0 +1,20 @@
+{
+  "name": "veritas-mock-services",
+  "version": "1.0.0",
+  "description": "Mock services for Veritas system testing",
+  "main": "index.js",
+  "scripts": {
+    "start:twitter": "node twitter-mock.js",
+    "start:reddit": "node reddit-mock.js",
+    "start:facebook": "node facebook-mock.js",
+    "start:all": "concurrently \"npm run start:twitter\" \"npm run start:reddit\" \"npm run start:facebook\""
+  },
+  "dependencies": {
+    "@faker-js/faker": "^8.0.2",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+} 
