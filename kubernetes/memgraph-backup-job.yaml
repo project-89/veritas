@@ -1,0 +1,221 @@
+---
+# CronJob for regular Memgraph backups
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: memgraph-backup
+  namespace: veritas
+  labels:
+    app: veritas
+    component: backup
+spec:
+  schedule: "0 2 * * *"  # Run daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: veritas
+            component: backup
+        spec:
+          containers:
+          - name: backup
+            image: google/cloud-sdk:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # Set variables
+              BACKUP_NAME="memgraph-backup-$(date +%Y%m%d-%H%M%S)"
+              BUCKET_NAME="gs://veritas-backups"
+              
+              # Create a temporary directory for the backup
+              mkdir -p /tmp/backup
+              
+              # Dump Memgraph data using mgconsole
+              echo "DUMP DATABASE" | nc memgraph-service 7687 > /tmp/backup/memgraph.dump
+              
+              # Compress the backup
+              tar -czf /tmp/backup/$BACKUP_NAME.tar.gz -C /tmp/backup memgraph.dump
+              
+              # Upload to Google Cloud Storage
+              gsutil cp /tmp/backup/$BACKUP_NAME.tar.gz $BUCKET_NAME/
+              
+              # Clean up
+              rm -rf /tmp/backup
+              
+              # Log success
+              echo "Backup completed successfully: $BACKUP_NAME.tar.gz"
+            env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /var/secrets/google/key.json
+            volumeMounts:
+            - name: google-cloud-key
+              mountPath: /var/secrets/google
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 300m
+                memory: 512Mi
+          restartPolicy: OnFailure
+          volumes:
+          - name: google-cloud-key
+            secret:
+              secretName: backup-sa-key
+              items:
+              - key: key.json
+                path: key.json
+
+---
+# One-time backup job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: memgraph-backup-manual
+  namespace: veritas
+  labels:
+    app: veritas
+    component: backup
+spec:
+  template:
+    metadata:
+      labels:
+        app: veritas
+        component: backup
+    spec:
+      containers:
+      - name: backup
+        image: google/cloud-sdk:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Set variables
+          BACKUP_NAME="memgraph-backup-manual-$(date +%Y%m%d-%H%M%S)"
+          BUCKET_NAME="gs://veritas-backups"
+          
+          # Create a temporary directory for the backup
+          mkdir -p /tmp/backup
+          
+          # Dump Memgraph data using mgconsole
+          echo "DUMP DATABASE" | nc memgraph-service 7687 > /tmp/backup/memgraph.dump
+          
+          # Compress the backup
+          tar -czf /tmp/backup/$BACKUP_NAME.tar.gz -C /tmp/backup memgraph.dump
+          
+          # Upload to Google Cloud Storage
+          gsutil cp /tmp/backup/$BACKUP_NAME.tar.gz $BUCKET_NAME/
+          
+          # Clean up
+          rm -rf /tmp/backup
+          
+          # Log success
+          echo "Backup completed successfully: $BACKUP_NAME.tar.gz"
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/google/key.json
+        volumeMounts:
+        - name: google-cloud-key
+          mountPath: /var/secrets/google
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 300m
+            memory: 512Mi
+      restartPolicy: OnFailure
+      volumes:
+      - name: google-cloud-key
+        secret:
+          secretName: backup-sa-key
+          items:
+          - key: key.json
+            path: key.json
+
+---
+# Restore job (to be used when needed)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: memgraph-restore
+  namespace: veritas
+  labels:
+    app: veritas
+    component: restore
+spec:
+  template:
+    metadata:
+      labels:
+        app: veritas
+        component: restore
+    spec:
+      containers:
+      - name: restore
+        image: google/cloud-sdk:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Set variables
+          BACKUP_FILE="${BACKUP_FILE:-latest}"  # Use latest by default, override with env var
+          BUCKET_NAME="gs://veritas-backups"
+          
+          # Create a temporary directory for the restore
+          mkdir -p /tmp/restore
+          
+          # If BACKUP_FILE is "latest", find the latest backup
+          if [ "$BACKUP_FILE" = "latest" ]; then
+            BACKUP_FILE=$(gsutil ls $BUCKET_NAME/ | sort | tail -n 1)
+            echo "Using latest backup: $BACKUP_FILE"
+          else
+            BACKUP_FILE="$BUCKET_NAME/$BACKUP_FILE"
+          fi
+          
+          # Download the backup
+          gsutil cp $BACKUP_FILE /tmp/restore/
+          
+          # Extract the backup
+          tar -xzf /tmp/restore/$(basename $BACKUP_FILE) -C /tmp/restore
+          
+          # Stop Memgraph (requires coordination with the application)
+          # This is a simplified example - in production, you would need to:
+          # 1. Scale down applications that use Memgraph
+          # 2. Ensure no active connections
+          
+          # Restore Memgraph data
+          cat /tmp/restore/memgraph.dump | nc memgraph-service 7687
+          
+          # Clean up
+          rm -rf /tmp/restore
+          
+          # Log success
+          echo "Restore completed successfully from: $(basename $BACKUP_FILE)"
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/google/key.json
+        - name: BACKUP_FILE
+          value: "latest"  # Can be overridden when creating the job
+        volumeMounts:
+        - name: google-cloud-key
+          mountPath: /var/secrets/google
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 300m
+            memory: 512Mi
+      restartPolicy: OnFailure
+      volumes:
+      - name: google-cloud-key
+        secret:
+          secretName: backup-sa-key
+          items:
+          - key: key.json
+            path: key.json 

@@ -1,130 +1,132 @@
 # Contributing to Veritas
 
-Thank you for your interest in contributing to the Veritas project! This document provides guidelines and instructions for contributing to this Nx monorepo.
+Thank you for your interest in contributing to Veritas! This document provides guidelines and instructions for contributing to the project.
 
-## Getting Started
+## Code of Conduct
+
+By participating in this project, you agree to abide by our Code of Conduct. We expect all contributors to be respectful, inclusive, and considerate of others.
+
+## How to Contribute
+
+### Reporting Bugs
+
+If you find a bug in the project, please create an issue on GitHub with the following information:
+
+1. A clear, descriptive title
+2. A detailed description of the issue
+3. Steps to reproduce the bug
+4. Expected behavior
+5. Actual behavior
+6. Screenshots (if applicable)
+7. Environment information (OS, browser, etc.)
+
+### Suggesting Enhancements
+
+If you have an idea for an enhancement, please create an issue on GitHub with the following information:
+
+1. A clear, descriptive title
+2. A detailed description of the enhancement
+3. The motivation behind the enhancement
+4. Any potential implementation details
+5. Any potential drawbacks or considerations
+
+### Pull Requests
+
+We welcome pull requests for bug fixes, enhancements, and documentation improvements. To submit a pull request:
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/your-username/veritas.git`
-3. Install dependencies: `npm install`
-4. Create a new branch for your feature or bugfix: `git checkout -b feature/your-feature-name`
+2. Create a new branch for your changes
+3. Make your changes
+4. Run tests and ensure they pass
+5. Submit a pull request with a clear description of the changes
 
-## Project Structure
-
-The project is organized as an Nx monorepo with the following structure:
-
-### Applications
-
-- **api**: NestJS backend application
-- **visualization-showcase**: React application showcasing all visualization components with mock data
-
-### Libraries
-
-- **analysis**: Analysis modules and utilities
-- **content**: Content management modules
-- **ingestion**: Data ingestion modules
-- **monitoring**: Monitoring and logging modules
-- **sources**: Data source modules
-- **shared**: Shared types and utilities
-- **visualization**: Visualization components library
-
-## Development Workflow
-
-### Running the Applications
-
-```bash
-# Run the API
-npm run serve:api
-
-# Run the visualization showcase
-npm run serve:visualization-showcase
-
-# Run both in parallel
-npm run dev:showcase
-```
-
-### Testing
-
-```bash
-# Run all tests
-npm run test
-
-# Run tests for a specific project
-npm run test:api
-npm run test:visualization
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run tests with coverage
-npm run test:coverage
-```
-
-### Linting
-
-```bash
-# Lint all projects
-npm run lint
-
-# Fix linting issues
-npm run lint:fix
-```
-
-### Building
-
-```bash
-# Build all projects
-npm run build
-
-# Build specific projects
-npm run build:api
-npm run build:visualization-showcase
-```
-
-## Adding New Features
-
-### Adding a New Component to the Visualization Library
-
-1. Create a new component file in `libs/visualization/src/lib/components/`
-2. Add necessary types to `libs/visualization/src/lib/types/`
-3. Add utility functions to `libs/visualization/src/lib/utils/` if needed
-4. Export the component in the appropriate index files
-5. Add tests in a `.spec.tsx` file
-6. Update the showcase application to demonstrate the new component
-
-### Adding a New API Endpoint
-
-1. Create or modify the appropriate controller in `apps/api/src/controllers/`
-2. Create or modify the appropriate service in `apps/api/src/services/`
-3. Add necessary DTOs, entities, and interfaces
-4. Add tests for the new functionality
-5. Update the API documentation if applicable
-
-## Pull Request Process
+#### Pull Request Process
 
 1. Ensure your code follows the project's coding standards
 2. Update documentation as necessary
-3. Add tests for your changes
-4. Make sure all tests pass: `npm run test`
-5. Make sure there are no linting errors: `npm run lint`
-6. Submit a pull request to the `main` branch
+3. Add tests for new functionality
+4. Ensure all tests pass
+5. Submit the pull request
+6. Address any feedback from reviewers
 
-## Code Style
+## Development Setup
 
-- Follow the TypeScript coding guidelines
+### Prerequisites
+
+- Node.js 16+
+- Docker and Docker Compose
+- Google Cloud SDK (for deployment)
+- Terraform 1.0+ (for deployment)
+- kubectl (for Kubernetes deployment)
+
+### Local Development
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/oneirocom/veritas.git
+   cd veritas
+   ```
+
+2. Install dependencies:
+   ```
+   npm install
+   ```
+
+3. Start the development environment:
+   ```
+   npm run dev
+   ```
+
+4. Access the application at http://localhost:3000
+
+## Coding Standards
+
+### JavaScript/TypeScript
+
+- Use TypeScript for all new code
+- Follow the ESLint configuration provided in the project
+- Use async/await for asynchronous code
 - Use meaningful variable and function names
-- Write clear comments and documentation
-- Keep functions small and focused on a single responsibility
-- Use proper typing and avoid using `any` when possible
+- Add JSDoc comments for functions and complex code blocks
 
-## Commit Messages
+### React
 
-- Use clear and descriptive commit messages
-- Start with a verb in the present tense (e.g., "Add", "Fix", "Update")
-- Reference issue numbers when applicable
+- Use functional components with hooks
+- Use TypeScript for component props and state
+- Follow the component structure used in the project
+- Use CSS modules for styling
 
-Example: `Fix: Resolve network graph rendering issue (#123)`
+### Testing
+
+- Write unit tests for all new functionality
+- Ensure all tests pass before submitting a pull request
+- Use Jest and React Testing Library for testing
+
+### Git Workflow
+
+- Use descriptive commit messages
+- Reference issue numbers in commit messages when applicable
+- Keep pull requests focused on a single issue or feature
+- Rebase your branch before submitting a pull request
+
+## Branch Naming Convention
+
+- `feature/short-description` for new features
+- `bugfix/short-description` for bug fixes
+- `docs/short-description` for documentation changes
+- `refactor/short-description` for code refactoring
+- `test/short-description` for test additions or changes
+
+## Versioning
+
+We use [Semantic Versioning](https://semver.org/) for versioning. For the versions available, see the tags on this repository.
 
 ## License
 
-By contributing to this project, you agree that your contributions will be licensed under the project's [MIT License](LICENSE). 
+By contributing to Veritas, you agree that your contributions will be licensed under the project's MIT license.
+
+## Questions
+
+If you have any questions about contributing, please reach out to the project maintainers at dev@veritas-system.com.
+
+Thank you for contributing to Veritas! 

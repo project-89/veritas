@@ -1,0 +1,397 @@
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: veritas
+  labels:
+    app: veritas
+    environment: dev
+
+---
+# ConfigMap for application configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: veritas-config
+  namespace: veritas
+data:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  API_PORT: "4000"
+  FRONTEND_PORT: "3000"
+  MEMGRAPH_HOST: "memgraph-service"
+  MEMGRAPH_PORT: "7687"
+  MEMGRAPH_USERNAME: "memgraph"
+  KAFKA_BROKERS: "kafka-service:9092"
+
+---
+# API Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veritas-api
+  namespace: veritas
+  labels:
+    app: veritas
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: veritas
+      component: api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: veritas
+        component: api
+    spec:
+      containers:
+      - name: api
+        image: gcr.io/PROJECT_ID/veritas-api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 4000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: veritas-config
+        - secretRef:
+            name: veritas-secrets
+            optional: true
+        env:
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: redis-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: redis-config
+              key: REDIS_PORT
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+
+---
+# API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: veritas-api-service
+  namespace: veritas
+  labels:
+    app: veritas
+    component: api
+spec:
+  selector:
+    app: veritas
+    component: api
+  ports:
+  - port: 4000
+    targetPort: http
+    name: http
+  type: ClusterIP
+
+---
+# Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: veritas-frontend
+  namespace: veritas
+  labels:
+    app: veritas
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: veritas
+      component: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: veritas
+        component: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: gcr.io/PROJECT_ID/veritas-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: veritas-config
+        env:
+        - name: API_URL
+          value: "http://veritas-api-service:4000"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: veritas-frontend-service
+  namespace: veritas
+  labels:
+    app: veritas
+    component: frontend
+spec:
+  selector:
+    app: veritas
+    component: frontend
+  ports:
+  - port: 3000
+    targetPort: http
+    name: http
+  type: ClusterIP
+
+---
+# Memgraph StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: memgraph
+  namespace: veritas
+  labels:
+    app: veritas
+    component: memgraph
+spec:
+  serviceName: memgraph-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: veritas
+      component: memgraph
+  template:
+    metadata:
+      labels:
+        app: veritas
+        component: memgraph
+    spec:
+      containers:
+      - name: memgraph
+        image: memgraph/memgraph:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 7687
+          name: bolt
+        - containerPort: 7444
+          name: http
+        env:
+        - name: MEMGRAPH_USERNAME
+          value: "memgraph"
+        - name: MEMGRAPH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: veritas-secrets
+              key: MEMGRAPH_PASSWORD
+              optional: true
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        volumeMounts:
+        - name: memgraph-data
+          mountPath: /var/lib/memgraph
+        readinessProbe:
+          tcpSocket:
+            port: bolt
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: bolt
+          initialDelaySeconds: 30
+          periodSeconds: 20
+  volumeClaimTemplates:
+  - metadata:
+      name: memgraph-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "standard"
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+# Memgraph Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: memgraph-service
+  namespace: veritas
+  labels:
+    app: veritas
+    component: memgraph
+spec:
+  selector:
+    app: veritas
+    component: memgraph
+  ports:
+  - port: 7687
+    targetPort: bolt
+    name: bolt
+  - port: 7444
+    targetPort: http
+    name: http
+  type: ClusterIP
+
+---
+# Ingress for external access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: veritas-ingress
+  namespace: veritas
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - veritas.example.com
+    secretName: veritas-tls
+  rules:
+  - host: veritas.example.com
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: veritas-api-service
+            port:
+              number: 4000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: veritas-frontend-service
+            port:
+              number: 3000
+
+---
+# HorizontalPodAutoscaler for API
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: veritas-api-hpa
+  namespace: veritas
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: veritas-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# HorizontalPodAutoscaler for Frontend
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: veritas-frontend-hpa
+  namespace: veritas
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: veritas-frontend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80 

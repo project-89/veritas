@@ -8,11 +8,10 @@ services:
       dockerfile: apps/api/Dockerfile.dev
     ports:
       - "4000:4000"
-      - "9229:9229" # For debugging
+      - "9229:9229"
     volumes:
-      - ./apps/api:/app/apps/api
-      - ./libs:/app/libs
-      - ./node_modules:/app/node_modules
+      - ./:/app
+      - /app/node_modules
     environment:
       - NODE_ENV=development
       - PORT=4000
@@ -21,12 +20,13 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - KAFKA_BROKERS=kafka:9092
-      - MOCK_DATA=true
     depends_on:
       - memgraph
       - redis
       - kafka
-    command: npm run serve:api
+    networks:
+      - veritas-network
+    command: npm run start:dev -- --project=api
 
   # Frontend Service
   frontend:
@@ -36,40 +36,41 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./apps/visualization-showcase:/app/apps/visualization-showcase
-      - ./libs:/app/libs
-      - ./node_modules:/app/node_modules
+      - ./:/app
+      - /app/node_modules
     environment:
       - NODE_ENV=development
       - PORT=3000
-      - API_URL=http://localhost:4000
+      - VITE_API_URL=http://localhost:4000
     depends_on:
       - api
-    command: npm run serve:visualization-showcase
+    networks:
+      - veritas-network
+    command: npm run start -- --project=visualization-showcase
 
   # Memgraph Database
   memgraph:
-    image: memgraph/memgraph-platform:latest
+    image: memgraph/memgraph:latest
     ports:
-      - "7687:7687" # Bolt protocol
-      - "7444:7444" # HTTP API
-      - "3001:3000" # Memgraph Lab UI
+      - "7687:7687"
+      - "7444:7444"
     volumes:
-      - memgraph_data:/var/lib/memgraph
-      - memgraph_log:/var/log/memgraph
-      - memgraph_conf:/etc/memgraph
+      - memgraph-data:/var/lib/memgraph
     environment:
       - MEMGRAPH_USER=memgraph
       - MEMGRAPH_PASSWORD=memgraph
+    networks:
+      - veritas-network
 
   # Redis Cache
   redis:
-    image: redis:6-alpine
+    image: redis:alpine
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
+      - redis-data:/data
+    networks:
+      - veritas-network
 
   # Redis Commander (UI for Redis)
   redis-commander:
@@ -80,28 +81,35 @@ services:
       - REDIS_HOSTS=local:redis:6379
     depends_on:
       - redis
+    networks:
+      - veritas-network
 
-  # Kafka for event streaming
+  # Zookeeper (required for Kafka)
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.0.1
+    image: confluentinc/cp-zookeeper:latest
     ports:
       - "2181:2181"
     environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+    networks:
+      - veritas-network
 
+  # Kafka Message Broker
   kafka:
-    image: confluentinc/cp-kafka:7.0.1
+    image: confluentinc/cp-kafka:latest
     ports:
       - "9092:9092"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
     depends_on:
       - zookeeper
+    networks:
+      - veritas-network
 
   # Kafka UI
   kafka-ui:
@@ -109,48 +117,32 @@ services:
     ports:
       - "8080:8080"
     environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
     depends_on:
       - kafka
+    networks:
+      - veritas-network
 
-  # Mock Social Media Services
-  mock-twitter:
+  # Twitter Mock Service
+  twitter-mock:
     build:
-      context: ./tools/mocks
-      dockerfile: Dockerfile.twitter
+      context: .
+      dockerfile: tools/mocks/Dockerfile.twitter
     ports:
       - "4001:4001"
     environment:
       - PORT=4001
-      - DELAY_MS=200
+      - DELAY_MS=100
       - ERROR_RATE=0.05
-
-  mock-reddit:
-    build:
-      context: ./tools/mocks
-      dockerfile: Dockerfile.reddit
-    ports:
-      - "4002:4002"
-    environment:
-      - PORT=4002
-      - DELAY_MS=300
-      - ERROR_RATE=0.05
-
-  mock-facebook:
-    build:
-      context: ./tools/mocks
-      dockerfile: Dockerfile.facebook
-    ports:
-      - "4003:4003"
-    environment:
-      - PORT=4003
-      - DELAY_MS=250
-      - ERROR_RATE=0.05
+    networks:
+      - veritas-network
 
 volumes:
-  memgraph_data:
-  memgraph_log:
-  memgraph_conf:
-  redis_data: 
+  memgraph-data:
+  redis-data:
+
+networks:
+  veritas-network:
+    driver: bridge 

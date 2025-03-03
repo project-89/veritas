@@ -1,0 +1,169 @@
+---
+name: Veritas CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run ESLint
+        run: npm run lint
+        
+      - name: Run TypeScript type checking
+        run: npm run type-check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run unit tests
+        run: npm test
+        
+      - name: Upload test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build API
+        run: npm run build:api
+        
+      - name: Build Frontend
+        run: npm run build:frontend
+        
+      - name: Upload API build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: api-build
+          path: apps/api/dist
+          
+      - name: Upload Frontend build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: apps/visualization-showcase/dist
+
+  docker:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download API build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: api-build
+          path: apps/api/dist
+          
+      - name: Download Frontend build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: frontend-build
+          path: apps/visualization-showcase/dist
+          
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Login to Google Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: gcr.io
+          username: _json_key
+          password: ${{ secrets.GCR_JSON_KEY }}
+          
+      - name: Build and push API Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: gcr.io/${{ secrets.GCP_PROJECT_ID }}/veritas-api:${{ github.sha }},gcr.io/${{ secrets.GCP_PROJECT_ID }}/veritas-api:latest
+          
+      - name: Build and push Frontend Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: apps/visualization-showcase/Dockerfile
+          push: true
+          tags: gcr.io/${{ secrets.GCP_PROJECT_ID }}/veritas-frontend:${{ github.sha }},gcr.io/${{ secrets.GCP_PROJECT_ID }}/veritas-frontend:latest
+
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup gcloud CLI
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          
+      - name: Setup kubectl
+        uses: google-github-actions/get-gke-credentials@v1
+        with:
+          cluster_name: ${{ secrets.GKE_CLUSTER_NAME }}
+          location: ${{ secrets.GKE_CLUSTER_LOCATION }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          
+      - name: Update Kubernetes manifests
+        run: |
+          sed -i 's|gcr.io/PROJECT_ID/veritas-api:latest|gcr.io/${{ secrets.GCP_PROJECT_ID }}/veritas-api:${{ github.sha }}|g' kubernetes/veritas-deployment.yaml
+          sed -i 's|gcr.io/PROJECT_ID/veritas-frontend:latest|gcr.io/${{ secrets.GCP_PROJECT_ID }}/veritas-frontend:${{ github.sha }}|g' kubernetes/veritas-deployment.yaml
+          
+      - name: Deploy to GKE
+        run: |
+          kubectl apply -f kubernetes/veritas-deployment.yaml
+          
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/veritas-api -n veritas
+          kubectl rollout status deployment/veritas-frontend -n veritas 
