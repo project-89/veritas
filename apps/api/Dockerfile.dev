@@ -1,4 +1,4 @@
-FROM node:16-alpine
+FROM node:18-alpine
 
 WORKDIR /app
 
@@ -17,5 +17,12 @@ EXPOSE 4000
 # Expose the debug port
 EXPOSE 9229
 
+# Set Node options to fix crypto issues
+ENV NODE_OPTIONS="--no-experimental-fetch"
+ENV VITE_CJS_IGNORE_WARNING=true
+ENV VITE_CJS_LEGACY_DEV=true
+ENV NODE_ENV=development
+ENV OPENSSL_CONF=/dev/null
+
 # Command to run the application in development mode
-CMD ["npm", "run", "start:dev", "--", "--project=api"] 
+CMD ["npm", "run", "serve:api"] 

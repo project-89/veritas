@@ -1,4 +1,4 @@
-FROM node:16-alpine
+FROM node:18-alpine
 
 WORKDIR /app
 
@@ -14,5 +14,12 @@ COPY . .
 # Expose the frontend port
 EXPOSE 3000
 
+# Set Node options to fix crypto issues
+ENV NODE_OPTIONS="--no-experimental-fetch"
+ENV VITE_CJS_IGNORE_WARNING=true
+ENV VITE_CJS_LEGACY_DEV=true
+ENV NODE_ENV=development
+ENV OPENSSL_CONF=/dev/null
+
 # Command to run the application in development mode with hot reloading
-CMD ["npm", "run", "start", "--", "--project=visualization-showcase"] 
+CMD ["npm", "run", "serve:visualization-showcase"] 

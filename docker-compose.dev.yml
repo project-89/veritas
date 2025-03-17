@@ -14,19 +14,23 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
-      - PORT=4000
-      - MEMGRAPH_HOST=memgraph
-      - MEMGRAPH_PORT=7687
+      - API_URL=http://localhost:4000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - KAFKA_BROKERS=kafka:9092
+      - MEMGRAPH_HOST=memgraph
+      - MEMGRAPH_PORT=7687
+      - KAFKA_BROKER=kafka:9092
+      - NODE_OPTIONS=--no-experimental-fetch
+      - VITE_CJS_IGNORE_WARNING=true
+      - VITE_CJS_LEGACY_DEV=true
+      - OPENSSL_CONF=/dev/null
     depends_on:
-      - memgraph
       - redis
+      - memgraph
       - kafka
     networks:
       - veritas-network
-    command: npm run start:dev -- --project=api
+    command: ["npm", "run", "serve:api"]
 
   # Frontend Service
   frontend:
@@ -40,13 +44,16 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
-      - PORT=3000
-      - VITE_API_URL=http://localhost:4000
+      - API_URL=http://localhost:4000
+      - NODE_OPTIONS=--no-experimental-fetch
+      - VITE_CJS_IGNORE_WARNING=true
+      - VITE_CJS_LEGACY_DEV=true
+      - OPENSSL_CONF=/dev/null
     depends_on:
       - api
     networks:
       - veritas-network
-    command: npm run start -- --project=visualization-showcase
+    command: ["npm", "run", "serve:visualization-showcase"]
 
   # Memgraph Database
   memgraph:
@@ -57,7 +64,7 @@ services:
     volumes:
       - memgraph-data:/var/lib/memgraph
     environment:
-      - MEMGRAPH_USER=memgraph
+      - MEMGRAPH_USERNAME=memgraph
       - MEMGRAPH_PASSWORD=memgraph
     networks:
       - veritas-network
@@ -75,10 +82,11 @@ services:
   # Redis Commander (UI for Redis)
   redis-commander:
     image: rediscommander/redis-commander:latest
+    platform: linux/arm64
     ports:
       - "8081:8081"
     environment:
-      - REDIS_HOSTS=local:redis:6379
+      - REDIS_HOSTS=redis:redis:6379
     depends_on:
       - redis
     networks:
@@ -90,8 +98,8 @@ services:
     ports:
       - "2181:2181"
     environment:
-      - ZOOKEEPER_CLIENT_PORT=2181
-      - ZOOKEEPER_TICK_TIME=2000
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
     networks:
       - veritas-network
 
@@ -101,11 +109,10 @@ services:
     ports:
       - "9092:9092"
     environment:
-      - KAFKA_BROKER_ID=1
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     depends_on:
       - zookeeper
     networks:
@@ -117,9 +124,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - KAFKA_CLUSTERS_0_NAME=local
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     depends_on:
       - kafka
     networks:
