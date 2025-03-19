@@ -1,5 +1,5 @@
-import { Field, ObjectType, Float, Int } from "@nestjs/graphql";
-import { ContentNode } from "@/schemas/base.schema";
+import { Field, ObjectType, Float, Int } from '@nestjs/graphql';
+import { ContentNode } from '@veritas/shared';
 
 @ObjectType()
 export class TimeFrame {
@@ -16,7 +16,7 @@ export class Pattern {
   id: string;
 
   @Field()
-  type: "organic" | "coordinated" | "automated";
+  type: 'organic' | 'coordinated' | 'automated';
 
   @Field(() => Float)
   confidence: number;
@@ -82,7 +82,7 @@ export class ExtendedContentNode implements ContentNode {
   timestamp: Date;
 
   @Field()
-  platform: "twitter" | "facebook" | "reddit" | "other";
+  platform: 'twitter' | 'facebook' | 'reddit' | 'other';
 
   @Field(() => String, { nullable: true })
   sourceId?: string;
@@ -91,7 +91,7 @@ export class ExtendedContentNode implements ContentNode {
   toxicity?: number;
 
   @Field(() => String, { nullable: true })
-  sentiment?: "positive" | "negative" | "neutral";
+  sentiment?: 'positive' | 'negative' | 'neutral';
 
   @Field(() => [String], { nullable: true })
   categories?: string[];
@@ -105,7 +105,7 @@ export class ExtendedContentNode implements ContentNode {
   @Field(() => Object, { nullable: true })
   classification?: {
     categories: string[];
-    sentiment: "positive" | "negative" | "neutral";
+    sentiment: 'positive' | 'negative' | 'neutral';
     toxicity: number;
     subjectivity: number;
     language: string;

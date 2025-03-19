@@ -1,12 +1,20 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { FacebookAdsApi, Page, Post } from "facebook-nodejs-business-sdk";
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { FacebookAdsApi, Page, Post } from 'facebook-nodejs-business-sdk';
 import {
   SocialMediaConnector,
   SocialMediaPost,
-} from "../interfaces/social-media-connector.interface";
-import { SourceNode } from "@/schemas/base.schema";
-import { EventEmitter } from "events";
+} from '../interfaces/social-media-connector.interface';
+import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
+import { SourceNode } from '@veritas/shared';
+import { EventEmitter } from 'events';
+import { TransformOnIngestService } from './transform/transform-on-ingest.service';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 
 interface FacebookPost {
   id: string;
@@ -47,15 +55,19 @@ interface SearchOptions {
 
 @Injectable()
 export class FacebookConnector
-  implements SocialMediaConnector, OnModuleInit, OnModuleDestroy
+  implements TransformOnIngestConnector, OnModuleInit, OnModuleDestroy
 {
-  platform = "facebook" as const;
+  platform = 'facebook' as const;
   private api: FacebookAdsApi | null = null;
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 60000; // 1 minute
   private interval: NodeJS.Timeout | null = null;
+  private readonly logger = new Logger(FacebookConnector.name);
 
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private configService: ConfigService,
+    private transformService: TransformOnIngestService
+  ) {}
 
   async onModuleInit() {
     await this.validateCredentials();
@@ -68,11 +80,11 @@ export class FacebookConnector
   async connect(): Promise<void> {
     try {
       const accessToken = this.configService.getOrThrow<string>(
-        "FACEBOOK_ACCESS_TOKEN"
+        'FACEBOOK_ACCESS_TOKEN'
       );
       this.api = FacebookAdsApi.init(accessToken);
     } catch (error) {
-      console.error("Error connecting to Facebook:", error);
+      this.logger.error('Error connecting to Facebook:', error);
       throw error;
     }
   }
@@ -89,16 +101,80 @@ export class FacebookConnector
     this.streamConnections.clear();
   }
 
+  /**
+   * Original searchContent method for backward compatibility
+   * Implements SocialMediaConnector interface
+   */
   async searchContent(
     query: string,
     options?: SearchOptions
   ): Promise<SocialMediaPost[]> {
     if (!this.api) {
-      throw new Error("Facebook client not initialized");
+      throw new Error('Facebook client not initialized');
     }
 
     try {
-      const pageId = this.configService.getOrThrow("FACEBOOK_PAGE_ID");
+      // Fetch posts (kept in memory only)
+      const rawPosts = await this.fetchRawPosts(query, options);
+
+      // Transform to SocialMediaPost format (for backward compatibility)
+      return this.transformToSocialMediaPosts(rawPosts);
+    } catch (error) {
+      this.logger.error('Error searching Facebook content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Enhanced searchAndTransform method that returns anonymized insights
+   * Implements TransformOnIngestConnector interface
+   */
+  async searchAndTransform(
+    query: string,
+    options?: SearchOptions
+  ): Promise<NarrativeInsight[]> {
+    if (!this.api) {
+      throw new Error('Facebook client not initialized');
+    }
+
+    try {
+      this.logger.log(`Searching Facebook for: ${query}`);
+
+      // Fetch posts (kept in memory only)
+      const rawPosts = await this.fetchRawPosts(query, options);
+
+      // Transform immediately - no raw storage
+      const insights = await this.transformService.transform(
+        rawPosts,
+        this.platform
+      );
+
+      this.logger.log(
+        `Transformed ${insights.length} Facebook posts into anonymized insights`
+      );
+
+      // Return only anonymized insights
+      return insights;
+    } catch (error) {
+      this.logger.error('Error searching Facebook content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch raw posts from Facebook (in-memory only, no storage)
+   * Private method to keep raw data contained
+   */
+  private async fetchRawPosts(
+    query: string,
+    options?: SearchOptions
+  ): Promise<FacebookPost[]> {
+    if (!this.api) {
+      throw new Error('Facebook client not initialized');
+    }
+
+    try {
+      const pageId = this.configService.getOrThrow('FACEBOOK_PAGE_ID');
       const page = new Page(pageId);
 
       const params: {
@@ -110,14 +186,14 @@ export class FacebookConnector
       } = {
         q: query,
         fields: [
-          "id",
-          "message",
-          "created_time",
-          "from",
-          "permalink_url",
-          "reactions.summary(total_count)",
-          "shares",
-          "comments.summary(total_count)",
+          'id',
+          'message',
+          'created_time',
+          'from',
+          'permalink_url',
+          'reactions.summary(total_count)',
+          'shares',
+          'comments.summary(total_count)',
         ],
         limit: options?.limit || 100,
       };
@@ -135,57 +211,63 @@ export class FacebookConnector
         return [];
       }
 
-      return response.data.map((post: any) => {
-        const likes = post.reactions?.summary?.total_count || 0;
-        const shares = post.shares?.count || 0;
-        const comments = post.comments?.summary?.total_count || 0;
-        const reach =
-          post.insights?.data?.find(
-            (insight: any) => insight.name === "post_impressions"
-          )?.values[0]?.value || 0;
-        const viralityScore =
-          reach > 0 ? (likes + shares + comments) / reach : 0;
-
-        return {
-          id: post.id,
-          text: post.message,
-          platform: "facebook",
-          url: post.permalink_url || `https://facebook.com/${post.id}`,
-          authorId: post.from?.id,
-          createdAt: new Date(post.created_time),
-          timestamp: new Date(post.created_time),
-          engagementMetrics: {
-            likes,
-            shares,
-            comments,
-            reach,
-            viralityScore,
-          },
-          metadata: {
-            likes,
-            shares,
-            comments,
-          },
-        };
-      });
+      // Return raw posts for transformation (never stored)
+      return response.data as FacebookPost[];
     } catch (error) {
-      console.error("Error searching Facebook content:", error);
+      this.logger.error('Error fetching raw Facebook posts:', error);
       throw error;
     }
+  }
+
+  /**
+   * Transform raw Facebook posts to SocialMediaPost format
+   * For backward compatibility
+   */
+  private transformToSocialMediaPosts(
+    posts: FacebookPost[]
+  ): SocialMediaPost[] {
+    return posts.map((post) => {
+      const likes = post.reactions?.summary?.total_count || 0;
+      const shares = post.shares?.count || 0;
+      const comments = post.comments?.summary?.total_count || 0;
+      const reach =
+        post.insights?.data?.find(
+          (insight: any) => insight.name === 'post_impressions'
+        )?.values[0]?.value || 0;
+      const viralityScore = reach > 0 ? (likes + shares + comments) / reach : 0;
+
+      return {
+        id: post.id,
+        text: post.message || '',
+        platform: this.platform,
+        url: post.permalink_url || `https://facebook.com/${post.id}`,
+        authorId: post.from?.id || '',
+        authorName: post.from?.name || '',
+        createdAt: new Date(post.created_time),
+        timestamp: new Date(post.created_time),
+        engagementMetrics: {
+          likes,
+          shares,
+          comments,
+          reach,
+          viralityScore,
+        },
+      };
+    });
   }
 
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
     try {
       if (!this.api) {
-        throw new Error("Facebook client not initialized");
+        throw new Error('Facebook client not initialized');
       }
 
       const page = new Page(authorId);
       const pageData = await page.get([
-        "id",
-        "name",
-        "verification_status",
-        "fan_count",
+        'id',
+        'name',
+        'verification_status',
+        'fan_count',
       ]);
 
       if (!pageData || !pageData.id) {
@@ -198,16 +280,20 @@ export class FacebookConnector
         platform: this.platform,
         credibilityScore: this.calculateCredibilityScore(pageData),
         verificationStatus:
-          pageData.verification_status === "verified"
-            ? "verified"
-            : "unverified",
+          pageData.verification_status === 'verified'
+            ? 'verified'
+            : 'unverified',
       } as Partial<SourceNode>;
     } catch (error) {
-      console.error("Error fetching Facebook author details:", error);
+      this.logger.error('Error fetching Facebook author details:', error);
       throw error;
     }
   }
 
+  /**
+   * Original streamContent method for backward compatibility
+   * Implements SocialMediaConnector interface
+   */
   streamContent(keywords: string[]): EventEmitter {
     const emitter = new EventEmitter();
     const streamId = Math.random().toString(36).substring(7);
@@ -215,21 +301,36 @@ export class FacebookConnector
     const interval = setInterval(async () => {
       try {
         if (!this.api) {
-          throw new Error("Facebook client not initialized");
+          throw new Error('Facebook client not initialized');
         }
 
-        const posts = await this.searchContent(keywords.join(" OR "), {
+        // Fetch posts (kept in memory only)
+        const rawPosts = await this.fetchRawPosts(keywords.join(' OR '), {
           startDate: new Date(Date.now() - 3600000), // Last hour
           limit: 100,
         });
 
-        for (const post of posts) {
-          if (this.postMatchesKeywords(post, keywords)) {
-            emitter.emit("data", post);
+        // Filter posts that match keywords
+        const filteredPosts = rawPosts.filter((post) =>
+          this.postMatchesKeywords(post, keywords)
+        );
+
+        if (filteredPosts.length > 0) {
+          // Transform to SocialMediaPost format (for backward compatibility)
+          const posts = this.transformToSocialMediaPosts(filteredPosts);
+
+          // Emit posts
+          for (const post of posts) {
+            emitter.emit('data', post);
           }
+
+          this.logger.debug(
+            `Emitted ${posts.length} posts from Facebook stream`
+          );
         }
       } catch (error) {
-        emitter.emit("error", error);
+        emitter.emit('error', error);
+        this.logger.error('Error in Facebook stream:', error);
       }
     }, this.pollingInterval);
 
@@ -237,9 +338,69 @@ export class FacebookConnector
     this.interval = interval;
 
     // Clean up on end event
-    emitter.on("end", () => {
+    emitter.on('end', () => {
       clearInterval(interval);
       this.streamConnections.delete(streamId);
+      this.logger.log(`Closed Facebook stream: ${streamId}`);
+    });
+
+    return emitter;
+  }
+
+  /**
+   * Enhanced streamAndTransform method that streams anonymized insights
+   * Implements TransformOnIngestConnector interface
+   */
+  streamAndTransform(keywords: string[]): EventEmitter {
+    const emitter = new EventEmitter();
+    const streamId = Math.random().toString(36).substring(7);
+
+    const interval = setInterval(async () => {
+      try {
+        if (!this.api) {
+          throw new Error('Facebook client not initialized');
+        }
+
+        // Fetch posts (kept in memory only)
+        const rawPosts = await this.fetchRawPosts(keywords.join(' OR '), {
+          startDate: new Date(Date.now() - 3600000), // Last hour
+          limit: 100,
+        });
+
+        // Filter posts that match keywords
+        const filteredPosts = rawPosts.filter((post) =>
+          this.postMatchesKeywords(post, keywords)
+        );
+
+        if (filteredPosts.length > 0) {
+          // Transform immediately - no raw storage
+          const insights = await this.transformService.transform(
+            filteredPosts,
+            this.platform
+          );
+
+          // Emit only anonymized insights
+          for (const insight of insights) {
+            emitter.emit('data', insight);
+          }
+
+          this.logger.debug(
+            `Emitted ${insights.length} anonymized insights from Facebook stream`
+          );
+        }
+      } catch (error) {
+        emitter.emit('error', error);
+        this.logger.error('Error in Facebook stream:', error);
+      }
+    }, this.pollingInterval);
+
+    this.streamConnections.set(`transform-${streamId}`, interval);
+
+    // Clean up on end event
+    emitter.on('end', () => {
+      clearInterval(interval);
+      this.streamConnections.delete(`transform-${streamId}`);
+      this.logger.log(`Closed transformed Facebook stream: ${streamId}`);
     });
 
     return emitter;
@@ -248,60 +409,56 @@ export class FacebookConnector
   async validateCredentials(): Promise<boolean> {
     try {
       await this.connect();
-      const pageId = this.configService.getOrThrow("FACEBOOK_PAGE_ID");
+      const pageId = this.configService.getOrThrow('FACEBOOK_PAGE_ID');
       const page = new Page(pageId);
 
-      // Try to get basic page info to validate credentials
-      await page.get(["id", "name"]);
+      // Just validate connectivity, don't store any data
+      const response = await page.get(['id', 'name']);
+
+      if (!response || !response.id) {
+        this.logger.error('Facebook page validation failed: Invalid page ID');
+        return false;
+      }
+
+      this.logger.log(
+        `Facebook credentials validated successfully for page: ${response.name}`
+      );
       return true;
     } catch (error) {
-      console.error("Facebook credentials validation failed:", error);
+      this.logger.error('Facebook credential validation failed:', error);
       return false;
     }
   }
 
-  private transformPostsToSocialMediaPosts(
-    posts: FacebookPost[]
-  ): SocialMediaPost[] {
-    return posts.map((post) => ({
-      id: post.id,
-      text: post.message || "",
-      timestamp: new Date(post.created_time),
-      platform: this.platform,
-      authorId: post.from?.id || "",
-      authorName: post.from?.name || "",
-      url: post.permalink_url || "",
-      engagementMetrics: {
-        likes: post.reactions?.summary?.total_count || 0,
-        shares: post.shares?.count || 0,
-        comments: post.comments?.summary?.total_count || 0,
-        reach: post.insights?.data?.[0]?.values?.[0]?.value || 0,
-        viralityScore: this.calculateViralityScore(post),
-      },
-    }));
+  /**
+   * Check if a post matches any of the keywords
+   * Used for filtering posts in the stream
+   */
+  private postMatchesKeywords(post: FacebookPost, keywords: string[]): boolean {
+    if (!post.message) {
+      return false;
+    }
+
+    const message = post.message.toLowerCase();
+    return keywords.some((keyword) => message.includes(keyword.toLowerCase()));
   }
 
-  private calculateViralityScore(post: FacebookPost): number {
-    const total =
-      (post.reactions?.summary?.total_count || 0) +
-      (post.shares?.count || 0) +
-      (post.comments?.summary?.total_count || 0);
-    const reach = post.insights?.data?.[0]?.values?.[0]?.value || 1;
-    return Math.min(total / reach, 1);
-  }
-
-  private postMatchesKeywords(
-    post: SocialMediaPost,
-    keywords: string[]
-  ): boolean {
-    const postText = post.text.toLowerCase();
-    return keywords.some((keyword) => postText.includes(keyword.toLowerCase()));
-  }
-
+  /**
+   * Calculate credibility score for a Facebook page
+   */
   private calculateCredibilityScore(pageData: any): number {
-    // Basic credibility scoring based on verification and fan count
-    const baseScore = pageData.verification_status === "verified" ? 0.8 : 0.5;
-    const fanScore = Math.min(pageData.fan_count / 1000000, 0.2); // Up to 0.2 based on fan count
-    return Math.min(baseScore + fanScore, 1);
+    const isVerified = pageData.verification_status === 'verified' ? 1 : 0;
+    const fanCount = pageData.fan_count || 0;
+
+    // Simple credibility algorithm based on verification and fan count
+    let score = isVerified * 0.5;
+
+    if (fanCount > 1000000) score += 0.5;
+    else if (fanCount > 100000) score += 0.4;
+    else if (fanCount > 10000) score += 0.3;
+    else if (fanCount > 1000) score += 0.2;
+    else score += 0.1;
+
+    return Math.min(score, 1.0);
   }
 }

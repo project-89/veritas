@@ -1,5 +1,5 @@
-import { Field, InputType, registerEnumType } from "@nestjs/graphql";
-import { EngagementMetrics } from "@/schemas/base.schema";
+import { Field, InputType, registerEnumType } from '@nestjs/graphql';
+import { EngagementMetrics } from '@veritas/shared';
 import {
   IsString,
   IsEnum,
@@ -10,29 +10,29 @@ import {
   IsObject,
   IsNotEmpty,
   ValidateNested,
-} from "class-validator";
-import { Type } from "class-transformer";
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum VerificationStatus {
-  VERIFIED = "verified",
-  UNVERIFIED = "unverified",
-  SUSPICIOUS = "suspicious",
+  VERIFIED = 'verified',
+  UNVERIFIED = 'unverified',
+  SUSPICIOUS = 'suspicious',
 }
 
 export enum Platform {
-  TWITTER = "twitter",
-  FACEBOOK = "facebook",
-  REDDIT = "reddit",
-  OTHER = "other",
+  TWITTER = 'twitter',
+  FACEBOOK = 'facebook',
+  REDDIT = 'reddit',
+  OTHER = 'other',
 }
 
 registerEnumType(VerificationStatus, {
-  name: "VerificationStatus",
-  description: "The verification status of a source",
+  name: 'VerificationStatus',
+  description: 'The verification status of a source',
 });
 
 registerEnumType(Platform, {
-  name: "Platform",
+  name: 'Platform',
 });
 
 @InputType()
@@ -73,7 +73,7 @@ export class ContentIngestionInput {
 
   @Field()
   @IsEnum(Platform)
-  platform: "twitter" | "facebook" | "reddit" | "other";
+  platform: 'twitter' | 'facebook' | 'reddit' | 'other';
 
   @Field(() => EngagementMetricsInput, { nullable: true })
   @IsOptional()
@@ -96,7 +96,7 @@ export class SourceIngestionInput {
 
   @Field()
   @IsEnum(Platform)
-  platform: "twitter" | "facebook" | "reddit" | "other";
+  platform: 'twitter' | 'facebook' | 'reddit' | 'other';
 
   @Field()
   @IsNumber()

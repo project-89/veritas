@@ -1,8 +1,8 @@
-import { Injectable } from "@nestjs/common";
-import { MemgraphService } from "@/database";
-import { ContentNode, SourceNode } from "@/schemas/base.schema";
-import { ContentValidationService } from "../services/content-validation.service";
-import { ContentClassificationService } from "../services/content-classification.service";
+import { Injectable } from '@nestjs/common';
+import { MemgraphService } from '@/database';
+import { ContentNode, SourceNode } from '@veritas/shared';
+import { ContentValidationService } from '../services/content-validation.service';
+import { ContentClassificationService } from '../services/content-classification.service';
 
 export interface ContentCreateInput {
   text: string;
@@ -51,7 +51,7 @@ export class ContentService {
     );
 
     // Create content node
-    const contentNode = await this.memgraphService.createNode("Content", {
+    const contentNode = await this.memgraphService.createNode('Content', {
       ...input,
       classification,
       engagementMetrics: {
@@ -68,7 +68,7 @@ export class ContentService {
     await this.memgraphService.createRelationship(
       input.sourceId,
       contentNode.id,
-      "PUBLISHED",
+      'PUBLISHED',
       { timestamp: input.timestamp }
     );
 
@@ -85,7 +85,7 @@ export class ContentService {
     // Get existing content
     const existingContent = await this.getContentById(id);
     if (!existingContent) {
-      throw new Error("Content not found");
+      throw new Error('Content not found');
     }
 
     // If text is updated, reclassify
@@ -150,7 +150,10 @@ export class ContentService {
     }
 
     if (params.sourceId) {
-      query += ` AND (c)<-[:PUBLISHED]-(:Source { id: $sourceId })`;
+      query += ` AND EXISTS {
+        MATCH (s:Source)-[:PUBLISHED]->(c)
+        WHERE s.id = $sourceId
+      }`;
       queryParams.sourceId = params.sourceId;
     }
 
@@ -159,15 +162,17 @@ export class ContentService {
       queryParams.query = params.query;
     }
 
-    query += `
-      RETURN c
-      ORDER BY c.timestamp DESC
-      SKIP $offset
-      LIMIT $limit
-    `;
+    query += ` RETURN c`;
 
-    queryParams.offset = params.offset || 0;
-    queryParams.limit = params.limit || 50;
+    if (params.limit) {
+      query += ` LIMIT $limit`;
+      queryParams.limit = params.limit;
+    }
+
+    if (params.offset) {
+      query += ` SKIP $offset`;
+      queryParams.offset = params.offset;
+    }
 
     const result = await this.memgraphService.executeQuery(query, queryParams);
     return result.map((row) => row.c);
@@ -178,22 +183,18 @@ export class ContentService {
       MATCH (c:Content)
       WHERE c.id = $id
       DETACH DELETE c
-      RETURN count(c) as deleted
+      RETURN count(*) as deleted
     `;
 
     const result = await this.memgraphService.executeQuery(query, { id });
     return result[0]?.deleted > 0;
   }
 
-  async getRelatedContent(
-    id: string,
-    limit: number = 10
-  ): Promise<ContentNode[]> {
+  async getRelatedContent(id: string, limit = 10): Promise<ContentNode[]> {
     const query = `
-      MATCH (c:Content { id: $id })-[*1..2]-(related:Content)
-      WHERE related.id <> $id
+      MATCH (c:Content)-[:HAS_TOPIC]->(t:Topic)<-[:HAS_TOPIC]-(related:Content)
+      WHERE c.id = $id AND related.id <> $id
       RETURN DISTINCT related
-      ORDER BY related.timestamp DESC
       LIMIT $limit
     `;
 
@@ -206,18 +207,12 @@ export class ContentService {
 
   async updateEngagementMetrics(
     id: string,
-    metrics: ContentUpdateInput["engagementMetrics"]
+    metrics: ContentUpdateInput['engagementMetrics']
   ): Promise<ContentNode> {
-    const existingContent = await this.getContentById(id);
-    if (!existingContent) {
-      throw new Error("Content not found");
-    }
-
     const query = `
       MATCH (c:Content)
       WHERE c.id = $id
-      SET c.engagementMetrics = $metrics,
-          c.updatedAt = datetime()
+      SET c.engagementMetrics = $metrics, c.updatedAt = datetime()
       RETURN c
     `;
 

@@ -1,5 +1,5 @@
-import { ContentNode, SourceNode } from "@/schemas/base.schema";
-import { EventEmitter } from "events";
+import { ContentNode, SourceNode } from '@veritas/shared';
+import { EventEmitter } from 'events';
 
 export interface SocialMediaPost {
   id: string;

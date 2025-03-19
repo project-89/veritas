@@ -1,8 +1,8 @@
-import { Field, ObjectType, Float } from "@nestjs/graphql";
-import { ContentNode } from "@/schemas/base.schema";
-import { ContentClassification } from "../services/content-classification.service";
+import { Field, ObjectType, Float } from '@nestjs/graphql';
+import { ContentNode } from '@veritas/shared';
+import { ContentClassification } from '../services/content-classification.service';
 
-@ObjectType("ContentNode")
+@ObjectType('ContentNode')
 export class ContentNodeType implements ContentNode {
   @Field()
   id: string;
@@ -14,13 +14,13 @@ export class ContentNodeType implements ContentNode {
   timestamp: Date;
 
   @Field()
-  platform: "twitter" | "facebook" | "reddit" | "other";
+  platform: 'twitter' | 'facebook' | 'reddit' | 'other';
 
   @Field(() => Float, { nullable: true })
   toxicity?: number;
 
   @Field(() => String, { nullable: true })
-  sentiment?: "positive" | "negative" | "neutral";
+  sentiment?: 'positive' | 'negative' | 'neutral';
 
   @Field(() => [String], { nullable: true })
   categories?: string[];

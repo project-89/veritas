@@ -1,75 +1,148 @@
-import { Resolver, Mutation, Args } from "@nestjs/graphql";
-import { ContentStorageService } from "../content-storage.service";
-import { ContentNode, SourceNode } from "@/schemas/base.schema";
-import { ContentType } from "@/modules/content/types/content.types";
-import { SourceType } from "@/modules/sources/types/source.types";
+import { Resolver, Mutation, Args, Query } from '@nestjs/graphql';
+import { NarrativeRepository } from '../repositories/narrative-insight.repository';
+import { ContentNode, SourceNode } from '@veritas/shared';
+import { ContentType } from '@/modules/content/types/content.types';
+import { SourceType } from '@/modules/sources/types/source.types';
 import {
   ContentIngestionInput,
   SourceIngestionInput,
   VerificationStatus,
-} from "../types/ingestion.types";
-import { ContentClassificationService } from "@/modules/content/services/content-classification.service";
+} from '../types/ingestion.types';
+import { ContentClassificationService } from '@/modules/content/services/content-classification.service';
+import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
+import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
+import { NarrativeInsight } from '../interfaces/narrative-insight.interface';
+import {
+  NarrativeTrendType,
+  NarrativeInsightType,
+} from '../types/graphql.types';
+import * as crypto from 'crypto';
+import { Inject, Logger } from '@nestjs/common';
 
+/**
+ * GraphQL resolver for ingestion operations
+ * Implements the transform-on-ingest flow for content processing
+ */
 @Resolver()
 export class IngestionResolver {
+  private readonly logger = new Logger(IngestionResolver.name);
+
   constructor(
-    private readonly storageService: ContentStorageService,
-    private readonly classificationService: ContentClassificationService
+    private readonly classificationService: ContentClassificationService,
+    private readonly transformService: TransformOnIngestService,
+    private readonly narrativeRepository: NarrativeRepository,
+    @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: any,
+    @Inject('KAFKA_SERVICE') private readonly kafkaClient: any
   ) {}
 
   private mapVerificationStatus(
     status: VerificationStatus
-  ): "verified" | "unverified" | "suspicious" {
-    return status.toLowerCase() as "verified" | "unverified" | "suspicious";
+  ): 'verified' | 'unverified' | 'suspicious' {
+    return status.toLowerCase() as 'verified' | 'unverified' | 'suspicious';
   }
 
-  @Mutation(() => ContentType)
-  async ingestContent(
-    @Args("content") content: ContentIngestionInput,
-    @Args("source") source: SourceIngestionInput
-  ): Promise<ContentNode> {
-    // Get classification results
-    const classification = await this.classificationService.classifyContent(
-      content.text
-    );
-
-    const contentNode: ContentNode = {
+  /**
+   * Ingest social media content using the transform-on-ingest pattern
+   * This adheres to our security architecture by transforming content immediately
+   */
+  @Mutation(() => NarrativeInsightType)
+  async ingestSocialContent(
+    @Args('content') content: ContentIngestionInput,
+    @Args('source') source: SourceIngestionInput
+  ): Promise<NarrativeInsight> {
+    // First convert to SocialMediaPost format
+    const socialMediaPost: SocialMediaPost = {
       id: crypto.randomUUID(),
       text: content.text,
       timestamp: new Date(),
-      platform: content.platform,
-      toxicity: classification.toxicity,
-      sentiment: classification.sentiment,
-      categories: classification.categories,
-      topics: classification.topics,
-      engagementMetrics: content.engagementMetrics,
-      metadata: content.metadata,
+      platform: content.platform as any,
+      authorId: source.name, // Using name as authorId for consistency
+      authorName: source.name,
+      engagementMetrics: content.engagementMetrics
+        ? {
+            likes: content.engagementMetrics.likes || 0,
+            shares: content.engagementMetrics.shares || 0,
+            comments: content.engagementMetrics.comments || 0,
+            reach: content.engagementMetrics.reach || 0,
+            viralityScore: content.engagementMetrics.viralityScore || 0,
+          }
+        : {
+            likes: 0,
+            shares: 0,
+            comments: 0,
+            reach: 0,
+            viralityScore: 0,
+          },
     };
 
-    const sourceNode: SourceNode = {
-      id: crypto.randomUUID(),
-      name: source.name,
-      platform: source.platform,
-      credibilityScore: source.credibilityScore,
-      verificationStatus: this.mapVerificationStatus(source.verificationStatus),
-      metadata: source.metadata,
-    };
+    // Transform immediately using our transform-on-ingest service
+    // This ensures no raw data is stored in the system
+    const narrativeInsight = this.transformService.transform(socialMediaPost);
 
-    const result = await this.storageService.ingestContent(
-      contentNode,
-      sourceNode
-    );
-    return result.contentNode;
+    return narrativeInsight;
   }
 
+  /**
+   * Retrieve narrative insights by timeframe
+   */
+  @Query(() => [NarrativeInsightType])
+  async getNarrativeInsights(
+    @Args('timeframe') timeframe: string,
+    @Args('limit', { nullable: true }) limit?: number,
+    @Args('skip', { nullable: true }) skip?: number
+  ): Promise<NarrativeInsight[]> {
+    return this.narrativeRepository.findByTimeframe(timeframe, {
+      limit,
+      skip,
+    });
+  }
+
+  /**
+   * Retrieve narrative trends by timeframe
+   */
+  @Query(() => [NarrativeTrendType])
+  async getNarrativeTrends(@Args('timeframe') timeframe: string) {
+    return this.narrativeRepository.getTrendsByTimeframe(timeframe);
+  }
+
+  /**
+   * Verify a source's status
+   */
   @Mutation(() => SourceType)
   async verifySource(
-    @Args("sourceId") sourceId: string,
-    @Args("status") status: VerificationStatus
+    @Args('sourceId') sourceId: string,
+    @Args('status') status: VerificationStatus
   ): Promise<SourceNode> {
-    return this.storageService.verifySource(
-      sourceId,
-      this.mapVerificationStatus(status)
-    );
+    try {
+      // Update graph database
+      const query = `
+        MATCH (s:Source)
+        WHERE s.id = $sourceId
+        SET s.verificationStatus = $verificationStatus,
+            s.verifiedAt = $timestamp
+        RETURN s
+      `;
+
+      const result = await this.memgraphService.executeQuery(query, {
+        sourceId,
+        verificationStatus: this.mapVerificationStatus(status),
+        timestamp: new Date().toISOString(),
+      });
+
+      // Emit verification event
+      await this.kafkaClient.emit('source.verified', {
+        sourceId,
+        verificationStatus: this.mapVerificationStatus(status),
+        timestamp: new Date(),
+      });
+
+      return result[0]?.s;
+    } catch (error: any) {
+      this.logger.error(
+        `Error verifying source: ${error.message}`,
+        error.stack
+      );
+      throw error;
+    }
   }
 }

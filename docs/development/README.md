@@ -1,13 +1,74 @@
 # Veritas Development Documentation
 
-This directory contains documentation for developing and testing the Veritas system locally.
+This directory contains technical documentation for developers working on the Veritas system.
 
-## Contents
+## Documentation Structure
 
-- [Local Environment Setup](./local-environment.md) - Instructions for setting up a local development environment
-- [API Documentation](./api-docs.md) - Documentation for the Veritas API endpoints
-- [Data Model](./data-model.md) - Description of the data model and schema
-- [Testing Guide](./testing.md) - Guide for testing the Veritas system
+### Core Concepts
+
+- [Project Structure](./project-structure.md) - Overview of the project's file and directory organization
+- [Local Development](./local-development.md) - Guide for setting up and running the project locally
+- [Local Environment](./local-environment.md) - Environment configuration for development
+- [Testing](./testing.md) - Testing strategies and frameworks used in the project
+
+### API and Data
+
+- [API Documentation](./api-docs.md) - Detailed API endpoint documentation
+- [Data Model](./data-model.md) - Current data model documentation
+- [Anonymized Data Model](./anonymized-data-model.md) - The anonymized data model for the transform-on-ingest architecture
+
+### Architecture and Design
+
+- [Data Ingestion Architecture](./data-ingestion-architecture.md) - Overview of the transform-on-ingest architecture
+- [Transform-on-Ingest Implementation Plan](./transform-on-ingest-implementation-plan.md) - Detailed plan for implementing the new architecture
+
+## Transform-on-Ingest Architecture
+
+Veritas is being built with a transform-on-ingest architecture for social media data to ensure compliance with platform terms of service while enabling robust narrative analysis capabilities.
+
+### Key Documents
+
+1. **[Data Ingestion Architecture](./data-ingestion-architecture.md)** - Provides a comprehensive overview of the transform-on-ingest architecture, including principles, components, and implementation details.
+
+2. **[Anonymized Data Model](./anonymized-data-model.md)** - Describes the data model that focuses on anonymized narrative insights rather than raw social media content.
+
+3. **[Transform-on-Ingest Implementation Plan](./transform-on-ingest-implementation-plan.md)** - Outlines the components to be implemented and the implementation roadmap.
+
+4. **[Transform-on-Ingest Implementation](./transform-on-ingest-implementation.md)** - Details the actual implementation of the transform-on-ingest architecture, including code samples and component documentation.
+
+5. **[Data Deletion Strategy](./data-deletion-strategy.md)** - Explains how the transform-on-ingest architecture handles data deletion requests and minimizes deletion obligations.
+
+6. **[Narrative Repository Pattern](./narrative-repository-pattern.md)** - Explains the repository pattern used for narrative insights and its advantages over direct database access.
+
+7. **[GraphQL Integration](./transform-on-ingest-graphql.md)** - Details how the GraphQL API has been integrated with the transform-on-ingest architecture to maintain security.
+
+### Core Principles
+
+The transform-on-ingest architecture is built on the following principles:
+
+1. **No Raw Data Storage** - Raw data from platforms never persists in our system
+2. **True Anonymization** - Cryptographic techniques make it mathematically impossible to reverse-engineer identities
+3. **Focus on Patterns** - The system stores narrative patterns and trends, not individual content
+4. **Generalized Attribution** - Source consistency is maintained without identifiability
+5. **No Cross-Platform Linkage** - Different cryptographic salts for different platforms prevent cross-referencing identities
+
+### Building From The Start
+
+Since Veritas is in pre-production, we're implementing this architecture from the beginning rather than migrating an existing system. This gives us several advantages:
+
+1. **Clean Design** - No legacy constraints or backward compatibility concerns
+2. **Optimized Performance** - Architecture designed for anonymization from day one
+3. **Simplified Implementation** - No migration complexity or dual-system operation
+4. **Cohesive Codebase** - All components built with the same architectural principles
+
+### Key Benefits for Narrative Analysis
+
+This architecture provides significant benefits for narrative analysis:
+
+1. **Narrative Integrity** - Anonymized model preserves narrative patterns even when platform data is deleted
+2. **Pattern Focus** - System is optimized for detecting trends rather than storing individual content
+3. **Compliance by Design** - System inherently meets platform terms rather than requiring ongoing modifications
+4. **Enhanced Privacy** - Analysis can proceed without compromising individual privacy
 
 ## Quick Start
 
@@ -66,7 +127,7 @@ chmod +x scripts/local-k8s-deploy.sh
 After setting up your local environment, you might want to:
 
 1. Explore the [API Documentation](./api-docs.md) to understand the available endpoints
-2. Review the [Data Model](./data-model.md) to understand the system's data structure
+2. Review the [Anonymized Data Model](./anonymized-data-model.md) to understand the system's data structure
 3. Follow the [Testing Guide](./testing.md) to learn how to test your changes
 
 ## Contributing

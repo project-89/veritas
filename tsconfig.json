@@ -1,0 +1,47 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "declaration": true,
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["libs/*"],
+      "@veritas/ingestion": ["libs/ingestion/src/index.ts"],
+      "@veritas/ingestion/*": ["libs/ingestion/src/*"],
+      "@veritas/shared": ["libs/shared/src/index.ts"],
+      "@veritas/shared/*": ["libs/shared/src/*"]
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./types"
+    ]
+  },
+  "include": [
+    "libs/**/*",
+    "apps/**/*",
+    "types/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/*.d.ts",
+    "**/*.js"
+  ],
+  "references": [
+    {
+      "path": "./libs/shared/utils/tsconfig.lib.json"
+    },
+    {
+      "path": "./libs/shared/types/tsconfig.lib.json"
+    },
+    {
+      "path": "./libs/ingestion/tsconfig.lib.json"
+    },
+    {
+      "path": "./libs/analysis/tsconfig.lib.json"
+    }
+  ]
+} 

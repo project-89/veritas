@@ -1,27 +1,27 @@
-import { Injectable } from "@nestjs/common";
-import { MemgraphService } from "@/database";
-import { SourceNode } from "@/schemas/base.schema";
-import { SourceValidationService } from "../services/source-validation.service";
+import { Injectable } from '@nestjs/common';
+import { MemgraphService } from '@/database';
+import { SourceNode } from '@veritas/shared';
+import { SourceValidationService } from '../services/source-validation.service';
 
 export interface SourceCreateInput {
   name: string;
-  platform: "twitter" | "facebook" | "reddit" | "other";
+  platform: 'twitter' | 'facebook' | 'reddit' | 'other';
   credibilityScore?: number;
-  verificationStatus?: "verified" | "unverified" | "disputed";
+  verificationStatus?: 'verified' | 'unverified' | 'disputed';
   metadata?: Record<string, any>;
 }
 
 export interface SourceUpdateInput {
   name?: string;
   credibilityScore?: number;
-  verificationStatus?: "verified" | "unverified" | "disputed";
+  verificationStatus?: 'verified' | 'unverified' | 'disputed';
   metadata?: Record<string, any>;
 }
 
 export interface SourceSearchParams {
   query?: string;
   platform?: string;
-  verificationStatus?: "verified" | "unverified" | "disputed";
+  verificationStatus?: 'verified' | 'unverified' | 'disputed';
   minCredibilityScore?: number;
   limit?: number;
   offset?: number;
@@ -39,10 +39,10 @@ export class SourceService {
     await this.validationService.validateSourceInput(input);
 
     // Create source node
-    const sourceNode = await this.memgraphService.createNode("Source", {
+    const sourceNode = await this.memgraphService.createNode('Source', {
       ...input,
       credibilityScore: input.credibilityScore || 0.5,
-      verificationStatus: input.verificationStatus || "unverified",
+      verificationStatus: input.verificationStatus || 'unverified',
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -60,7 +60,7 @@ export class SourceService {
     // Get existing source
     const existingSource = await this.getSourceById(id);
     if (!existingSource) {
-      throw new Error("Source not found");
+      throw new Error('Source not found');
     }
 
     // Update source node
@@ -144,7 +144,7 @@ export class SourceService {
     return result[0]?.deleted > 0;
   }
 
-  async getSourceContent(id: string, limit: number = 10): Promise<any[]> {
+  async getSourceContent(id: string, limit = 10): Promise<any[]> {
     const query = `
       MATCH (s:Source { id: $id })-[:PUBLISHED]->(c:Content)
       RETURN c
@@ -161,12 +161,12 @@ export class SourceService {
 
   async updateCredibilityScore(id: string, score: number): Promise<SourceNode> {
     if (score < 0 || score > 1) {
-      throw new Error("Credibility score must be between 0 and 1");
+      throw new Error('Credibility score must be between 0 and 1');
     }
 
     const existingSource = await this.getSourceById(id);
     if (!existingSource) {
-      throw new Error("Source not found");
+      throw new Error('Source not found');
     }
 
     const query = `

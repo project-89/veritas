@@ -5,6 +5,20 @@ dist
 tmp
 out-tsc
 
+# TypeScript build output
+**/*.js
+**/*.d.ts
+**/*.js.map
+**/*.tsbuildinfo
+!jest.config.js
+!jest.preset.js
+!**/jest.config.ts
+!vite.config.ts
+!**/webpack.config.js
+!**/tailwind.config.js
+!scripts/**/*.js
+!eslint.config.mjs
+
 # dependencies
 node_modules
 

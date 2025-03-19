@@ -1,6 +1,6 @@
-import { Field, ObjectType, Float } from "@nestjs/graphql";
-import { Pattern, DeviationMetrics } from "../analysis.types";
-import { ContentNode } from "@/schemas/base.schema";
+import { Field, ObjectType, Float } from '@nestjs/graphql';
+import { Pattern, DeviationMetrics } from '../analysis.types';
+import { ContentNode } from '@veritas/shared';
 
 @ObjectType()
 export class RelatedContent implements ContentNode {
@@ -14,13 +14,13 @@ export class RelatedContent implements ContentNode {
   timestamp: Date;
 
   @Field()
-  platform: "twitter" | "facebook" | "reddit" | "other";
+  platform: 'twitter' | 'facebook' | 'reddit' | 'other';
 
   @Field(() => Float, { nullable: true })
   toxicity?: number;
 
   @Field(() => String, { nullable: true })
-  sentiment?: "positive" | "negative" | "neutral";
+  sentiment?: 'positive' | 'negative' | 'neutral';
 
   @Field(() => [String], { nullable: true })
   categories?: string[];

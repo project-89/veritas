@@ -1,32 +1,74 @@
-import { Injectable, OnModuleInit, Inject } from "@nestjs/common";
-import { ClientKafka } from "@nestjs/microservices";
-import { MemgraphService, RedisService } from "@/database";
-import { ContentNode, SourceNode } from "@/schemas/base.schema";
+/**
+ * Mock implementation of ContentStorageService
+ * This avoids external dependencies and provides a simplified version for testing
+ */
 
-@Injectable()
-export class ContentStorageService implements OnModuleInit {
-  constructor(
-    @Inject("KAFKA_SERVICE") private readonly kafkaClient: ClientKafka,
-    private readonly memgraphService: MemgraphService,
-    private readonly redisService: RedisService
-  ) {}
+/**
+ * Simplified ContentNode for mock implementation
+ */
+export interface MockContentNode {
+  id: string;
+  text: string;
+  timestamp: Date;
+  platform: string;
+  [key: string]: any;
+}
 
-  async onModuleInit() {
-    // Subscribe to topics
-    const topics = ["content.created", "content.updated", "source.verified"];
-    topics.forEach((topic) => this.kafkaClient.subscribeToResponseOf(topic));
-    await this.kafkaClient.connect();
+/**
+ * Simplified SourceNode for mock implementation
+ */
+export interface MockSourceNode {
+  id: string;
+  name: string;
+  platform: string;
+  verificationStatus?: string;
+  [key: string]: any;
+}
+
+/**
+ * Mock implementation of ContentStorageService that doesn't rely on external dependencies
+ */
+export class MockContentStorageService {
+  private readonly kafkaClient: any;
+  private readonly memgraphService: any;
+  private readonly redisService: any;
+
+  constructor(kafkaClient: any, memgraphService: any, redisService: any) {
+    this.kafkaClient = kafkaClient;
+    this.memgraphService = memgraphService;
+    this.redisService = redisService;
   }
 
-  async ingestContent(content: ContentNode, source: SourceNode) {
+  /**
+   * Initialize the service
+   */
+  async onModuleInit() {
+    // Subscribe to topics
+    const topics = ['content.created', 'content.updated', 'source.verified'];
+    topics.forEach((topic) => this.kafkaClient.subscribeToResponseOf(topic));
+    await this.kafkaClient.connect();
+
+    console.warn(
+      'WARNING: Using deprecated ContentStorageService. Consider migrating to NarrativeRepository.'
+    );
+  }
+
+  /**
+   * Store content and source in the database
+   */
+  async ingestContent(content: MockContentNode, source: MockSourceNode) {
     try {
+      console.warn(
+        'WARNING: Using deprecated method that stores raw data. Consider migrating to transform-on-ingest.'
+      );
+
       // Store in graph database
       const contentNode = await this.memgraphService.createNode(
-        "Content",
+        'Content',
         content
       );
       const sourceNode = await this.memgraphService.createNode(
-        "Source",
+        'Source',
         source
       );
 
@@ -34,7 +76,7 @@ export class ContentStorageService implements OnModuleInit {
       await this.memgraphService.createRelationship(
         sourceNode.id,
         contentNode.id,
-        "PUBLISHED",
+        'PUBLISHED',
         { timestamp: new Date().toISOString() }
       );
 
@@ -47,7 +89,7 @@ export class ContentStorageService implements OnModuleInit {
       });
 
       // Emit event for analysis
-      await this.kafkaClient.emit("content.created", {
+      await this.kafkaClient.emit('content.created', {
         content,
         source,
         timestamp: new Date(),
@@ -55,12 +97,15 @@ export class ContentStorageService implements OnModuleInit {
 
       return { contentNode, sourceNode };
     } catch (error) {
-      console.error("Error ingesting content:", error);
+      console.error('Error ingesting content:', error);
       throw error;
     }
   }
 
-  async updateContent(contentId: string, updates: Partial<ContentNode>) {
+  /**
+   * Update content
+   */
+  async updateContent(contentId: string, updates: Partial<MockContentNode>) {
     try {
       // Update graph database
       const query = `
@@ -87,7 +132,7 @@ export class ContentStorageService implements OnModuleInit {
       }
 
       // Emit update event
-      await this.kafkaClient.emit("content.updated", {
+      await this.kafkaClient.emit('content.updated', {
         contentId,
         updates,
         timestamp: new Date(),
@@ -95,14 +140,17 @@ export class ContentStorageService implements OnModuleInit {
 
       return result[0]?.c;
     } catch (error) {
-      console.error("Error updating content:", error);
+      console.error('Error updating content:', error);
       throw error;
     }
   }
 
+  /**
+   * Verify a source's status
+   */
   async verifySource(
     sourceId: string,
-    verificationStatus: "verified" | "unverified" | "suspicious"
+    verificationStatus: 'verified' | 'unverified' | 'suspicious'
   ) {
     try {
       // Update graph database
@@ -120,7 +168,7 @@ export class ContentStorageService implements OnModuleInit {
       });
 
       // Emit verification event
-      await this.kafkaClient.emit("source.verified", {
+      await this.kafkaClient.emit('source.verified', {
         sourceId,
         verificationStatus,
         timestamp: new Date(),
@@ -128,7 +176,7 @@ export class ContentStorageService implements OnModuleInit {
 
       return result[0]?.s;
     } catch (error) {
-      console.error("Error verifying source:", error);
+      console.error('Error verifying source:', error);
       throw error;
     }
   }
