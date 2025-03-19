@@ -1,23 +1,27 @@
 # Veritas User Guide
 
+**Status: Current**  
+**Last Updated: [Current Date]**
+
 This comprehensive guide provides detailed information on using the Veritas system for narrative tracking and analysis.
 
 ## Table of Contents
 
 1. [Introduction](#introduction)
-2. [User Interface](#user-interface)
-3. [Account Management](#account-management)
-4. [Source Configuration](#source-configuration)
-5. [Content Management](#content-management)
-6. [Narrative Analysis](#narrative-analysis)
-7. [Visualization Tools](#visualization-tools)
-8. [Search and Filtering](#search-and-filtering)
-9. [Reports and Exports](#reports-and-exports)
-10. [Collaboration Features](#collaboration-features)
-11. [Notifications and Alerts](#notifications-and-alerts)
-12. [Advanced Features](#advanced-features)
-13. [Troubleshooting](#troubleshooting)
-14. [Glossary](#glossary)
+2. [Data Privacy and Security](#data-privacy-and-security)
+3. [User Interface](#user-interface)
+4. [Account Management](#account-management)
+5. [Source Configuration](#source-configuration)
+6. [Content Management](#content-management)
+7. [Narrative Analysis](#narrative-analysis)
+8. [Visualization Tools](#visualization-tools)
+9. [Search and Filtering](#search-and-filtering)
+10. [Reports and Exports](#reports-and-exports)
+11. [Collaboration Features](#collaboration-features)
+12. [Notifications and Alerts](#notifications-and-alerts)
+13. [Advanced Features](#advanced-features)
+14. [Troubleshooting](#troubleshooting)
+15. [Glossary](#glossary)
 
 ## Introduction
 
@@ -30,6 +34,34 @@ Veritas is a powerful system for tracking and analyzing narratives across digita
 - **Narrative**: A cohesive story or theme that emerges from related content
 - **Branch**: A divergent path that a narrative takes as it evolves
 - **Consensus**: Areas where multiple narratives converge on similar points
+- **Anonymized Insights**: Privacy-preserving data points that represent patterns without exposing identifiable information
+
+## Data Privacy and Security
+
+Veritas is designed with privacy and security as core principles. The system implements a transform-on-ingest architecture that ensures raw social media data is never stored.
+
+### Transform-on-Ingest Architecture
+
+When you use Veritas to analyze content from social media platforms:
+
+1. **Immediate Transformation**: All incoming data is immediately transformed into anonymized insights
+2. **No Raw Data Storage**: The original identifiable content is never stored in the system
+3. **Privacy Preservation**: Only anonymized, non-identifiable insights are saved
+
+### Benefits for Users
+
+This architecture provides several key benefits:
+
+1. **Enhanced Compliance**: Reduced concerns about platform terms of service violations
+2. **Simplified Data Management**: No need to manage or delete raw social media content
+3. **Focus on Patterns**: The system emphasizes narrative patterns rather than individual content items
+4. **Reduced Privacy Risk**: Analysis can proceed with minimal privacy concerns
+
+### What This Means for Your Analysis
+
+- You'll see statistical and pattern-based information rather than raw content in some views
+- Trends and narrative evolution are preserved while individual identities are protected
+- The system may use terms like "Source Identifier" rather than usernames in certain contexts
 
 ## User Interface
 

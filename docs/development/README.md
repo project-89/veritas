@@ -2,13 +2,14 @@
 
 This directory contains technical documentation for developers working on the Veritas system.
 
+**Last Updated: [Current Date]**
+
 ## Documentation Structure
 
 ### Core Concepts
 
 - [Project Structure](./project-structure.md) - Overview of the project's file and directory organization
-- [Local Development](./local-development.md) - Guide for setting up and running the project locally
-- [Local Environment](./local-environment.md) - Environment configuration for development
+- [Development Environment](./development-environment.md) - Comprehensive guide for setting up and running the project locally
 - [Testing](./testing.md) - Testing strategies and frameworks used in the project
 
 ### API and Data
@@ -16,31 +17,30 @@ This directory contains technical documentation for developers working on the Ve
 - [API Documentation](./api-docs.md) - Detailed API endpoint documentation
 - [Data Model](./data-model.md) - Current data model documentation
 - [Anonymized Data Model](./anonymized-data-model.md) - The anonymized data model for the transform-on-ingest architecture
+- [Data Ingestion Architecture](./data-ingestion-architecture.md) - Overview of the data ingestion process
 
 ### Architecture and Design
 
-- [Data Ingestion Architecture](./data-ingestion-architecture.md) - Overview of the transform-on-ingest architecture
-- [Transform-on-Ingest Implementation Plan](./transform-on-ingest-implementation-plan.md) - Detailed plan for implementing the new architecture
+- [Transform-on-Ingest Architecture](./transform-on-ingest-consolidated.md) - Comprehensive documentation of the transform-on-ingest architecture
+- [Narrative Repository Pattern](./narrative-repository-pattern.md) - Explains the repository pattern used for narrative insights
+- [Data Deletion Strategy](./data-deletion-strategy.md) - Data retention and deletion strategy
+- [GraphQL Integration](./transform-on-ingest-graphql.md) - Details how GraphQL integrates with the transform-on-ingest architecture
 
 ## Transform-on-Ingest Architecture
 
-Veritas is being built with a transform-on-ingest architecture for social media data to ensure compliance with platform terms of service while enabling robust narrative analysis capabilities.
+Veritas is built with a transform-on-ingest architecture for social media data to ensure compliance with platform terms of service while enabling robust narrative analysis capabilities.
 
 ### Key Documents
 
-1. **[Data Ingestion Architecture](./data-ingestion-architecture.md)** - Provides a comprehensive overview of the transform-on-ingest architecture, including principles, components, and implementation details.
+1. **[Transform-on-Ingest Architecture](./transform-on-ingest-consolidated.md)** - Provides a comprehensive overview of the transform-on-ingest architecture, including principles, components, implementation details, and code examples.
 
 2. **[Anonymized Data Model](./anonymized-data-model.md)** - Describes the data model that focuses on anonymized narrative insights rather than raw social media content.
 
-3. **[Transform-on-Ingest Implementation Plan](./transform-on-ingest-implementation-plan.md)** - Outlines the components to be implemented and the implementation roadmap.
+3. **[Data Deletion Strategy](./data-deletion-strategy.md)** - Explains how the transform-on-ingest architecture handles data deletion requests and minimizes deletion obligations.
 
-4. **[Transform-on-Ingest Implementation](./transform-on-ingest-implementation.md)** - Details the actual implementation of the transform-on-ingest architecture, including code samples and component documentation.
+4. **[Narrative Repository Pattern](./narrative-repository-pattern.md)** - Explains the repository pattern used for narrative insights and its advantages over direct database access.
 
-5. **[Data Deletion Strategy](./data-deletion-strategy.md)** - Explains how the transform-on-ingest architecture handles data deletion requests and minimizes deletion obligations.
-
-6. **[Narrative Repository Pattern](./narrative-repository-pattern.md)** - Explains the repository pattern used for narrative insights and its advantages over direct database access.
-
-7. **[GraphQL Integration](./transform-on-ingest-graphql.md)** - Details how the GraphQL API has been integrated with the transform-on-ingest architecture to maintain security.
+5. **[GraphQL Integration](./transform-on-ingest-graphql.md)** - Details how the GraphQL API has been integrated with the transform-on-ingest architecture to maintain security.
 
 ### Core Principles
 
@@ -51,15 +51,6 @@ The transform-on-ingest architecture is built on the following principles:
 3. **Focus on Patterns** - The system stores narrative patterns and trends, not individual content
 4. **Generalized Attribution** - Source consistency is maintained without identifiability
 5. **No Cross-Platform Linkage** - Different cryptographic salts for different platforms prevent cross-referencing identities
-
-### Building From The Start
-
-Since Veritas is in pre-production, we're implementing this architecture from the beginning rather than migrating an existing system. This gives us several advantages:
-
-1. **Clean Design** - No legacy constraints or backward compatibility concerns
-2. **Optimized Performance** - Architecture designed for anonymization from day one
-3. **Simplified Implementation** - No migration complexity or dual-system operation
-4. **Cohesive Codebase** - All components built with the same architectural principles
 
 ### Key Benefits for Narrative Analysis
 
@@ -89,11 +80,8 @@ For a quick start with local development, follow these steps:
 
 2. **Generate mock data**:
    ```bash
-   # Install required packages
-   npm install @faker-js/faker
-   
    # Generate mock data
-   node scripts/generate-mock-data.js
+   npm run generate-mock-data
    ```
 
 3. **Access the services**:
@@ -103,6 +91,8 @@ For a quick start with local development, follow these steps:
    - Redis Commander: http://localhost:8081
    - Kafka UI: http://localhost:8080
 
+For more detailed setup instructions, see the [Development Environment](./development-environment.md) guide.
+
 ## Development Workflow
 
 1. Make changes to the code
@@ -110,25 +100,9 @@ For a quick start with local development, follow these steps:
 3. Write tests for your changes
 4. Submit a pull request
 
-## Testing with Kubernetes
+## Documentation Status
 
-For testing with Kubernetes locally:
-
-```bash
-# Make the script executable
-chmod +x scripts/local-k8s-deploy.sh
-
-# Run the deployment script
-./scripts/local-k8s-deploy.sh
-```
-
-## Next Steps
-
-After setting up your local environment, you might want to:
-
-1. Explore the [API Documentation](./api-docs.md) to understand the available endpoints
-2. Review the [Anonymized Data Model](./anonymized-data-model.md) to understand the system's data structure
-3. Follow the [Testing Guide](./testing.md) to learn how to test your changes
+For information about the status of documentation files, including which documents have been consolidated or need updates, see the [Documentation Audit](../documentation-audit.md).
 
 ## Contributing
 

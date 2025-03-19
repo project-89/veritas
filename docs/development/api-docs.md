@@ -1,5 +1,8 @@
 # Veritas API Documentation
 
+**Status: Current**  
+**Last Updated: [Current Date]**
+
 This document provides information about the Veritas API endpoints, request/response formats, and authentication.
 
 ## Base URL
@@ -42,6 +45,26 @@ Include the token in the Authorization header for protected endpoints:
 ```
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
+
+## API Design Principles
+
+### Transform-on-Ingest Architecture
+
+The Veritas API is built on a transform-on-ingest architecture, which means that all data ingested through the API is immediately transformed into anonymized insights. Key principles include:
+
+1. **No Raw Data Storage**: Raw identifiable data from social media platforms is never persisted in our system
+2. **Immediate Transformation**: Data is transformed at the point of ingestion
+3. **Anonymized Insights**: Only anonymized, non-reversible insights are stored
+
+For more details on this architecture, see the [Transform-on-Ingest Architecture](./transform-on-ingest-consolidated.md) documentation.
+
+### Security Considerations
+
+When using the API:
+
+1. Always use the latest ingestion endpoints that implement the transform-on-ingest pattern
+2. Be aware that certain legacy endpoints may be deprecated if they don't follow this pattern
+3. Remember that raw social media content sent to the API is not stored in its original form
 
 ## API Endpoints
 
@@ -790,4 +813,57 @@ X-RateLimit-Remaining: 95
 X-RateLimit-Reset: 1623456789
 ```
 
-When the rate limit is exceeded, the API returns a 429 Too Many Requests status code. 
+When the rate limit is exceeded, the API returns a 429 Too Many Requests status code.
+
+### Content Ingestion
+
+#### Ingest Social Media Content (Recommended)
+
+```
+POST /ingest/social-content
+```
+
+This endpoint implements the transform-on-ingest pattern and is the recommended way to ingest social media content.
+
+**Request Body:**
+
+```json
+{
+  "platform": "twitter",
+  "content": {
+    "text": "This is a sample tweet about climate change #climateaction",
+    "author": {
+      "id": "user123",
+      "username": "climatewatcher"
+    },
+    "metrics": {
+      "likes": 45,
+      "shares": 12,
+      "comments": 5
+    },
+    "createdAt": "2023-06-15T14:30:00Z"
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "transformationCompleted": true,
+  "insightId": "ins_893jf8s9d3",
+  "processingMetrics": {
+    "transformationTimeMs": 125,
+    "featuresExtracted": ["sentiment", "themes", "entities"]
+  }
+}
+```
+
+#### Ingest Content (Legacy - Deprecated)
+
+```
+POST /ingest/content
+```
+
+**Warning**: This endpoint does not implement the transform-on-ingest pattern and is deprecated. Use `/ingest/social-content` instead. 

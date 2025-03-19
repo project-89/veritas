@@ -1,10 +1,17 @@
 # Veritas Data Model
 
+**Status: Current**  
+**Last Updated: [Current Date]**
+
 This document describes the data model used in the Veritas system for storing and analyzing narrative data.
+
+> **Note**: This document describes the current implementation of the data model. For information on the anonymized data model used with the transform-on-ingest architecture, please refer to the [Anonymized Data Model](./anonymized-data-model.md) document.
 
 ## Overview
 
 The Veritas system uses a graph database (Memgraph) to store and analyze relationships between content, sources, and narratives. The graph model allows for efficient traversal of relationships and pattern detection.
+
+With the implementation of the transform-on-ingest architecture, all data is anonymized during ingestion, ensuring that no identifiable information is stored in its raw form.
 
 ## Core Entities
 
@@ -12,37 +19,36 @@ The Veritas system uses a graph database (Memgraph) to store and analyze relatio
 
 #### Source Node
 
-Represents a source of content, such as a social media account, news site, or blog.
+Represents an anonymized source of content, such as a social media account, news site, or blog.
 
 ```typescript
 interface SourceNode {
-  id: string;
+  id: string;  // Anonymized identifier
   type: 'source';
-  name: string;
+  sourceHash: string;  // Secure hash of the original source identifier
   platform: string;  // 'twitter', 'reddit', 'facebook', 'news', etc.
-  url: string;
   verified: boolean;
   credibilityScore: number;  // 0.0 to 1.0
-  followerCount?: number;
-  description?: string;
-  profileImageUrl?: string;
-  createdAt: string;  // ISO date string
+  followerCategory?: string;  // Categorized as 'small', 'medium', 'large', 'massive'
   verificationStatus: 'verified' | 'unverified' | 'suspicious';
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any>;  // Non-identifying metadata
 }
 ```
 
 #### Content Node
 
-Represents a piece of content, such as a social media post, article, or comment.
+Represents anonymized content, such as a social media post, article, or comment.
 
 ```typescript
 interface ContentNode {
-  id: string;
+  id: string;  // Anonymized identifier
   type: 'content';
   contentType: string;  // 'post', 'article', 'comment', 'reply', etc.
+  contentFingerprint: string;  // Secure hash of the content
+  sourceId: string;  // Reference to the anonymized source
+  publishedTimeframe: string;  // Generalized timeframe (e.g., '2023-Q2-W3-evening')
+  engagementCategory?: string;  // Categorized as 'low', 'medium', 'high', 'viral'
   text: string;
-  sourceId: string;  // Reference to the source
   url?: string;
   publishedAt: string;  // ISO date string
   engagementMetrics?: {

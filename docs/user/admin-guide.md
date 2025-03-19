@@ -139,49 +139,75 @@ Organize users into groups:
 
 ## Data Management
 
-### Source Management
+Veritas implements a transform-on-ingest architecture for data privacy and compliance. This means that all raw data from social media platforms is transformed into anonymized insights during ingestion, and no raw identifiable data is stored in the system.
 
-Manage data sources:
+### Data Ingestion Principles
 
-1. Navigate to Admin > Sources
-2. Configure global source settings
-3. Set up API keys for external services
-4. Configure rate limiting
-5. Set up source templates
+1. **Privacy by Design**: All data is anonymized at the point of ingestion
+2. **No Raw Data Storage**: Original identifiable content is never stored
+3. **Secure Transformations**: Cryptographic techniques ensure one-way transformation
 
-### Data Retention
+### Managing Data Sources
 
-Configure data retention policies:
-
-1. Navigate to Admin > Data Retention
-2. Set retention periods for:
-   - Raw content
-   - Processed content
-   - Narratives
-   - User activity logs
-   - System logs
-3. Configure archiving options
-4. Set up data purging schedules
-
-### Data Import/Export
-
-Manage data import and export:
+As an administrator, you can manage the data sources that feed content into the Veritas system:
 
 1. Navigate to Admin > Data Management
-2. Import data from external sources
-3. Export system data for backup or migration
-4. Schedule regular exports
-5. Configure export formats and destinations
+2. Select the "Data Sources" tab
+3. From here, you can:
+   - Add new data sources
+   - Edit connection parameters for existing sources
+   - Enable/disable sources
+   - View ingestion metrics for each source
 
-### Database Management
+### Configuring Transformation Settings
 
-Manage the graph database:
+The transform-on-ingest architecture uses various settings that can be configured:
 
-1. Navigate to Admin > Database
-2. View database status and metrics
-3. Perform database maintenance
-4. Optimize queries
-5. Manage database connections
+1. Navigate to Admin > System Configuration
+2. Select the "Transformation" tab
+3. Configure settings such as:
+   - Salt rotation frequency (default: 30 days)
+   - Anonymization strength levels
+   - Temporal generalization settings
+   - Engagement categorization thresholds
+
+### Data Retention Policies
+
+Configure how long anonymized insights are retained in the system:
+
+1. Navigate to Admin > Data Management
+2. Select the "Retention Policies" tab
+3. Configure retention periods for different data categories
+4. Set up automatic cleanup schedules
+
+### Monitoring Data Transformation
+
+Monitor the health and performance of the data transformation process:
+
+1. Navigate to Admin > Monitoring
+2. Select the "Data Transformation" dashboard
+3. View metrics such as:
+   - Transformation throughput
+   - Processing latency
+   - Error rates
+   - Source distribution
+
+### Data Export and Backup
+
+While the system doesn't store raw social media data, you can export and backup the anonymized insights:
+
+1. Navigate to Admin > Data Management
+2. Select the "Export & Backup" tab
+3. Configure automated backups or perform manual exports
+4. Choose export formats (JSON, CSV, etc.)
+
+### Handling Deletion Requests
+
+One advantage of the transform-on-ingest architecture is simplified handling of deletion requests:
+
+1. Since no raw identifiable data is stored, there's no need to delete specific content
+2. For audit purposes, navigate to Admin > Compliance > Deletion Requests to log any received requests
+3. The system will automatically generate compliance responses based on the architecture
 
 ## System Configuration
 
