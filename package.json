@@ -24,7 +24,9 @@
     "serve:visualization-showcase": "nx serve visualization-showcase",
     "dev": "nx run-many --target=serve --projects=api,visualization --parallel=2",
     "dev:showcase": "nx run-many --target=serve --projects=api,visualization-showcase --parallel=2",
-    "clean:build": "find . -type f -name \"*.js\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -not -path \"*/scripts/*\" -not -name \"jest.config.js\" -not -name \"jest.preset.js\" -not -name \"*.config.js\" -delete && find . -type f -name \"*.d.ts\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -not -path \"*/types/*\" -delete && find . -type f -name \"*.js.map\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -delete && find . -type f -name \"*.tsbuildinfo\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -delete"
+    "clean:build": "find . -type f -name \"*.js\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -not -path \"*/scripts/*\" -not -name \"jest.config.js\" -not -name \"jest.preset.js\" -not -name \"*.config.js\" -delete && find . -type f -name \"*.d.ts\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -not -path \"*/types/*\" -delete && find . -type f -name \"*.js.map\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -delete && find . -type f -name \"*.tsbuildinfo\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -delete",
+    "mongodb:up": "docker-compose -f docker-compose.mongodb.yml up -d",
+    "mongodb:down": "docker-compose -f docker-compose.mongodb.yml down"
   },
   "private": true,
   "devDependencies": {
@@ -97,10 +99,12 @@
     "@nestjs/core": "^10.4.15",
     "@nestjs/graphql": "^13.0.3",
     "@nestjs/microservices": "^11.0.11",
+    "@nestjs/mongoose": "^11.0.2",
     "@nestjs/platform-express": "^10.0.2",
     "axios": "^1.6.0",
     "d3": "^7.9.0",
     "graphql": "^16.10.0",
+    "mongoose": "^8.12.1",
     "react": "^19.0.0",
     "react-dom": "19.0.0",
     "react-router-dom": "^6.29.0",

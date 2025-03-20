@@ -28,7 +28,29 @@ This document summarizes the documentation cleanup performed on the Veritas proj
     - `local-development.md`
     - `local-environment.md`
 
-### 3. New Documentation Structure
+### 3. Updated Documents
+
+- **API Documentation**:
+  - Updated [API Documentation](./development/api-docs.md) to reflect the transform-on-ingest architecture
+  - Added information about new API endpoints and deprecated endpoints
+
+- **Data Model Documentation**:
+  - Updated [Data Model](./development/data-model.md) to align with the anonymized data model
+  - Added references to transform-on-ingest architecture
+
+- **Data Ingestion Architecture**:
+  - Updated [Data Ingestion Architecture](./development/data-ingestion-architecture.md) to reference the consolidated transform-on-ingest document
+  - Streamlined duplicate content
+
+- **User and Admin Guides**:
+  - Updated [User Guide](./user/user-guide.md) to reflect current UI and features, adding data privacy information
+  - Updated [Admin Guide](./user/admin-guide.md) with transform-on-ingest architecture information
+
+- **Implementation Roadmap**:
+  - Updated [Implementation Roadmap](./narrative-analysis/implementation-roadmap.md) to reflect current implementation status
+  - Added completed items and adjusted future plans
+
+### 4. New Documentation Structure
 
 - Created an overall [Documentation README](./README.md) file with:
   - Documentation structure
@@ -45,12 +67,12 @@ This document summarizes the documentation cleanup performed on the Veritas proj
   - Remove references to archived documents
   - Improve organization of listed documents
 
-### 4. Archive System
+### 5. Archive System
 
 - Created an `archived` directory in `docs/development/` for historical documents
 - Moved redundant and outdated documents to the archive
 
-### 5. Removed Unnecessary Documentation
+### 6. Removed Unnecessary Documentation
 
 - Archived the `interfaces-vs-types.md` file as it described information that should be self-documenting in the code
 - Updated references to remove mention of this document
@@ -63,25 +85,27 @@ This document summarizes the documentation cleanup performed on the Veritas proj
 4. **Clear Status**: Added status indicators to documents so readers know what's current
 5. **Historical Context**: Preserved historical documents in an archive instead of deleting them
 6. **Self-Documenting Code**: Removed documentation that should be evident from the code itself
+7. **Architecture Alignment**: Ensured all documentation reflects the transform-on-ingest architecture
 
 ## Next Steps
 
 1. **Regular Audits**: Continue to perform regular documentation audits
-2. **Update Remaining Documents**: Update documents marked as "Needs Update" in the audit
-3. **Complete Consolidation**: Consider additional document consolidation as identified in the audit
-4. **Documentation Style Guide**: Create a more detailed style guide for future documentation
-5. **Further Reduction**: Consider if any other documents are unnecessary and could be archived
+2. **Documentation Style Guide**: Create a more detailed style guide for future documentation
+3. **Further Reduction**: Consider if any other documents are unnecessary and could be archived
+4. **Automated Updates**: Consider implementing tools to automatically update version numbers and dates
 
 ## Audit Results
 
-The initial documentation audit found:
+The final documentation audit shows:
 - 38 total documentation files
 - 6 files consolidated into 2 new files
-- 6 files identified as needing updates
+- 6 files updated to reflect current state and architecture
 - 3 files marked as redundant and archived
 - 2 files marked as historical and archived
 - 1 file marked as unnecessary and archived (interfaces-vs-types.md)
 
 ## Conclusion
 
-This documentation cleanup effort has significantly improved the organization and maintainability of the Veritas project documentation. By consolidating redundant documents, creating a clear structure, implementing a documentation audit system, and removing unnecessary documents, we've made it easier for both developers and users to find and use the information they need. We've also reinforced the principle that code should be self-documenting where possible, rather than requiring separate explanation documents. 
+This documentation cleanup effort has significantly improved the organization and maintainability of the Veritas project documentation. By consolidating redundant documents, updating outdated information, creating a clear structure, implementing a documentation audit system, and removing unnecessary documents, we've made it easier for both developers and users to find and use the information they need. We've also reinforced the principle that code should be self-documenting where possible, rather than requiring separate explanation documents.
+
+Most importantly, all documentation now aligns with the transform-on-ingest architecture, ensuring consistent representation of this key privacy and compliance feature throughout the codebase documentation. 

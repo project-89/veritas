@@ -57,3 +57,6 @@ Thumbs.db
 
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
+
+# MongoDB data directory
+mongodb_data/

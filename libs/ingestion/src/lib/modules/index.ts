@@ -7,3 +7,4 @@ export * from './ingestion.module';
 export * from './narrative.module';
 export * from './transform-on-ingest.module';
 export * from './module-resolver';
+export * from './mongodb.module';

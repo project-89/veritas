@@ -15,7 +15,7 @@ import { NarrativeModule } from './narrative.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    NarrativeModule,
+    NarrativeModule.register(),
   ],
   exports: [NarrativeModule],
 })

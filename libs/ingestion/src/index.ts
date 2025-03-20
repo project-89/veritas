@@ -41,3 +41,15 @@ export * from './lib/modules/module-resolver';
 // Mock implementations for testing
 import * as Mocks from './lib/__mocks__';
 export { Mocks };
+
+// Explicit MongoDB exports to make them easier to import
+export { MongoNarrativeRepository } from './lib/repositories/mongo-narrative.repository';
+export {
+  NarrativeInsightSchema,
+  NarrativeInsightModel,
+} from './lib/schemas/narrative-insight.schema';
+export {
+  NarrativeTrendSchema,
+  NarrativeTrendModel,
+} from './lib/schemas/narrative-trend.schema';
+export { MongoDBModule } from './lib/modules/mongodb.module';
