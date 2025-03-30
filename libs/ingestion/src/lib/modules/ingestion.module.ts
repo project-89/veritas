@@ -10,6 +10,9 @@ class StubDatabaseModule {}
 // Original platform connectors
 import { TwitterConnector as OriginalTwitterConnector } from '../services/twitter.connector';
 import { RedditConnector as OriginalRedditConnector } from '../services/reddit.connector';
+import { FacebookConnector as OriginalFacebookConnector } from '../services/facebook.connector';
+import { RSSConnector } from '../services/rss.connector';
+import { WebScraperConnector } from '../services/web-scraper.connector';
 
 // Services
 import { SocialMediaService } from '../services/social-media.service';
@@ -71,6 +74,9 @@ import { TransformOnIngestModule } from './transform-on-ingest.module';
     // Original Social Media Connectors (soon to be replaced)
     OriginalTwitterConnector,
     OriginalRedditConnector,
+    OriginalFacebookConnector,
+    RSSConnector,
+    WebScraperConnector,
     SocialMediaService,
 
     // GraphQL resolvers
