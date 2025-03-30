@@ -6,13 +6,13 @@ import { Field, ObjectType, Float } from '@nestjs/graphql';
 @ObjectType()
 export class SentimentAnalysisType {
   @Field(() => Float)
-  score: number;
+  score = 0.0;
 
   @Field()
-  label: string;
+  label = 'neutral';
 
   @Field(() => Float)
-  confidence: number;
+  confidence = 0.0;
 }
 
 /**
@@ -21,13 +21,13 @@ export class SentimentAnalysisType {
 @ObjectType()
 export class EntityType {
   @Field()
-  name: string;
+  name = '';
 
   @Field()
-  type: string;
+  type = '';
 
   @Field(() => Float)
-  relevance: number;
+  relevance = 0.0;
 }
 
 /**
@@ -36,10 +36,10 @@ export class EntityType {
 @ObjectType()
 export class EngagementType {
   @Field(() => Float)
-  total: number;
+  total = 0;
 
   @Field(() => Object)
-  breakdown: Record<string, number>;
+  breakdown: Record<string, number> = {};
 }
 
 /**
@@ -49,40 +49,40 @@ export class EngagementType {
 @ObjectType('NarrativeInsight')
 export class NarrativeInsightType {
   @Field()
-  id: string;
+  id = '';
 
   @Field()
-  contentHash: string;
+  contentHash = '';
 
   @Field()
-  sourceHash: string;
+  sourceHash = '';
 
   @Field()
-  platform: string;
+  platform = '';
 
   @Field()
-  timestamp: Date;
+  timestamp: Date = new Date();
 
   @Field(() => [String])
-  themes: string[];
+  themes: string[] = [];
 
   @Field(() => [EntityType])
-  entities: EntityType[];
+  entities: EntityType[] = [];
 
   @Field(() => SentimentAnalysisType)
-  sentiment: SentimentAnalysisType;
+  sentiment: SentimentAnalysisType = new SentimentAnalysisType();
 
   @Field(() => EngagementType)
-  engagement: EngagementType;
+  engagement: EngagementType = new EngagementType();
 
   @Field(() => Float)
-  narrativeScore: number;
+  narrativeScore = 0.0;
 
   @Field()
-  processedAt: Date;
+  processedAt: Date = new Date();
 
   @Field()
-  expiresAt: Date;
+  expiresAt: Date = new Date();
 }
 
 /**
@@ -91,7 +91,7 @@ export class NarrativeInsightType {
 @ObjectType()
 export class PlatformDistributionType {
   @Field(() => Object)
-  distribution: Record<string, number>;
+  distribution: Record<string, number> = {};
 }
 
 /**
@@ -101,32 +101,32 @@ export class PlatformDistributionType {
 @ObjectType('NarrativeTrend')
 export class NarrativeTrendType {
   @Field()
-  id: string;
+  id = '';
 
   @Field()
-  timeframe: string;
+  timeframe = '';
 
   @Field()
-  primaryTheme: string;
+  primaryTheme = '';
 
   @Field(() => [String])
-  relatedThemes: string[];
+  relatedThemes: string[] = [];
 
   @Field(() => Float)
-  insightCount: number;
+  insightCount = 0;
 
   @Field(() => Float)
-  uniqueSourcesCount: number;
+  uniqueSourcesCount = 0;
 
   @Field(() => Float)
-  sentimentTrend: number;
+  sentimentTrend = 0.0;
 
   @Field(() => Object)
-  platformDistribution: Record<string, number>;
+  platformDistribution: Record<string, number> = {};
 
   @Field(() => Float)
-  narrativeScore: number;
+  narrativeScore = 0.0;
 
   @Field()
-  detectedAt: Date;
+  detectedAt: Date = new Date();
 }

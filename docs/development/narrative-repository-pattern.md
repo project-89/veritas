@@ -29,7 +29,29 @@ Currently, the system includes the following implementations:
 
 1. **InMemoryNarrativeRepository**: A lightweight implementation for development and testing, storing data in memory.
 
-2. **MongoNarrativeRepository** (planned): A MongoDB-based implementation for production use, leveraging the database's indexing and aggregation capabilities.
+2. **MongoNarrativeRepository**: A MongoDB-based implementation for production use, leveraging the database's indexing and aggregation capabilities. This implementation provides persistent storage and is optimized for production workloads.
+
+## Configuring the Repository
+
+The NarrativeModule allows you to specify which repository implementation to use:
+
+```typescript
+// Use the in-memory implementation (default)
+NarrativeModule.register()
+
+// Or explicitly specify the in-memory implementation
+NarrativeModule.forRoot({ repositoryType: 'memory' })
+
+// Use the MongoDB implementation for production
+NarrativeModule.forRoot({ repositoryType: 'mongodb' })
+```
+
+When using the MongoDB implementation, you'll need to configure the connection string:
+
+```
+# In your .env file or environment variables
+MONGODB_URI=mongodb://username:password@localhost:27017/veritas
+```
 
 ## Key Features
 

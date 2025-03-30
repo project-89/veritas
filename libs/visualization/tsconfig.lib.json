@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
     "declaration": true,
+    "composite": true,
     "types": [
       "node",
       "@nx/react/typings/cssmodule.d.ts",
@@ -21,5 +22,14 @@
     "src/**/*.spec.jsx",
     "src/**/*.test.jsx"
   ],
-  "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"]
+  "include": [
+    "src/**/*.js", 
+    "src/**/*.jsx", 
+    "src/**/*.ts", 
+    "src/**/*.tsx",
+    "src/lib/**/*.ts",
+    "src/lib/**/*.tsx",
+    "src/lib/**/*.js",
+    "src/lib/**/*.jsx"
+  ]
 }

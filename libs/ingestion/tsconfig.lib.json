@@ -3,8 +3,13 @@
   "compilerOptions": {
     "outDir": "../../dist/libs/ingestion",
     "declaration": true,
-    "composite": true
+    "composite": true,
+    "rootDir": "../../",
+    "paths": {
+      "@veritas/shared": ["libs/shared/types/src/index.ts"],
+      "@veritas/shared/*": ["libs/shared/*/src/index.ts"]
+    }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../shared/types/src/**/*"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"]
 } 

@@ -29,6 +29,18 @@ type TweetWithIncludes = TweetV2 & {
       username: string;
     }>;
   };
+  user?: {
+    id_str: string;
+    name: string;
+    screen_name: string;
+    verified: boolean;
+  };
+  public_metrics?: {
+    like_count?: number;
+    retweet_count?: number;
+    reply_count?: number;
+    impression_count?: number;
+  };
 };
 
 interface SearchOptions {
@@ -126,7 +138,7 @@ export class TwitterConnector
     options?: SearchOptions
   ): Promise<NarrativeInsight[]> {
     if (!this.v2Client) {
-      throw new Error('Twitter client not initialized');
+      await this.connect();
     }
 
     try {
@@ -142,9 +154,8 @@ export class TwitterConnector
       );
 
       // Transform immediately - no raw storage
-      const insights = await this.transformService.transform(
-        enrichedTweets,
-        this.platform
+      const insights = await this.transformService.transformBatch(
+        enrichedTweets
       );
 
       this.logger.log(
@@ -332,20 +343,27 @@ export class TwitterConnector
           limit: 100,
         });
 
-        // Enrich tweets with user data
+        // Transform the raw tweets with user information into a format suitable for transformation
         const enrichedTweets = this.enrichTweetsWithUserData(
           rawTweets.tweets,
           rawTweets.includes
         );
 
-        if (enrichedTweets.length > 0) {
-          // Transform immediately - no raw storage
-          const insights = await this.transformService.transform(
-            enrichedTweets,
-            this.platform
+        // Filter posts that match keywords
+        const filteredTweets = enrichedTweets.filter((tweet: any) =>
+          this.postMatchesKeywords(
+            this.transformTweetToSocialMediaPost(tweet),
+            keywords
+          )
+        );
+
+        if (filteredTweets.length > 0) {
+          // Transform immediately using transform-on-ingest
+          const insights = await this.transformService.transformBatch(
+            filteredTweets
           );
 
-          // Emit only anonymized insights
+          // Emit anonymized insights only
           for (const insight of insights) {
             emitter.emit('data', insight);
           }
@@ -360,13 +378,14 @@ export class TwitterConnector
       }
     }, this.pollingInterval);
 
-    this.streamConnections.set(`transform-${streamId}`, interval);
+    this.streamConnections.set(streamId, interval);
+    this.interval = interval;
 
     // Clean up on end event
     emitter.on('end', () => {
       clearInterval(interval);
-      this.streamConnections.delete(`transform-${streamId}`);
-      this.logger.log(`Closed transformed Twitter stream: ${streamId}`);
+      this.streamConnections.delete(streamId);
+      this.logger.log(`Closed Twitter stream: ${streamId}`);
     });
 
     return emitter;
@@ -427,7 +446,6 @@ export class TwitterConnector
   private transformTweetToSocialMediaPost(
     tweet: TweetWithIncludes
   ): SocialMediaPost {
-    const authorUser = tweet.includes?.users?.[0];
     const metrics = tweet.public_metrics || {};
 
     return {
@@ -436,14 +454,14 @@ export class TwitterConnector
       timestamp: tweet.created_at ? new Date(tweet.created_at) : new Date(),
       platform: this.platform,
       authorId: tweet.author_id || '',
-      authorName: authorUser?.name || '',
-      authorHandle: authorUser?.username || '',
-      url: `https://twitter.com/user/status/${tweet.id}`,
+      authorName: tweet.user ? tweet.user.name : undefined,
+      authorHandle: tweet.user ? tweet.user.screen_name : undefined,
+      url: `https://twitter.com/i/web/status/${tweet.id}`,
       engagementMetrics: {
-        likes: metrics.like_count || 0,
-        shares: metrics.retweet_count || 0,
-        comments: metrics.reply_count || 0,
-        reach: metrics.impression_count || 0,
+        likes: Number(metrics.like_count) || 0,
+        shares: Number(metrics.retweet_count) || 0,
+        comments: Number(metrics.reply_count) || 0,
+        reach: Number(metrics.impression_count) || 0,
         viralityScore: this.calculateViralityScore(metrics),
       },
     };
@@ -459,6 +477,19 @@ export class TwitterConnector
       return (likes + retweets * 2 + replies) / impressions;
     }
     return 0;
+  }
+
+  private calculateCredibilityScore(user: any): number {
+    // Simple credibility calculation based on verified status and other metrics
+    let score = 0.5; // Base score
+
+    if (user.verified) {
+      score += 0.3; // Verified accounts get a boost
+    }
+
+    // Add more sophisticated credibility scoring logic here as needed
+
+    return Math.min(1.0, score); // Ensure score is between 0 and 1
   }
 
   private postMatchesKeywords(

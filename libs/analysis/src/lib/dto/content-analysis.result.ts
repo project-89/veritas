@@ -1,20 +1,33 @@
 import { Field, ObjectType, Float } from '@nestjs/graphql';
 import { Pattern, DeviationMetrics } from '../analysis.types';
-import { ContentNode } from '@veritas/shared';
+
+// Define a local interface instead of importing from @veritas/shared
+interface ContentNode {
+  id: string;
+  text: string;
+  timestamp: Date;
+  platform: 'twitter' | 'facebook' | 'reddit' | 'other';
+  toxicity?: number;
+  sentiment?: 'positive' | 'negative' | 'neutral';
+  categories?: string[];
+  topics?: string[];
+  sourceId?: string;
+  metadata?: Record<string, any>;
+}
 
 @ObjectType()
 export class RelatedContent implements ContentNode {
   @Field()
-  id: string;
+  id!: string;
 
   @Field()
-  text: string;
+  text!: string;
 
   @Field()
-  timestamp: Date;
+  timestamp: Date = new Date();
 
   @Field()
-  platform: 'twitter' | 'facebook' | 'reddit' | 'other';
+  platform: 'twitter' | 'facebook' | 'reddit' | 'other' = 'other';
 
   @Field(() => Float, { nullable: true })
   toxicity?: number;
@@ -29,7 +42,7 @@ export class RelatedContent implements ContentNode {
   topics?: string[];
 
   @Field(() => String, { nullable: true })
-  sourceId?: string;
+  sourceId?: string = '';
 
   @Field(() => Object, { nullable: true })
   metadata?: Record<string, any>;
@@ -38,23 +51,23 @@ export class RelatedContent implements ContentNode {
 @ObjectType()
 export class ContentAnalysisResult {
   @Field()
-  contentId: string;
+  contentId!: string;
 
   @Field(() => [Pattern])
-  patterns: Pattern[];
+  patterns: Pattern[] = [];
 
   @Field(() => DeviationMetrics)
-  deviationMetrics: DeviationMetrics;
+  deviationMetrics!: DeviationMetrics;
 
   @Field(() => [RelatedContent])
-  relatedContent: RelatedContent[];
+  relatedContent: RelatedContent[] = [];
 
   @Field(() => Float)
-  sourceCredibility: number;
+  sourceCredibility = 0.0;
 
   @Field(() => Float)
-  trustScore: number;
+  trustScore = 0.0;
 
   @Field()
-  analysisTimestamp: Date;
+  analysisTimestamp: Date = new Date();
 }

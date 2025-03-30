@@ -26,6 +26,7 @@ Each connector implements both raw data retrieval and immediate transformation m
 
 - **NarrativeRepository**: An abstract repository for narrative insights
 - **InMemoryNarrativeRepository**: A reference implementation for development
+- **MongoNarrativeRepository**: A production-ready MongoDB implementation with optimized queries, indices, and trend caching
 
 ### Transform Services
 
@@ -50,7 +51,11 @@ import { IngestionModule, TransformOnIngestModule, NarrativeModule } from '@veri
   imports: [
     IngestionModule,
     TransformOnIngestModule,
-    NarrativeModule,
+    // Use in-memory repository (default for development)
+    NarrativeModule.forRoot({ repositoryType: 'memory' }),
+    
+    // OR use MongoDB repository for production
+    // NarrativeModule.forRoot({ repositoryType: 'mongodb' }),
   ],
 })
 export class AppModule {}
@@ -77,6 +82,7 @@ The library follows a clean, modular organization:
 
 - `src/lib/repositories/`: Data access layer
   - `narrative-insight.repository.ts`: Repository for narrative insights
+  - `mongo-narrative.repository.ts`: MongoDB implementation of the repository
 
 - `src/lib/resolvers/`: GraphQL resolvers
   - `ingestion.resolver.ts`: GraphQL resolver for ingestion operations
@@ -100,11 +106,45 @@ The modules in this library require various configurations:
 
 - Kafka service for event messaging
 - Social media API credentials (configured via environment variables)
-- Database connections (Memgraph)
+- Database connections:
+  - MongoDB (when using the MongoDB repository implementation)
+  - Memgraph (for graph-based analysis)
 
-## Testing
+## MongoDB Setup
 
-Mock implementations are provided for testing in the `__mocks__` directory.
+When using the MongoDB repository, you can use the provided Docker Compose file:
+
+```bash
+# Start MongoDB and Mongo Express
+docker-compose -f docker-compose.mongodb.yml up -d
+
+# Access Mongo Express UI at http://localhost:8081
+```
+
+Environmental variables for MongoDB:
+- `MONGO_URI`: Connection string (default: mongodb://localhost:27017/veritas)
+
+See the example application in `examples/narrative-repository/mongo-sample-app.ts` for a complete working example.
+
+## Testing and Examples
+
+### MongoDB Repository Example
+
+A direct example of MongoDB repository functionality is available in the `examples/narrative-repository/mongo-direct-example.sh` script. This script demonstrates:
+
+1. Starting MongoDB containers
+2. Creating a test narrative insight
+3. Storing it in the MongoDB database
+4. Querying the stored insights
+
+To run the example:
+
+```bash
+chmod +x examples/narrative-repository/mongo-direct-example.sh
+./examples/narrative-repository/mongo-direct-example.sh
+```
+
+For detailed documentation on setting up and using the MongoDB repository implementation, see [MongoDB Repository Setup](../../docs/development/mongodb-repository-setup.md).
 
 ## Development
 

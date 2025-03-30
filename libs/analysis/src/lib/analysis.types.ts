@@ -1,58 +1,69 @@
 import { Field, ObjectType, Float, Int } from '@nestjs/graphql';
-import { ContentNode } from '@veritas/shared';
+// Use local ContentNode rather than importing from a problematic path
+// import { ContentNode } from '../../../shared/types/src/lib/types';
+
+// Define a local ContentNode instead of importing it
+interface ContentNode {
+  id: string;
+  title: string;
+  content: string;
+  sourceId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 @ObjectType()
 export class TimeFrame {
   @Field()
-  start: Date;
+  start!: Date;
 
   @Field()
-  end: Date;
+  end!: Date;
 }
 
 @ObjectType()
 export class Pattern {
   @Field()
-  id: string;
+  id!: string;
 
   @Field()
-  type: 'organic' | 'coordinated' | 'automated';
+  type!: 'organic' | 'coordinated' | 'automated';
 
   @Field(() => Float)
-  confidence: number;
+  confidence!: number;
 
   @Field(() => [String])
-  nodes: string[];
+  nodes!: string[];
 
   @Field(() => [String])
-  edges: string[];
+  edges!: string[];
 
   @Field(() => TimeFrame)
-  timeframe: TimeFrame;
+  timeframe!: TimeFrame;
 }
 
 @ObjectType()
 export class DeviationMetrics {
   @Field(() => Float)
-  baselineScore: number;
+  baselineScore!: number;
 
   @Field(() => Float)
-  deviationMagnitude: number;
+  deviationMagnitude!: number;
 
   @Field(() => Float)
-  propagationVelocity: number;
+  propagationVelocity!: number;
 
   @Field(() => Float)
-  crossReferenceScore: number;
+  crossReferenceScore!: number;
 
   @Field(() => Float)
-  sourceCredibility: number;
+  sourceCredibility!: number;
 
   @Field(() => Float)
-  impactScore: number;
+  impactScore!: number;
 
   @Field(() => TimeFrame)
-  timeframe: TimeFrame;
+  timeframe!: TimeFrame;
 }
 
 @ObjectType()
@@ -73,19 +84,25 @@ export class ContentMetadata {
 @ObjectType()
 export class ExtendedContentNode implements ContentNode {
   @Field()
-  id: string;
+  id!: string;
 
   @Field()
-  text: string;
+  text!: string;
+
+  // Required fields from ContentNode
+  title = '';
+  content = '';
+  createdAt: Date = new Date();
+  updatedAt: Date = new Date();
 
   @Field()
-  timestamp: Date;
+  timestamp!: Date;
 
   @Field()
-  platform: 'twitter' | 'facebook' | 'reddit' | 'other';
+  platform!: 'twitter' | 'facebook' | 'reddit' | 'other';
 
   @Field(() => String, { nullable: true })
-  sourceId?: string;
+  sourceId = '';
 
   @Field(() => Float, { nullable: true })
   toxicity?: number;

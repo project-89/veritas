@@ -10,8 +10,9 @@ import {
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { NarrativeRepository } from '../repositories/narrative-insight.repository';
 import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
-import { ContentNode, SourceNode } from '@veritas/shared';
+import { ContentNode, SourceNode } from '@veritas/shared/types';
 import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
+import { SocialMediaContentNode } from '../../types/social-media.types';
 import * as crypto from 'crypto';
 
 @ApiTags('ingestion')
@@ -31,7 +32,7 @@ export class IngestionController {
     summary: 'Ingest new content using transform-on-ingest pattern',
   })
   async ingestContent(
-    @Body('content') content: ContentNode,
+    @Body('content') content: SocialMediaContentNode,
     @Body('source') source: SourceNode
   ) {
     // Convert to SocialMediaPost format
@@ -39,7 +40,7 @@ export class IngestionController {
       id: content.id || crypto.randomUUID(),
       text: content.text,
       timestamp: content.timestamp || new Date(),
-      platform: content.platform as any,
+      platform: content.platform,
       authorId: source.id,
       authorName: source.name,
       engagementMetrics: content.engagementMetrics

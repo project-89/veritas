@@ -12,9 +12,13 @@ import {
   SocialMediaPost,
 } from '../interfaces/social-media-connector.interface';
 import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
-import { SourceNode } from '@veritas/shared';
+import { SourceNode } from '@veritas/shared/types';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import {
+  RedditPost,
+  SocialMediaContentNode,
+} from '../../types/social-media.types';
 
 interface SearchOptions {
   startDate?: Date;
@@ -104,6 +108,31 @@ export class RedditConnector
   }
 
   /**
+   * Enhanced version that returns strongly typed RedditPost objects
+   */
+  async searchRedditContent(
+    query: string,
+    options?: SearchOptions
+  ): Promise<RedditPost[]> {
+    if (!this.client) {
+      throw new Error('Reddit client not initialized');
+    }
+
+    try {
+      this.logger.log(`Searching Reddit for: ${query}`);
+
+      // Fetch posts (kept in memory only)
+      const rawPosts = await this.fetchRawPosts(query, options);
+
+      // Transform to typed RedditPost format
+      return this.transformPostsToRedditPosts(rawPosts);
+    } catch (error) {
+      this.logger.error('Error searching Reddit content:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Enhanced searchAndTransform method that returns anonymized insights
    * Implements TransformOnIngestConnector interface
    */
@@ -121,10 +150,12 @@ export class RedditConnector
       // Fetch posts (kept in memory only)
       const rawPosts = await this.fetchRawPosts(query, options);
 
+      // Convert to SocialMediaPost format for the transform service
+      const socialMediaPosts = this.transformPostsToSocialMediaPosts(rawPosts);
+
       // Transform immediately - no raw storage
-      const insights = await this.transformService.transform(
-        rawPosts,
-        this.platform
+      const insights = await this.transformService.transformBatch(
+        socialMediaPosts
       );
 
       this.logger.log(
@@ -206,10 +237,10 @@ export class RedditConnector
 
       return {
         id: userData.id,
-        name: userData.name,
+        name: userData.name || authorId,
         platform: this.platform,
         credibilityScore: this.calculateCredibilityScore(userData),
-        verificationStatus: userData.has_verified_email
+        verificationStatus: userData.has_verified_mail
           ? 'verified'
           : 'unverified',
       } as Partial<SourceNode>;
@@ -295,11 +326,19 @@ export class RedditConnector
           limit: 100,
         });
 
-        if (rawPosts.length > 0) {
-          // Transform immediately - no raw storage
-          const insights = await this.transformService.transform(
-            rawPosts,
-            this.platform
+        // Convert to SocialMediaPost format
+        const socialMediaPosts =
+          this.transformPostsToSocialMediaPosts(rawPosts);
+
+        // Filter posts that match keywords
+        const filteredPosts = socialMediaPosts.filter((post) =>
+          this.postMatchesKeywords(post, keywords)
+        );
+
+        if (filteredPosts.length > 0) {
+          // Transform immediately using transform-on-ingest
+          const insights = await this.transformService.transformBatch(
+            filteredPosts
           );
 
           // Emit only anonymized insights
@@ -362,22 +401,77 @@ export class RedditConnector
   private transformPostsToSocialMediaPosts(
     posts: Submission[]
   ): SocialMediaPost[] {
-    return posts.map((post) => ({
-      id: post.id,
-      text: post.selftext || post.title,
-      platform: this.platform,
-      authorId: post.author.name,
-      authorName: post.author.name,
-      url: `https://reddit.com${post.permalink}`,
-      timestamp: new Date(post.created_utc * 1000),
-      engagementMetrics: {
-        likes: Math.round(post.score * post.upvote_ratio),
-        shares: 0, // Reddit doesn't provide share counts
-        comments: post.num_comments,
-        reach: post.score / post.upvote_ratio, // Estimate total views based on score and ratio
-        viralityScore: this.calculateViralityScore(post),
-      },
-    }));
+    return posts.map((post) => {
+      const authorName =
+        typeof post.author === 'string'
+          ? post.author
+          : post.author?.name || 'anonymous';
+
+      return {
+        id: post.id,
+        text: post.selftext || post.title,
+        platform: this.platform,
+        authorId: authorName,
+        authorName: authorName,
+        url: `https://reddit.com${post.permalink}`,
+        timestamp: new Date(post.created_utc * 1000),
+        engagementMetrics: {
+          likes: Math.round(post.score * post.upvote_ratio),
+          shares: 0, // Reddit doesn't provide share counts
+          comments: post.num_comments,
+          reach: post.score / post.upvote_ratio, // Estimate total views based on score and ratio
+          viralityScore: this.calculateViralityScore(post),
+        },
+      };
+    });
+  }
+
+  /**
+   * Transform Reddit submissions to strongly typed RedditPost objects
+   */
+  private transformPostsToRedditPosts(posts: Submission[]): RedditPost[] {
+    return posts.map((post) => {
+      const authorName =
+        typeof post.author === 'string'
+          ? post.author
+          : post.author?.name || 'anonymous';
+
+      const subredditName =
+        typeof post.subreddit === 'string'
+          ? post.subreddit
+          : post.subreddit?.display_name || 'unknown';
+
+      return {
+        id: post.id,
+        text: post.selftext || post.title,
+        platform: 'reddit',
+        authorId: authorName,
+        authorName: authorName,
+        authorHandle: authorName,
+        url: `https://reddit.com${post.permalink}`,
+        timestamp: new Date(post.created_utc * 1000),
+        subreddit: subredditName,
+        isComment: false,
+        threadId: (post as any).parent_id, // Cast to any to access potential parent_id
+        engagementMetrics: {
+          likes: Math.round(post.score * post.upvote_ratio),
+          shares: 0, // Reddit doesn't provide share counts
+          comments: post.num_comments,
+          views: Math.round(post.score / post.upvote_ratio), // Estimate views
+          reach: post.score / post.upvote_ratio, // Estimate reach
+          viralityScore: this.calculateViralityScore(post),
+        },
+        metadata: {
+          upvoteRatio: post.upvote_ratio,
+          isSelf: post.is_self,
+          isVideo: post.is_video,
+          over18: post.over_18,
+          spoiler: post.spoiler,
+          stickied: post.stickied,
+          title: post.title,
+        },
+      };
+    });
   }
 
   private calculateViralityScore(post: Submission): number {

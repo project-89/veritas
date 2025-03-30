@@ -5,16 +5,21 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FacebookAdsApi, Page, Post } from 'facebook-nodejs-business-sdk';
+import {
+  FacebookAdsApi,
+  Page,
+  FacebookPost as RawFacebookPost,
+} from 'facebook-nodejs-business-sdk';
 import {
   SocialMediaConnector,
   SocialMediaPost,
 } from '../interfaces/social-media-connector.interface';
 import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
-import { SourceNode } from '@veritas/shared';
+import { SourceNode } from '@veritas/shared/types';
 import { EventEmitter } from 'events';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { FacebookPost } from '../../types/social-media.types';
 
 interface FacebookPost {
   id: string;
@@ -143,10 +148,12 @@ export class FacebookConnector
       // Fetch posts (kept in memory only)
       const rawPosts = await this.fetchRawPosts(query, options);
 
+      // Convert to SocialMediaPost format for the transform service
+      const socialMediaPosts = this.transformToSocialMediaPosts(rawPosts);
+
       // Transform immediately - no raw storage
-      const insights = await this.transformService.transform(
-        rawPosts,
-        this.platform
+      const insights = await this.transformService.transformBatch(
+        socialMediaPosts
       );
 
       this.logger.log(
@@ -373,10 +380,13 @@ export class FacebookConnector
         );
 
         if (filteredPosts.length > 0) {
+          // Convert to SocialMediaPost format for the transform service
+          const socialMediaPosts =
+            this.transformToSocialMediaPosts(filteredPosts);
+
           // Transform immediately - no raw storage
-          const insights = await this.transformService.transform(
-            filteredPosts,
-            this.platform
+          const insights = await this.transformService.transformBatch(
+            socialMediaPosts
           );
 
           // Emit only anonymized insights
@@ -460,5 +470,81 @@ export class FacebookConnector
     else score += 0.1;
 
     return Math.min(score, 1.0);
+  }
+
+  /**
+   * Enhanced method that returns strongly typed FacebookPost objects
+   */
+  async searchFacebookContent(
+    query: string,
+    options?: SearchOptions
+  ): Promise<FacebookPost[]> {
+    if (!this.api) {
+      throw new Error('Facebook client not initialized');
+    }
+
+    try {
+      this.logger.log(`Searching Facebook for: ${query}`);
+
+      // Fetch posts (kept in memory only)
+      const rawPosts = await this.fetchRawPosts(query, options);
+
+      // Transform to strongly typed FacebookPost format
+      return this.transformToTypedFacebookPosts(rawPosts);
+    } catch (error) {
+      this.logger.error('Error searching Facebook content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Transform raw Facebook posts to strongly typed FacebookPost format
+   */
+  private transformToTypedFacebookPosts(
+    posts: RawFacebookPost[]
+  ): FacebookPost[] {
+    return posts.map((post) => {
+      const likes = post.reactions?.summary?.total_count || 0;
+      const shares = post.shares?.count || 0;
+      const comments = post.comments?.summary?.total_count || 0;
+      const reach =
+        post.insights?.data?.find(
+          (insight) => insight.name === 'post_impressions'
+        )?.values[0]?.value || 0;
+      const views =
+        post.insights?.data?.find(
+          (insight) => insight.name === 'post_impressions_unique'
+        )?.values[0]?.value || 0;
+
+      return {
+        id: post.id,
+        text: post.message || '',
+        platform: 'facebook',
+        authorId: post.from?.id || '',
+        authorName: post.from?.name || '',
+        authorHandle: '',
+        url: post.permalink_url || `https://facebook.com/${post.id}`,
+        timestamp: new Date(post.created_time),
+        pageId: post.from?.id,
+        isPagePost: true,
+        engagementMetrics: {
+          likes,
+          shares,
+          comments,
+          reach,
+          views,
+          viralityScore: reach > 0 ? (likes + shares + comments) / reach : 0,
+        },
+        metadata: {
+          postType: post.type || 'status',
+          createdTime: post.created_time,
+          rawEngagement: {
+            reactionCount: likes,
+            shareCount: shares,
+            commentCount: comments,
+          },
+        },
+      };
+    });
   }
 }

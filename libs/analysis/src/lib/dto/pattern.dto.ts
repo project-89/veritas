@@ -1,23 +1,23 @@
-import { Field, ObjectType, ID, Float } from "@nestjs/graphql";
-import { TimeFrame } from "./timeframe.dto";
+import { Field, ObjectType, ID, Float } from '@nestjs/graphql';
+import { TimeFrame } from './timeframe.dto';
 
-@ObjectType("Pattern")
+@ObjectType('Pattern')
 export class Pattern {
   @Field(() => ID)
-  id: string;
+  id = '';
 
   @Field()
-  type: string;
+  type = 'organic';
 
   @Field(() => Float)
-  confidence: number;
+  confidence = 0.0;
 
   @Field(() => [ID])
-  nodes: string[];
+  nodes: string[] = [];
 
   @Field(() => [ID])
-  edges: string[];
+  edges: string[] = [];
 
   @Field(() => TimeFrame)
-  timeframe: TimeFrame;
+  timeframe: TimeFrame = new TimeFrame();
 }

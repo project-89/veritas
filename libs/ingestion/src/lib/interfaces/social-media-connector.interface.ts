@@ -1,4 +1,5 @@
-import { ContentNode, SourceNode } from '@veritas/shared';
+import { ContentNode, SourceNode } from '@veritas/shared/types';
+import { SocialMediaEngagementMetrics } from '../../types/social-media.types';
 import { EventEmitter } from 'events';
 
 export interface SocialMediaPost {
@@ -10,7 +11,7 @@ export interface SocialMediaPost {
   authorName?: string;
   authorHandle?: string;
   url?: string;
-  engagementMetrics: {
+  engagementMetrics: SocialMediaEngagementMetrics & {
     likes: number;
     shares: number;
     comments: number;

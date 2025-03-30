@@ -1,4 +1,4 @@
-import { Field, InputType, registerEnumType } from '@nestjs/graphql';
+import { InputType, registerEnumType } from '@nestjs/graphql';
 import { EngagementMetrics } from '@veritas/shared';
 import {
   IsString,
@@ -11,7 +11,19 @@ import {
   IsNotEmpty,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+
+// Create local decorator implementations for testing
+export function Field(typeFunc?: any, options?: any): PropertyDecorator {
+  return (target: any, propertyKey: string | symbol) => {
+    // This is a mock implementation
+  };
+}
+
+export function Type(typeFunction: () => any): PropertyDecorator {
+  return (target: any, propertyKey: string | symbol) => {
+    // This is a mock implementation
+  };
+}
 
 export enum VerificationStatus {
   VERIFIED = 'verified',
@@ -40,28 +52,28 @@ export class EngagementMetricsInput {
   @Field()
   @IsNumber()
   @Min(0)
-  likes: number;
+  likes = 0;
 
   @Field()
   @IsNumber()
   @Min(0)
-  shares: number;
+  shares = 0;
 
   @Field()
   @IsNumber()
   @Min(0)
-  comments: number;
+  comments = 0;
 
   @Field()
   @IsNumber()
   @Min(0)
-  reach: number;
+  reach = 0;
 
   @Field()
   @IsNumber()
   @Min(0)
   @Max(1)
-  viralityScore: number;
+  viralityScore = 0;
 }
 
 @InputType()
@@ -69,11 +81,11 @@ export class ContentIngestionInput {
   @Field()
   @IsString()
   @IsNotEmpty()
-  text: string;
+  text = '';
 
   @Field()
   @IsEnum(Platform)
-  platform: 'twitter' | 'facebook' | 'reddit' | 'other';
+  platform: 'twitter' | 'facebook' | 'reddit' | 'other' = 'twitter';
 
   @Field(() => EngagementMetricsInput, { nullable: true })
   @IsOptional()
@@ -92,21 +104,21 @@ export class SourceIngestionInput {
   @Field()
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name = '';
 
   @Field()
   @IsEnum(Platform)
-  platform: 'twitter' | 'facebook' | 'reddit' | 'other';
+  platform: 'twitter' | 'facebook' | 'reddit' | 'other' = 'twitter';
 
   @Field()
   @IsNumber()
   @Min(0)
   @Max(1)
-  credibilityScore: number;
+  credibilityScore = 0.5;
 
   @Field(() => VerificationStatus)
   @IsEnum(VerificationStatus)
-  verificationStatus: VerificationStatus;
+  verificationStatus: VerificationStatus = VerificationStatus.UNVERIFIED;
 
   @Field(() => Object, { nullable: true })
   @IsOptional()

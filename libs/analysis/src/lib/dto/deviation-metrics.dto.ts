@@ -1,22 +1,22 @@
-import { Field, ObjectType, Float } from "@nestjs/graphql";
+import { Field, ObjectType, Float } from '@nestjs/graphql';
 
-@ObjectType("DeviationMetrics")
+@ObjectType('DeviationMetrics')
 export class DeviationMetrics {
   @Field(() => Float)
-  baselineScore: number;
+  baselineScore = 0.0;
 
   @Field(() => Float)
-  deviationMagnitude: number;
+  deviationMagnitude = 0.0;
 
   @Field(() => Float)
-  propagationVelocity: number;
+  propagationVelocity = 0.0;
 
   @Field(() => Float)
-  crossReferenceScore: number;
+  crossReferenceScore = 0.0;
 
   @Field(() => Float)
-  sourceCredibility: number;
+  sourceCredibility = 0.0;
 
   @Field(() => Float)
-  impactScore: number;
+  impactScore = 0.0;
 }

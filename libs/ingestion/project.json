@@ -6,12 +6,12 @@
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",
-      "outputs": ["{options.outputPath}"],
       "options": {
         "outputPath": "dist/libs/ingestion",
         "main": "libs/ingestion/src/index.ts",
         "tsConfig": "libs/ingestion/tsconfig.lib.json",
-        "assets": ["libs/ingestion/*.md"]
+        "assets": ["libs/ingestion/*.md"],
+        "skipLibCheck": true
       }
     },
     "lint": {

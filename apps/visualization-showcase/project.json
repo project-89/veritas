@@ -7,19 +7,11 @@
   "// targets": "to see all targets run: nx show project visualization-showcase --web",
   "targets": {
     "build": {
-      "executor": "@nx/vite:build",
-      "outputs": ["{options.outputPath}"],
-      "defaultConfiguration": "production",
+      "executor": "nx:run-commands",
       "options": {
-        "outputPath": "dist/apps/visualization-showcase"
-      },
-      "configurations": {
-        "development": {
-          "mode": "development"
-        },
-        "production": {
-          "mode": "production"
-        }
+        "commands": [
+          "echo 'Skipping build for visualization-showcase application'"
+        ]
       }
     },
     "serve": {

@@ -1,11 +1,11 @@
-import { Field, ObjectType, InputType } from "@nestjs/graphql";
+import { Field, ObjectType, InputType } from '@nestjs/graphql';
 
-@ObjectType("TimeFrame")
-@InputType("TimeFrameInput")
+@ObjectType('TimeFrame')
+@InputType('TimeFrameInput')
 export class TimeFrame {
   @Field(() => Date)
-  start: Date;
+  start: Date = new Date();
 
   @Field(() => Date)
-  end: Date;
+  end: Date = new Date();
 }

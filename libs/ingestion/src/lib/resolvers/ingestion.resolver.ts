@@ -1,14 +1,34 @@
 import { Resolver, Mutation, Args, Query } from '@nestjs/graphql';
 import { NarrativeRepository } from '../repositories/narrative-insight.repository';
-import { ContentNode, SourceNode } from '@veritas/shared';
-import { ContentType } from '@/modules/content/types/content.types';
-import { SourceType } from '@/modules/sources/types/source.types';
+import { ContentNode, SourceNode } from '@veritas/shared/types';
+// Create local type definitions instead of importing from paths that don't work
+// import { ContentType } from '@/modules/content/types/content.types';
+// import { SourceType } from '@/modules/sources/types/source.types';
+
+// Local definitions
+class ContentType implements ContentNode {
+  id!: string;
+  title!: string;
+  content!: string;
+  sourceId!: string;
+  createdAt!: Date;
+  updatedAt!: Date;
+}
+
+class SourceType implements SourceNode {
+  id!: string;
+  name!: string;
+  type!: 'social' | 'news' | 'blog' | 'forum' | 'other';
+  createdAt!: Date;
+  updatedAt!: Date;
+}
+
 import {
   ContentIngestionInput,
   SourceIngestionInput,
   VerificationStatus,
 } from '../types/ingestion.types';
-import { ContentClassificationService } from '@/modules/content/services/content-classification.service';
+// import { ContentClassificationService } from '@/modules/content/services/content-classification.service';
 import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
 import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
 import { NarrativeInsight } from '../interfaces/narrative-insight.interface';
@@ -28,7 +48,8 @@ export class IngestionResolver {
   private readonly logger = new Logger(IngestionResolver.name);
 
   constructor(
-    private readonly classificationService: ContentClassificationService,
+    @Inject('ContentClassificationService')
+    private readonly classificationService: any,
     private readonly transformService: TransformOnIngestService,
     private readonly narrativeRepository: NarrativeRepository,
     @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: any,

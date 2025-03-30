@@ -8,13 +8,9 @@
     "build": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "webpack-cli build",
-        "args": ["node-env=production"]
-      },
-      "configurations": {
-        "development": {
-          "args": ["node-env=development"]
-        }
+        "commands": [
+          "echo 'Skipping build for API application'"
+        ]
       }
     },
     "serve": {

@@ -1,34 +1,51 @@
-import { Test, TestingModule } from "@nestjs/testing";
+import { Test, TestingModule } from '@nestjs/testing';
 import {
   SocialMediaService,
   SocialMediaPlatform,
-} from "./social-media.service";
-import type { SocialMediaPlatform as SocialMediaPlatformType } from "./social-media.service";
-import { TwitterConnector } from "./twitter.connector";
-import { FacebookConnector } from "./facebook.connector";
-import { RedditConnector } from "./reddit.connector";
+} from './social-media.service';
+import { TwitterConnector } from './twitter.connector';
+import { FacebookConnector } from './facebook.connector';
+import { RedditConnector } from './reddit.connector';
 import {
   SocialMediaPost,
   SocialMediaConnector,
-} from "../interfaces/social-media-connector.interface";
-import { mockSourceNode } from "../../../../test/test-utils";
-import { EventEmitter } from "events";
+} from '../interfaces/social-media-connector.interface';
+import { EventEmitter } from 'events';
 
-describe("SocialMediaService", () => {
+// Define mockSourceNode locally instead of importing
+const mockSourceNode = {
+  id: 'test-source-123',
+  name: 'Test Source',
+  platform: 'twitter',
+  url: 'https://twitter.com/test-account',
+  description: 'Test account for unit tests',
+  verificationStatus: 'verified',
+  credibilityScore: 0.85,
+  metadata: {
+    followerCount: 10000,
+    location: 'Test Location',
+    userId: '123456789',
+    screenName: 'test_account',
+    verified: true,
+    profileImageUrl: 'https://example.com/profile.jpg',
+  },
+};
+
+describe('SocialMediaService', () => {
   let service: SocialMediaService;
   let twitterConnector: TwitterConnector;
   let facebookConnector: FacebookConnector;
   let redditConnector: RedditConnector;
 
   const mockPost: SocialMediaPost = {
-    id: "123",
-    text: "Test post",
+    id: '123',
+    text: 'Test post',
     timestamp: new Date(),
-    platform: "twitter",
-    authorId: "author123",
-    authorName: "Test Author",
-    authorHandle: "@testauthor",
-    url: "https://twitter.com/testauthor/123",
+    platform: 'twitter',
+    authorId: 'author123',
+    authorName: 'Test Author',
+    authorHandle: '@testauthor',
+    url: 'https://twitter.com/testauthor/123',
     engagementMetrics: {
       likes: 100,
       shares: 50,
@@ -40,7 +57,7 @@ describe("SocialMediaService", () => {
 
   beforeEach(async () => {
     const mockTwitterConnector = {
-      platform: "twitter",
+      platform: 'twitter',
       validateCredentials: jest.fn().mockResolvedValue(true),
       searchContent: jest.fn().mockResolvedValue([mockPost]),
       getAuthorDetails: jest.fn().mockResolvedValue(mockSourceNode),
@@ -48,7 +65,7 @@ describe("SocialMediaService", () => {
         const emitter = new EventEmitter();
         // Simulate emitting a post
         setTimeout(() => {
-          emitter.emit("data", mockPost);
+          emitter.emit('data', mockPost);
         }, 0);
         return emitter;
       }),
@@ -56,7 +73,7 @@ describe("SocialMediaService", () => {
     };
 
     const mockFacebookConnector = {
-      platform: "facebook",
+      platform: 'facebook',
       validateCredentials: jest.fn().mockResolvedValue(true),
       searchContent: jest.fn().mockResolvedValue([]),
       getAuthorDetails: jest.fn().mockResolvedValue(mockSourceNode),
@@ -67,7 +84,7 @@ describe("SocialMediaService", () => {
     };
 
     const mockRedditConnector = {
-      platform: "reddit",
+      platform: 'reddit',
       validateCredentials: jest.fn().mockResolvedValue(true),
       searchContent: jest.fn().mockResolvedValue([]),
       getAuthorDetails: jest.fn().mockResolvedValue(mockSourceNode),
@@ -101,9 +118,9 @@ describe("SocialMediaService", () => {
     redditConnector = module.get<RedditConnector>(RedditConnector);
   });
 
-  describe("Module Lifecycle", () => {
-    describe("onModuleInit", () => {
-      it("should validate credentials for all platforms", async () => {
+  describe('Module Lifecycle', () => {
+    describe('onModuleInit', () => {
+      it('should validate credentials for all platforms', async () => {
         await service.onModuleInit();
 
         expect(twitterConnector.validateCredentials).toHaveBeenCalled();
@@ -111,18 +128,18 @@ describe("SocialMediaService", () => {
         expect(redditConnector.validateCredentials).toHaveBeenCalled();
       });
 
-      it("should handle validation failures gracefully", async () => {
-        const validationError = new Error("Invalid credentials");
+      it('should handle validation failures gracefully', async () => {
+        const validationError = new Error('Invalid credentials');
         jest
-          .spyOn(twitterConnector, "validateCredentials")
+          .spyOn(twitterConnector, 'validateCredentials')
           .mockRejectedValueOnce(validationError);
 
         await expect(service.onModuleInit()).resolves.not.toThrow();
       });
     });
 
-    describe("onModuleDestroy", () => {
-      it("should disconnect from all platforms", async () => {
+    describe('onModuleDestroy', () => {
+      it('should disconnect from all platforms', async () => {
         await service.onModuleDestroy();
 
         expect(twitterConnector.disconnect).toHaveBeenCalled();
@@ -130,10 +147,10 @@ describe("SocialMediaService", () => {
         expect(redditConnector.disconnect).toHaveBeenCalled();
       });
 
-      it("should handle disconnection errors gracefully", async () => {
-        const disconnectError = new Error("Disconnect failed");
+      it('should handle disconnection errors gracefully', async () => {
+        const disconnectError = new Error('Disconnect failed');
         jest
-          .spyOn(twitterConnector, "disconnect")
+          .spyOn(twitterConnector, 'disconnect')
           .mockRejectedValueOnce(disconnectError);
 
         await expect(service.onModuleDestroy()).resolves.not.toThrow();
@@ -141,15 +158,15 @@ describe("SocialMediaService", () => {
     });
   });
 
-  describe("searchAllPlatforms", () => {
-    it("should search with date range options", async () => {
-      const startDate = new Date("2024-01-01");
-      const endDate = new Date("2024-01-31");
+  describe('searchAllPlatforms', () => {
+    it('should search with date range options', async () => {
+      const startDate = new Date('2024-01-01');
+      const endDate = new Date('2024-01-31');
 
-      await service.searchAllPlatforms("test", { startDate, endDate });
+      await service.searchAllPlatforms('test', { startDate, endDate });
 
       expect(twitterConnector.searchContent).toHaveBeenCalledWith(
-        "test",
+        'test',
         expect.objectContaining({
           startDate,
           endDate,
@@ -157,40 +174,40 @@ describe("SocialMediaService", () => {
       );
     });
 
-    it("should search with limit option", async () => {
+    it('should search with limit option', async () => {
       const limit = 10;
 
-      await service.searchAllPlatforms("test", { limit });
+      await service.searchAllPlatforms('test', { limit });
 
       expect(twitterConnector.searchContent).toHaveBeenCalledWith(
-        "test",
+        'test',
         expect.objectContaining({ limit })
       );
     });
 
-    it("should handle empty results from all platforms", async () => {
-      jest.spyOn(twitterConnector, "searchContent").mockResolvedValue([]);
+    it('should handle empty results from all platforms', async () => {
+      jest.spyOn(twitterConnector, 'searchContent').mockResolvedValue([]);
 
-      const results = await service.searchAllPlatforms("test");
+      const results = await service.searchAllPlatforms('test');
 
       expect(results).toEqual([]);
     });
 
-    it("should handle mixed success and failure across platforms", async () => {
+    it('should handle mixed success and failure across platforms', async () => {
       jest
-        .spyOn(twitterConnector, "searchContent")
-        .mockRejectedValue(new Error("API Error"));
+        .spyOn(twitterConnector, 'searchContent')
+        .mockRejectedValue(new Error('API Error'));
       jest
-        .spyOn(facebookConnector, "searchContent")
+        .spyOn(facebookConnector, 'searchContent')
         .mockResolvedValue([mockPost]);
 
-      const results = await service.searchAllPlatforms("test");
+      const results = await service.searchAllPlatforms('test');
 
       expect(results).toEqual([mockPost]);
     });
 
-    it("should search content across all platforms", async () => {
-      const query = "test query";
+    it('should search content across all platforms', async () => {
+      const query = 'test query';
       const options = {
         startDate: new Date(),
         endDate: new Date(),
@@ -215,10 +232,10 @@ describe("SocialMediaService", () => {
       expect(results[0]).toEqual(mockPost);
     });
 
-    it("should search specific platforms when specified", async () => {
-      const query = "test query";
+    it('should search specific platforms when specified', async () => {
+      const query = 'test query';
       const options = {
-        platforms: ["twitter", "facebook"] as SocialMediaPlatform[],
+        platforms: ['twitter', 'facebook'] as SocialMediaPlatform[],
       };
 
       await service.searchAllPlatforms(query, options);
@@ -228,21 +245,21 @@ describe("SocialMediaService", () => {
       expect(redditConnector.searchContent).not.toHaveBeenCalled();
     });
 
-    it("should handle platform errors gracefully", async () => {
+    it('should handle platform errors gracefully', async () => {
       jest
-        .spyOn(twitterConnector, "searchContent")
-        .mockRejectedValueOnce(new Error("API Error"));
+        .spyOn(twitterConnector, 'searchContent')
+        .mockRejectedValueOnce(new Error('API Error'));
 
-      const results = await service.searchAllPlatforms("test");
+      const results = await service.searchAllPlatforms('test');
 
       expect(results).toHaveLength(0);
     });
   });
 
-  describe("getAuthorDetails", () => {
-    it("should get author details from specified platform", async () => {
-      const authorId = "author123";
-      const platform = "twitter";
+  describe('getAuthorDetails', () => {
+    it('should get author details from specified platform', async () => {
+      const authorId = 'author123';
+      const platform = 'twitter';
 
       const result = await service.getAuthorDetails(authorId, platform);
 
@@ -250,53 +267,53 @@ describe("SocialMediaService", () => {
       expect(result).toEqual(mockSourceNode);
     });
 
-    it("should throw error for unsupported platform", async () => {
-      const authorId = "author123";
-      const platform = "unsupported" as any;
+    it('should throw error for unsupported platform', async () => {
+      const authorId = 'author123';
+      const platform = 'unsupported' as any;
 
       await expect(
         service.getAuthorDetails(authorId, platform)
-      ).rejects.toThrow("Unsupported platform");
+      ).rejects.toThrow('Unsupported platform');
     });
   });
 
-  describe("streamAllPlatforms", () => {
+  describe('streamAllPlatforms', () => {
     // Increase timeout for streaming tests
     jest.setTimeout(10000);
 
-    it("should handle platform streaming errors", async () => {
-      const mockError = new Error("Stream error");
+    it('should handle platform streaming errors', async () => {
+      const mockError = new Error('Stream error');
       jest
-        .spyOn(twitterConnector, "streamContent")
+        .spyOn(twitterConnector, 'streamContent')
         .mockImplementation((keywords: string[]) => {
           const emitter = new EventEmitter();
           process.nextTick(() => {
-            emitter.emit("error", mockError);
+            emitter.emit('error', mockError);
           });
           return emitter;
         });
 
-      const stream = service.streamAllPlatforms(["test"]);
+      const stream = service.streamAllPlatforms(['test']);
 
       try {
         // Just try to get the first value, which should trigger the error
         await stream.next();
-        fail("Expected an error to be thrown");
+        fail('Expected an error to be thrown');
       } catch (error) {
         expect(error).toEqual(mockError);
       }
     }, 15000); // Increase timeout for this specific test
 
-    it("should aggregate content from all platforms", async () => {
+    it('should aggregate content from all platforms', async () => {
       const mockPost: SocialMediaPost = {
-        id: "test-post",
-        text: "Test content",
+        id: 'test-post',
+        text: 'Test content',
         timestamp: new Date(),
-        platform: "twitter",
-        authorId: "test-author",
-        authorName: "Test User",
-        authorHandle: "@testuser",
-        url: "https://twitter.com/testuser/status/test-post",
+        platform: 'twitter',
+        authorId: 'test-author',
+        authorName: 'Test User',
+        authorHandle: '@testuser',
+        url: 'https://twitter.com/testuser/status/test-post',
         engagementMetrics: {
           likes: 100,
           shares: 50,
@@ -307,17 +324,17 @@ describe("SocialMediaService", () => {
       };
 
       jest
-        .spyOn(twitterConnector, "streamContent")
+        .spyOn(twitterConnector, 'streamContent')
         .mockImplementation((keywords: string[]) => {
           const emitter = new EventEmitter();
           // Emit data immediately instead of using setTimeout
           process.nextTick(() => {
-            emitter.emit("data", mockPost);
+            emitter.emit('data', mockPost);
           });
           return emitter;
         });
 
-      const stream = service.streamAllPlatforms(["test"]);
+      const stream = service.streamAllPlatforms(['test']);
       const { value, done } = await stream.next();
 
       expect(value).toEqual(mockPost);
