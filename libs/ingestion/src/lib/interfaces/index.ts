@@ -1,4 +1,11 @@
-export * from './social-media-connector.interface';
-export * from './transform-on-ingest-connector.interface';
+/**
+ * Export all interfaces from a single location
+ */
+
+// Export the DataConnector interface (transform-on-ingest pattern)
+export * from './data-connector.interface';
+
+// Export the NarrativeInsight interface
 export * from './narrative-insight.interface';
-export * from './narrative-trend.interface';
+
+// Export other interfaces as needed

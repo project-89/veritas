@@ -5,22 +5,14 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  TwitterApi,
-  TweetV2,
-  UserV2,
-  TwitterApiv2,
-  Tweetv2TimelineResult,
-} from 'twitter-api-v2';
-import {
-  SocialMediaConnector,
-  SocialMediaPost,
-} from '../interfaces/social-media-connector.interface';
-import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
+import { TwitterApi, TweetV2, UserV2, TwitterApiv2 } from 'twitter-api-v2';
+import { SocialMediaPost } from '../../types/social-media.types';
+import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '@veritas/shared';
 import { EventEmitter } from 'events';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { TwitterUser } from '../../types/twitter-metrics.interface';
 
 type TweetWithIncludes = TweetV2 & {
   includes?: {
@@ -35,12 +27,6 @@ type TweetWithIncludes = TweetV2 & {
     screen_name: string;
     verified: boolean;
   };
-  public_metrics?: {
-    like_count?: number;
-    retweet_count?: number;
-    reply_count?: number;
-    impression_count?: number;
-  };
 };
 
 interface SearchOptions {
@@ -51,12 +37,15 @@ interface SearchOptions {
 
 @Injectable()
 export class TwitterConnector
-  implements TransformOnIngestConnector, OnModuleInit, OnModuleDestroy
+  implements DataConnector, OnModuleInit, OnModuleDestroy
 {
   platform = 'twitter' as const;
   private client: TwitterApi | null = null;
   private v2Client: TwitterApiv2 | null = null;
-  private streamConnections: Map<string, any> = new Map();
+  private streamConnections: Map<
+    string,
+    NodeJS.Timeout | { close?: () => void }
+  > = new Map();
   private pollingInterval = 60000; // 1 minute polling interval
   private interval: NodeJS.Timeout | null = null;
   private readonly logger = new Logger(TwitterConnector.name);
@@ -95,43 +84,21 @@ export class TwitterConnector
     this.v2Client = null;
 
     this.streamConnections.forEach((connection) => {
-      if (connection && typeof connection.close === 'function') {
+      if (
+        connection &&
+        'close' in connection &&
+        typeof connection.close === 'function'
+      ) {
         connection.close();
+      } else if ('clearInterval' in global) {
+        clearInterval(connection as NodeJS.Timeout);
       }
     });
     this.streamConnections.clear();
   }
 
   /**
-   * Original searchContent method for backward compatibility
-   * Implements SocialMediaConnector interface
-   */
-  async searchContent(
-    query: string,
-    options?: SearchOptions
-  ): Promise<SocialMediaPost[]> {
-    try {
-      if (!this.v2Client) {
-        throw new Error('Twitter client not initialized');
-      }
-
-      // Fetch tweets (kept in memory only)
-      const rawTweets = await this.fetchRawTweets(query, options);
-
-      // Transform to SocialMediaPost format (for backward compatibility)
-      return this.transformTweetsToSocialMediaPosts(
-        rawTweets.tweets,
-        rawTweets.includes
-      );
-    } catch (error) {
-      this.logger.error('Error searching Twitter content:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Enhanced searchAndTransform method that returns anonymized insights
-   * Implements TransformOnIngestConnector interface
+   * Search for content and transform it immediately into anonymized insights
    */
   async searchAndTransform(
     query: string,
@@ -153,9 +120,14 @@ export class TwitterConnector
         rawTweets.includes
       );
 
+      // Convert enriched tweets to SocialMediaPost format before transformation
+      const socialMediaPosts = enrichedTweets.map((tweet) =>
+        this.transformTweetToSocialMediaPost(tweet)
+      );
+
       // Transform immediately - no raw storage
       const insights = await this.transformService.transformBatch(
-        enrichedTweets
+        socialMediaPosts
       );
 
       this.logger.log(
@@ -168,72 +140,6 @@ export class TwitterConnector
       this.logger.error('Error searching Twitter content:', error);
       throw error;
     }
-  }
-
-  /**
-   * Fetch raw tweets from Twitter (in-memory only, no storage)
-   * Private method to keep raw data contained
-   */
-  private async fetchRawTweets(
-    query: string,
-    options?: SearchOptions
-  ): Promise<{ tweets: TweetV2[]; includes: { users?: UserV2[] } }> {
-    if (!this.v2Client) {
-      throw new Error('Twitter client not initialized');
-    }
-
-    try {
-      const response = await this.v2Client.search(query, {
-        start_time: options?.startDate?.toISOString(),
-        end_time: options?.endDate?.toISOString(),
-        max_results: options?.limit || 100,
-        'tweet.fields': ['created_at', 'public_metrics', 'author_id'],
-        'user.fields': ['username', 'name', 'verified'],
-        expansions: ['author_id'],
-      });
-
-      const tweets = response.data.data || [];
-      const includes = response.data.includes || { users: [] };
-
-      return { tweets, includes };
-    } catch (error) {
-      this.logger.error('Error fetching raw Twitter tweets:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Enriches tweets with user data for more complete transformation
-   */
-  private enrichTweetsWithUserData(
-    tweets: TweetV2[],
-    includes: { users?: UserV2[] }
-  ): any[] {
-    if (!tweets || !Array.isArray(tweets)) {
-      return [];
-    }
-
-    const userMap = new Map<string, UserV2>();
-    if (includes?.users) {
-      for (const user of includes.users) {
-        userMap.set(user.id, user);
-      }
-    }
-
-    return tweets.map((tweet) => {
-      const user = tweet.author_id ? userMap.get(tweet.author_id) : undefined;
-      return {
-        ...tweet,
-        user: user
-          ? {
-              id_str: user.id,
-              name: user.name,
-              screen_name: user.username,
-              verified: user.verified,
-            }
-          : undefined,
-      };
-    });
   }
 
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
@@ -265,67 +171,7 @@ export class TwitterConnector
   }
 
   /**
-   * Original streamContent method for backward compatibility
-   * Implements SocialMediaConnector interface
-   */
-  streamContent(keywords: string[]): EventEmitter {
-    const emitter = new EventEmitter();
-    const streamId = Math.random().toString(36).substring(7);
-
-    const interval = setInterval(async () => {
-      try {
-        if (!this.v2Client) {
-          throw new Error('Twitter client not initialized');
-        }
-
-        // Fetch tweets (kept in memory only)
-        const rawTweets = await this.fetchRawTweets(keywords.join(' OR '), {
-          startDate: new Date(Date.now() - 3600000), // Last hour
-          limit: 100,
-        });
-
-        const posts = this.transformTweetsToSocialMediaPosts(
-          rawTweets.tweets,
-          rawTweets.includes
-        );
-
-        // Filter posts that match keywords
-        const filteredPosts = posts.filter((post) =>
-          this.postMatchesKeywords(post, keywords)
-        );
-
-        if (filteredPosts.length > 0) {
-          // Emit posts
-          for (const post of filteredPosts) {
-            emitter.emit('data', post);
-          }
-
-          this.logger.debug(
-            `Emitted ${filteredPosts.length} posts from Twitter stream`
-          );
-        }
-      } catch (error) {
-        emitter.emit('error', error);
-        this.logger.error('Error in Twitter stream:', error);
-      }
-    }, this.pollingInterval);
-
-    this.streamConnections.set(streamId, interval);
-    this.interval = interval;
-
-    // Clean up on end event
-    emitter.on('end', () => {
-      clearInterval(interval);
-      this.streamConnections.delete(streamId);
-      this.logger.log(`Closed Twitter stream: ${streamId}`);
-    });
-
-    return emitter;
-  }
-
-  /**
-   * Enhanced streamAndTransform method that streams anonymized insights
-   * Implements TransformOnIngestConnector interface
+   * Stream content and transform it immediately into anonymized insights
    */
   streamAndTransform(keywords: string[]): EventEmitter {
     const emitter = new EventEmitter();
@@ -350,28 +196,32 @@ export class TwitterConnector
         );
 
         // Filter posts that match keywords
-        const filteredTweets = enrichedTweets.filter((tweet: any) =>
-          this.postMatchesKeywords(
-            this.transformTweetToSocialMediaPost(tweet),
-            keywords
-          )
+        const filteredTweets = enrichedTweets.filter(
+          (tweet: TweetWithIncludes) =>
+            this.postMatchesKeywords(
+              this.transformTweetToSocialMediaPost(tweet),
+              keywords
+            )
         );
 
-        if (filteredTweets.length > 0) {
-          // Transform immediately using transform-on-ingest
-          const insights = await this.transformService.transformBatch(
-            filteredTweets
-          );
+        // Convert enriched tweets to SocialMediaPost format
+        const socialMediaPosts = filteredTweets.map((tweet) =>
+          this.transformTweetToSocialMediaPost(tweet)
+        );
 
-          // Emit anonymized insights only
-          for (const insight of insights) {
-            emitter.emit('data', insight);
-          }
+        // Transform immediately using transform-on-ingest
+        const insights = await this.transformService.transformBatch(
+          socialMediaPosts
+        );
 
-          this.logger.debug(
-            `Emitted ${insights.length} anonymized insights from Twitter stream`
-          );
+        // Emit anonymized insights only
+        for (const insight of insights) {
+          emitter.emit('data', insight);
         }
+
+        this.logger.debug(
+          `Emitted ${insights.length} anonymized insights from Twitter stream`
+        );
       } catch (error) {
         emitter.emit('error', error);
         this.logger.error('Error in Twitter stream:', error);
@@ -411,10 +261,38 @@ export class TwitterConnector
     }
   }
 
-  private transformTweetsToSocialMediaPosts(
+  private async fetchRawTweets(
+    query: string,
+    options?: SearchOptions
+  ): Promise<{ tweets: TweetV2[]; includes: { users?: UserV2[] } }> {
+    if (!this.v2Client) {
+      throw new Error('Twitter client not initialized');
+    }
+
+    try {
+      const response = await this.v2Client.search(query, {
+        start_time: options?.startDate?.toISOString(),
+        end_time: options?.endDate?.toISOString(),
+        max_results: options?.limit || 100,
+        'tweet.fields': ['created_at', 'public_metrics', 'author_id'],
+        'user.fields': ['username', 'name', 'verified'],
+        expansions: ['author_id'],
+      });
+
+      const tweets = response.data.data || [];
+      const includes = response.data.includes || { users: [] };
+
+      return { tweets, includes };
+    } catch (error) {
+      this.logger.error('Error fetching raw Twitter tweets:', error);
+      throw error;
+    }
+  }
+
+  private enrichTweetsWithUserData(
     tweets: TweetV2[],
-    includes?: { users?: UserV2[] }
-  ): SocialMediaPost[] {
+    includes: { users?: UserV2[] }
+  ): TweetWithIncludes[] {
     if (!tweets || !Array.isArray(tweets)) {
       return [];
     }
@@ -427,26 +305,40 @@ export class TwitterConnector
     }
 
     return tweets.map((tweet) => {
-      const tweetWithUser: TweetWithIncludes = { ...tweet };
-      if (tweet.author_id && userMap.has(tweet.author_id)) {
-        const user = userMap.get(tweet.author_id)!;
-        tweetWithUser.includes = {
-          users: [
-            {
+      const user = tweet.author_id ? userMap.get(tweet.author_id) : undefined;
+      return {
+        ...tweet,
+        user: user
+          ? {
+              id_str: user.id,
               name: user.name,
-              username: user.username,
-            },
-          ],
-        };
-      }
-      return this.transformTweetToSocialMediaPost(tweetWithUser);
+              screen_name: user.username,
+              verified: user.verified || false,
+            }
+          : undefined,
+      };
     });
   }
 
   private transformTweetToSocialMediaPost(
     tweet: TweetWithIncludes
   ): SocialMediaPost {
-    const metrics = tweet.public_metrics || {};
+    // Create a default metrics object
+    const defaultMetrics = {
+      like_count: 0,
+      retweet_count: 0,
+      reply_count: 0,
+      impression_count: 0,
+    };
+
+    // Use the original metrics if available, otherwise use defaults
+    const publicMetrics = tweet.public_metrics || defaultMetrics;
+
+    // Safely access metrics with fallbacks
+    const likeCount = publicMetrics.like_count ?? 0;
+    const retweetCount = publicMetrics.retweet_count ?? 0;
+    const replyCount = publicMetrics.reply_count ?? 0;
+    const impressionCount = publicMetrics.impression_count ?? 0;
 
     return {
       id: tweet.id,
@@ -458,28 +350,19 @@ export class TwitterConnector
       authorHandle: tweet.user ? tweet.user.screen_name : undefined,
       url: `https://twitter.com/i/web/status/${tweet.id}`,
       engagementMetrics: {
-        likes: Number(metrics.like_count) || 0,
-        shares: Number(metrics.retweet_count) || 0,
-        comments: Number(metrics.reply_count) || 0,
-        reach: Number(metrics.impression_count) || 0,
-        viralityScore: this.calculateViralityScore(metrics),
+        likes: likeCount,
+        shares: retweetCount,
+        comments: replyCount,
+        reach: impressionCount,
+        viralityScore:
+          impressionCount > 0
+            ? (likeCount + retweetCount * 2 + replyCount) / impressionCount
+            : 0,
       },
     };
   }
 
-  private calculateViralityScore(metrics: any): number {
-    const likes = metrics.like_count || 0;
-    const retweets = metrics.retweet_count || 0;
-    const replies = metrics.reply_count || 0;
-    const impressions = metrics.impression_count || 0;
-
-    if (impressions > 0) {
-      return (likes + retweets * 2 + replies) / impressions;
-    }
-    return 0;
-  }
-
-  private calculateCredibilityScore(user: any): number {
+  private calculateCredibilityScore(user: TwitterUser): number {
     // Simple credibility calculation based on verified status and other metrics
     let score = 0.5; // Base score
 

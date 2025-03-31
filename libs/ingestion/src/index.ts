@@ -53,3 +53,47 @@ export {
   NarrativeTrendModel,
 } from './lib/schemas/narrative-trend.schema';
 export { MongoDBModule } from './lib/modules/mongodb.module';
+
+/**
+ * Export all public-facing APIs from the ingestion module
+ */
+export * from './lib/ingestion.module';
+export * from './lib/services/ingestion.service';
+
+// Export the DataConnector interface for clients to use
+export * from './lib/interfaces/data-connector.interface';
+
+// Export the SocialMediaPost and related types for ease of use
+export * from './types/social-media.types';
+
+// Export the NarrativeInsight interface
+export * from './types/narrative-insight.interface';
+
+// Export the module instance
+export { IngestionModule } from './lib/ingestion.module';
+
+// Export the service instance
+export { IngestionService } from './lib/services/ingestion.service';
+
+// Export the DataConnector interface for clients to use
+export { DataConnector } from './lib/interfaces/data-connector.interface';
+
+// Export the SocialMediaPost and related types for ease of use
+export {
+  SocialMediaPost,
+  SocialMediaEngagementMetrics,
+  SocialMediaContentNode,
+  TwitterPost,
+  FacebookPost,
+  RedditPost,
+  YouTubeComment,
+} from './types/social-media.types';
+
+// Export the NarrativeInsight interface
+export {
+  NarrativeInsight,
+  SentimentAnalysis,
+} from './types/narrative-insight.interface';
+
+// Export the NarrativeTrend class
+export { NarrativeTrendSchema as NarrativeTrend } from './lib/schemas/narrative-trend.schema';

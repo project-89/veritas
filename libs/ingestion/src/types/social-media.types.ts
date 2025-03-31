@@ -24,6 +24,27 @@ export interface SocialMediaEngagementMetrics extends BaseEngagementMetrics {
 }
 
 /**
+ * Standard social media post format used by transform-on-ingest components
+ */
+export interface SocialMediaPost {
+  id: string;
+  text: string;
+  timestamp: Date;
+  platform: string;
+  authorId: string;
+  authorName?: string;
+  authorHandle?: string;
+  url?: string;
+  engagementMetrics: SocialMediaEngagementMetrics & {
+    likes: number;
+    shares: number;
+    comments: number;
+    reach: number;
+    viralityScore: number;
+  };
+}
+
+/**
  * Extended social media post interface with type safety
  */
 export interface SocialMediaContentNode extends Partial<ContentNode> {

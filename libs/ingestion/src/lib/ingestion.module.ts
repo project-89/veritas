@@ -34,6 +34,7 @@ class ContentClassificationServiceStub {
     },
     IngestionResolver,
     TransformOnIngestService,
+    // Data connectors implementing the transform-on-ingest pattern
     RedditConnector,
     FacebookConnector,
     RSSConnector,

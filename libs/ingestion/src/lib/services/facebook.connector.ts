@@ -6,12 +6,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FacebookAdsApi, Page } from 'facebook-nodejs-business-sdk';
-import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
-import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
+import { SocialMediaPost } from '../../types/social-media.types';
+import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '@veritas/shared/types';
 import { EventEmitter } from 'events';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { NarrativeInsight } from '../interfaces/narrative-insight.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { FacebookPost as SocialMediaFacebookPost } from '../../types/social-media.types';
 
 // Local interface for internal use
@@ -56,7 +56,7 @@ interface SearchOptions {
 
 @Injectable()
 export class FacebookConnector
-  implements TransformOnIngestConnector, OnModuleInit, OnModuleDestroy
+  implements DataConnector, OnModuleInit, OnModuleDestroy
 {
   platform = 'facebook' as const;
   private api: FacebookAdsApi | null = null;
@@ -103,32 +103,7 @@ export class FacebookConnector
   }
 
   /**
-   * Original searchContent method for backward compatibility
-   * Implements SocialMediaConnector interface
-   */
-  async searchContent(
-    query: string,
-    options?: SearchOptions
-  ): Promise<SocialMediaPost[]> {
-    if (!this.api) {
-      throw new Error('Facebook client not initialized');
-    }
-
-    try {
-      // Fetch posts (kept in memory only)
-      const rawPosts = await this.fetchRawPosts(query, options);
-
-      // Transform to SocialMediaPost format (for backward compatibility)
-      return this.transformToSocialMediaPosts(rawPosts);
-    } catch (error) {
-      this.logger.error('Error searching Facebook content:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Enhanced searchAndTransform method that returns anonymized insights
-   * Implements TransformOnIngestConnector interface
+   * Search for content and transform it immediately into anonymized insights
    */
   async searchAndTransform(
     query: string,
@@ -294,65 +269,7 @@ export class FacebookConnector
   }
 
   /**
-   * Original streamContent method for backward compatibility
-   * Implements SocialMediaConnector interface
-   */
-  streamContent(keywords: string[]): EventEmitter {
-    const emitter = new EventEmitter();
-    const streamId = Math.random().toString(36).substring(7);
-
-    const interval = setInterval(async () => {
-      try {
-        if (!this.api) {
-          throw new Error('Facebook client not initialized');
-        }
-
-        // Fetch posts (kept in memory only)
-        const rawPosts = await this.fetchRawPosts(keywords.join(' OR '), {
-          startDate: new Date(Date.now() - 3600000), // Last hour
-          limit: 100,
-        });
-
-        // Filter posts that match keywords
-        const filteredPosts = rawPosts.filter((post) =>
-          this.postMatchesKeywords(post, keywords)
-        );
-
-        if (filteredPosts.length > 0) {
-          // Transform to SocialMediaPost format (for backward compatibility)
-          const posts = this.transformToSocialMediaPosts(filteredPosts);
-
-          // Emit posts
-          for (const post of posts) {
-            emitter.emit('data', post);
-          }
-
-          this.logger.debug(
-            `Emitted ${posts.length} posts from Facebook stream`
-          );
-        }
-      } catch (error) {
-        emitter.emit('error', error);
-        this.logger.error('Error in Facebook stream:', error);
-      }
-    }, this.pollingInterval);
-
-    this.streamConnections.set(streamId, interval);
-    this.interval = interval;
-
-    // Clean up on end event
-    emitter.on('end', () => {
-      clearInterval(interval);
-      this.streamConnections.delete(streamId);
-      this.logger.log(`Closed Facebook stream: ${streamId}`);
-    });
-
-    return emitter;
-  }
-
-  /**
-   * Enhanced streamAndTransform method that streams anonymized insights
-   * Implements TransformOnIngestConnector interface
+   * Stream content and transform it immediately into anonymized insights
    */
   streamAndTransform(keywords: string[]): EventEmitter {
     const emitter = new EventEmitter();

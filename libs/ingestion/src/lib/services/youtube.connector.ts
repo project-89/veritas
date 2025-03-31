@@ -6,12 +6,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { google, youtube_v3 } from 'googleapis';
-import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
-import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
+import { SocialMediaPost } from '../../types/social-media.types';
+import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '@veritas/shared/types';
 import { EventEmitter } from 'events';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { NarrativeInsight } from '../interfaces/narrative-insight.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { YouTubeComment } from '../../types/social-media.types';
 
 interface SearchOptions {
@@ -23,7 +23,7 @@ interface SearchOptions {
 
 @Injectable()
 export class YouTubeConnector
-  implements TransformOnIngestConnector, OnModuleInit, OnModuleDestroy
+  implements DataConnector, OnModuleInit, OnModuleDestroy
 {
   platform = 'youtube' as const;
   private youtube: youtube_v3.Youtube | null = null;
@@ -70,32 +70,6 @@ export class YouTubeConnector
   }
 
   /**
-   * Search for YouTube comments matching a query
-   */
-  async searchContent(
-    query: string,
-    options?: SearchOptions
-  ): Promise<SocialMediaPost[]> {
-    if (!this.youtube) {
-      throw new Error('YouTube client not initialized');
-    }
-
-    try {
-      // First, search for videos
-      const videoIds = await this.searchVideos(query, options);
-
-      // Then fetch comments for these videos
-      const comments = await this.fetchCommentsForVideos(videoIds, options);
-
-      // Transform to SocialMediaPost format
-      return this.transformToSocialMediaPosts(comments);
-    } catch (error) {
-      this.logger.error('Error searching YouTube comments:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Search and transform YouTube comments
    */
   async searchAndTransform(
@@ -139,72 +113,6 @@ export class YouTubeConnector
   }
 
   /**
-   * Stream YouTube comments for videos containing specified keywords
-   */
-  streamContent(keywords: string[]): EventEmitter {
-    const emitter = new EventEmitter();
-    const streamId = Math.random().toString(36).substring(7);
-
-    const checkForComments = async () => {
-      try {
-        if (!this.youtube) {
-          throw new Error('YouTube client not initialized');
-        }
-
-        // Search for videos matching keywords
-        const videoIds = await this.searchVideos(keywords.join(' OR '), {
-          // Last day
-          startDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
-          maxResults: 10,
-        });
-
-        // Check if we found any videos
-        if (videoIds.length === 0) {
-          this.logger.debug('No videos found matching keywords');
-          return;
-        }
-
-        // Fetch comments for these videos
-        const comments = await this.fetchCommentsForVideos(videoIds, {
-          maxResults: 100,
-        });
-
-        // If we have comments, emit them
-        if (comments.length > 0) {
-          const posts = this.transformToSocialMediaPosts(comments);
-
-          for (const post of posts) {
-            emitter.emit('data', post);
-          }
-
-          this.logger.debug(
-            `Emitted ${posts.length} comments from YouTube stream`
-          );
-        }
-      } catch (error) {
-        emitter.emit('error', error);
-        this.logger.error('Error in YouTube stream:', error);
-      }
-    };
-
-    // Initial check
-    checkForComments();
-
-    // Set up recurring check
-    const interval = setInterval(checkForComments, this.pollingInterval);
-    this.streamConnections.set(streamId, interval);
-
-    // Clean up on end event
-    emitter.on('end', () => {
-      clearInterval(interval);
-      this.streamConnections.delete(streamId);
-      this.logger.log(`Closed YouTube stream: ${streamId}`);
-    });
-
-    return emitter;
-  }
-
-  /**
    * Stream and transform YouTube comments
    */
   streamAndTransform(keywords: string[]): EventEmitter {
@@ -235,24 +143,25 @@ export class YouTubeConnector
           maxResults: 100,
         });
 
-        // If we have comments, transform and emit them
-        if (comments.length > 0) {
-          const posts = this.transformToSocialMediaPosts(comments);
+        // Transform to SocialMediaPost format for the transform service
+        const socialMediaPosts = this.transformToSocialMediaPosts(comments);
 
-          // Transform immediately - no raw storage
-          const insights = await this.transformService.transformBatch(posts);
+        // Transform immediately using transform-on-ingest
+        const insights = await this.transformService.transformBatch(
+          socialMediaPosts
+        );
 
-          for (const insight of insights) {
-            emitter.emit('data', insight);
-          }
-
-          this.logger.debug(
-            `Emitted ${insights.length} transformed comments from YouTube stream`
-          );
+        // Emit anonymized insights only
+        for (const insight of insights) {
+          emitter.emit('data', insight);
         }
+
+        this.logger.debug(
+          `Emitted ${insights.length} anonymized insights from YouTube stream`
+        );
       } catch (error) {
         emitter.emit('error', error);
-        this.logger.error('Error in YouTube transform stream:', error);
+        this.logger.error('Error in YouTube stream:', error);
       }
     };
 
@@ -261,13 +170,13 @@ export class YouTubeConnector
 
     // Set up recurring check
     const interval = setInterval(checkForComments, this.pollingInterval);
-    this.streamConnections.set(`transform-${streamId}`, interval);
+    this.streamConnections.set(streamId, interval);
 
     // Clean up on end event
     emitter.on('end', () => {
       clearInterval(interval);
-      this.streamConnections.delete(`transform-${streamId}`);
-      this.logger.log(`Closed transformed YouTube stream: ${streamId}`);
+      this.streamConnections.delete(streamId);
+      this.logger.log(`Closed YouTube stream: ${streamId}`);
     });
 
     return emitter;
