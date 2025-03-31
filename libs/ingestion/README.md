@@ -19,6 +19,9 @@ The library includes connectors for various social media platforms:
 - **FacebookConnector**: Facebook data ingestion
 - **TwitterConnector**: Twitter data ingestion
 - **RedditConnector**: Reddit data ingestion
+- **RSSConnector**: RSS/Atom feed ingestion
+- **WebScraperConnector**: Web content scraping 
+- **YouTubeConnector**: YouTube comment scraping
 
 Each connector implements both raw data retrieval and immediate transformation methods.
 

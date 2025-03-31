@@ -107,14 +107,18 @@
     "@nestjs/platform-express": "^10.0.2",
     "@nestjs/swagger": "^11.1.0",
     "axios": "^1.6.0",
+    "cheerio": "^1.0.0",
     "d3": "^7.9.0",
+    "googleapis": "^148.0.0",
     "graphql": "^16.10.0",
     "mongoose": "^8.12.1",
     "react": "^19.0.0",
     "react-dom": "19.0.0",
     "react-router-dom": "^6.29.0",
     "reflect-metadata": "^0.1.13",
+    "rss-parser": "^3.13.0",
     "rxjs": "^7.8.0",
+    "youtube-comment-api": "^3.0.2",
     "zod": "^3.24.2"
   },
   "nx": {

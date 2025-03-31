@@ -4,7 +4,6 @@
  */
 import {
   ContentNode,
-  SourceNode,
   EngagementMetrics as BaseEngagementMetrics,
 } from '@veritas/shared/types';
 
@@ -40,7 +39,7 @@ export interface SocialMediaContentNode extends Partial<ContentNode> {
   authorHandle?: string;
   url?: string;
   engagementMetrics?: SocialMediaEngagementMetrics;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -84,4 +83,22 @@ export interface TwitterPost extends SocialMediaContentNode {
   isRetweet?: boolean;
   inReplyToId?: string;
   hashtags?: string[];
+}
+
+/**
+ * YouTube-specific post/comment type
+ */
+export interface YouTubeComment extends SocialMediaContentNode {
+  platform: 'youtube';
+  videoId: string;
+  channelId?: string | null;
+  parentId?: string; // For replies to comments
+  isReply: boolean;
+  likeCount?: number;
+  publishedAt: Date;
+  updatedAt?: Date;
+  metadata?: {
+    replyCount?: number;
+    [key: string]: any;
+  };
 }

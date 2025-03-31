@@ -7,11 +7,11 @@ This phase focuses on implementing the complete data ingestion pipeline, analysi
 
 ### Social Media Connectors
 - [x] Implement Twitter/X connector
-- [x] Develop Reddit connector
-- [x] Create Facebook/Instagram connector
-- [ ] Build YouTube comment scraper
-- [x] Implement generic RSS/Atom feed connector
+- [x] Build Reddit connector
+- [x] Build Facebook/Instagram connector
+- [x] Build RSS/Atom feed connector
 - [x] Develop web scraping module for news sites
+- [x] Build YouTube comment scraper
 
 ### Data Processing Services
 - [x] Deploy content normalization service

@@ -5,23 +5,17 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  FacebookAdsApi,
-  Page,
-  FacebookPost as RawFacebookPost,
-} from 'facebook-nodejs-business-sdk';
-import {
-  SocialMediaConnector,
-  SocialMediaPost,
-} from '../interfaces/social-media-connector.interface';
+import { FacebookAdsApi, Page } from 'facebook-nodejs-business-sdk';
+import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
 import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
 import { SourceNode } from '@veritas/shared/types';
 import { EventEmitter } from 'events';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
-import { FacebookPost } from '../../types/social-media.types';
+import { NarrativeInsight } from '../interfaces/narrative-insight.interface';
+import { FacebookPost as SocialMediaFacebookPost } from '../../types/social-media.types';
 
-interface FacebookPost {
+// Local interface for internal use
+interface InternalFacebookPost {
   id: string;
   message?: string;
   created_time: string;
@@ -44,12 +38,14 @@ interface FacebookPost {
   };
   insights?: {
     data: Array<{
+      name?: string;
       values: Array<{
         value: number;
       }>;
     }>;
   };
   permalink_url?: string;
+  type?: string;
 }
 
 interface SearchOptions {
@@ -175,7 +171,7 @@ export class FacebookConnector
   private async fetchRawPosts(
     query: string,
     options?: SearchOptions
-  ): Promise<FacebookPost[]> {
+  ): Promise<InternalFacebookPost[]> {
     if (!this.api) {
       throw new Error('Facebook client not initialized');
     }
@@ -201,6 +197,7 @@ export class FacebookConnector
           'reactions.summary(total_count)',
           'shares',
           'comments.summary(total_count)',
+          'type',
         ],
         limit: options?.limit || 100,
       };
@@ -219,7 +216,7 @@ export class FacebookConnector
       }
 
       // Return raw posts for transformation (never stored)
-      return response.data as FacebookPost[];
+      return response.data as InternalFacebookPost[];
     } catch (error) {
       this.logger.error('Error fetching raw Facebook posts:', error);
       throw error;
@@ -231,7 +228,7 @@ export class FacebookConnector
    * For backward compatibility
    */
   private transformToSocialMediaPosts(
-    posts: FacebookPost[]
+    posts: InternalFacebookPost[]
   ): SocialMediaPost[] {
     return posts.map((post) => {
       const likes = post.reactions?.summary?.total_count || 0;
@@ -239,7 +236,7 @@ export class FacebookConnector
       const comments = post.comments?.summary?.total_count || 0;
       const reach =
         post.insights?.data?.find(
-          (insight: any) => insight.name === 'post_impressions'
+          (insight) => insight.name === 'post_impressions'
         )?.values[0]?.value || 0;
       const viralityScore = reach > 0 ? (likes + shares + comments) / reach : 0;
 
@@ -250,7 +247,6 @@ export class FacebookConnector
         url: post.permalink_url || `https://facebook.com/${post.id}`,
         authorId: post.from?.id || '',
         authorName: post.from?.name || '',
-        createdAt: new Date(post.created_time),
         timestamp: new Date(post.created_time),
         engagementMetrics: {
           likes,
@@ -444,7 +440,10 @@ export class FacebookConnector
    * Check if a post matches any of the keywords
    * Used for filtering posts in the stream
    */
-  private postMatchesKeywords(post: FacebookPost, keywords: string[]): boolean {
+  private postMatchesKeywords(
+    post: InternalFacebookPost,
+    keywords: string[]
+  ): boolean {
     if (!post.message) {
       return false;
     }
@@ -456,7 +455,10 @@ export class FacebookConnector
   /**
    * Calculate credibility score for a Facebook page
    */
-  private calculateCredibilityScore(pageData: any): number {
+  private calculateCredibilityScore(pageData: {
+    verification_status?: string;
+    fan_count?: number;
+  }): number {
     const isVerified = pageData.verification_status === 'verified' ? 1 : 0;
     const fanCount = pageData.fan_count || 0;
 
@@ -478,7 +480,7 @@ export class FacebookConnector
   async searchFacebookContent(
     query: string,
     options?: SearchOptions
-  ): Promise<FacebookPost[]> {
+  ): Promise<SocialMediaFacebookPost[]> {
     if (!this.api) {
       throw new Error('Facebook client not initialized');
     }
@@ -501,8 +503,8 @@ export class FacebookConnector
    * Transform raw Facebook posts to strongly typed FacebookPost format
    */
   private transformToTypedFacebookPosts(
-    posts: RawFacebookPost[]
-  ): FacebookPost[] {
+    posts: InternalFacebookPost[]
+  ): SocialMediaFacebookPost[] {
     return posts.map((post) => {
       const likes = post.reactions?.summary?.total_count || 0;
       const shares = post.shares?.count || 0;

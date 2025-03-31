@@ -26,6 +26,7 @@
       "@veritas/analysis": ["libs/analysis/src/index.ts"],
       "@veritas/content": ["libs/content/src/index.ts"],
       "@veritas/data-access": ["libs/data-access/src/index.ts"],
+      "@veritas/database": ["libs/database/src/index.ts"],
       "@veritas/ingestion": ["libs/ingestion/src/index.ts"],
       "@veritas/monitoring": ["libs/monitoring/src/index.ts"],
       "@veritas/shared": ["libs/shared/types/src/index.ts"],

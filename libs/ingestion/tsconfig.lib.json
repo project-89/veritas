@@ -5,11 +5,13 @@
     "declaration": true,
     "composite": true,
     "rootDir": "../../",
+    "esModuleInterop": true,
     "paths": {
+      "@veritas/shared/types": ["libs/shared/types/src/index.ts"],
       "@veritas/shared": ["libs/shared/types/src/index.ts"],
-      "@veritas/shared/*": ["libs/shared/*/src/index.ts"]
+      "@veritas/database": ["libs/database/src/index.ts"]
     }
   },
-  "include": ["src/**/*", "../shared/types/src/**/*"],
+  "include": ["src/**/*", "../shared/types/src/**/*", "../database/src/**/*"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"]
 } 
