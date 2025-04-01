@@ -7,20 +7,24 @@ import {
   Body,
   Param,
   Query,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   ContentService,
+  ContentSearchParams,
+  ExtendedContentNode,
+} from '../services/content.service';
+import {
   ContentCreateInput,
   ContentUpdateInput,
-  ContentSearchParams,
-} from './services/content.service';
-import { ContentNode } from '@veritas/shared';
+} from '../services/content-validation.service';
 
 @ApiTags('content')
 @Controller('content')
 export class ContentController {
-  constructor(private readonly contentService: ContentService) {}
+  constructor(@Optional() private readonly contentService: ContentService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create new content' })
@@ -28,7 +32,14 @@ export class ContentController {
     status: 201,
     description: 'The content has been successfully created.',
   })
-  async createContent(@Body() input: ContentCreateInput): Promise<ContentNode> {
+  async createContent(
+    @Body() input: ContentCreateInput
+  ): Promise<ExtendedContentNode> {
+    if (!this.contentService) {
+      throw new Error(
+        'Content service not available - use ContentClassificationModule.forRoot() with databaseProvider'
+      );
+    }
     return this.contentService.createContent(input);
   }
 
@@ -38,7 +49,14 @@ export class ContentController {
     status: 200,
     description: 'The content has been successfully retrieved.',
   })
-  async getContent(@Param('id') id: string): Promise<ContentNode | null> {
+  async getContent(
+    @Param('id') id: string
+  ): Promise<ExtendedContentNode | null> {
+    if (!this.contentService) {
+      throw new Error(
+        'Content service not available - use ContentClassificationModule.forRoot() with databaseProvider'
+      );
+    }
     return this.contentService.getContentById(id);
   }
 
@@ -50,7 +68,12 @@ export class ContentController {
   })
   async searchContent(
     @Query() params: ContentSearchParams
-  ): Promise<ContentNode[]> {
+  ): Promise<ExtendedContentNode[]> {
+    if (!this.contentService) {
+      throw new Error(
+        'Content service not available - use ContentClassificationModule.forRoot() with databaseProvider'
+      );
+    }
     return this.contentService.searchContent(params);
   }
 
@@ -63,7 +86,12 @@ export class ContentController {
   async updateContent(
     @Param('id') id: string,
     @Body() input: ContentUpdateInput
-  ): Promise<ContentNode> {
+  ): Promise<ExtendedContentNode> {
+    if (!this.contentService) {
+      throw new Error(
+        'Content service not available - use ContentClassificationModule.forRoot() with databaseProvider'
+      );
+    }
     return this.contentService.updateContent(id, input);
   }
 
@@ -74,6 +102,11 @@ export class ContentController {
     description: 'The content has been successfully deleted.',
   })
   async deleteContent(@Param('id') id: string): Promise<boolean> {
+    if (!this.contentService) {
+      throw new Error(
+        'Content service not available - use ContentClassificationModule.forRoot() with databaseProvider'
+      );
+    }
     return this.contentService.deleteContent(id);
   }
 
@@ -86,7 +119,12 @@ export class ContentController {
   async getRelatedContent(
     @Param('id') id: string,
     @Query('limit') limit?: number
-  ): Promise<ContentNode[]> {
+  ): Promise<ExtendedContentNode[]> {
+    if (!this.contentService) {
+      throw new Error(
+        'Content service not available - use ContentClassificationModule.forRoot() with databaseProvider'
+      );
+    }
     return this.contentService.getRelatedContent(id, limit);
   }
 
@@ -99,7 +137,14 @@ export class ContentController {
   async updateEngagementMetrics(
     @Param('id') id: string,
     @Body() metrics: ContentUpdateInput['engagementMetrics']
-  ): Promise<ContentNode> {
-    return this.contentService.updateEngagementMetrics(id, metrics);
+  ): Promise<ExtendedContentNode> {
+    if (!this.contentService) {
+      throw new Error(
+        'Content service not available - use ContentClassificationModule.forRoot() with databaseProvider'
+      );
+    }
+    return this.contentService.updateContent(id, {
+      engagementMetrics: metrics,
+    });
   }
 }

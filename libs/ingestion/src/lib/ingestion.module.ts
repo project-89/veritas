@@ -10,13 +10,7 @@ import { RSSConnector } from './services/rss.connector';
 import { WebScraperConnector } from './services/web-scraper.connector';
 import { YouTubeConnector } from './services/youtube.connector';
 import { IngestionService } from './services/ingestion.service';
-
-// Create a stub for ContentClassificationService
-class ContentClassificationServiceStub {
-  classifyContent() {
-    return { sentiment: 'neutral', categories: [], toxicity: 0 };
-  }
-}
+import { ContentClassificationModule } from '@veritas/content-classification';
 
 @Module({
   imports: [
@@ -24,14 +18,11 @@ class ContentClassificationServiceStub {
       isGlobal: true,
     }),
     DatabaseModule.forRoot(),
+    ContentClassificationModule,
   ],
   controllers: [IngestionController],
   providers: [
     IngestionService,
-    {
-      provide: 'ContentClassificationService',
-      useClass: ContentClassificationServiceStub,
-    },
     IngestionResolver,
     TransformOnIngestService,
     // Data connectors implementing the transform-on-ingest pattern
@@ -41,6 +32,6 @@ class ContentClassificationServiceStub {
     WebScraperConnector,
     YouTubeConnector,
   ],
-  exports: [IngestionService, 'ContentClassificationService'],
+  exports: [IngestionService],
 })
 export class IngestionModule {}

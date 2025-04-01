@@ -1,10 +1,11 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { EventEmitter } from 'events';
+import { SourceNode } from '@veritas/shared/types';
 import { TwitterConnector } from './twitter.connector';
 import { FacebookConnector } from './facebook.connector';
 import { RedditConnector } from './reddit.connector';
-import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
-import { SourceNode } from '@veritas/shared';
-import { EventEmitter } from 'events';
+import { SocialMediaPost } from '../../types/social-media.types';
+import { SocialMediaConnector } from '../interfaces/social-media-connector.interface';
 
 export type SocialMediaPlatform = 'twitter' | 'facebook' | 'reddit';
 
@@ -20,9 +21,7 @@ export type SocialMediaPlatform = 'twitter' | 'facebook' | 'reddit';
  */
 @Injectable()
 export class SocialMediaService implements OnModuleInit, OnModuleDestroy {
-  private readonly connectors: Array<
-    TwitterConnector | FacebookConnector | RedditConnector
-  >;
+  private readonly connectors: SocialMediaConnector[];
 
   constructor(
     private readonly twitterConnector: TwitterConnector,

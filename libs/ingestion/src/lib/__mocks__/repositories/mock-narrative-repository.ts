@@ -2,8 +2,8 @@
  * Mock implementation of NarrativeRepository for testing purposes
  * This avoids external dependencies and provides a simplified version for testing
  */
-import { NarrativeInsight } from '../../interfaces/narrative-insight.interface';
-import { NarrativeTrend } from '../../interfaces/narrative-trend.interface';
+import { NarrativeInsight } from '../../../types/narrative-insight.interface';
+import { NarrativeTrend } from '../../../types/narrative-trend.interface';
 import { Logger } from '@nestjs/common';
 
 /**

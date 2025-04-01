@@ -1,0 +1,33 @@
+{
+  "name": "content-classification",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/content-classification/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "options": {
+        "outputPath": "dist/libs/content-classification",
+        "main": "libs/content-classification/src/index.ts",
+        "tsConfig": "libs/content-classification/tsconfig.build.json",
+        "assets": ["libs/content-classification/*.md"],
+        "skipLibCheck": true
+      },
+      "dependsOn": [
+        {
+          "target": "build",
+          "projects": "dependencies"
+        }
+      ]
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/content-classification/**/*.ts"]
+      }
+    }
+  },
+  "tags": ["domain:content", "type:feature"],
+  "implicitDependencies": ["types"]
+} 

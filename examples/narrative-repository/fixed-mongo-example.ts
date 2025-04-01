@@ -3,12 +3,15 @@ import { ConfigModule } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { v4 as uuidv4 } from 'uuid';
 
-// Import the NarrativeModule directly from the proper path
-import { NarrativeModule } from '@veritas/ingestion';
-import { NarrativeRepository } from '@veritas/ingestion';
-import { NarrativeInsight } from '../../libs/ingestion/src/lib/interfaces/narrative-insight.interface';
-import { TransformOnIngestService } from '@veritas/ingestion';
-import { SocialMediaPost } from '../../libs/ingestion/src/lib/interfaces/social-media-connector.interface';
+// Note: Make sure to build the ingestion module first with: nx build ingestion
+// Import from the @veritas/ingestion package
+import {
+  NarrativeModule,
+  NarrativeRepository,
+  NarrativeInsight,
+  SocialMediaPost,
+  TransformOnIngestService,
+} from '@veritas/ingestion';
 
 /**
  * Main application module that uses MongoDB for storage

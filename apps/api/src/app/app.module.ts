@@ -1,35 +1,35 @@
-import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
-import { GraphQLModule } from "@nestjs/graphql";
-import { ApolloDriver, ApolloDriverConfig } from "@nestjs/apollo";
-import { join } from "path";
-import { DatabaseModule } from "@/database";
-import { AnalysisModule } from "@/modules/analysis/analysis.module";
-import { ContentModule } from "@/modules/content/content.module";
-import { SourcesModule } from "@/modules/sources/sources.module";
-import { MonitoringModule } from "@/modules/monitoring/monitoring.module";
-import { IngestionModule } from "@/modules/ingestion/ingestion.module";
-import { VisualizationModule } from "@/modules/visualization/visualization.module";
-import { LoggingService } from "./services/logging.service";
-import { LoggingMiddleware } from "./middleware/logging.middleware";
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { GraphQLModule } from '@nestjs/graphql';
+import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
+import { join } from 'path';
+import { DatabaseModule } from '@/database';
+import { AnalysisModule } from '@/modules/analysis/analysis.module';
+import { ContentClassificationModule } from '@veritas/content-classification';
+import { SourcesModule } from '@/modules/sources/sources.module';
+import { MonitoringModule } from '@/modules/monitoring/monitoring.module';
+import { IngestionModule } from '@/modules/ingestion/ingestion.module';
+import { VisualizationModule } from '@/modules/visualization/visualization.module';
+import { LoggingService } from './services/logging.service';
+import { LoggingMiddleware } from './middleware/logging.middleware';
 
 @Module({
   imports: [
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ".env",
+      envFilePath: '.env',
     }),
 
     // GraphQL
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
-      autoSchemaFile: join(process.cwd(), "src/schema.gql"),
+      autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
       sortSchema: true,
-      playground: process.env.NODE_ENV !== "production",
+      playground: process.env.NODE_ENV !== 'production',
       definitions: {
-        path: join(process.cwd(), "src/graphql.ts"),
-        outputAs: "class",
+        path: join(process.cwd(), 'src/graphql.ts'),
+        outputAs: 'class',
       },
     }),
 
@@ -39,7 +39,7 @@ import { LoggingMiddleware } from "./middleware/logging.middleware";
     // Feature Modules
     IngestionModule,
     AnalysisModule,
-    ContentModule,
+    ContentClassificationModule,
     SourcesModule,
     MonitoringModule,
     VisualizationModule,
@@ -48,6 +48,6 @@ import { LoggingMiddleware } from "./middleware/logging.middleware";
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggingMiddleware).forRoutes("*");
+    consumer.apply(LoggingMiddleware).forRoutes('*');
   }
 }

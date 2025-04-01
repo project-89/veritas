@@ -1,11 +1,15 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/libs/database",
     "declaration": true,
     "composite": true,
     "types": ["node"],
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "paths": {
+      "@veritas/shared/types": ["../shared/types/src/index.ts"],
+      "@veritas/shared": ["../shared/types/src/index.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"]

@@ -1,51 +1,51 @@
 import { EventEmitter } from 'events';
+import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '@veritas/shared/types';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
 
 /**
- * Interface for data connectors following the transform-on-ingest pattern
- * This is the standard connector interface for all data sources
+ * Interface for social media connectors
+ * Provides methods for searching and streaming content from social media platforms
  */
-export interface DataConnector {
+export interface SocialMediaConnector {
   /**
-   * Platform identifier for this connector
+   * Platform identifier for this connector (twitter, facebook, reddit, etc.)
    */
   platform: string;
 
   /**
-   * Connect to the data source
+   * Connect to the social media platform API
    */
   connect(): Promise<void>;
 
   /**
-   * Disconnect from the data source
+   * Disconnect from the social media platform API
    */
   disconnect(): Promise<void>;
 
   /**
-   * Search for content and transform it into anonymized narrative insights
+   * Search for content on the platform
    *
    * @param query - Search query
    * @param options - Search options (platform-specific)
-   * @returns Promise resolving to an array of anonymized NarrativeInsight objects
+   * @returns Promise resolving to an array of SocialMediaPost objects
    */
-  searchAndTransform(
+  searchContent(
     query: string,
     options?: {
       startDate?: Date;
       endDate?: Date;
       limit?: number;
-      [key: string]: unknown;
+      [key: string]: any;
     }
-  ): Promise<NarrativeInsight[]>;
+  ): Promise<SocialMediaPost[]>;
 
   /**
-   * Stream content and transform it into anonymized narrative insights
+   * Stream content from the platform based on keywords
    *
    * @param keywords - Array of keywords to monitor
-   * @returns EventEmitter that emits 'data' events with NarrativeInsight objects
+   * @returns EventEmitter that emits 'data' events with SocialMediaPost objects
    */
-  streamAndTransform(keywords: string[]): EventEmitter;
+  streamContent(keywords: string[]): EventEmitter;
 
   /**
    * Get details about an author/source
@@ -62,3 +62,5 @@ export interface DataConnector {
    */
   validateCredentials(): Promise<boolean>;
 }
+
+export { SocialMediaPost };

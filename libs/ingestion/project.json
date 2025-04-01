@@ -5,15 +5,21 @@
   "projectType": "library",
   "targets": {
     "build": {
-      "executor": "@nx/js:tsc",
+      "executor": "@nx/js:swc",
+      "outputs": ["{options.outputPath}"],
       "options": {
         "outputPath": "dist/libs/ingestion",
         "main": "libs/ingestion/src/index.ts",
         "tsConfig": "libs/ingestion/tsconfig.lib.json",
         "assets": ["libs/ingestion/*.md"],
-        "skipLibCheck": true,
         "skipTypeCheck": true
-      }
+      },
+      "dependsOn": [
+        {
+          "target": "build",
+          "projects": ["types", "content-classification", "database"]
+        }
+      ]
     },
     "lint": {
       "executor": "@nx/eslint:lint",
@@ -31,5 +37,6 @@
       }
     }
   },
-  "tags": ["domain:ingestion", "type:feature"]
+  "tags": ["domain:ingestion", "type:feature"],
+  "implicitDependencies": ["types", "content-classification", "database"]
 } 

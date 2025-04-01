@@ -12,7 +12,7 @@ import { NarrativeRepository } from '../repositories/narrative-insight.repositor
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { NarrativeTrend } from '../../types/narrative-trend.interface';
 import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
-import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
+import { SocialMediaPost } from '../../types/social-media.types';
 
 /**
  * Controller for narrative insights and trends

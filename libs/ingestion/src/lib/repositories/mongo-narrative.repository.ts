@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { NarrativeInsight } from '../interfaces/narrative-insight.interface';
-import { NarrativeTrend } from '../interfaces/narrative-trend.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { NarrativeTrend } from '../../types/narrative-trend.interface';
 import { NarrativeRepository } from './narrative-insight.repository';
 
 /**

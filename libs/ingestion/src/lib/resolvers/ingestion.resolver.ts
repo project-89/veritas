@@ -1,19 +1,7 @@
 import { Resolver, Mutation, Args, Query } from '@nestjs/graphql';
 import { NarrativeRepository } from '../repositories/narrative-insight.repository';
-import { ContentNode, SourceNode } from '@veritas/shared/types';
-// Create local type definitions instead of importing from paths that don't work
-// import { ContentType } from '@/modules/content/types/content.types';
-// import { SourceType } from '@/modules/sources/types/source.types';
-
-// Local definitions
-class ContentType implements ContentNode {
-  id!: string;
-  title!: string;
-  content!: string;
-  sourceId!: string;
-  createdAt!: Date;
-  updatedAt!: Date;
-}
+import { SourceNode } from '@veritas/shared/types';
+import { Inject, Logger } from '@nestjs/common';
 
 class SourceType implements SourceNode {
   id!: string;
@@ -28,16 +16,14 @@ import {
   SourceIngestionInput,
   VerificationStatus,
 } from '../types/ingestion.types';
-// import { ContentClassificationService } from '@/modules/content/services/content-classification.service';
 import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
-import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
-import { NarrativeInsight } from '../interfaces/narrative-insight.interface';
+import { SocialMediaPost } from '../../types/social-media.types';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import {
   NarrativeTrendType,
   NarrativeInsightType,
 } from '../types/graphql.types';
 import * as crypto from 'crypto';
-import { Inject, Logger } from '@nestjs/common';
 
 /**
  * GraphQL resolver for ingestion operations
@@ -48,8 +34,6 @@ export class IngestionResolver {
   private readonly logger = new Logger(IngestionResolver.name);
 
   constructor(
-    @Inject('ContentClassificationService')
-    private readonly classificationService: any,
     private readonly transformService: TransformOnIngestService,
     private readonly narrativeRepository: NarrativeRepository,
     @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: any,
@@ -98,7 +82,9 @@ export class IngestionResolver {
 
     // Transform immediately using our transform-on-ingest service
     // This ensures no raw data is stored in the system
-    const narrativeInsight = this.transformService.transform(socialMediaPost);
+    const narrativeInsight = await this.transformService.transform(
+      socialMediaPost
+    );
 
     return narrativeInsight;
   }

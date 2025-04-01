@@ -8,8 +8,8 @@ import { EventEmitter } from 'events';
 import { TwitterConnector } from './twitter.connector';
 import { FacebookConnector } from './facebook.connector';
 import { RedditConnector } from './reddit.connector';
-import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
-import { NarrativeInsight } from '../interfaces/narrative-insight.interface';
+import { DataConnector } from '../interfaces/data-connector.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 
 // Renamed to avoid name collision with SocialMediaPlatform in social-media.service.ts
 export type AnonymizedPlatform = 'twitter' | 'facebook' | 'reddit';
@@ -29,7 +29,7 @@ export type AnonymizedPlatform = 'twitter' | 'facebook' | 'reddit';
 export class AnonymizedSocialMediaService
   implements OnModuleInit, OnModuleDestroy
 {
-  private readonly connectors: TransformOnIngestConnector[];
+  private readonly connectors: DataConnector[];
   private readonly logger = new Logger(AnonymizedSocialMediaService.name);
 
   constructor(

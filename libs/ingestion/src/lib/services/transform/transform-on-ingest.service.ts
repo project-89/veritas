@@ -1,8 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import { NarrativeInsight } from '../../interfaces/narrative-insight.interface';
-import { SocialMediaPost } from '../../interfaces/social-media-connector.interface';
+import {
+  ContentClassificationService,
+  ContentClassification,
+} from '@veritas/content-classification';
+import { NarrativeInsight } from '../../../types/narrative-insight.interface';
+import { SocialMediaPost } from '../../../types/social-media.types';
 import { NarrativeRepository } from '../../repositories/narrative-insight.repository';
 
 /**
@@ -17,7 +21,8 @@ export class TransformOnIngestService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly narrativeRepository: NarrativeRepository
+    private readonly narrativeRepository: NarrativeRepository,
+    private readonly contentClassificationService: ContentClassificationService
   ) {
     // Get hash salt from config or generate a secure random one
     this.hashSalt =
@@ -38,7 +43,7 @@ export class TransformOnIngestService {
    * Transform a social media post into an anonymized narrative insight
    * The original raw data is never stored, only the transformed result
    */
-  public transform(post: SocialMediaPost): NarrativeInsight {
+  public async transform(post: SocialMediaPost): Promise<NarrativeInsight> {
     try {
       // Step 1: Create content hash (deterministic but non-reversible)
       const contentHash = this.hashContent(post.text, post.timestamp);
@@ -46,19 +51,14 @@ export class TransformOnIngestService {
       // Step 2: Create source hash (deterministic but non-reversible)
       const sourceHash = this.hashSource(post.authorId, post.platform);
 
-      // Step 3: Extract themes using NLP (simplified for example)
-      const themes = this.extractThemes(post.text);
+      // Step 3: Classify the content using the content classification service
+      const classification =
+        await this.contentClassificationService.classifyContent(post.text);
 
-      // Step 4: Extract entities (simplified for example)
-      const entities = this.extractEntities(post.text);
+      // Step 4: Calculate narrative score
+      const narrativeScore = this.calculateNarrativeScore(post, classification);
 
-      // Step 5: Analyze sentiment (simplified for example)
-      const sentiment = this.analyzeSentiment(post.text);
-
-      // Step 6: Calculate narrative score (simplified for example)
-      const narrativeScore = this.calculateNarrativeScore(post);
-
-      // Step 7: Create expiration date
+      // Step 5: Create expiration date
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + this.retentionPeriodDays);
 
@@ -69,9 +69,13 @@ export class TransformOnIngestService {
         sourceHash,
         platform: post.platform,
         timestamp: post.timestamp,
-        themes,
-        entities,
-        sentiment,
+        themes: classification.topics,
+        entities: this.mapClassificationEntities(classification.entities),
+        sentiment: {
+          score: classification.sentiment.score,
+          label: classification.sentiment.label,
+          confidence: classification.sentiment.confidence,
+        },
         engagement: {
           total: this.calculateTotalEngagement(post.engagementMetrics),
           breakdown: this.normalizeEngagementMetrics(post.engagementMetrics),
@@ -101,23 +105,81 @@ export class TransformOnIngestService {
   public async transformBatch(
     posts: SocialMediaPost[]
   ): Promise<NarrativeInsight[]> {
-    const insights = posts.map((post) => this.transform(post));
-
     try {
-      // Store all insights in a batch operation
+      // Step 1: Extract all texts for batch classification
+      const texts = posts.map((post) => post.text);
+
+      // Step 2: Perform batch classification
+      const classifications =
+        await this.contentClassificationService.batchClassify(texts);
+
+      // Step 3: Transform each post with its classification
+      const insights = await Promise.all(
+        posts.map((post, index) =>
+          this.transformWithClassification(post, classifications[index])
+        )
+      );
+
+      // Step 4: Store all insights in a batch operation
       await this.narrativeRepository.saveMany(insights);
       this.logger.debug(
         `Stored ${insights.length} insights from batch transformation`
       );
+
+      return insights;
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
-        `Error storing batch insights: ${err.message}`,
+        `Error in batch transformation: ${err.message}`,
         err.stack
       );
+      throw error;
     }
+  }
 
-    return insights;
+  /**
+   * Transform a post with pre-computed classification
+   * Used by transformBatch for better performance
+   */
+  private async transformWithClassification(
+    post: SocialMediaPost,
+    classification: ContentClassification
+  ): Promise<NarrativeInsight> {
+    // Step 1: Create content hash (deterministic but non-reversible)
+    const contentHash = this.hashContent(post.text, post.timestamp);
+
+    // Step 2: Create source hash (deterministic but non-reversible)
+    const sourceHash = this.hashSource(post.authorId, post.platform);
+
+    // Step 3: Calculate narrative score
+    const narrativeScore = this.calculateNarrativeScore(post, classification);
+
+    // Step 4: Create expiration date
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + this.retentionPeriodDays);
+
+    // Create the anonymized narrative insight
+    return {
+      id: `insight-${contentHash.substring(0, 8)}`,
+      contentHash,
+      sourceHash,
+      platform: post.platform,
+      timestamp: post.timestamp,
+      themes: classification.topics,
+      entities: this.mapClassificationEntities(classification.entities),
+      sentiment: {
+        score: classification.sentiment.score,
+        label: classification.sentiment.label,
+        confidence: classification.sentiment.confidence,
+      },
+      engagement: {
+        total: this.calculateTotalEngagement(post.engagementMetrics),
+        breakdown: this.normalizeEngagementMetrics(post.engagementMetrics),
+      },
+      narrativeScore,
+      processedAt: new Date(),
+      expiresAt,
+    };
   }
 
   /**
@@ -167,137 +229,52 @@ export class TransformOnIngestService {
   }
 
   /**
-   * Extract themes from text using NLP techniques
+   * Map entities from ContentClassification format to NarrativeInsight format
    */
-  private extractThemes(text: string): string[] {
-    // Simplified implementation for example
-    const themes = new Set<string>();
-    const words = text.toLowerCase().split(/\s+/);
-
-    // Common theme words (simplified for example)
-    const themeKeywords = {
-      politics: ['policy', 'government', 'election', 'vote', 'political'],
-      technology: ['tech', 'digital', 'software', 'app', 'innovation'],
-      environment: ['climate', 'sustainable', 'green', 'eco', 'environmental'],
-      // Add more themes as needed
-    };
-
-    // Check for theme keywords in the text
-    Object.entries(themeKeywords).forEach(([theme, keywords]) => {
-      if (keywords.some((keyword) => words.includes(keyword))) {
-        themes.add(theme);
-      }
-    });
-
-    return Array.from(themes);
-  }
-
-  /**
-   * Extract entities from text
-   */
-  private extractEntities(
-    text: string
+  private mapClassificationEntities(
+    entities: ContentClassification['entities']
   ): Array<{ name: string; type: string; relevance: number }> {
-    // Simplified implementation for example
-    const entities: Array<{ name: string; type: string; relevance: number }> =
-      [];
-
-    // Extract simple entity mentions (highly simplified)
-    const matches = text.match(/@([a-zA-Z0-9_]+)|#([a-zA-Z0-9_]+)/g) || [];
-
-    matches.forEach((match) => {
-      if (match.startsWith('@')) {
-        entities.push({
-          name: match.substring(1),
-          type: 'person',
-          relevance: 0.8,
-        });
-      } else if (match.startsWith('#')) {
-        entities.push({
-          name: match.substring(1),
-          type: 'topic',
-          relevance: 0.7,
-        });
-      }
-    });
-
-    return entities;
-  }
-
-  /**
-   * Analyze sentiment of text
-   */
-  private analyzeSentiment(text: string): {
-    score: number;
-    label: 'negative' | 'neutral' | 'positive';
-    confidence: number;
-  } {
-    // Simplified implementation for example
-    const positiveWords = [
-      'good',
-      'great',
-      'excellent',
-      'like',
-      'love',
-      'happy',
-    ];
-    const negativeWords = [
-      'bad',
-      'awful',
-      'terrible',
-      'dislike',
-      'hate',
-      'sad',
-    ];
-
-    const words = text.toLowerCase().split(/\s+/);
-    let score = 0;
-
-    // Count positive and negative words
-    const positiveCount = words.filter((word) =>
-      positiveWords.includes(word)
-    ).length;
-    const negativeCount = words.filter((word) =>
-      negativeWords.includes(word)
-    ).length;
-
-    // Calculate score between -1 and 1
-    if (positiveCount + negativeCount > 0) {
-      score = (positiveCount - negativeCount) / (positiveCount + negativeCount);
-    }
-
-    // Determine label
-    let label: 'negative' | 'neutral' | 'positive' = 'neutral';
-    if (score > 0.2) {
-      label = 'positive';
-    } else if (score < -0.2) {
-      label = 'negative';
-    }
-
-    return {
-      score,
-      label,
-      confidence: Math.min(0.9, Math.abs(score) + 0.5), // Simplified confidence calculation
-    };
+    return entities.map(
+      (entity: { text: string; type: string; confidence: number }) => ({
+        name: entity.text,
+        type: entity.type,
+        relevance: entity.confidence,
+      })
+    );
   }
 
   /**
    * Calculate a narrative score for the post
    */
-  private calculateNarrativeScore(post: SocialMediaPost): number {
-    // Simplified implementation for example
+  private calculateNarrativeScore(
+    post: SocialMediaPost,
+    classification: ContentClassification
+  ): number {
+    // Engagement factor (weighted engagement relative to platform norms)
     const engagementFactor =
       this.calculateTotalEngagement(post.engagementMetrics) / 1000;
+
+    // Time relevance factor (recent content scores higher)
     const timeFactor = Math.max(
       0,
       1 - (Date.now() - post.timestamp.getTime()) / (30 * 24 * 60 * 60 * 1000)
     );
 
-    // Score between 0 and 1
-    return Math.min(
-      0.95,
-      Math.max(0.1, engagementFactor * 0.7 + timeFactor * 0.3)
-    );
+    // Content quality factors
+    const toxicityPenalty = classification.toxicity * 0.5; // Higher toxicity reduces score
+    const topicRelevance = classification.topics.length * 0.05; // More identified topics increases score
+    const entityBonus = classification.entities.length * 0.02; // More entities increases score
+
+    // Combine factors to get base score
+    const score =
+      engagementFactor * 0.4 +
+      timeFactor * 0.2 +
+      topicRelevance * 0.2 +
+      entityBonus * 0.2 -
+      toxicityPenalty;
+
+    // Ensure score is between 0.1 and 0.95
+    return Math.min(0.95, Math.max(0.1, score));
   }
 
   /**
@@ -323,13 +300,23 @@ export class TransformOnIngestService {
   ): Record<string, number> {
     const total = this.calculateTotalEngagement(metrics);
 
+    if (total === 0) {
+      return {
+        likes: 0,
+        shares: 0,
+        comments: 0,
+        reach: 0,
+        viralityScore: metrics.viralityScore || 0,
+      };
+    }
+
     // Return normalized breakdown
     return {
       likes: metrics.likes / total,
       shares: metrics.shares / total,
       comments: metrics.comments / total,
       reach: metrics.reach / total,
-      viralityScore: metrics.viralityScore,
+      viralityScore: metrics.viralityScore || 0,
     };
   }
 

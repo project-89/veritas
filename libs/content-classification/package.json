@@ -1,0 +1,16 @@
+{
+  "name": "@veritas/content-classification",
+  "version": "0.0.1",
+  "description": "Content analysis and classification library for Veritas",
+  "author": "Veritas Team",
+  "license": "MIT",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "peerDependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^10.0.0",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.8.0"
+  }
+} 

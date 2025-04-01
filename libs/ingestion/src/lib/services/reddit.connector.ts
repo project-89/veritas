@@ -211,9 +211,12 @@ export class RedditConnector
       id: post.id,
       title: post.title,
       selftext: post.selftext,
-      author: post.author.name,
+      author: typeof post.author === 'string' ? post.author : post.author.name,
       created_utc: post.created_utc,
-      subreddit: post.subreddit.display_name,
+      subreddit:
+        typeof post.subreddit === 'string'
+          ? post.subreddit
+          : post.subreddit.display_name,
       score: post.score,
       upvote_ratio: post.upvote_ratio,
       num_comments: post.num_comments,

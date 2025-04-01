@@ -1,7 +1,7 @@
-import { ObjectType, InputType, Field, ID, Float } from "@nestjs/graphql";
-import { ContentClassification } from "../services/content-classification.service";
+import { ObjectType, InputType, Field, ID, Float } from '@nestjs/graphql';
+import { ContentClassification } from '../services/content-classification.service';
 
-@ObjectType("EngagementMetrics")
+@ObjectType('EngagementMetrics')
 export class EngagementMetricsType {
   @Field(() => Float)
   likes: number;
@@ -16,7 +16,7 @@ export class EngagementMetricsType {
   reach: number;
 }
 
-@InputType("EngagementMetricsInput")
+@InputType('EngagementMetricsInput')
 export class EngagementMetricsInputType {
   @Field(() => Float, { nullable: true })
   likes?: number;
@@ -31,7 +31,7 @@ export class EngagementMetricsInputType {
   reach?: number;
 }
 
-@ObjectType("ContentClassification")
+@ObjectType('ContentClassification')
 export class ContentClassificationType {
   @Field(() => [String])
   categories: string[];
@@ -55,7 +55,7 @@ export class ContentClassificationType {
   entities: Array<{ text: string; type: string; confidence: number }>;
 }
 
-@ObjectType("Entity")
+@ObjectType('Entity')
 export class EntityType {
   @Field()
   text: string;
@@ -67,7 +67,7 @@ export class EntityType {
   confidence: number;
 }
 
-@ObjectType("Content")
+@ObjectType('Content')
 export class ContentType {
   @Field(() => ID)
   id: string;
@@ -97,7 +97,7 @@ export class ContentType {
   updatedAt: Date;
 }
 
-@InputType("ContentCreateInput")
+@InputType('ContentCreateInput')
 export class ContentCreateInputType {
   @Field()
   text: string;
@@ -115,7 +115,7 @@ export class ContentCreateInputType {
   metadata?: Record<string, any>;
 }
 
-@InputType("ContentUpdateInput")
+@InputType('ContentUpdateInput')
 export class ContentUpdateInputType {
   @Field({ nullable: true })
   text?: string;
@@ -127,7 +127,7 @@ export class ContentUpdateInputType {
   engagementMetrics?: EngagementMetricsInputType;
 }
 
-@InputType("ContentSearchParams")
+@InputType('ContentSearchParams')
 export class ContentSearchParamsType {
   @Field({ nullable: true })
   query?: string;

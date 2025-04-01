@@ -1,11 +1,29 @@
-import { Injectable } from "@nestjs/common";
-import { z } from "zod";
-import { ContentCreateInput, ContentUpdateInput } from "./content.service";
+import { Injectable } from '@nestjs/common';
+import { z } from 'zod';
+
+export interface ContentCreateInput {
+  text: string;
+  timestamp: Date;
+  platform: string;
+  sourceId: string;
+  metadata?: Record<string, any>;
+}
+
+export interface ContentUpdateInput {
+  text?: string;
+  metadata?: Record<string, any>;
+  engagementMetrics?: {
+    likes?: number;
+    shares?: number;
+    comments?: number;
+    reach?: number;
+  };
+}
 
 const ContentCreateSchema = z.object({
   text: z.string().min(1).max(10000),
   timestamp: z.date(),
-  platform: z.enum(["twitter", "facebook", "reddit", "other"]),
+  platform: z.enum(['twitter', 'facebook', 'reddit', 'other']),
   sourceId: z.string().uuid(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
@@ -48,7 +66,7 @@ export class ContentValidationService {
   }
 
   validateEngagementMetrics(
-    metrics: ContentUpdateInput["engagementMetrics"]
+    metrics: ContentUpdateInput['engagementMetrics']
   ): void {
     try {
       EngagementMetricsSchema.parse(metrics);

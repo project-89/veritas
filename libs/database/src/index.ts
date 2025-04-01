@@ -1,5 +1,3 @@
-import { Module } from '@nestjs/common';
-
 export * from './lib/services/content.service';
 export * from './lib/services/source.service';
 export * from './lib/database.module';

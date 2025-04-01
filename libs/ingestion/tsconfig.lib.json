@@ -1,17 +1,14 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "../../dist/libs/ingestion",
     "declaration": true,
-    "composite": true,
-    "rootDir": "../../",
+    "module": "commonjs",
+    "rootDir": "src",
     "esModuleInterop": true,
-    "paths": {
-      "@veritas/shared/types": ["libs/shared/types/src/index.ts"],
-      "@veritas/shared": ["libs/shared/types/src/index.ts"],
-      "@veritas/database": ["libs/database/src/index.ts"]
-    }
+    "types": ["node", "jest"]
   },
-  "include": ["src/**/*", "../shared/types/src/**/*", "../database/src/**/*"],
-  "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.test.ts"],
+  "files": []
 } 

@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "declaration": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@veritas/content-classification": ["dist/libs/content-classification"],
+      "@veritas/shared": ["dist/libs/shared/types"],
+      "@veritas/database": ["dist/libs/database"]
+    },
+    "outDir": "dist/libs/ingestion/lib/services/transform"
+  },
+  "include": ["libs/ingestion/src/lib/services/transform/transform-on-ingest.service.ts"]
+}

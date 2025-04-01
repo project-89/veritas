@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "outDir": "../../dist/libs/content-classification",
+    "rootDir": "src",
+    "skipLibCheck": true,
+    "baseUrl": "../../",
+    "preserveSymlinks": true,
+    "paths": {
+      "@veritas/shared/types": ["libs/shared/types/src/index.ts"],
+      "@veritas/shared": ["libs/shared/types/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
+} 

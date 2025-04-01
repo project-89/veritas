@@ -1,27 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { MemgraphService } from '@/database';
-import { ContentNode, SourceNode } from '@veritas/shared';
-import { ContentValidationService } from '../services/content-validation.service';
-import { ContentClassificationService } from '../services/content-classification.service';
-
-export interface ContentCreateInput {
-  text: string;
-  timestamp: Date;
-  platform: string;
-  sourceId: string;
-  metadata?: Record<string, any>;
-}
-
-export interface ContentUpdateInput {
-  text?: string;
-  metadata?: Record<string, any>;
-  engagementMetrics?: {
-    likes?: number;
-    shares?: number;
-    comments?: number;
-    reach?: number;
-  };
-}
+import { ContentNode } from '@veritas/shared/types';
+import {
+  ContentValidationService,
+  ContentCreateInput,
+  ContentUpdateInput,
+} from './content-validation.service';
+import {
+  ContentClassificationService,
+  ContentClassification,
+} from './content-classification.service';
 
 export interface ContentSearchParams {
   query?: string;
@@ -33,15 +20,32 @@ export interface ContentSearchParams {
   offset?: number;
 }
 
+// Extended ContentNode with classification field
+export interface ExtendedContentNode extends ContentNode {
+  classification?: ContentClassification;
+}
+
+// We use an interface because the actual implementation depends on the database module
+export interface DatabaseService {
+  createNode(label: string, data: any): Promise<any>;
+  createRelationship(
+    sourceId: string,
+    targetId: string,
+    type: string,
+    data?: any
+  ): Promise<any>;
+  executeQuery(query: string, params?: Record<string, any>): Promise<any[]>;
+}
+
 @Injectable()
 export class ContentService {
   constructor(
-    private readonly memgraphService: MemgraphService,
+    private readonly dbService: DatabaseService,
     private readonly validationService: ContentValidationService,
     private readonly classificationService: ContentClassificationService
   ) {}
 
-  async createContent(input: ContentCreateInput): Promise<ContentNode> {
+  async createContent(input: ContentCreateInput): Promise<ExtendedContentNode> {
     // Validate input
     await this.validationService.validateContentInput(input);
 
@@ -51,7 +55,7 @@ export class ContentService {
     );
 
     // Create content node
-    const contentNode = await this.memgraphService.createNode('Content', {
+    const contentNode = await this.dbService.createNode('Content', {
       ...input,
       classification,
       engagementMetrics: {
@@ -65,7 +69,7 @@ export class ContentService {
     });
 
     // Create relationship with source
-    await this.memgraphService.createRelationship(
+    await this.dbService.createRelationship(
       input.sourceId,
       contentNode.id,
       'PUBLISHED',
@@ -78,7 +82,7 @@ export class ContentService {
   async updateContent(
     id: string,
     input: ContentUpdateInput
-  ): Promise<ContentNode> {
+  ): Promise<ExtendedContentNode> {
     // Validate update input
     await this.validationService.validateContentUpdate(input);
 
@@ -89,7 +93,9 @@ export class ContentService {
     }
 
     // If text is updated, reclassify
-    let classification = existingContent.classification;
+    let classification =
+      existingContent.classification ||
+      (await this.classificationService.classifyContent(''));
     if (input.text) {
       classification = await this.classificationService.classifyContent(
         input.text
@@ -104,7 +110,7 @@ export class ContentService {
       RETURN c
     `;
 
-    const result = await this.memgraphService.executeQuery(query, {
+    const result = await this.dbService.executeQuery(query, {
       id,
       updates: {
         ...input,
@@ -115,18 +121,20 @@ export class ContentService {
     return result[0]?.c;
   }
 
-  async getContentById(id: string): Promise<ContentNode | null> {
+  async getContentById(id: string): Promise<ExtendedContentNode | null> {
     const query = `
       MATCH (c:Content)
       WHERE c.id = $id
       RETURN c
     `;
 
-    const result = await this.memgraphService.executeQuery(query, { id });
+    const result = await this.dbService.executeQuery(query, { id });
     return result[0]?.c || null;
   }
 
-  async searchContent(params: ContentSearchParams): Promise<ContentNode[]> {
+  async searchContent(
+    params: ContentSearchParams
+  ): Promise<ExtendedContentNode[]> {
     let query = `
       MATCH (c:Content)
       WHERE 1=1
@@ -174,7 +182,7 @@ export class ContentService {
       queryParams.offset = params.offset;
     }
 
-    const result = await this.memgraphService.executeQuery(query, queryParams);
+    const result = await this.dbService.executeQuery(query, queryParams);
     return result.map((row) => row.c);
   }
 
@@ -186,11 +194,14 @@ export class ContentService {
       RETURN count(*) as deleted
     `;
 
-    const result = await this.memgraphService.executeQuery(query, { id });
+    const result = await this.dbService.executeQuery(query, { id });
     return result[0]?.deleted > 0;
   }
 
-  async getRelatedContent(id: string, limit = 10): Promise<ContentNode[]> {
+  async getRelatedContent(
+    id: string,
+    limit = 10
+  ): Promise<ExtendedContentNode[]> {
     const query = `
       MATCH (c:Content)-[:HAS_TOPIC]->(t:Topic)<-[:HAS_TOPIC]-(related:Content)
       WHERE c.id = $id AND related.id <> $id
@@ -198,29 +209,7 @@ export class ContentService {
       LIMIT $limit
     `;
 
-    const result = await this.memgraphService.executeQuery(query, {
-      id,
-      limit,
-    });
+    const result = await this.dbService.executeQuery(query, { id, limit });
     return result.map((row) => row.related);
-  }
-
-  async updateEngagementMetrics(
-    id: string,
-    metrics: ContentUpdateInput['engagementMetrics']
-  ): Promise<ContentNode> {
-    const query = `
-      MATCH (c:Content)
-      WHERE c.id = $id
-      SET c.engagementMetrics = $metrics, c.updatedAt = datetime()
-      RETURN c
-    `;
-
-    const result = await this.memgraphService.executeQuery(query, {
-      id,
-      metrics,
-    });
-
-    return result[0]?.c;
   }
 }

@@ -24,7 +24,7 @@
       "@/services/*": ["apps/api/src/app/services/*"],
       "@veritas-nx/visualization": ["libs/visualization/src/index.ts"],
       "@veritas/analysis": ["libs/analysis/src/index.ts"],
-      "@veritas/content": ["libs/content/src/index.ts"],
+      "@veritas/content-classification": ["libs/content-classification/src/index.ts"],
       "@veritas/data-access": ["libs/data-access/src/index.ts"],
       "@veritas/database": ["libs/database/src/index.ts"],
       "@veritas/ingestion": ["libs/ingestion/src/index.ts"],

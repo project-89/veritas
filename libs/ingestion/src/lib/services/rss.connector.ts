@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
 import axios from 'axios';
-import * as Parser from 'rss-parser';
+import Parser from 'rss-parser';
 import {
   SocialMediaConnector,
   SocialMediaPost,

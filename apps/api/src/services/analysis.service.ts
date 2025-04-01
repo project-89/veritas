@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { MemgraphService } from '@/database';
-import { ContentClassificationService } from '@/modules/content/services/content-classification.service';
+import { MemgraphService } from '../database/index';
+import { ContentClassificationService } from '@veritas/content-classification';
 import {
   ExtendedContentNode,
   PatternDetectionResult,
   NetworkAnalysisResult,
-} from '@/modules/analysis/analysis.types';
+} from '../modules/analysis/analysis.types';
 import { LoggingService } from './logging.service';
 
 @Injectable()
