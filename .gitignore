@@ -10,6 +10,12 @@ out-tsc
 **/*.d.ts
 **/*.js.map
 **/*.tsbuildinfo
+
+# Keep manually created declaration files
+!libs/shared/types/src/lib/facebook-nodejs-business-sdk.d.ts
+!libs/shared/types/src/lib/snoowrap.d.ts
+
+# Keep config files
 !jest.config.js
 !jest.preset.js
 !**/jest.config.ts
