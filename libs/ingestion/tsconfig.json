@@ -10,7 +10,7 @@
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,
     "esModuleInterop": true,
-    "declaration": true
+    "preserveSymlinks": true
   },
   "files": [],
   "include": [],

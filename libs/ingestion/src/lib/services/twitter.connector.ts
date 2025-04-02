@@ -8,11 +8,12 @@ import { ConfigService } from '@nestjs/config';
 import { TwitterApi, TweetV2, UserV2, TwitterApiv2 } from 'twitter-api-v2';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
-import { SourceNode } from '@veritas/shared';
+import { SourceNode } from '../schemas';
 import { EventEmitter } from 'events';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { TwitterUser } from '../../types/twitter-metrics.interface';
+import { SocialMediaConnector } from '../interfaces/social-media-connector.interface';
 
 type TweetWithIncludes = TweetV2 & {
   includes?: {
@@ -37,7 +38,7 @@ interface SearchOptions {
 
 @Injectable()
 export class TwitterConnector
-  implements DataConnector, OnModuleInit, OnModuleDestroy
+  implements DataConnector, OnModuleInit, OnModuleDestroy, SocialMediaConnector
 {
   platform = 'twitter' as const;
   private client: TwitterApi | null = null;
@@ -381,5 +382,118 @@ export class TwitterConnector
   ): boolean {
     const text = post.text.toLowerCase();
     return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
+  }
+
+  /**
+   * Search for content on the platform
+   *
+   * @param query - Search query
+   * @param options - Search options (platform-specific)
+   * @returns Promise resolving to an array of SocialMediaPost objects
+   */
+  async searchContent(
+    query: string,
+    options?: {
+      startDate?: Date;
+      endDate?: Date;
+      limit?: number;
+      [key: string]: any;
+    }
+  ): Promise<SocialMediaPost[]> {
+    if (!this.v2Client) {
+      await this.connect();
+    }
+
+    try {
+      this.logger.log(`Searching Twitter for: ${query}`);
+
+      // Fetch tweets
+      const rawTweets = await this.fetchRawTweets(query, options);
+
+      // Transform the raw tweets with user information
+      const enrichedTweets = this.enrichTweetsWithUserData(
+        rawTweets.tweets,
+        rawTweets.includes
+      );
+
+      // Convert enriched tweets to SocialMediaPost format
+      const socialMediaPosts = enrichedTweets.map((tweet) =>
+        this.transformTweetToSocialMediaPost(tweet)
+      );
+
+      return socialMediaPosts;
+    } catch (error) {
+      this.logger.error('Error searching Twitter content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Stream content from the platform based on keywords
+   *
+   * @param keywords - Array of keywords to monitor
+   * @returns EventEmitter that emits 'data' events with SocialMediaPost objects
+   */
+  streamContent(keywords: string[]): EventEmitter {
+    const emitter = new EventEmitter();
+    const streamId = Math.random().toString(36).substring(7);
+
+    const interval = setInterval(async () => {
+      try {
+        if (!this.v2Client) {
+          throw new Error('Twitter client not initialized');
+        }
+
+        // Fetch tweets
+        const rawTweets = await this.fetchRawTweets(keywords.join(' OR '), {
+          startDate: new Date(Date.now() - 3600000), // Last hour
+          limit: 100,
+        });
+
+        // Transform the raw tweets with user information
+        const enrichedTweets = this.enrichTweetsWithUserData(
+          rawTweets.tweets,
+          rawTweets.includes
+        );
+
+        // Filter posts that match keywords
+        const filteredTweets = enrichedTweets.filter(
+          (tweet: TweetWithIncludes) =>
+            this.postMatchesKeywords(
+              this.transformTweetToSocialMediaPost(tweet),
+              keywords
+            )
+        );
+
+        // Convert enriched tweets to SocialMediaPost format
+        const socialMediaPosts = filteredTweets.map((tweet) =>
+          this.transformTweetToSocialMediaPost(tweet)
+        );
+
+        // Emit posts
+        for (const post of socialMediaPosts) {
+          emitter.emit('data', post);
+        }
+
+        this.logger.debug(
+          `Emitted ${socialMediaPosts.length} posts from Twitter stream`
+        );
+      } catch (error) {
+        emitter.emit('error', error);
+        this.logger.error('Error in Twitter stream:', error);
+      }
+    }, this.pollingInterval);
+
+    this.streamConnections.set(streamId, interval);
+    this.interval = interval;
+
+    // Clean up on end event
+    emitter.on('end', () => {
+      clearInterval(interval);
+      this.streamConnections.delete(streamId);
+      this.logger.log(`Closed Twitter stream: ${streamId}`);
+    });
+
+    return emitter;
   }
 }

@@ -5,19 +5,20 @@
   "projectType": "library",
   "targets": {
     "build": {
-      "executor": "@nx/js:swc",
+      "executor": "@nx/js:tsc",
       "outputs": ["{options.outputPath}"],
       "options": {
         "outputPath": "dist/libs/ingestion",
-        "main": "libs/ingestion/src/index.ts",
         "tsConfig": "libs/ingestion/tsconfig.lib.json",
+        "packageJson": "libs/ingestion/package.json",
+        "main": "libs/ingestion/src/index.ts",
         "assets": ["libs/ingestion/*.md"],
-        "skipTypeCheck": true
+        "rootDir": "libs/ingestion/src"
       },
       "dependsOn": [
         {
           "target": "build",
-          "projects": ["types", "content-classification", "database"]
+          "projects": "dependencies"
         }
       ]
     },

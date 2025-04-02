@@ -4,13 +4,17 @@ import {
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
-import { ContentService, SourceService } from '@veritas/database';
+// import { ContentService, SourceService } from '@veritas/database';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { RedditConnector } from './reddit.connector';
 import { FacebookConnector } from './facebook.connector';
 import { RSSConnector } from './rss.connector';
 import { WebScraperConnector } from './web-scraper.connector';
 import { YouTubeConnector } from './youtube.connector';
+
+// Local stubs for database services
+class ContentService {}
+class SourceService {}
 
 @Injectable()
 export class IngestionService implements OnModuleInit, OnModuleDestroy {

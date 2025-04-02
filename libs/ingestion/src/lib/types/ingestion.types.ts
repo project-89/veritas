@@ -1,5 +1,4 @@
 import { InputType, registerEnumType } from '@nestjs/graphql';
-import { EngagementMetrics } from '@veritas/shared';
 import {
   IsString,
   IsEnum,
@@ -11,6 +10,15 @@ import {
   IsNotEmpty,
   ValidateNested,
 } from 'class-validator';
+
+// Local definition of EngagementMetrics to avoid external dependency
+export interface EngagementMetrics {
+  likes: number;
+  shares: number;
+  comments: number;
+  reach: number;
+  viralityScore: number;
+}
 
 // Create local decorator implementations for testing
 export function Field(typeFunc?: any, options?: any): PropertyDecorator {

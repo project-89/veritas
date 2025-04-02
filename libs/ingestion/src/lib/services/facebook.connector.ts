@@ -8,11 +8,13 @@ import { ConfigService } from '@nestjs/config';
 import { FacebookAdsApi, Page } from 'facebook-nodejs-business-sdk';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
-import { SourceNode } from '@veritas/shared/types';
+
 import { EventEmitter } from 'events';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { FacebookPost as SocialMediaFacebookPost } from '../../types/social-media.types';
+import { SocialMediaConnector } from '../interfaces/social-media-connector.interface';
+import { SourceNode } from '../schemas';
 
 // Local interface for internal use
 interface InternalFacebookPost {
@@ -56,7 +58,7 @@ interface SearchOptions {
 
 @Injectable()
 export class FacebookConnector
-  implements DataConnector, OnModuleInit, OnModuleDestroy
+  implements DataConnector, OnModuleInit, OnModuleDestroy, SocialMediaConnector
 {
   platform = 'facebook' as const;
   private api: FacebookAdsApi | null = null;
@@ -444,26 +446,110 @@ export class FacebookConnector
         authorHandle: '',
         url: post.permalink_url || `https://facebook.com/${post.id}`,
         timestamp: new Date(post.created_time),
-        pageId: post.from?.id,
-        isPagePost: true,
         engagementMetrics: {
+          views,
           likes,
           shares,
           comments,
           reach,
-          views,
           viralityScore: reach > 0 ? (likes + shares + comments) / reach : 0,
-        },
-        metadata: {
-          postType: post.type || 'status',
-          createdTime: post.created_time,
-          rawEngagement: {
-            reactionCount: likes,
-            shareCount: shares,
-            commentCount: comments,
-          },
         },
       };
     });
+  }
+
+  /**
+   * Search for content on the platform
+   *
+   * @param query - Search query
+   * @param options - Search options (platform-specific)
+   * @returns Promise resolving to an array of SocialMediaPost objects
+   */
+  async searchContent(
+    query: string,
+    options?: {
+      startDate?: Date;
+      endDate?: Date;
+      limit?: number;
+      [key: string]: unknown;
+    }
+  ): Promise<SocialMediaPost[]> {
+    if (!this.api) {
+      await this.connect();
+    }
+
+    try {
+      this.logger.log(`Searching Facebook for: ${query}`);
+
+      // Fetch posts
+      const rawPosts = await this.fetchRawPosts(query, options);
+
+      // Transform to SocialMediaPost format
+      return this.transformToSocialMediaPosts(rawPosts);
+    } catch (error) {
+      this.logger.error('Error searching Facebook content:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Stream content from the platform based on keywords
+   *
+   * @param keywords - Array of keywords to monitor
+   * @returns EventEmitter that emits 'data' events with SocialMediaPost objects
+   */
+  streamContent(keywords: string[]): EventEmitter {
+    const emitter = new EventEmitter();
+    const streamId = Math.random().toString(36).substring(7);
+
+    const interval = setInterval(async () => {
+      try {
+        if (!this.api) {
+          throw new Error('Facebook client not initialized');
+        }
+
+        // Create a search query from the keywords
+        const query = keywords.join(' OR ');
+
+        // Fetch posts from last hour
+        const rawPosts = await this.fetchRawPosts(query, {
+          startDate: new Date(Date.now() - 3600000), // Last hour
+          limit: 100,
+        });
+
+        // Filter posts that match keywords
+        const filteredPosts = rawPosts.filter((post) =>
+          this.postMatchesKeywords(post, keywords)
+        );
+
+        // Transform to SocialMediaPost format
+        const socialMediaPosts =
+          this.transformToSocialMediaPosts(filteredPosts);
+
+        // Emit posts
+        for (const post of socialMediaPosts) {
+          emitter.emit('data', post);
+        }
+
+        this.logger.debug(
+          `Emitted ${socialMediaPosts.length} posts from Facebook stream`
+        );
+      } catch (error) {
+        emitter.emit('error', error);
+        this.logger.error('Error in Facebook stream:', error);
+      }
+    }, this.pollingInterval);
+
+    this.streamConnections.set(streamId, interval);
+    this.interval = interval;
+
+    // Clean up on end event
+    emitter.on('end', () => {
+      clearInterval(interval);
+      this.streamConnections.delete(streamId);
+      this.logger.log(`Closed Facebook stream: ${streamId}`);
+    });
+
+    return emitter;
   }
 }

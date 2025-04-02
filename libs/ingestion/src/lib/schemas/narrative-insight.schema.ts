@@ -50,7 +50,7 @@ class Engagement {
 })
 export class NarrativeInsightSchema extends Document {
   @Prop({ required: true, unique: true })
-  id!: string;
+  override id!: string;
 
   @Prop({ required: true, index: true })
   contentHash!: string;

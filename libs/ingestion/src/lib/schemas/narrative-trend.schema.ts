@@ -13,7 +13,7 @@ import { Document } from 'mongoose';
 })
 export class NarrativeTrendSchema extends Document {
   @Prop({ required: true, unique: true })
-  id!: string;
+  override id!: string;
 
   @Prop({ required: true, index: true })
   timeframe!: string;

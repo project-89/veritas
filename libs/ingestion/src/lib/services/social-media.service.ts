@@ -1,11 +1,14 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { EventEmitter } from 'events';
-import { SourceNode } from '@veritas/shared/types';
-import { TwitterConnector } from './twitter.connector';
-import { FacebookConnector } from './facebook.connector';
-import { RedditConnector } from './reddit.connector';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { SocialMediaConnector } from '../interfaces/social-media-connector.interface';
+import { DataConnector } from '../interfaces/data-connector.interface';
+import { SourceNode } from '../schemas';
 
 export type SocialMediaPlatform = 'twitter' | 'facebook' | 'reddit';
 
@@ -21,24 +24,33 @@ export type SocialMediaPlatform = 'twitter' | 'facebook' | 'reddit';
  */
 @Injectable()
 export class SocialMediaService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(SocialMediaService.name);
   private readonly connectors: SocialMediaConnector[];
 
   constructor(
-    private readonly twitterConnector: TwitterConnector,
-    private readonly facebookConnector: FacebookConnector,
-    private readonly redditConnector: RedditConnector
+    // Connectors injected via NestJS DI
+    private readonly twitterConnector: SocialMediaConnector,
+    private readonly facebookConnector: SocialMediaConnector,
+    private readonly redditConnector: SocialMediaConnector
   ) {
-    this.connectors = [twitterConnector, facebookConnector, redditConnector];
+    // Initialize the connector array
+    this.connectors = [
+      twitterConnector,
+      facebookConnector,
+      redditConnector,
+      // Add additional social media connectors here
+    ];
   }
 
   async onModuleInit() {
+    // Validate credentials for all connectors
     await Promise.all(
       this.connectors.map(async (connector) => {
         try {
           await connector.validateCredentials();
         } catch (error) {
-          console.error(
-            `Failed to validate credentials for ${connector.platform}:`,
+          this.logger.error(
+            `Failed to validate credentials for ${connector.platform}`,
             error
           );
         }
@@ -47,25 +59,17 @@ export class SocialMediaService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
+    // Disconnect all connectors
     await Promise.all(
-      this.connectors.map(async (connector) => {
-        try {
-          await connector.disconnect();
-        } catch (error) {
-          console.error(
-            `Failed to disconnect from ${connector.platform}:`,
-            error
-          );
-        }
-      })
+      this.connectors.map((connector) => connector.disconnect())
     );
   }
 
   /**
-   * Search across all platforms for matching content
+   * Search for content across all platforms
    *
-   * WARNING: Returns raw social media data which may contain PII. For privacy-compliant
-   * implementations, use TransformedSocialMediaService.searchAllAndTransform() instead.
+   * WARNING: This method returns raw data that may contain PII.
+   * For privacy-compliant data handling, use TransformedSocialMediaService instead.
    */
   async searchAllPlatforms(
     query: string,
@@ -89,12 +93,12 @@ export class SocialMediaService implements OnModuleInit, OnModuleDestroy {
           endDate: options?.endDate,
           limit: options?.limit,
         })
-        .catch((error) => {
-          console.error(
-            `Error searching content on ${connector.platform}:`,
-            error
+        .catch((error: Error) => {
+          this.logger.error(
+            `Error searching ${connector.platform}: ${error.message}`,
+            error.stack
           );
-          return [];
+          return [] as SocialMediaPost[];
         })
     );
 
@@ -103,9 +107,58 @@ export class SocialMediaService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Get author details from a specific platform
+   * Stream content from all platforms based on keywords
    *
-   * WARNING: Returns raw author data which may contain PII.
+   * WARNING: This method returns raw data that may contain PII.
+   * For privacy-compliant data handling, use TransformedSocialMediaService instead.
+   */
+  streamAllPlatforms(
+    keywords: string[],
+    options?: {
+      platforms?: SocialMediaPlatform[];
+    }
+  ): EventEmitter {
+    const emitter = new EventEmitter();
+
+    // Filter connectors by platform if specified
+    const targetConnectors = options?.platforms
+      ? this.connectors.filter((connector) =>
+          options.platforms!.includes(connector.platform as SocialMediaPlatform)
+        )
+      : this.connectors;
+
+    let hasError = false;
+
+    targetConnectors.forEach((connector) => {
+      try {
+        const stream = connector.streamContent(keywords);
+        stream.on('data', (post: SocialMediaPost) => {
+          if (!hasError) {
+            emitter.emit('data', post);
+          }
+        });
+        stream.on('error', (error) => {
+          this.logger.error(`Error from ${connector.platform} stream:`, error);
+          emitter.emit('error', error);
+        });
+      } catch (error) {
+        hasError = true;
+        this.logger.error(
+          `Failed to start ${connector.platform} stream:`,
+          error
+        );
+        emitter.emit('error', error);
+      }
+    });
+
+    return emitter;
+  }
+
+  /**
+   * Get details about an author from a specified platform
+   *
+   * WARNING: This method returns raw data that may contain PII.
+   * For privacy-compliant data handling, use TransformedSocialMediaService instead.
    */
   async getAuthorDetails(
     authorId: string,
@@ -117,65 +170,5 @@ export class SocialMediaService implements OnModuleInit, OnModuleDestroy {
     }
 
     return connector.getAuthorDetails(authorId);
-  }
-
-  /**
-   * Stream content from all platforms
-   *
-   * WARNING: Yields raw social media data which may contain PII. For privacy-compliant
-   * implementations, use TransformedSocialMediaService.streamAllAndTransform() instead.
-   */
-  async *streamAllPlatforms(
-    keywords: string[],
-    options?: {
-      platforms?: SocialMediaPlatform[];
-    }
-  ): AsyncGenerator<SocialMediaPost> {
-    const targetConnectors = options?.platforms
-      ? this.connectors.filter((connector) =>
-          options.platforms!.includes(connector.platform as SocialMediaPlatform)
-        )
-      : this.connectors;
-
-    const emitter = new EventEmitter();
-    let hasError = false;
-
-    for (const connector of targetConnectors) {
-      try {
-        const stream = connector.streamContent(keywords);
-        stream.on('data', (post: SocialMediaPost) => {
-          if (!hasError) {
-            emitter.emit('data', post);
-          }
-        });
-        stream.on('error', (error: Error) => {
-          hasError = true;
-          console.error(`Error in ${connector.platform} stream:`, error);
-          emitter.emit('error', error);
-        });
-      } catch (error) {
-        hasError = true;
-        console.error(`Error setting up ${connector.platform} stream:`, error);
-        emitter.emit('error', error);
-      }
-    }
-
-    try {
-      while (!hasError) {
-        const post: SocialMediaPost = await new Promise((resolve, reject) => {
-          emitter.once('data', resolve);
-          emitter.once('error', reject);
-        });
-        yield post;
-      }
-    } catch (error) {
-      console.error('Error in stream:', error);
-      throw error;
-    } finally {
-      emitter.removeAllListeners();
-      await Promise.all(
-        targetConnectors.map((connector) => connector.disconnect())
-      );
-    }
   }
 }

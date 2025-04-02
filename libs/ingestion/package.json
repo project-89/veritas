@@ -1,0 +1,14 @@
+{
+  "name": "@veritas/ingestion",
+  "version": "0.0.1",
+  "peerDependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/mongoose": "^10.0.0"
+  },
+  "dependencies": {
+    "@veritas/shared": "0.0.1",
+    "@veritas/database": "0.0.1", 
+    "@veritas/content-classification": "0.0.1"
+  }
+} 

@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
-import { SourceNode } from '@veritas/shared/types';
+
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { SourceNode } from '../schemas';
 
 /**
  * Interface for data connectors following the transform-on-ingest pattern

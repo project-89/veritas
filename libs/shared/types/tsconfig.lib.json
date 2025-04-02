@@ -3,10 +3,11 @@
   "compilerOptions": {
     "outDir": "../../../dist/libs/shared/types",
     "declaration": true,
+    "declarationDir": "../../../dist/libs/shared/types",
     "composite": true,
     "types": ["node"],
     "esModuleInterop": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
+  "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts", "src/**/*.d.ts"]
 }
