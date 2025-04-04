@@ -14,14 +14,12 @@
       "@veritas/shared/*": ["libs/shared/src/*"]
     },
     "typeRoots": [
-      "./node_modules/@types",
-      "./types"
+      "./node_modules/@types"
     ]
   },
   "include": [
     "libs/**/*",
-    "apps/**/*",
-    "types/**/*"
+    "apps/**/*"
   ],
   "exclude": [
     "node_modules",
