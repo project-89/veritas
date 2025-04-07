@@ -1,0 +1,22 @@
+{
+  "name": "@veritas/database",
+  "version": "0.1.0",
+  "description": "Database library for Veritas",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0",
+    "mongoose": "^7.5.0",
+    "neo4j-driver": "^5.10.0",
+    "redis": "^4.6.0",
+    "uuid": "^9.0.0",
+    "rxjs": "^7.8.1"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.0"
+  }
+} 
