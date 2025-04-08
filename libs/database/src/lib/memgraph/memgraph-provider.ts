@@ -80,7 +80,7 @@ export class MemgraphProvider implements DatabaseProvider {
    * Register a model with the Memgraph provider
    * This is a no-op for Memgraph as it doesn't use schemas
    */
-  registerModel(name: string, schema: any): any {
+  registerModel(name: string, schema?: any): any {
     this.logger.log(`Registering model ${name} for Memgraph (no-op)`);
     return null;
   }

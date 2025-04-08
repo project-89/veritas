@@ -76,7 +76,7 @@ export class MongoDBProvider implements DatabaseProvider {
    * @param name The name of the model
    * @param schema The Mongoose schema for the model
    */
-  registerModel(name: string, schema: any): Model<any> {
+  registerModel(name: string, schema?: any): Model<any> {
     if (!this.connection) {
       throw new Error('Cannot register model: MongoDB is not connected');
     }

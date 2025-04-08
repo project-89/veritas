@@ -1,5 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Driver, Record as Neo4jRecord, Session, int } from 'neo4j-driver';
+import {
+  Driver,
+  Record as Neo4jRecord,
+  Session,
+  int,
+  isInt,
+  Integer,
+} from 'neo4j-driver';
 import { FindOptions, Repository } from '../interfaces/repository.interface';
 
 /**
@@ -27,8 +34,8 @@ export class MemgraphRepository<T> implements Repository<T> {
 
     // Convert Neo4j integer values to JavaScript numbers
     Object.keys(properties).forEach((key) => {
-      if (int.isInt(properties[key])) {
-        properties[key] = properties[key].toNumber();
+      if (isInt(properties[key])) {
+        properties[key] = (properties[key] as Integer).toNumber();
       }
     });
 
@@ -183,7 +190,7 @@ export class MemgraphRepository<T> implements Repository<T> {
 
       const records = await this.executeQuery(query, filter);
       const count = records[0].get('count');
-      return int.isInt(count) ? count.toNumber() : count;
+      return isInt(count) ? (count as Integer).toNumber() : (count as number);
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error counting entities: ${err.message}`, err.stack);
@@ -287,7 +294,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       const params = { ...filter, data: updateData };
       const records = await this.executeQuery(query, params);
       const count = records[0].get('count');
-      return int.isInt(count) ? count.toNumber() : count;
+      return isInt(count) ? (count as Integer).toNumber() : (count as number);
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
@@ -353,7 +360,7 @@ export class MemgraphRepository<T> implements Repository<T> {
 
       const records = await this.executeQuery(query, filter);
       const count = records[0].get('count');
-      return int.isInt(count) ? count.toNumber() : count;
+      return isInt(count) ? (count as Integer).toNumber() : (count as number);
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
