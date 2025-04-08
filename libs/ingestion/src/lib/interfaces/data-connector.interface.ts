@@ -4,12 +4,12 @@ import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SourceNode } from '../schemas';
 
 /**
- * Interface for data connectors following the transform-on-ingest pattern
- * This is the standard connector interface for all data sources
+ * Interface for data connectors that provide content to the ingestion system
+ * All connectors must implement this interface
  */
 export interface DataConnector {
   /**
-   * Platform identifier for this connector
+   * Platform or data source identifier for this connector
    */
   platform: string;
 
@@ -25,10 +25,10 @@ export interface DataConnector {
 
   /**
    * Search for content and transform it into anonymized narrative insights
+   * Implements the transform-on-ingest pattern for privacy compliance
    *
    * @param query - Search query
-   * @param options - Search options (platform-specific)
-   * @returns Promise resolving to an array of anonymized NarrativeInsight objects
+   * @param options - Search options
    */
   searchAndTransform(
     query: string,
@@ -36,15 +36,15 @@ export interface DataConnector {
       startDate?: Date;
       endDate?: Date;
       limit?: number;
-      [key: string]: unknown;
+      [key: string]: any;
     }
   ): Promise<NarrativeInsight[]>;
 
   /**
    * Stream content and transform it into anonymized narrative insights
+   * Implements the transform-on-ingest pattern for privacy compliance
    *
    * @param keywords - Array of keywords to monitor
-   * @returns EventEmitter that emits 'data' events with NarrativeInsight objects
    */
   streamAndTransform(keywords: string[]): EventEmitter;
 

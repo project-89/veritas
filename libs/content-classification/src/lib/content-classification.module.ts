@@ -1,17 +1,39 @@
-import { Module, DynamicModule, Provider } from '@nestjs/common';
+import { Module, DynamicModule, Provider, Global } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ContentClassificationService } from './services/content-classification.service';
 import { ContentValidationService } from './services/content-validation.service';
 import { ContentService } from './services/content.service';
 import { ContentController } from './controllers/content.controller';
 import { ContentResolver } from './resolvers/content.resolver';
+import { DatabaseService, DatabaseModule } from '@veritas/database';
 
 export interface ContentClassificationModuleOptions {
   /**
-   * Optional database service provider
+   * Optional database provider configuration
    * If not provided, the database operations in ContentService won't work
    */
-  databaseProvider?: any;
+  database?: {
+    /**
+     * Type of database provider to use
+     */
+    providerType: 'mongodb' | 'memgraph' | 'redis';
+
+    /**
+     * Connection options for the database
+     */
+    providerOptions: {
+      uri: string;
+      databaseName: string;
+      username?: string;
+      password?: string;
+      options?: Record<string, any>;
+    };
+  };
+
+  /**
+   * Set module as global
+   */
+  isGlobal?: boolean;
 }
 
 /**
@@ -47,15 +69,52 @@ export class ContentClassificationModule {
       ContentResolver,
     ];
 
-    // Only register ContentService if database provider is supplied
-    if (options?.databaseProvider) {
+    const imports = [
+      ConfigModule.forRoot({
+        isGlobal: true,
+      }),
+    ];
+
+    // Add database module and service if options are provided
+    if (options?.database) {
+      imports.push(
+        DatabaseModule.register({
+          providerType: options.database.providerType,
+          providerOptions: options.database.providerOptions,
+        })
+      );
+
+      // Add database service provider
       providers.push({
         provide: 'DATABASE_SERVICE',
-        useClass: options.databaseProvider,
-      } as Provider);
+        useExisting: DatabaseService,
+      });
+
+      // Register ContentService only when database is configured
       providers.push(ContentService);
     }
 
+    const module: DynamicModule = {
+      module: ContentClassificationModule,
+      imports,
+      controllers: [ContentController],
+      providers,
+      exports: providers,
+    };
+
+    // Set module as global if specified
+    if (options?.isGlobal) {
+      module.global = true;
+    }
+
+    return module;
+  }
+
+  /**
+   * Register the content classification module with default configuration
+   * Note: This will not enable database operations
+   */
+  static register(): DynamicModule {
     return {
       module: ContentClassificationModule,
       imports: [
@@ -64,8 +123,16 @@ export class ContentClassificationModule {
         }),
       ],
       controllers: [ContentController],
-      providers,
-      exports: providers,
+      providers: [
+        ContentClassificationService,
+        ContentValidationService,
+        ContentResolver,
+      ],
+      exports: [
+        ContentClassificationService,
+        ContentValidationService,
+        ContentResolver,
+      ],
     };
   }
 }

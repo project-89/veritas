@@ -1,9 +1,36 @@
+import { Test } from '@nestjs/testing';
 import { MongoDBProvider } from './mongodb-provider';
 import { DatabaseProviderOptions } from '../interfaces/database-provider.interface';
 import { MongoDBRepository } from './mongodb-repository';
+import { Connection, Model, createConnection } from 'mongoose';
 
 // Mock the MongoDBRepository class
 jest.mock('./mongodb-repository');
+
+// Mock mongoose module
+jest.mock('mongoose', () => {
+  // Create mock model functions
+  const mockModel = {
+    find: jest.fn().mockReturnThis(),
+    findById: jest.fn().mockReturnThis(),
+    findOne: jest.fn().mockReturnThis(),
+    create: jest.fn().mockReturnThis(),
+    exec: jest.fn().mockResolvedValue([]),
+  };
+
+  // Create mock connection
+  const mockConnection = {
+    readyState: 1,
+    close: jest.fn().mockResolvedValue(undefined),
+    model: jest.fn().mockReturnValue(mockModel),
+  };
+
+  return {
+    createConnection: jest.fn().mockResolvedValue(mockConnection),
+    Connection: jest.fn(),
+    Model: jest.fn(),
+  };
+});
 
 describe('MongoDBProvider', () => {
   let provider: MongoDBProvider;
@@ -12,45 +39,12 @@ describe('MongoDBProvider', () => {
     databaseName: 'test',
     username: 'user',
     password: 'pass',
+    options: {},
   };
 
-  // Create mock objects manually
-  const mockModel: any = {
-    find: jest.fn().mockReturnThis(),
-    exec: jest.fn().mockResolvedValue([]),
-  };
-
-  const mockConnection: any = {
-    readyState: 1,
-    close: jest.fn().mockResolvedValue(undefined),
-    model: jest.fn().mockReturnValue(mockModel),
-  };
-
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
-
-    // Set up the provider with mocked connection
     provider = new MongoDBProvider(mockOptions);
-
-    // Manually mock the methods we need to test
-    (provider as any).connect = jest.fn().mockImplementation(async () => {
-      (provider as any).connection = mockConnection;
-    });
-
-    // Keep the original isConnected method
-    const originalIsConnected = provider.isConnected;
-    provider.isConnected = jest.fn().mockImplementation(() => {
-      return originalIsConnected.call(provider);
-    });
-
-    // Keep the original disconnect method but still track calls
-    const originalDisconnect = provider.disconnect;
-    provider.disconnect = jest.fn().mockImplementation(async () => {
-      if ((provider as any).connection) {
-        await mockConnection.close();
-        (provider as any).connection = null;
-      }
-    });
   });
 
   it('should be defined', () => {
@@ -58,26 +52,37 @@ describe('MongoDBProvider', () => {
   });
 
   describe('connect', () => {
-    it('should connect to MongoDB with the provided options', async () => {
+    it('should connect to the database', async () => {
       await provider.connect();
+      expect(createConnection).toHaveBeenCalledWith(mockOptions.uri, {
+        dbName: mockOptions.databaseName,
+        user: mockOptions.username,
+        pass: mockOptions.password,
+        ...mockOptions.options,
+      });
+    });
 
-      // Verify connect was called
-      expect(provider.connect).toHaveBeenCalled();
-      expect(provider.isConnected()).toBe(true);
+    it('should handle connection errors', async () => {
+      const mockError = new Error('Connection failed');
+      (createConnection as jest.Mock).mockRejectedValueOnce(mockError);
+
+      await expect(provider.connect()).rejects.toThrow(mockError);
     });
   });
 
   describe('disconnect', () => {
-    it('should disconnect from MongoDB', async () => {
-      // First connect
+    it('should disconnect from the database', async () => {
       await provider.connect();
-
-      // Then disconnect
       await provider.disconnect();
 
-      // Verify that close was called on the connection
-      expect(mockConnection.close).toHaveBeenCalled();
-      expect(provider.isConnected()).toBe(false);
+      const mockMongooseConnection = await (createConnection as jest.Mock).mock
+        .results[0].value;
+      expect(mockMongooseConnection.close).toHaveBeenCalled();
+    });
+
+    it('should do nothing if not connected', async () => {
+      await provider.disconnect();
+      expect(createConnection).not.toHaveBeenCalled();
     });
   });
 
@@ -93,98 +98,73 @@ describe('MongoDBProvider', () => {
   });
 
   describe('registerModel', () => {
-    it('should register a model with the provider', async () => {
+    it('should register a model', async () => {
       await provider.connect();
+      const schema = { name: String };
+      const model = provider.registerModel('TestModel', schema);
 
-      const modelName = 'TestModel';
-      const mockSchema = {};
-
-      // Mock the private models Map in the provider
-      (provider as any).models = new Map();
-
-      // Use the real registerModel method
-      const original = MongoDBProvider.prototype.registerModel;
-      provider.registerModel = original;
-
-      provider.registerModel(modelName, mockSchema);
-
-      // Verify that model was called on the connection
-      expect(mockConnection.model).toHaveBeenCalledWith(modelName, mockSchema);
-      expect((provider as any).models.has(modelName)).toBe(true);
+      const mockMongooseConnection = await (createConnection as jest.Mock).mock
+        .results[0].value;
+      expect(mockMongooseConnection.model).toHaveBeenCalledWith(
+        'TestModel',
+        schema
+      );
+      expect(model).toBeDefined();
     });
 
     it('should throw an error if not connected', () => {
-      const modelName = 'TestModel';
-      const mockSchema = {};
-
-      // Use the real registerModel method
-      const original = MongoDBProvider.prototype.registerModel;
-      provider.registerModel = original;
-
-      expect(() => provider.registerModel(modelName, mockSchema)).toThrow(
+      expect(() => provider.registerModel('TestModel', {})).toThrow(
         'Cannot register model: MongoDB is not connected'
       );
+    });
+
+    it('should return an existing model if already registered', async () => {
+      await provider.connect();
+      const schema = { name: String };
+      provider.registerModel('TestModel', schema);
+
+      const mockMongooseConnection = await (createConnection as jest.Mock).mock
+        .results[0].value;
+      expect(mockMongooseConnection.model).toHaveBeenCalledTimes(1);
+
+      provider.registerModel('TestModel', schema);
+      expect(mockMongooseConnection.model).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('getRepository', () => {
     it('should return a repository for a registered model', async () => {
       await provider.connect();
-
-      // Set up the models Map
-      (provider as any).models = new Map();
-      (provider as any).models.set('TestModel', mockModel);
-      (provider as any).repositories = new Map();
-
-      // Use the real getRepository method
-      const original = MongoDBProvider.prototype.getRepository;
-      provider.getRepository = original;
-
-      // Make sure MongoDBRepository returns an appropriate mock
-      (MongoDBRepository as jest.Mock).mockImplementation(() => {
-        return {
-          find: jest.fn(),
-          findById: jest.fn(),
-          findOne: jest.fn(),
-          count: jest.fn(),
-          create: jest.fn(),
-          createMany: jest.fn(),
-          updateById: jest.fn(),
-          updateMany: jest.fn(),
-          deleteById: jest.fn(),
-          deleteMany: jest.fn(),
-        };
-      });
+      const schema = { name: String };
+      provider.registerModel('TestModel', schema);
 
       const repository = provider.getRepository('TestModel');
-
       expect(repository).toBeDefined();
-      expect(MongoDBRepository).toHaveBeenCalledWith(mockModel);
+      expect(MongoDBRepository).toHaveBeenCalled();
+    });
+
+    it('should throw an error if the model is not registered', async () => {
+      await provider.connect();
+      expect(() => provider.getRepository('UnregisteredModel')).toThrow(
+        "Model 'UnregisteredModel' is not registered"
+      );
     });
 
     it('should throw an error if not connected', () => {
-      // Use the real getRepository method
-      const original = MongoDBProvider.prototype.getRepository;
-      provider.getRepository = original;
-
       expect(() => provider.getRepository('TestModel')).toThrow(
         'Cannot get repository: MongoDB is not connected'
       );
     });
 
-    it('should throw an error if model is not registered', async () => {
+    it('should return the same repository instance for the same model', async () => {
       await provider.connect();
+      provider.registerModel('TestModel', {});
 
-      // Set up the models Map without the requested model
-      (provider as any).models = new Map();
+      const repository1 = provider.getRepository('TestModel');
+      const repository2 = provider.getRepository('TestModel');
 
-      // Use the real getRepository method
-      const original = MongoDBProvider.prototype.getRepository;
-      provider.getRepository = original;
-
-      expect(() => provider.getRepository('NonExistentModel')).toThrow(
-        `Model 'NonExistentModel' is not registered`
-      );
+      expect(repository1).toBe(repository2);
+      expect(MongoDBRepository).toHaveBeenCalledTimes(1);
     });
   });
 });

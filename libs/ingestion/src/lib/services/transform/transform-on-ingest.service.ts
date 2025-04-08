@@ -41,54 +41,23 @@ export class TransformOnIngestService {
 
   /**
    * Transform a social media post into an anonymized narrative insight
-   * The original raw data is never stored, only the transformed result
+   * This is the core method implementing the transform-on-ingest pattern
    */
   public async transform(post: SocialMediaPost): Promise<NarrativeInsight> {
     try {
-      // Step 1: Create content hash (deterministic but non-reversible)
-      const contentHash = this.hashContent(post.text, post.timestamp);
-
-      // Step 2: Create source hash (deterministic but non-reversible)
-      const sourceHash = this.hashSource(post.authorId, post.platform);
-
-      // Step 3: Classify the content using the content classification service
-      const classification =
-        await this.contentClassificationService.classifyContent(post.text);
-
-      // Step 4: Calculate narrative score
-      const narrativeScore = this.calculateNarrativeScore(post, classification);
-
-      // Step 5: Create expiration date
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + this.retentionPeriodDays);
-
-      // Create the anonymized narrative insight
-      const insight: NarrativeInsight = {
-        id: `insight-${contentHash.substring(0, 8)}`,
-        contentHash,
-        sourceHash,
-        platform: post.platform,
-        timestamp: post.timestamp,
-        themes: classification.topics,
-        entities: this.mapClassificationEntities(classification.entities),
-        sentiment: {
-          score: classification.sentiment.score,
-          label: classification.sentiment.label,
-          confidence: classification.sentiment.confidence,
-        },
-        engagement: {
-          total: this.calculateTotalEngagement(post.engagementMetrics),
-          breakdown: this.normalizeEngagementMetrics(post.engagementMetrics),
-        },
-        narrativeScore,
-        processedAt: new Date(),
-        expiresAt,
-      };
-
-      // Store the insight (non-blocking)
-      this.storeInsight(insight).catch((err: Error) =>
-        this.logger.error(`Failed to store insight: ${err.message}`, err.stack)
+      // Step 1: Classify the content
+      const classification = await this.contentClassificationService.classify(
+        post.text
       );
+
+      // Step 2: Transform with classification
+      const insight = await this.transformWithClassification(
+        post,
+        classification
+      );
+
+      // Step 3: Store the insight
+      await this.storeInsight(insight);
 
       return insight;
     } catch (error: unknown) {
@@ -244,60 +213,94 @@ export class TransformOnIngestService {
   }
 
   /**
-   * Calculate a narrative score for the post
+   * Calculate a narrative score based on content and classification
    */
   private calculateNarrativeScore(
     post: SocialMediaPost,
     classification: ContentClassification
   ): number {
-    // Engagement factor (weighted engagement relative to platform norms)
-    const engagementFactor =
-      this.calculateTotalEngagement(post.engagementMetrics) / 1000;
-
-    // Time relevance factor (recent content scores higher)
-    const timeFactor = Math.max(
-      0,
-      1 - (Date.now() - post.timestamp.getTime()) / (30 * 24 * 60 * 60 * 1000)
+    // Factor 1: Engagement score (normalized, max 0.4)
+    const engagementScore = Math.min(
+      this.calculateEngagementScore(post.engagementMetrics) * 0.4,
+      0.4
     );
 
-    // Content quality factors
-    const toxicityPenalty = classification.toxicity * 0.5; // Higher toxicity reduces score
-    const topicRelevance = classification.topics.length * 0.05; // More identified topics increases score
-    const entityBonus = classification.entities.length * 0.02; // More entities increases score
+    // Factor 2: Entity relevance score (max 0.2)
+    const entityScore = Math.min(
+      this.calculateEntityScore(classification.entities) * 0.2,
+      0.2
+    );
 
-    // Combine factors to get base score
-    const score =
-      engagementFactor * 0.4 +
-      timeFactor * 0.2 +
-      topicRelevance * 0.2 +
-      entityBonus * 0.2 -
-      toxicityPenalty;
+    // Factor 3: Topic relevance (max 0.2)
+    const topicScore = Math.min(
+      classification.topics.length > 0 ? 0.2 : 0.1,
+      0.2
+    );
 
-    // Ensure score is between 0.1 and 0.95
-    return Math.min(0.95, Math.max(0.1, score));
+    // Factor 4: Sentiment intensity (max 0.2)
+    const sentimentIntensity = Math.abs(classification.sentiment.score);
+    const sentimentScore = Math.min(sentimentIntensity * 0.2, 0.2);
+
+    // Return total score (0-1 range)
+    return engagementScore + entityScore + topicScore + sentimentScore;
   }
 
   /**
-   * Calculate total engagement from metrics
+   * Calculate the total engagement from engagement metrics
    */
   private calculateTotalEngagement(
     metrics: SocialMediaPost['engagementMetrics']
   ): number {
-    // Sum of all engagement metrics with weights
+    if (!metrics) return 0;
     return (
-      metrics.likes * 1 +
-      metrics.shares * 2 +
-      metrics.comments * 1.5 +
-      metrics.reach * 0.1
+      (metrics.likes || 0) + (metrics.shares || 0) + (metrics.comments || 0)
     );
   }
 
   /**
-   * Normalize engagement metrics for storage
+   * Calculate an engagement score from engagement metrics
+   */
+  private calculateEngagementScore(
+    metrics: SocialMediaPost['engagementMetrics']
+  ): number {
+    if (!metrics) return 0;
+
+    const total = this.calculateTotalEngagement(metrics);
+    const reach = metrics.reach || 1; // Avoid division by zero
+
+    // Engagement rate calculation (higher is better)
+    return Math.min(total / reach, 1);
+  }
+
+  /**
+   * Calculate an entity score based on entity relevance
+   */
+  private calculateEntityScore(
+    entities: ContentClassification['entities']
+  ): number {
+    if (!entities || entities.length === 0) return 0;
+
+    // Average confidence of all entities
+    return (
+      entities.reduce((sum, entity) => sum + entity.confidence, 0) /
+      entities.length
+    );
+  }
+
+  /**
+   * Normalize engagement metrics to create a percentage breakdown
    */
   private normalizeEngagementMetrics(
     metrics: SocialMediaPost['engagementMetrics']
   ): Record<string, number> {
+    if (!metrics) {
+      return {
+        likes: 0,
+        shares: 0,
+        comments: 0,
+      };
+    }
+
     const total = this.calculateTotalEngagement(metrics);
 
     if (total === 0) {
@@ -305,18 +308,13 @@ export class TransformOnIngestService {
         likes: 0,
         shares: 0,
         comments: 0,
-        reach: 0,
-        viralityScore: metrics.viralityScore || 0,
       };
     }
 
-    // Return normalized breakdown
     return {
-      likes: metrics.likes / total,
-      shares: metrics.shares / total,
-      comments: metrics.comments / total,
-      reach: metrics.reach / total,
-      viralityScore: metrics.viralityScore || 0,
+      likes: (metrics.likes || 0) / total,
+      shares: (metrics.shares || 0) / total,
+      comments: (metrics.comments || 0) / total,
     };
   }
 
