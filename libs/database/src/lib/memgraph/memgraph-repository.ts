@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Injectable, Logger } from '@nestjs/common';
 import {
   Driver,
@@ -72,7 +73,7 @@ export class MemgraphRepository<T> implements Repository<T> {
   ): Promise<T[]> {
     try {
       // Build WHERE clause from filter
-      const whereConditions = Object.entries(filter).map(([key, value]) => {
+      const whereConditions = Object.entries(filter).map(([key]) => {
         return `n.${key} = $${key}`;
       });
 
@@ -142,7 +143,7 @@ export class MemgraphRepository<T> implements Repository<T> {
   async findOne(filter: Record<string, any>): Promise<T | null> {
     try {
       // Build WHERE clause from filter
-      const whereConditions = Object.entries(filter).map(([key, value]) => {
+      const whereConditions = Object.entries(filter).map(([key]) => {
         return `n.${key} = $${key}`;
       });
 
@@ -173,7 +174,7 @@ export class MemgraphRepository<T> implements Repository<T> {
   async count(filter: Record<string, any> = {}): Promise<number> {
     try {
       // Build WHERE clause from filter
-      const whereConditions = Object.entries(filter).map(([key, value]) => {
+      const whereConditions = Object.entries(filter).map(([key]) => {
         return `n.${key} = $${key}`;
       });
 
@@ -275,7 +276,7 @@ export class MemgraphRepository<T> implements Repository<T> {
   ): Promise<number> {
     try {
       // Build WHERE clause from filter
-      const whereConditions = Object.entries(filter).map(([key, value]) => {
+      const whereConditions = Object.entries(filter).map(([key]) => {
         return `n.${key} = $${key}`;
       });
 
@@ -341,7 +342,7 @@ export class MemgraphRepository<T> implements Repository<T> {
   async deleteMany(filter: Record<string, any>): Promise<number> {
     try {
       // Build WHERE clause from filter
-      const whereConditions = Object.entries(filter).map(([key, value]) => {
+      const whereConditions = Object.entries(filter).map(([key]) => {
         return `n.${key} = $${key}`;
       });
 
