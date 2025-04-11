@@ -29,5 +29,5 @@
     }
   },
   "tags": ["domain:content", "type:feature"],
-  "implicitDependencies": ["types"]
+  "implicitDependencies": ["types", "database"]
 } 

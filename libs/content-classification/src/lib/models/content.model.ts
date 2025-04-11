@@ -1,4 +1,4 @@
-import { ContentSchema } from '../schemas/content.schema';
+import { ContentSchema, ContentModel } from '../schemas/content.schema';
 
 /**
  * Factory function to create a Content model

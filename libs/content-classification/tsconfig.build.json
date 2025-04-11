@@ -10,7 +10,8 @@
     "preserveSymlinks": true,
     "paths": {
       "@veritas/shared/types": ["libs/shared/types/src/index.ts"],
-      "@veritas/shared": ["libs/shared/types/src/index.ts"]
+      "@veritas/shared": ["libs/shared/types/src/index.ts"],
+      "@veritas/database": ["libs/database/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"],

@@ -5,7 +5,8 @@ import { ContentValidationService } from './services/content-validation.service'
 import { ContentService } from './services/content.service';
 import { ContentController } from './controllers/content.controller';
 import { ContentResolver } from './resolvers/content.resolver';
-import { DatabaseService, DatabaseModule } from '@veritas/database';
+import { CONTENT_MODEL_NAME } from './models/content.model';
+import { DATABASE_PROVIDER_TOKEN } from './constants';
 
 export interface ContentClassificationModuleOptions {
   /**
@@ -69,6 +70,7 @@ export class ContentClassificationModule {
       ContentResolver,
     ];
 
+    // Create the imports array
     const imports = [
       ConfigModule.forRoot({
         isGlobal: true,
@@ -77,37 +79,47 @@ export class ContentClassificationModule {
 
     // Add database module and service if options are provided
     if (options?.database) {
-      imports.push(
-        DatabaseModule.register({
-          providerType: options.database.providerType,
-          providerOptions: options.database.providerOptions,
-        })
-      );
+      // Add ContentService only when database is configured
+      providers.push(ContentService);
 
-      // Add database service provider
+      // Import the DatabaseModule dynamically to avoid import issues
+      // This will load the module from node_modules at runtime
+      const DatabaseModule = require('@veritas/database').DatabaseModule;
+
+      // Add the DatabaseService provider using token
       providers.push({
-        provide: 'DATABASE_SERVICE',
-        useExisting: DatabaseService,
+        provide: DATABASE_PROVIDER_TOKEN,
+        useFactory: async (databaseService) => databaseService,
+        inject: ['DATABASE_PROVIDER'], // Use DatabaseModule's token
       });
 
-      // Register ContentService only when database is configured
-      providers.push(ContentService);
+      // Create a module with the database module included
+      return {
+        module: ContentClassificationModule,
+        imports: [
+          ...imports,
+          DatabaseModule.register({
+            providerType: options.database.providerType,
+            providerOptions: options.database.providerOptions,
+            isGlobal: false, // Keep the database module scoped to this module
+          }),
+        ],
+        controllers: [ContentController],
+        providers,
+        exports: providers,
+        global: options.isGlobal ?? false,
+      };
     }
 
-    const module: DynamicModule = {
+    // Return a module without database if no database options
+    return {
       module: ContentClassificationModule,
       imports,
       controllers: [ContentController],
       providers,
       exports: providers,
+      global: options.isGlobal ?? false,
     };
-
-    // Set module as global if specified
-    if (options?.isGlobal) {
-      module.global = true;
-    }
-
-    return module;
   }
 
   /**

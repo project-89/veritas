@@ -13,8 +13,13 @@ import {
   ContentCreateInput,
   ContentUpdateInput,
 } from './content-validation.service';
-import { DatabaseService, Repository } from '@veritas/database';
-import { ContentModel, ContentSchema } from '../schemas/content.schema';
+import { ContentModel } from '../schemas/content.schema';
+import { DATABASE_PROVIDER_TOKEN } from '../constants';
+
+// Use type-only imports to avoid module resolution issues
+// This only imports the TypeScript types, not the actual implementation
+type DatabaseService = any;
+type Repository<T> = any;
 
 // Content node with classification data
 export interface ExtendedContentNode {
@@ -65,7 +70,7 @@ export class ContentService implements OnModuleInit {
   constructor(
     private readonly classificationService: ContentClassificationService,
     @Optional()
-    @Inject('DATABASE_SERVICE')
+    @Inject(DATABASE_PROVIDER_TOKEN)
     private readonly databaseService?: DatabaseService
   ) {}
 
@@ -91,26 +96,37 @@ export class ContentService implements OnModuleInit {
         throw new Error('Database service required but not provided');
       }
 
-      // Register the content model with the proper Mongoose schema
+      // Check if the database is connected
+      if (!this.databaseService.isConnected()) {
+        this.logger.debug('Database not connected, attempting to connect...');
+        await this.databaseService.connect();
+      }
+
+      // Register the content model with the database
       try {
+        this.logger.debug('Registering Content model with database...');
         this.databaseService.registerModel('Content', ContentModel);
-        this.logger.debug('Content model registered with database service');
+        this.logger.debug('Content model registered successfully');
       } catch (error) {
         this.logger.warn(
-          'Content model already registered or error registering model',
-          error
+          'Content model registration issue',
+          error instanceof Error ? error.message : String(error)
         );
+        // Continue as the model might already be registered
       }
 
       // Get the repository
-      this.contentRepository =
-        this.databaseService.getRepository<ExtendedContentNode>('Content');
+      this.contentRepository = this.databaseService.getRepository('Content');
       this.initialized = true;
-      this.logger.log('Content repository initialized');
-    } catch (error: any) {
+      this.logger.log('Content repository initialized successfully');
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `Failed to initialize content repository: ${error.message}`,
-        error.stack
+        `Failed to initialize content repository: ${errorMessage}`,
+        errorStack
       );
       throw error;
     }
@@ -122,7 +138,7 @@ export class ContentService implements OnModuleInit {
   private ensureInitialized(): void {
     if (!this.initialized || !this.databaseService) {
       throw new Error(
-        'ContentService not initialized with database - use ContentClassificationModule.forRoot() with a databaseProvider'
+        'ContentService not initialized with database - use ContentClassificationModule.forRoot() with a database configuration'
       );
     }
   }
@@ -153,15 +169,15 @@ export class ContentService implements OnModuleInit {
 
     try {
       // Classify the content
+      this.logger.debug(
+        `Classifying content: "${input.text.substring(0, 50)}..."`
+      );
       const classification = await this.classificationService.classifyContent(
         input.text
       );
 
       // Prepare the content object
       const content: Partial<ExtendedContentNode> = {
-        id: input.sourceId
-          ? `${input.sourceId}-${Date.now()}`
-          : `content-${Date.now()}`,
         text: input.text,
         timestamp: input.timestamp,
         platform: input.platform,
@@ -172,20 +188,20 @@ export class ContentService implements OnModuleInit {
           reach: 0,
         },
         classification: this.adaptClassification(classification),
-        metadata: input.metadata,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        metadata: input.metadata || {},
       };
 
       // Save to database
+      this.logger.debug('Saving content to database...');
       const createdContent = await this.contentRepository.create(content);
       this.logger.debug(`Created content with ID: ${createdContent.id}`);
       return createdContent;
-    } catch (error: any) {
-      this.logger.error(
-        `Error creating content: ${error.message}`,
-        error.stack
-      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(`Error creating content: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -198,12 +214,20 @@ export class ContentService implements OnModuleInit {
     this.ensureInitialized();
 
     try {
+      this.logger.debug(`Finding content by ID: ${id}`);
       const content = await this.contentRepository.findById(id);
+      if (!content) {
+        this.logger.debug(`Content with ID ${id} not found`);
+      }
       return content;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `Error finding content by ID ${id}: ${error.message}`,
-        error.stack
+        `Error finding content by ID ${id}: ${errorMessage}`,
+        errorStack
       );
       throw error;
     }
@@ -219,6 +243,9 @@ export class ContentService implements OnModuleInit {
     this.ensureInitialized();
 
     try {
+      this.logger.debug(
+        `Searching content with params: ${JSON.stringify(params)}`
+      );
       const filter: Record<string, any> = {};
 
       // Apply filters based on provided parameters
@@ -255,11 +282,12 @@ export class ContentService implements OnModuleInit {
         `Found ${contents.length} content items matching search criteria`
       );
       return contents;
-    } catch (error: any) {
-      this.logger.error(
-        `Error searching content: ${error.message}`,
-        error.stack
-      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(`Error searching content: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -276,6 +304,8 @@ export class ContentService implements OnModuleInit {
     this.ensureInitialized();
 
     try {
+      this.logger.debug(`Updating content ID: ${id}`);
+
       // Get existing content to update metrics correctly
       const existingContent = await this.getContentById(id);
       if (!existingContent) {
@@ -288,6 +318,12 @@ export class ContentService implements OnModuleInit {
       // If text is updated, reclassify
       let classificationUpdate = undefined;
       if (input.text) {
+        this.logger.debug(
+          `Reclassifying updated content text: "${input.text.substring(
+            0,
+            50
+          )}..."`
+        );
         const classification = await this.classificationService.classifyContent(
           input.text
         );
@@ -295,9 +331,7 @@ export class ContentService implements OnModuleInit {
       }
 
       // Prepare the update
-      const update: Partial<ExtendedContentNode> = {
-        updatedAt: new Date(),
-      };
+      const update: Partial<ExtendedContentNode> = {};
 
       if (input.text) {
         update.text = input.text;
@@ -305,7 +339,7 @@ export class ContentService implements OnModuleInit {
       }
 
       if (input.metadata) {
-        update.metadata = input.metadata;
+        update.metadata = { ...existingContent.metadata, ...input.metadata };
       }
 
       if (input.engagementMetrics) {
@@ -326,18 +360,23 @@ export class ContentService implements OnModuleInit {
         };
       }
 
+      this.logger.debug(`Applying update to content ID: ${id}`);
       const updatedContent = await this.contentRepository.updateById(
         id,
         update
       );
       if (updatedContent) {
-        this.logger.debug(`Updated content with ID: ${id}`);
+        this.logger.debug(`Successfully updated content with ID: ${id}`);
       }
       return updatedContent;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `Error updating content ${id}: ${error.message}`,
-        error.stack
+        `Error updating content ${id}: ${errorMessage}`,
+        errorStack
       );
       throw error;
     }
@@ -351,16 +390,22 @@ export class ContentService implements OnModuleInit {
     this.ensureInitialized();
 
     try {
+      this.logger.debug(`Deleting content ID: ${id}`);
       const result = await this.contentRepository.deleteById(id);
       if (result) {
-        this.logger.debug(`Deleted content with ID: ${id}`);
+        this.logger.debug(`Successfully deleted content with ID: ${id}`);
         return true;
       }
+      this.logger.debug(`Content with ID ${id} not found for deletion`);
       return false;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `Error deleting content ${id}: ${error.message}`,
-        error.stack
+        `Error deleting content ${id}: ${errorMessage}`,
+        errorStack
       );
       throw error;
     }
@@ -378,6 +423,8 @@ export class ContentService implements OnModuleInit {
     this.ensureInitialized();
 
     try {
+      this.logger.debug(`Finding related content for ID: ${id}`);
+
       // Get the source content
       const content = await this.getContentById(id);
       if (!content) {
@@ -402,10 +449,14 @@ export class ContentService implements OnModuleInit {
         `Found ${relatedContent.length} related content items for ID: ${id}`
       );
       return relatedContent;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `Error finding related content for ${id}: ${error.message}`,
-        error.stack
+        `Error finding related content for ${id}: ${errorMessage}`,
+        errorStack
       );
       throw error;
     }

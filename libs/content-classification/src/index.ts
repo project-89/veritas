@@ -23,7 +23,6 @@ export {
 export {
   ContentService,
   ContentSearchParams,
-  DatabaseService,
   ExtendedContentNode,
 } from './lib/services/content.service';
 
