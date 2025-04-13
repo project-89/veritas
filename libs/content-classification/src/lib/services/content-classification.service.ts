@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NlpServiceResponse } from '../types/content.types';
+import * as francMin from 'franc-min';
 
 /**
  * Result of content classification including all analysis aspects
@@ -279,7 +281,9 @@ export class ContentClassificationService {
       const dataArray = await response.json();
 
       // Map each response to our internal format
-      return dataArray.map(this.mapServiceResponseToClassification);
+      return dataArray.map((data) =>
+        this.mapServiceResponseToClassification(data)
+      );
     } catch (error) {
       this.logger.error(
         `External NLP batch service error: ${
@@ -294,7 +298,9 @@ export class ContentClassificationService {
   /**
    * Map external service response to our internal ContentClassification format
    */
-  private mapServiceResponseToClassification(data: any): ContentClassification {
+  private mapServiceResponseToClassification(
+    data: NlpServiceResponse
+  ): ContentClassification {
     // This mapping would be specific to your chosen NLP service
     return {
       categories: data.categories || [],
@@ -307,7 +313,7 @@ export class ContentClassificationService {
       subjectivity: data.subjectivity || 0.5,
       language: data.language || 'en',
       topics: data.topics || [],
-      entities: (data.entities || []).map((entity: any) => ({
+      entities: (data.entities || []).map((entity) => ({
         text: entity.text || '',
         type: entity.type || 'unknown',
         confidence: entity.confidence || 0.5,
@@ -569,19 +575,61 @@ export class ContentClassificationService {
 
   /**
    * Detect language based on character n-gram frequency profiles
-   * This is a simplified implementation - in production use a dedicated library
+   * Uses franc-min library for accurate language detection
    */
   private detectLanguage(text: string): string {
-    // Default to English for simplified implementation
-    // In production, use a library like franc-min or langdetect
-    return 'en';
+    try {
+      // Text needs to be at least a few characters for reliable detection
+      if (text.length < 10) {
+        this.logger.debug(
+          'Text too short for language detection, defaulting to English'
+        );
+        return 'en';
+      }
+
+      // Detect language using franc-min (returns ISO 639-3 codes)
+      const detectedLang = francMin.franc(text);
+
+      // Map ISO 639-3 codes to ISO 639-1 codes for common languages
+      const langMap: Record<string, string> = {
+        eng: 'en', // English
+        spa: 'es', // Spanish
+        fra: 'fr', // French
+        deu: 'de', // German
+        ita: 'it', // Italian
+        por: 'pt', // Portuguese
+        rus: 'ru', // Russian
+        jpn: 'ja', // Japanese
+        zho: 'zh', // Chinese
+        ara: 'ar', // Arabic
+        hin: 'hi', // Hindi
+        kor: 'ko', // Korean
+        nld: 'nl', // Dutch
+        und: 'en', // Undefined (default to English)
+      };
+
+      // Return the mapped language code or the original code if not in the map
+      const mappedLang = langMap[detectedLang] || detectedLang;
+      this.logger.debug(
+        `Detected language: ${mappedLang} (from ${detectedLang})`
+      );
+
+      return mappedLang;
+    } catch (error) {
+      this.logger.warn(
+        `Language detection error: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      // Default to English on error
+      return 'en';
+    }
   }
 
   /**
    * Extract main topics from text using TF-IDF approach
    */
   private extractTopics(text: string): string[] {
-    const topics = new Set<string>();
     const words = text.split(/\s+/);
 
     // Get candidate keywords (remove common stop words)

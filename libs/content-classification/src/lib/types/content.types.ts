@@ -1,6 +1,28 @@
 import { ObjectType, InputType, Field, ID, Float } from '@nestjs/graphql';
 import { ContentClassification } from '../services/content-classification.service';
 
+/**
+ * Interface defining the expected response structure from external NLP services
+ * This matches the structure used in mapServiceResponseToClassification
+ */
+export interface NlpServiceResponse {
+  categories?: string[];
+  sentiment?: {
+    score?: number;
+    label?: string;
+    confidence?: number;
+  };
+  toxicity?: number;
+  subjectivity?: number;
+  language?: string;
+  topics?: string[];
+  entities?: Array<{
+    text?: string;
+    type?: string;
+    confidence?: number;
+  }>;
+}
+
 @ObjectType('EngagementMetrics')
 export class EngagementMetricsType {
   @Field(() => Float)

@@ -112,6 +112,7 @@
     "cheerio": "^1.0.0",
     "d3": "^7.9.0",
     "dotenv-safe": "^9.1.0",
+    "franc-min": "^6.2.0",
     "googleapis": "^148.0.0",
     "graphql": "^16.10.0",
     "mongoose": "^8.13.2",

@@ -3,12 +3,8 @@ import { Optional } from '@nestjs/common';
 import {
   ContentService,
   ExtendedContentNode,
-  ContentSearchParams,
 } from '../services/content.service';
-import {
-  ContentCreateInput,
-  ContentUpdateInput,
-} from '../services/content-validation.service';
+
 import {
   ContentType,
   ContentCreateInputType,

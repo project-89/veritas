@@ -131,6 +131,7 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
       .slice(0, 10); // Top 10 themes
 
     // Create trend objects
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const trends: NarrativeTrend[] = sortedThemes.map(([theme, count]) => {
       // Filter insights related to this theme
       const themeInsights = insights.filter((insight) =>
