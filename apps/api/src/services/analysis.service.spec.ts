@@ -6,7 +6,7 @@ import {
   ExtendedContentNode,
   PatternDetectionResult,
 } from '../modules/analysis/analysis.types';
-import { ContentClassificationService } from '../modules/content/services/content-classification.service';
+import { ContentClassificationService } from '@veritas/content-classification';
 import { ContentNode } from '../schemas/base.schema';
 import { LoggingService } from '../services/logging.service';
 

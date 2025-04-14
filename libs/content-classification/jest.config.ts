@@ -7,4 +7,7 @@ export default {
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/libs/content-classification',
+  transformIgnorePatterns: [
+    '/node_modules/(?!franc-min|trigram-utils).+\\.js$',
+  ],
 };

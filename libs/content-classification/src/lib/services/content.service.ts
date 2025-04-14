@@ -6,10 +6,6 @@ import {
   Optional,
 } from '@nestjs/common';
 import {
-  ContentClassificationService,
-  ContentClassification,
-} from './content-classification.service';
-import {
   ContentCreateInput,
   ContentUpdateInput,
 } from './content-validation.service';
@@ -20,6 +16,25 @@ import { DATABASE_PROVIDER_TOKEN } from '../constants';
 // This only imports the TypeScript types, not the actual implementation
 type DatabaseService = any;
 type Repository<T> = any;
+
+// Define ContentClassification interface locally to avoid importing from service with franc-min dependency
+interface ContentClassification {
+  categories: string[];
+  sentiment: {
+    score: number;
+    label: 'positive' | 'negative' | 'neutral';
+    confidence: number;
+  };
+  toxicity: number;
+  subjectivity: number;
+  language: string;
+  topics: string[];
+  entities: Array<{
+    text: string;
+    type: string;
+    confidence: number;
+  }>;
+}
 
 // Content node with classification data
 export interface ExtendedContentNode {
@@ -68,7 +83,8 @@ export class ContentService implements OnModuleInit {
   private initialized = false;
 
   constructor(
-    private readonly classificationService: ContentClassificationService,
+    @Inject('ContentClassificationService')
+    private readonly classificationService: any,
     @Optional()
     @Inject(DATABASE_PROVIDER_TOKEN)
     private readonly databaseService?: DatabaseService
