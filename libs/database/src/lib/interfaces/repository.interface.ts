@@ -11,6 +11,26 @@ export interface FindOptions {
 }
 
 /**
+ * Options for vector search operations
+ */
+export interface VectorSearchOptions {
+  /** Maximum number of results to return */
+  limit?: number;
+  /** Minimum similarity threshold (0-1) */
+  minScore?: number;
+}
+
+/**
+ * Result of a vector search operation
+ */
+export interface VectorSearchResult<T> {
+  /** The matched item */
+  item: T;
+  /** Similarity score (0-1) */
+  score: number;
+}
+
+/**
  * Generic repository interface for CRUD operations
  */
 export interface Repository<T> {
@@ -86,4 +106,18 @@ export interface Repository<T> {
    * @returns The number of deleted entities
    */
   deleteMany(filter: any): Promise<number>;
+
+  /**
+   * Perform vector similarity search
+   * This is optional and may not be implemented by all repositories
+   * @param field The field containing the vector to search against
+   * @param vector The query vector
+   * @param options Options for the vector search
+   * @returns Array of search results with similarity scores
+   */
+  vectorSearch?<R = T>(
+    field: string,
+    vector: number[],
+    options?: VectorSearchOptions
+  ): Promise<VectorSearchResult<R>[]>;
 }

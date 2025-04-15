@@ -7,8 +7,14 @@ import {
   int,
   isInt,
   Integer,
+  Result,
 } from 'neo4j-driver';
-import { FindOptions, Repository } from '../interfaces/repository.interface';
+import {
+  FindOptions,
+  Repository,
+  VectorSearchOptions,
+  VectorSearchResult,
+} from '../interfaces/repository.interface';
 
 /**
  * Memgraph implementation of the Repository interface
@@ -370,5 +376,166 @@ export class MemgraphRepository<T> implements Repository<T> {
       );
       throw error;
     }
+  }
+
+  // Add vector search capability to MemgraphRepository
+  /**
+   * Perform vector similarity search
+   * Uses Memgraph's vector search capabilities
+   *
+   * @param field The field containing the vector to search against
+   * @param vector The query vector
+   * @param options Options for the vector search
+   * @returns Promise resolving to search results
+   */
+  async vectorSearch<R = T>(
+    field: string,
+    vector: number[],
+    options: VectorSearchOptions = {}
+  ): Promise<VectorSearchResult<R>[]> {
+    const limit = options.limit || 10;
+    const minScore = options.minScore || 0.7;
+
+    try {
+      // Convert vector to string representation for Cypher
+      const vectorStr = JSON.stringify(vector);
+
+      // Cypher query to find similar entities using cosine similarity
+      // This uses a custom function that should be registered in Memgraph
+      const query = `
+        MATCH (n:${this.entityName})
+        WHERE EXISTS(n.${field})
+        WITH n, gds.similarity.cosine(n.${field}, $vector) AS similarity
+        WHERE similarity >= $minScore
+        RETURN n, similarity
+        ORDER BY similarity DESC
+        LIMIT $limit
+      `;
+
+      const params = {
+        vector,
+        minScore,
+        limit,
+      };
+
+      const result = await this.executeQuery(query, params);
+
+      return result.map((record) => ({
+        item: this.recordToEntity(record.get('n')) as unknown as R,
+        score: record.get('similarity'),
+      }));
+    } catch (error) {
+      this.logger.error(
+        `Vector search error: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+
+      // Fall back to in-memory vector search if the Memgraph query fails
+      return this.inMemoryVectorSearch<R>(field, vector, limit, minScore);
+    }
+  }
+
+  /**
+   * In-memory vector search implementation
+   * Used as fallback when Memgraph vector search is not available
+   */
+  private async inMemoryVectorSearch<R>(
+    field: string,
+    vector: number[],
+    limit: number,
+    minScore: number
+  ): Promise<VectorSearchResult<R>[]> {
+    try {
+      // Get all entities with the specified field
+      const query = `
+        MATCH (n:${this.entityName})
+        WHERE EXISTS(n.${field})
+        RETURN n
+      `;
+
+      const records = await this.executeQuery(query);
+      const entities = records.map((record) =>
+        this.recordToEntity(record.get('n'))
+      );
+
+      // Calculate similarity for each entity
+      const results = entities
+        .map((entity) => {
+          const entityVector = this.getNestedProperty(entity, field);
+          if (
+            !Array.isArray(entityVector) ||
+            entityVector.length !== vector.length
+          ) {
+            return null;
+          }
+
+          const similarity = this.calculateCosineSimilarity(
+            vector,
+            entityVector
+          );
+          return {
+            item: entity as unknown as R,
+            score: similarity,
+          };
+        })
+        .filter(
+          (result): result is VectorSearchResult<R> =>
+            result !== null && result.score >= minScore
+        )
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+
+      return results;
+    } catch (error) {
+      this.logger.error(
+        `In-memory vector search error: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Calculate cosine similarity between two vectors
+   */
+  private calculateCosineSimilarity(vecA: number[], vecB: number[]): number {
+    if (vecA.length !== vecB.length) {
+      throw new Error('Vectors must have the same dimensions');
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
+    }
+
+    if (normA === 0 || normB === 0) {
+      return 0;
+    }
+
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  /**
+   * Access nested property in an object using dot notation
+   */
+  private getNestedProperty(obj: any, path: string): any {
+    const parts = path.split('.');
+    let current = obj;
+
+    for (const part of parts) {
+      if (current === null || current === undefined) {
+        return undefined;
+      }
+      current = current[part];
+    }
+
+    return current;
   }
 }

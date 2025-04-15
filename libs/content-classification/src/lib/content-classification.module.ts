@@ -1,5 +1,5 @@
 import { Module, DynamicModule, Provider, Global } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ContentClassificationService } from './services/content-classification.service';
 import { ContentValidationService } from './services/content-validation.service';
 import { ContentService } from './services/content.service';
@@ -7,7 +7,11 @@ import { ContentController } from './controllers/content.controller';
 import { ContentResolver } from './resolvers/content.resolver';
 import { CONTENT_MODEL_NAME } from './models/content.model';
 import { DATABASE_PROVIDER_TOKEN } from './constants';
+import { EmbeddingsService } from './services/embeddings.service';
 
+/**
+ * Module options for ContentClassificationModule
+ */
 export interface ContentClassificationModuleOptions {
   /**
    * Optional database provider configuration
@@ -35,6 +39,31 @@ export interface ContentClassificationModuleOptions {
    * Set module as global
    */
   isGlobal?: boolean;
+
+  /**
+   * Enable embeddings and vector search
+   */
+  enableEmbeddings?: boolean;
+
+  /**
+   * Configuration for embeddings service
+   */
+  embeddings?: {
+    /**
+     * External embedding service endpoint
+     */
+    serviceEndpoint?: string;
+
+    /**
+     * API key for external embedding service
+     */
+    apiKey?: string;
+
+    /**
+     * Embedding vector dimension
+     */
+    dimension?: number;
+  };
 }
 
 /**
@@ -64,10 +93,65 @@ export class ContentClassificationModule {
    * @param options Configuration options
    */
   static forRoot(options?: ContentClassificationModuleOptions): DynamicModule {
-    const providers: Provider[] = [
+    const databaseProvider = options?.database
+      ? {
+          provide: DATABASE_PROVIDER_TOKEN,
+          useFactory: () => {
+            // Dynamically import the required database provider
+            if (options.database.providerType === 'mongodb') {
+              const { MongoDBProvider } = require('@veritas/database');
+              return new MongoDBProvider(options.database.providerOptions);
+            } else if (options.database.providerType === 'memgraph') {
+              const { MemgraphProvider } = require('@veritas/database');
+              return new MemgraphProvider(options.database.providerOptions);
+            } else if (options.database.providerType === 'redis') {
+              const { RedisProvider } = require('@veritas/database');
+              return new RedisProvider(options.database.providerOptions);
+            }
+
+            throw new Error(
+              `Unsupported database provider type: ${options.database.providerType}`
+            );
+          },
+        }
+      : { provide: DATABASE_PROVIDER_TOKEN, useValue: null };
+
+    const providers = [
       ContentClassificationService,
       ContentValidationService,
-      ContentResolver,
+      ContentService,
+      databaseProvider,
+      // Add EmbeddingsService conditionally
+      ...(options?.enableEmbeddings !== false
+        ? [
+            {
+              provide: EmbeddingsService,
+              useFactory: (configService: ConfigService) => {
+                const embeddingsService = new EmbeddingsService(configService);
+
+                // Override config from options if provided
+                if (options?.embeddings?.serviceEndpoint) {
+                  process.env.EMBEDDING_SERVICE_ENDPOINT =
+                    options.embeddings.serviceEndpoint;
+                }
+
+                if (options?.embeddings?.apiKey) {
+                  process.env.EMBEDDING_SERVICE_API_KEY =
+                    options.embeddings.apiKey;
+                }
+
+                if (options?.embeddings?.dimension) {
+                  process.env.EMBEDDING_DIMENSION = String(
+                    options.embeddings.dimension
+                  );
+                }
+
+                return embeddingsService;
+              },
+              inject: [ConfigService],
+            },
+          ]
+        : []),
     ];
 
     // Create the imports array

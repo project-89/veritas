@@ -11,6 +11,7 @@ import {
 } from './content-validation.service';
 import { ContentModel } from '../schemas/content.schema';
 import { DATABASE_PROVIDER_TOKEN } from '../constants';
+import { EmbeddingsService, EmbeddingVector } from './embeddings.service';
 
 // Use type-only imports to avoid module resolution issues
 // This only imports the TypeScript types, not the actual implementation
@@ -87,7 +88,9 @@ export class ContentService implements OnModuleInit {
     private readonly classificationService: any,
     @Optional()
     @Inject(DATABASE_PROVIDER_TOKEN)
-    private readonly databaseService?: DatabaseService
+    private readonly databaseService?: DatabaseService,
+    @Optional()
+    private readonly embeddingsService?: EmbeddingsService
   ) {}
 
   /**
@@ -475,6 +478,386 @@ export class ContentService implements OnModuleInit {
         errorStack
       );
       throw error;
+    }
+  }
+
+  /**
+   * Generate embedding for a content item
+   * @param contentId ID of the content to generate embedding for
+   * @returns The updated content with embedding
+   */
+  async generateEmbedding(
+    contentId: string
+  ): Promise<ExtendedContentNode | null> {
+    this.ensureInitialized();
+
+    if (!this.embeddingsService) {
+      this.logger.warn(
+        'EmbeddingsService not available, cannot generate embeddings'
+      );
+      return null;
+    }
+
+    try {
+      // Get content
+      const content = await this.getContentById(contentId);
+      if (!content) {
+        this.logger.warn(`Content with ID ${contentId} not found`);
+        return null;
+      }
+
+      // Generate embedding
+      const embedding = await this.embeddingsService.generateEmbedding(
+        content.text
+      );
+
+      // Update content with embedding
+      return this.updateEmbedding(contentId, embedding);
+    } catch (error) {
+      this.logger.error(
+        `Error generating embedding for content ${contentId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Update embedding for a content item
+   * @param contentId ID of the content to update
+   * @param embedding The embedding vector
+   * @returns The updated content
+   */
+  private async updateEmbedding(
+    contentId: string,
+    embedding: EmbeddingVector
+  ): Promise<ExtendedContentNode | null> {
+    try {
+      // Update directly in the repository to avoid classification logic
+      const updated = await this.contentRepository.updateById(contentId, {
+        embedding,
+      });
+
+      return updated;
+    } catch (error) {
+      this.logger.error(
+        `Error updating embedding for content ${contentId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Find semantically similar content using vector search
+   * @param contentId ID of the content to find similar items for
+   * @param options Search options
+   * @returns Array of similar content items with similarity scores
+   */
+  async findSimilarContent(
+    contentId: string,
+    options: {
+      limit?: number;
+      minScore?: number;
+      useExistingEmbedding?: boolean;
+    } = {}
+  ): Promise<Array<{ content: ExtendedContentNode; score: number }>> {
+    this.ensureInitialized();
+
+    if (!this.embeddingsService) {
+      this.logger.warn(
+        'EmbeddingsService not available, cannot find similar content'
+      );
+      return [];
+    }
+
+    try {
+      // Get the source content
+      const content = await this.getContentById(contentId);
+      if (!content) {
+        this.logger.warn(`Content with ID ${contentId} not found`);
+        return [];
+      }
+
+      let embedding: EmbeddingVector;
+
+      // Use existing embedding if available and requested
+      if (options.useExistingEmbedding && (content as any).embedding) {
+        embedding = (content as any).embedding;
+      } else {
+        // Generate new embedding
+        embedding = await this.embeddingsService.generateEmbedding(
+          content.text
+        );
+
+        // Save the embedding for future use
+        await this.updateEmbedding(contentId, embedding);
+      }
+
+      // Check if repository supports vector search
+      if (this.contentRepository.vectorSearch) {
+        // Use repository's vector search
+        const results =
+          await this.contentRepository.vectorSearch<ExtendedContentNode>(
+            'embedding',
+            embedding,
+            {
+              limit: options.limit || 10,
+              minScore: options.minScore || 0.7,
+            }
+          );
+
+        // Filter out the source content itself
+        return results
+          .filter((result) => (result.item as any).id !== contentId)
+          .map((result) => ({
+            content: result.item,
+            score: result.score,
+          }));
+      } else {
+        // Use embeddings service's search
+        const results =
+          await this.embeddingsService.searchSimilarContent<ExtendedContentNode>(
+            embedding,
+            {
+              limit: options.limit || 10,
+              minScore: options.minScore || 0.7,
+            }
+          );
+
+        // Filter out the source content itself
+        return results
+          .filter((result) => (result.item as any).id !== contentId)
+          .map((result) => ({
+            content: result.item,
+            score: result.score,
+          }));
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error finding similar content for ${contentId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Search content using text and embeddings
+   * Enhances the existing searchContent method with semantic search capabilities
+   * @param params Search parameters
+   * @param useEmbeddings Whether to use embeddings for semantic search
+   * @returns Array of content items matching the search criteria
+   */
+  async semanticSearchContent(
+    params: ContentSearchParams & {
+      semanticQuery?: string;
+      minScore?: number;
+    },
+    useEmbeddings = true
+  ): Promise<ExtendedContentNode[]> {
+    this.ensureInitialized();
+
+    // If no semantic query or embeddings service not available,
+    // use standard search
+    if (!params.semanticQuery || !useEmbeddings || !this.embeddingsService) {
+      return this.searchContent(params);
+    }
+
+    try {
+      // Generate embedding for the semantic query
+      const embedding = await this.embeddingsService.generateEmbedding(
+        params.semanticQuery
+      );
+
+      // Build combined search approach - first try vector search
+      // if supported by repository
+      if (this.contentRepository.vectorSearch) {
+        // Apply standard filters
+        const filter: Record<string, any> = {};
+
+        if (params.platform) {
+          filter.platform = params.platform;
+        }
+
+        if (params.sourceId) {
+          filter.id = { $regex: new RegExp(`^${params.sourceId}-`) };
+        }
+
+        if (params.startDate || params.endDate) {
+          filter.timestamp = {};
+          if (params.startDate) {
+            filter.timestamp.$gte = params.startDate;
+          }
+          if (params.endDate) {
+            filter.timestamp.$lte = params.endDate;
+          }
+        }
+
+        // Perform vector search with filters
+        const results =
+          await this.contentRepository.vectorSearch<ExtendedContentNode>(
+            'embedding',
+            embedding,
+            {
+              limit: params.limit || 20,
+              minScore: params.minScore || 0.7,
+            }
+          );
+
+        // If we have exact-match query too, boost items that match both
+        if (params.query) {
+          const textResults = await this.searchContent({
+            ...params,
+            limit: 100, // Get more items to have better chance of overlap
+          });
+
+          const textResultIds = new Set(textResults.map((item) => item.id));
+
+          // Boost items that match both text and semantic search
+          return results
+            .sort((a, b) => {
+              const aMatchesText = textResultIds.has((a.item as any).id)
+                ? 1
+                : 0;
+              const bMatchesText = textResultIds.has((b.item as any).id)
+                ? 1
+                : 0;
+
+              // First sort by text match, then by similarity score
+              return bMatchesText - aMatchesText || b.score - a.score;
+            })
+            .map((result) => result.item)
+            .slice(0, params.limit || 20);
+        }
+
+        // Return vector search results
+        return results.map((result) => result.item);
+      } else {
+        // Fall back to traditional search if vector search not available
+        const results = await this.searchContent(params);
+
+        // If we have embedding service, re-rank results by similarity
+        const scoredResults = await Promise.all(
+          results.map(async (item) => {
+            // Get or generate item embedding
+            let itemEmbedding: EmbeddingVector;
+            if ((item as any).embedding) {
+              itemEmbedding = (item as any).embedding;
+            } else {
+              itemEmbedding = await this.embeddingsService!.generateEmbedding(
+                item.text
+              );
+              // Store for future use
+              await this.updateEmbedding(item.id, itemEmbedding);
+            }
+
+            // Calculate similarity
+            const score = this.embeddingsService!.calculateSimilarity(
+              embedding,
+              itemEmbedding
+            );
+            return { item, score };
+          })
+        );
+
+        // Filter by minimum score and sort by similarity
+        return scoredResults
+          .filter((result) => result.score >= (params.minScore || 0.7))
+          .sort((a, b) => b.score - a.score)
+          .map((result) => result.item);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error in semantic search: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined
+      );
+
+      // Fall back to standard search on error
+      return this.searchContent(params);
+    }
+  }
+
+  /**
+   * Generate embeddings for all content without them
+   * This is useful for bulk processing existing content
+   * @param batchSize Size of batches to process
+   * @returns Number of items processed
+   */
+  async generateAllEmbeddings(batchSize = 50): Promise<number> {
+    this.ensureInitialized();
+
+    if (!this.embeddingsService) {
+      this.logger.warn(
+        'EmbeddingsService not available, cannot generate embeddings'
+      );
+      return 0;
+    }
+
+    try {
+      // Find content without embeddings
+      const filter = { embedding: { $exists: false } };
+      const totalCount = await this.contentRepository.count(filter);
+
+      this.logger.log(`Found ${totalCount} content items without embeddings`);
+
+      if (totalCount === 0) {
+        return 0;
+      }
+
+      let processedCount = 0;
+      let currentOffset = 0;
+
+      // Process in batches
+      while (currentOffset < totalCount) {
+        // Get batch
+        const contentBatch = await this.contentRepository.find(filter, {
+          skip: currentOffset,
+          limit: batchSize,
+        });
+
+        if (contentBatch.length === 0) {
+          break;
+        }
+
+        // Generate embeddings for batch
+        const textBatch = contentBatch.map((item) => item.text);
+        const embeddings = await this.embeddingsService.batchGenerateEmbeddings(
+          textBatch
+        );
+
+        // Update each item with its embedding
+        const updatePromises = contentBatch.map((item, index) =>
+          this.updateEmbedding(item.id, embeddings[index])
+        );
+
+        await Promise.all(updatePromises);
+
+        processedCount += contentBatch.length;
+        currentOffset += batchSize;
+
+        this.logger.log(
+          `Processed ${processedCount}/${totalCount} content items`
+        );
+      }
+
+      return processedCount;
+    } catch (error) {
+      this.logger.error(
+        `Error generating all embeddings: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        error instanceof Error ? error.stack : undefined
+      );
+      return 0;
     }
   }
 }

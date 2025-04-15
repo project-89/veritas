@@ -26,6 +26,14 @@ export {
   ExtendedContentNode,
 } from './lib/services/content.service';
 
+// Export EmbeddingsService
+export {
+  EmbeddingsService,
+  EmbeddingVector,
+  VectorSearchResult,
+  VectorSearchOptions,
+} from './lib/services/embeddings.service';
+
 // Export the controller
 export { ContentController } from './lib/controllers/content.controller';
 

@@ -87,6 +87,9 @@ export class ContentSchema extends Document {
   @Prop({ type: Object })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
+
+  @Prop({ type: [Number], index: false, sparse: true })
+  embedding?: number[];
 }
 
 // Create the Mongoose model from the schema
@@ -100,3 +103,22 @@ ContentModel.index({ platform: 1, timestamp: -1 });
 
 // Add index for topic search
 ContentModel.index({ 'classification.topics': 1 });
+
+// Add embedding index for vector similarity search if MongoDB supports it
+// Note: This requires MongoDB 5.0+ with Atlas Vector Search or similar capability
+// The index creation will fail silently on unsupported MongoDB versions
+try {
+  ContentModel.index(
+    { embedding: 'vector' },
+    {
+      name: 'embedding_vector_index',
+      vectorOptions: {
+        dimension: 384, // Default dimension, should match your embedding model
+        similarity: 'cosine',
+      },
+    }
+  );
+} catch (error) {
+  // Vector index not supported in this MongoDB version
+  // Will use fallback search methods instead
+}

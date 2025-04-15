@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisClientType } from 'redis';
 import { v4 as uuidv4 } from 'uuid';
-import { FindOptions, Repository } from '../interfaces/repository.interface';
+import {
+  FindOptions,
+  Repository,
+  VectorSearchOptions,
+  VectorSearchResult,
+} from '../interfaces/repository.interface';
 
 /**
  * Redis implementation of the Repository interface
