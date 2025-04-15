@@ -46,6 +46,8 @@ export {
   ContentCreateInputType,
   ContentUpdateInputType,
   ContentSearchParamsType,
+  SemanticSearchParamsType,
+  SimilarContentResultType,
   EngagementMetricsType,
   ContentClassificationType,
   EntityType,

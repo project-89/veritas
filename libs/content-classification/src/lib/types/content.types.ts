@@ -172,3 +172,30 @@ export class ContentSearchParamsType {
   @Field(() => Float, { nullable: true })
   offset?: number;
 }
+
+/**
+ * Input type for semantic search that extends regular content search
+ */
+@InputType('SemanticSearchParams')
+export class SemanticSearchParamsType extends ContentSearchParamsType {
+  @Field({ description: 'Semantic query text for vector similarity search' })
+  semanticQuery: string;
+
+  @Field(() => Float, {
+    nullable: true,
+    description: 'Minimum similarity score threshold (0-1)',
+  })
+  minScore?: number;
+}
+
+/**
+ * Object type for content with similarity score
+ */
+@ObjectType('SimilarContentResult')
+export class SimilarContentResultType {
+  @Field(() => ContentType)
+  content: ContentType;
+
+  @Field(() => Float, { description: 'Similarity score between 0-1' })
+  score: number;
+}

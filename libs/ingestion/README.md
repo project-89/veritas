@@ -1,154 +1,200 @@
 # Veritas Ingestion Library
 
-## Overview
+The Ingestion Library is a core component of the Veritas system responsible for collecting, transforming, and storing data from various sources while ensuring data privacy and compliance through a transform-on-ingest pattern.
 
-The Ingestion library is responsible for data ingestion from various social media platforms and implementing the transform-on-ingest architecture for privacy-focused data processing.
+## Features
 
-## Key Components
+- **Transform-on-ingest** pattern ensuring data privacy at the edge
+- Multiple data connectors for different platforms:
+  - Social media (Twitter, Facebook, Reddit)
+  - RSS feeds
+  - Web scraping
+  - YouTube
+- Content classification and entity recognition
+- Secure one-way hashing of personally identifiable information (PII)
+- Automatic data lifecycle management with configurable retention periods
+- Streaming and batch processing capabilities
+- Narrative trend detection and analysis
 
-### Modules
+## Architecture Overview
 
-- **IngestionModule**: The main module that coordinates ingestion activities
-- **TransformOnIngestModule**: Implements the transform-on-ingest pattern
-- **NarrativeModule**: Manages narrative insights derived from ingested data
+The Ingestion Library follows a modular architecture centered around the transform-on-ingest pattern. This pattern ensures that any sensitive or personally identifiable information is anonymized at the very beginning of the data pipeline, before storage.
 
-### Connectors
+### Key Components
 
-The library includes connectors for various social media platforms:
+1. **Data Connectors**: Connect to various data sources and retrieve raw data
+2. **TransformOnIngestService**: Transforms raw data into anonymized insights
+3. **NarrativeRepository**: Stores and retrieves transformed insights
+4. **ContentClassificationService**: Analyzes and classifies content
 
-- **FacebookConnector**: Facebook data ingestion
-- **TwitterConnector**: Twitter data ingestion
-- **RedditConnector**: Reddit data ingestion
-- **RSSConnector**: RSS/Atom feed ingestion
-- **WebScraperConnector**: Web content scraping 
-- **YouTubeConnector**: YouTube comment scraping
+### Transform-on-Ingest Pattern
 
-Each connector implements both raw data retrieval and immediate transformation methods.
+The transform-on-ingest pattern is a privacy-first approach that follows these steps:
 
-### Repository Layer
+1. Raw data is collected from the source
+2. Sensitive information is immediately transformed:
+   - Content is classified and key features extracted
+   - One-way hashing is applied to identifiable information
+   - Data is normalized and standardized
+3. Only transformed, anonymized data is stored
+4. Raw data is discarded
 
-- **NarrativeRepository**: An abstract repository for narrative insights
-- **InMemoryNarrativeRepository**: A reference implementation for development
-- **MongoNarrativeRepository**: A production-ready MongoDB implementation with optimized queries, indices, and trend caching
+This approach ensures compliance with privacy regulations and reduces risk by ensuring that sensitive information never reaches persistent storage.
 
-### Transform Services
+## Getting Started
 
-- **TransformOnIngestService**: Core service for transforming raw social media data into anonymized narrative insights
+### Installation
 
-## Architecture
+```bash
+# Install dependencies
+npm install
 
-This library follows the "transform-on-ingest" architecture, which ensures:
+# Build the library
+npx nx build ingestion
+```
 
-1. No raw identifiable data is stored in the system
-2. All data is anonymized at the edge
-3. Only transformed insights are persisted
+### Usage
 
-## Usage
-
-Import the modules in your NestJS application:
+#### Basic Module Registration
 
 ```typescript
-import { IngestionModule, TransformOnIngestModule, NarrativeModule } from '@veritas/ingestion';
+// In your app module
+import { Module } from '@nestjs/common';
+import { IngestionModule } from '@veritas/ingestion';
 
 @Module({
   imports: [
-    IngestionModule,
-    TransformOnIngestModule,
-    // Use in-memory repository (default for development)
-    NarrativeModule.forRoot({ repositoryType: 'memory' }),
-    
-    // OR use MongoDB repository for production
-    // NarrativeModule.forRoot({ repositoryType: 'mongodb' }),
+    IngestionModule.register(), // Use default configuration
   ],
 })
 export class AppModule {}
 ```
 
-## Directory Structure
+#### Advanced Configuration
 
-The library follows a clean, modular organization:
+```typescript
+// In your app module
+import { Module } from '@nestjs/common';
+import { IngestionModule } from '@veritas/ingestion';
+import { DatabaseModule, DatabaseService } from '@veritas/database';
 
-- `src/lib/modules/`: Module definitions for the library
-  - `ingestion.module.ts`: Main module for content ingestion
-  - `narrative.module.ts`: Module for narrative processing
-  - `transform-on-ingest.module.ts`: Module for transformation during ingestion
-  - `module-resolver.ts`: Utilities for dynamic module resolution
+@Module({
+  imports: [
+    DatabaseModule.register({
+      providerType: 'mongodb',
+      providerOptions: {
+        uri: process.env.MONGODB_URI || 'mongodb://localhost:27017',
+        databaseName: 'veritas',
+      },
+    }),
+    IngestionModule.forRoot({
+      repositoryType: 'mongodb', // Use MongoDB for storage
+      connectors: {
+        twitter: true,
+        facebook: true,
+        reddit: true,
+        rss: false, // Disable RSS connector
+        webScraper: false, // Disable web scraper
+        youtube: true,
+      },
+      isGlobal: true, // Register as global module
+    }),
+  ],
+})
+export class AppModule {}
+```
 
-- `src/lib/controllers/`: API controllers
-  - `ingestion.controller.ts`: Handles content ingestion endpoints
-  - `narrative.controller.ts`: Handles narrative insight endpoints
+### Using the Ingestion Service
 
-- `src/lib/services/`: Service implementations
-  - `facebook.connector.ts`, `twitter.connector.ts`, `reddit.connector.ts`: Platform-specific connectors
-  - `social-media.service.ts`: Common service for social media operations
-  - `transform/transform-on-ingest.service.ts`: Service for transforming content during ingestion
+```typescript
+import { Injectable } from '@nestjs/common';
+import { IngestionService, NarrativeInsight } from '@veritas/ingestion';
 
-- `src/lib/repositories/`: Data access layer
-  - `narrative-insight.repository.ts`: Repository for narrative insights
-  - `mongo-narrative.repository.ts`: MongoDB implementation of the repository
+@Injectable()
+export class YourService {
+  constructor(private readonly ingestionService: IngestionService) {}
 
-- `src/lib/resolvers/`: GraphQL resolvers
-  - `ingestion.resolver.ts`: GraphQL resolver for ingestion operations
+  async searchForContent(query: string): Promise<NarrativeInsight[]> {
+    // Search across all platforms and transform the results
+    return this.ingestionService.searchAndTransformAll(query, {
+      platforms: ['twitter', 'facebook'],
+      limit: 100,
+    });
+  }
+  
+  // Get a specific connector if needed
+  async getTwitterTrends() {
+    const connector = this.ingestionService.getConnector('twitter');
+    if (connector) {
+      // Use connector directly
+    }
+  }
+}
+```
 
-- `src/lib/interfaces/`: Interface definitions
-  - `narrative-insight.interface.ts`: Defines narrative insight structures
-  - `transform-on-ingest-connector.interface.ts`: Interface for transformation connectors
-  - `social-media-connector.interface.ts`: Interface for social media platform connectors
+## API Reference
 
-- `src/lib/types/`: Type definitions
-  - `ingestion.types.ts`: Types for ingestion operations
-  - `graphql.types.ts`: GraphQL type definitions
+### IngestionModule
 
-- `src/lib/schemas/`: Schema definitions
+- `register()`: Register with default configuration
+- `forRoot(options)`: Register with custom configuration
 
-- `src/lib/__mocks__/`: Mock implementations for testing
+### IngestionService
+
+- `getConnector(platform)`: Get a specific connector by platform
+- `getAllConnectors()`: Get all registered connectors
+- `searchAndTransformAll(query, options)`: Search and transform data from all registered connectors
+
+### TransformOnIngestService
+
+- `transform(post)`: Transform a social media post into an anonymized insight
+- `transformBatch(posts)`: Transform multiple posts in a batch operation
+
+### Data Connectors
+
+All connectors implement the `DataConnector` interface with these methods:
+
+- `connect()`: Connect to the data source
+- `disconnect()`: Disconnect from the data source
+- `searchAndTransform(query, options)`: Search for content and transform results
+- `streamAndTransform(keywords)`: Stream content matching keywords and transform in real-time
+- `getAuthorDetails(authorId)`: Get anonymized details about a content author
 
 ## Configuration
 
-The modules in this library require various configurations:
+Configure the library through environment variables:
 
-- Kafka service for event messaging
-- Social media API credentials (configured via environment variables)
-- Database connections:
-  - MongoDB (when using the MongoDB repository implementation)
-  - Memgraph (for graph-based analysis)
+```
+# Data Source API Keys
+TWITTER_BEARER_TOKEN=your_twitter_token
+FACEBOOK_ACCESS_TOKEN=your_facebook_token
+REDDIT_CLIENT_ID=your_reddit_client_id
+REDDIT_CLIENT_SECRET=your_reddit_client_secret
+YOUTUBE_API_KEY=your_youtube_key
 
-## MongoDB Setup
+# Transformation Configuration
+HASH_SALT=random_secure_salt_string
+RETENTION_PERIOD_DAYS=90
 
-When using the MongoDB repository, you can use the provided Docker Compose file:
-
-```bash
-# Start MongoDB and Mongo Express
-docker-compose -f docker-compose.mongodb.yml up -d
-
-# Access Mongo Express UI at http://localhost:8081
+# Database Configuration
+MONGODB_URI=mongodb://localhost:27017/veritas
 ```
 
-Environmental variables for MongoDB:
-- `MONGO_URI`: Connection string (default: mongodb://localhost:27017/veritas)
+## Best Practices
 
-See the example application in `examples/narrative-repository/mongo-sample-app.ts` for a complete working example.
+1. **Privacy First**: Always use the transform-on-ingest pattern for external data
+2. **Batch Operations**: Use batch transformation when processing multiple items
+3. **Error Handling**: Implement proper error handling for connector failures
+4. **Monitoring**: Monitor connector health and authentication status
+5. **Rate Limiting**: Be aware of API rate limits for different platforms
 
-## Testing and Examples
+## Contributing
 
-### MongoDB Repository Example
+1. Ensure all new connectors implement the `DataConnector` interface
+2. Follow the transform-on-ingest pattern for all data sources
+3. Add tests for all new functionality
+4. Document new features and connectors
 
-A direct example of MongoDB repository functionality is available in the `examples/narrative-repository/mongo-direct-example.sh` script. This script demonstrates:
+## License
 
-1. Starting MongoDB containers
-2. Creating a test narrative insight
-3. Storing it in the MongoDB database
-4. Querying the stored insights
-
-To run the example:
-
-```bash
-chmod +x examples/narrative-repository/mongo-direct-example.sh
-./examples/narrative-repository/mongo-direct-example.sh
-```
-
-For detailed documentation on setting up and using the MongoDB repository implementation, see [MongoDB Repository Setup](../../docs/development/mongodb-repository-setup.md).
-
-## Development
-
-This library is part of the Veritas NX monorepo. See the main README for development instructions. 
+MIT 
