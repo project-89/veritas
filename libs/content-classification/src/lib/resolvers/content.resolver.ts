@@ -1,8 +1,14 @@
 import { Resolver, Query, Mutation, Args, Int, Float } from '@nestjs/graphql';
-import { Optional } from '@nestjs/common';
+import {
+  Injectable,
+  Optional,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import {
   ContentService,
   ExtendedContentNode,
+  ContentSearchParams,
 } from '../services/content.service';
 
 import {
@@ -93,20 +99,20 @@ export class ContentResolver {
   ): Promise<ExtendedContentNode[]> {
     this.ensureContentService();
 
-    return this.contentService.semanticSearchContent(
-      {
-        query: params.query,
-        platform: params.platform,
-        startDate: params.startDate,
-        endDate: params.endDate,
-        sourceId: params.sourceId,
-        limit: params.limit,
-        offset: params.offset,
-        semanticQuery: params.semanticQuery,
-        minScore: params.minScore,
-      },
-      true // use embeddings for semantic search
-    );
+    // Convert SemanticSearchParamsType to ContentSearchParams
+    const searchParams: ContentSearchParams = {
+      query: params.query,
+      platform: params.platform,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      sourceId: params.sourceId,
+      limit: params.limit,
+      offset: params.offset,
+      semanticQuery: params.semanticQuery,
+      minScore: params.minScore,
+    };
+
+    return this.contentService.semanticSearchContent(searchParams, true);
   }
 
   @Query(() => [SimilarContentResultType])

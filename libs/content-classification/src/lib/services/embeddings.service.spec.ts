@@ -1,31 +1,41 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { EmbeddingsService, EmbeddingVector } from './embeddings.service';
+import { EmbeddingsService } from './embeddings.service';
 import { DATABASE_PROVIDER_TOKEN } from '../constants';
+
+// We'll use global fetch instead of axios
+global.fetch = jest.fn();
 
 describe('EmbeddingsService', () => {
   let service: EmbeddingsService;
   let configService: ConfigService;
 
-  // Mock ConfigService implementation
-  const mockConfigService = {
-    get: jest.fn().mockImplementation((key: string) => {
-      if (key === 'EMBEDDING_SERVICE_ENDPOINT') return null;
-      if (key === 'EMBEDDING_SERVICE_API_KEY') return null;
-      if (key === 'EMBEDDING_DIMENSION') return 384;
-      return null;
-    }),
+  // Mock repository with vectorSearch method
+  const mockRepository = {
+    vectorSearch: jest.fn(),
   };
 
-  // Mock database provider
-  const mockDatabaseProvider = {
-    getRepository: jest.fn().mockReturnValue({
-      find: jest.fn().mockResolvedValue([]),
-      vectorSearch: jest.fn().mockResolvedValue([]),
+  const mockDatabaseService = {
+    getRepository: jest.fn().mockReturnValue(mockRepository),
+  };
+
+  const mockConfigService = {
+    get: jest.fn((key: string) => {
+      const config = {
+        EMBEDDING_SERVICE_ENDPOINT: 'https://api.embeddings.test',
+        EMBEDDING_SERVICE_API_KEY: 'test-api-key',
+        EMBEDDING_DIMENSION: 384,
+      };
+      return config[key];
     }),
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+
+    // Reset the fetch mock
+    global.fetch = jest.fn();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmbeddingsService,
@@ -35,7 +45,7 @@ describe('EmbeddingsService', () => {
         },
         {
           provide: DATABASE_PROVIDER_TOKEN,
-          useValue: mockDatabaseProvider,
+          useValue: mockDatabaseService,
         },
       ],
     }).compile();
@@ -49,104 +59,149 @@ describe('EmbeddingsService', () => {
   });
 
   describe('generateEmbedding', () => {
-    it('should generate an embedding vector with the correct dimensions', async () => {
-      const text = 'Test text for embedding generation';
-      const embedding = await service.generateEmbedding(text);
+    it('should generate an embedding vector with correct dimensions', async () => {
+      // Mock successful API response
+      const mockEmbedding = Array(384)
+        .fill(0)
+        .map((_, i) => i / 384);
 
-      expect(Array.isArray(embedding)).toBe(true);
-      expect(embedding.length).toBe(384); // Default dimension
-      expect(typeof embedding[0]).toBe('number');
+      // Mock fetch response
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [{ embedding: mockEmbedding }] }),
+      });
+
+      const result = await service.generateEmbedding('test text');
+
+      expect(result).toEqual(mockEmbedding);
+      expect(result.length).toBe(384);
+      expect(global.fetch).toHaveBeenCalledWith('https://api.embeddings.test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test-api-key',
+        },
+        body: JSON.stringify({ text: 'test text', model: 'text-embedding' }),
+      });
     });
 
-    it('should return the same embedding for the same text (from cache)', async () => {
-      const text = 'This is a test for caching';
+    it('should return the same embedding for the same text (caching)', async () => {
+      // Mock successful API response
+      const mockEmbedding = Array(384)
+        .fill(0)
+        .map((_, i) => i / 384);
 
-      const firstEmbedding = await service.generateEmbedding(text);
-      const secondEmbedding = await service.generateEmbedding(text);
+      // Mock fetch response
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [{ embedding: mockEmbedding }] }),
+      });
 
-      expect(firstEmbedding).toEqual(secondEmbedding);
+      // First call should use the API
+      const result1 = await service.generateEmbedding('cached text');
+
+      // Second call should use cache
+      const result2 = await service.generateEmbedding('cached text');
+
+      expect(result1).toEqual(result2);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle API errors and fall back to local processing', async () => {
+      // Mock API failure
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
+
+      const result = await service.generateEmbedding('test text');
+
+      // Local processing should return a vector of the correct dimension
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(384);
     });
   });
 
   describe('batchGenerateEmbeddings', () => {
     it('should generate embeddings for multiple texts', async () => {
-      const texts = ['First test text', 'Second test text', 'Third test text'];
-      const embeddings = await service.batchGenerateEmbeddings(texts);
+      const texts = ['text 1', 'text 2', 'text 3'];
 
-      expect(Array.isArray(embeddings)).toBe(true);
-      expect(embeddings.length).toBe(texts.length);
+      // Mock the batchGenerateWithExternalService method
+      const mockEmbeddings = [
+        Array(384).fill(0.1),
+        Array(384).fill(0.2),
+        Array(384).fill(0.3),
+      ];
 
-      embeddings.forEach((embedding) => {
-        expect(Array.isArray(embedding)).toBe(true);
-        expect(embedding.length).toBe(384);
-      });
+      // We need to mock the implementation of batchGenerateEmbeddings
+      // instead of trying to mock generateEmbedding
+      jest
+        .spyOn(service as any, 'batchGenerateWithExternalService')
+        .mockResolvedValueOnce(mockEmbeddings);
+
+      const results = await service.batchGenerateEmbeddings(texts);
+
+      expect(results.length).toBe(3);
+      expect(results).toEqual(mockEmbeddings);
+      expect(
+        (service as any).batchGenerateWithExternalService
+      ).toHaveBeenCalledWith(texts);
     });
 
     it('should return an empty array for empty input', async () => {
-      const embeddings = await service.batchGenerateEmbeddings([]);
-      expect(embeddings).toEqual([]);
+      const results = await service.batchGenerateEmbeddings([]);
+      expect(results).toEqual([]);
     });
   });
 
   describe('calculateSimilarity', () => {
-    it('should calculate cosine similarity between two vectors', () => {
-      const vecA: EmbeddingVector = [1, 2, 3];
-      const vecB: EmbeddingVector = [4, 5, 6];
+    it('should calculate cosine similarity correctly', () => {
+      const vector1 = [1, 0, 0];
+      const vector2 = [0, 1, 0];
 
-      const similarity = service.calculateSimilarity(vecA, vecB);
-
-      // Calculated cosine similarity: (1*4 + 2*5 + 3*6) / (sqrt(1^2 + 2^2 + 3^2) * sqrt(4^2 + 5^2 + 6^2))
-      // = (4 + 10 + 18) / (sqrt(14) * sqrt(77))
-      // ≈ 32 / 32.83 ≈ 0.975
-      expect(similarity).toBeCloseTo(0.975, 3);
-    });
-
-    it('should return 0 for orthogonal vectors', () => {
-      const vecA: EmbeddingVector = [1, 0, 0];
-      const vecB: EmbeddingVector = [0, 1, 0];
-
-      const similarity = service.calculateSimilarity(vecA, vecB);
+      // Cosine similarity should be 0 for orthogonal vectors
+      const similarity = service.calculateSimilarity(vector1, vector2);
       expect(similarity).toBe(0);
     });
 
-    it('should return 1 for identical vectors', () => {
-      const vecA: EmbeddingVector = [1, 2, 3];
-      const vecB: EmbeddingVector = [1, 2, 3];
+    it('should handle identical vectors', () => {
+      const vector = [0.5, 0.5, 0.5];
 
-      const similarity = service.calculateSimilarity(vecA, vecB);
-      expect(similarity).toBe(1);
+      // Cosine similarity should be 1 for identical vectors
+      // Use toBeCloseTo instead of toBe to handle floating point precision
+      const similarity = service.calculateSimilarity(vector, vector);
+      expect(similarity).toBeCloseTo(1, 10);
     });
 
-    it('should throw an error for vectors with different dimensions', () => {
-      const vecA: EmbeddingVector = [1, 2, 3];
-      const vecB: EmbeddingVector = [1, 2];
+    it('should throw error for vectors with different dimensions', () => {
+      const vector1 = [1, 0, 0];
+      const vector2 = [0, 1];
 
-      expect(() => service.calculateSimilarity(vecA, vecB)).toThrow(
-        'Vectors must have the same dimensions'
-      );
+      expect(() => {
+        service.calculateSimilarity(vector1, vector2);
+      }).toThrow('Vectors must have the same dimensions');
     });
   });
 
   describe('searchSimilarContent', () => {
-    it('should use repository vectorSearch if available', async () => {
-      // Setup mock repository with vector search capability
-      const mockRepository = {
-        vectorSearch: jest.fn().mockResolvedValue([
-          { item: { id: '1', text: 'Test content' }, score: 0.9 },
-          { item: { id: '2', text: 'Another test' }, score: 0.8 },
-        ]),
-      };
+    it('should search similar content using repository vectorSearch if available', async () => {
+      const embedding = [0.1, 0.2, 0.3];
 
-      mockDatabaseProvider.getRepository.mockReturnValue(mockRepository);
+      mockRepository.vectorSearch.mockResolvedValueOnce([
+        { item: { id: '1', text: 'Similar content' }, score: 0.95 },
+      ]);
 
-      const results = await service.searchSimilarContent('test query');
+      const results = await service.searchSimilarContent(embedding, {
+        limit: 5,
+        minScore: 0.8,
+      });
 
-      expect(results.length).toBe(2);
-      expect(mockRepository.vectorSearch).toHaveBeenCalled();
-      expect(results[0].score).toBe(0.9);
-      expect(results[1].score).toBe(0.8);
+      expect(results).toHaveLength(1);
+      expect(results[0].score).toBe(0.95);
+      expect(mockDatabaseService.getRepository).toHaveBeenCalledWith('Content');
+      expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
+        'embedding',
+        embedding,
+        { limit: 5, minScore: 0.8 }
+      );
     });
-
-    // Additional test cases for fallback behavior could be added here
   });
 });

@@ -88,7 +88,7 @@ export class ContentSchema extends Document {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 
-  @Prop({ type: [Number], index: false, sparse: true })
+  @Prop({ type: [Number] })
   embedding?: number[];
 }
 
@@ -106,19 +106,19 @@ ContentModel.index({ 'classification.topics': 1 });
 
 // Add embedding index for vector similarity search if MongoDB supports it
 // Note: This requires MongoDB 5.0+ with Atlas Vector Search or similar capability
-// The index creation will fail silently on unsupported MongoDB versions
-try {
-  ContentModel.index(
-    { embedding: 'vector' },
-    {
-      name: 'embedding_vector_index',
-      vectorOptions: {
-        dimension: 384, // Default dimension, should match your embedding model
-        similarity: 'cosine',
-      },
-    }
-  );
-} catch (error) {
-  // Vector index not supported in this MongoDB version
-  // Will use fallback search methods instead
-}
+// Vector indexes should be created programmatically in your application initialization:
+//
+// Example of creating a vector index in MongoDB Atlas:
+// db.content.createIndex(
+//   { embedding: "vector" },
+//   {
+//     name: "embedding_vector_index",
+//     vectorOptions: {
+//       dimension: 384,
+//       similarity: "cosine"
+//     }
+//   }
+// )
+//
+// For NestJS applications, this should be handled in a separate initialization service
+// that runs on application startup, not directly in the schema definition.

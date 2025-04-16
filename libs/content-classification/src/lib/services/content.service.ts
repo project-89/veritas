@@ -11,7 +11,13 @@ import {
 } from './content-validation.service';
 import { ContentModel } from '../schemas/content.schema';
 import { DATABASE_PROVIDER_TOKEN } from '../constants';
-import { EmbeddingsService, EmbeddingVector } from './embeddings.service';
+import {
+  EmbeddingsService,
+  EmbeddingVector,
+  VectorSearchOptions,
+} from './embeddings.service';
+import { VectorSearchResult } from '../../index';
+import { CONTENT_COLLECTION_NAME } from '../models/content.model';
 
 // Use type-only imports to avoid module resolution issues
 // This only imports the TypeScript types, not the actual implementation
@@ -72,6 +78,8 @@ export interface ContentSearchParams {
   sourceId?: string;
   limit?: number;
   offset?: number;
+  semanticQuery?: string; // For semantic search
+  minScore?: number; // For similarity threshold
 }
 
 /**
@@ -553,9 +561,9 @@ export class ContentService implements OnModuleInit {
   }
 
   /**
-   * Find semantically similar content using vector search
-   * @param contentId ID of the content to find similar items for
-   * @param options Search options
+   * Find content items similar to the specified content ID using vector search
+   * @param contentId The ID of the content to find similar items for
+   * @param options Options for the similarity search
    * @returns Array of similar content items with similarity scores
    */
   async findSimilarContent(
@@ -566,222 +574,227 @@ export class ContentService implements OnModuleInit {
       useExistingEmbedding?: boolean;
     } = {}
   ): Promise<Array<{ content: ExtendedContentNode; score: number }>> {
-    this.ensureInitialized();
-
-    if (!this.embeddingsService) {
-      this.logger.warn(
-        'EmbeddingsService not available, cannot find similar content'
-      );
-      return [];
-    }
-
     try {
-      // Get the source content
       const content = await this.getContentById(contentId);
       if (!content) {
         this.logger.warn(`Content with ID ${contentId} not found`);
-        return [];
+        return []; // Return empty array instead of throwing
       }
 
-      let embedding: EmbeddingVector;
-
-      // Use existing embedding if available and requested
-      if (options.useExistingEmbedding && (content as any).embedding) {
-        embedding = (content as any).embedding;
-      } else {
-        // Generate new embedding
+      // Use existing embedding if available and requested, otherwise generate new one
+      let embedding: number[] = (content as any).embedding;
+      if (!embedding || !options.useExistingEmbedding) {
         embedding = await this.embeddingsService.generateEmbedding(
           content.text
         );
-
-        // Save the embedding for future use
-        await this.updateEmbedding(contentId, embedding);
       }
 
-      // Check if repository supports vector search
-      if (this.contentRepository.vectorSearch) {
-        // Use repository's vector search
-        const results =
-          await this.contentRepository.vectorSearch<ExtendedContentNode>(
-            'embedding',
-            embedding,
-            {
-              limit: options.limit || 10,
-              minScore: options.minScore || 0.7,
-            }
-          );
+      // Return empty array if no embedding could be generated
+      if (!embedding || embedding.length === 0) {
+        this.logger.warn(
+          `Unable to generate embedding for content ${contentId}`
+        );
+        return [];
+      }
 
-        // Filter out the source content itself
-        return results
-          .filter((result) => (result.item as any).id !== contentId)
-          .map((result) => ({
-            content: result.item,
-            score: result.score,
-          }));
+      // Check if repository has vectorSearch capability
+      if (typeof this.contentRepository.vectorSearch === 'function') {
+        // Perform vector search using the repository
+        const searchResults = await this.contentRepository.vectorSearch(
+          'embedding',
+          embedding,
+          {
+            limit: options.limit || 10,
+            minScore: options.minScore || 0.7,
+            collection: CONTENT_COLLECTION_NAME,
+          }
+        );
+
+        // Transform results to match expected format with "content" property
+        return searchResults.map((result) => ({
+          content: result.item || result.document,
+          score: result.score,
+        }));
       } else {
-        // Use embeddings service's search
-        const results =
-          await this.embeddingsService.searchSimilarContent<ExtendedContentNode>(
-            embedding,
-            {
-              limit: options.limit || 10,
-              minScore: options.minScore || 0.7,
+        // Fallback when vectorSearch is not available
+        this.logger.warn(
+          'Repository does not support vectorSearch, using manual similarity calculation'
+        );
+
+        // Get all content (with a reasonable limit)
+        const allContent = await this.contentRepository.find(
+          { id: { $ne: contentId } }, // Exclude the source content
+          { limit: options.limit || 50 }
+        );
+
+        // Filter content items that have embeddings, or generate on the fly
+        const contentWithSimilarity: Array<{
+          content: ExtendedContentNode;
+          score: number;
+        }> = [];
+
+        for (const item of allContent) {
+          let itemEmbedding = (item as any).embedding;
+
+          // Generate embedding if needed
+          if (!itemEmbedding) {
+            try {
+              itemEmbedding = await this.embeddingsService.generateEmbedding(
+                item.text
+              );
+            } catch (error) {
+              this.logger.debug(
+                `Error generating embedding for content ${item.id}: ${error.message}`
+              );
+              continue; // Skip this item
             }
+          }
+
+          if (!itemEmbedding || itemEmbedding.length === 0) continue;
+
+          // Calculate similarity
+          const score = this.embeddingsService.calculateSimilarity(
+            embedding,
+            itemEmbedding
           );
 
-        // Filter out the source content itself
-        return results
-          .filter((result) => (result.item as any).id !== contentId)
-          .map((result) => ({
-            content: result.item,
-            score: result.score,
-          }));
+          // Add if above threshold
+          if (score >= (options.minScore || 0.7)) {
+            contentWithSimilarity.push({ content: item, score });
+          }
+        }
+
+        // Sort by similarity score (descending)
+        contentWithSimilarity.sort((a, b) => b.score - a.score);
+
+        // Limit results if needed
+        return contentWithSimilarity.slice(0, options.limit || 10);
       }
     } catch (error) {
       this.logger.error(
-        `Error finding similar content for ${contentId}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        error instanceof Error ? error.stack : undefined
+        `Error finding similar content for ${contentId}: ${error.message}`,
+        error.stack
       );
-      return [];
+      return []; // Return empty array on error instead of throwing
     }
   }
 
   /**
-   * Search content using text and embeddings
-   * Enhances the existing searchContent method with semantic search capabilities
+   * Semantic search for content using text embeddings
    * @param params Search parameters
-   * @param useEmbeddings Whether to use embeddings for semantic search
+   * @param useEmbeddings Whether to use embeddings for search
    * @returns Array of content items matching the search criteria
    */
   async semanticSearchContent(
-    params: ContentSearchParams & {
-      semanticQuery?: string;
-      minScore?: number;
-    },
+    params: ContentSearchParams,
     useEmbeddings = true
   ): Promise<ExtendedContentNode[]> {
-    this.ensureInitialized();
-
-    // If no semantic query or embeddings service not available,
-    // use standard search
-    if (!params.semanticQuery || !useEmbeddings || !this.embeddingsService) {
-      return this.searchContent(params);
-    }
-
     try {
-      // Generate embedding for the semantic query
-      const embedding = await this.embeddingsService.generateEmbedding(
-        params.semanticQuery
+      // If embeddings are not enabled or requested, fall back to regular search
+      if (!this.embeddingsService || !useEmbeddings) {
+        return this.searchContent(params);
+      }
+
+      // Use semanticQuery if provided, otherwise use regular query
+      const queryText = params.semanticQuery || params.query;
+      if (!queryText) {
+        this.logger.warn(
+          `No query provided for semantic search, falling back to regular search`
+        );
+        return this.searchContent(params);
+      }
+
+      // Generate embedding for the search query text
+      const queryEmbedding = await this.embeddingsService.generateEmbedding(
+        queryText
       );
+      if (!queryEmbedding || queryEmbedding.length === 0) {
+        this.logger.warn(
+          `Could not generate embedding for search query, falling back to regular search`
+        );
+        return this.searchContent(params);
+      }
 
-      // Build combined search approach - first try vector search
-      // if supported by repository
+      // Check if repository supports vector search
       if (this.contentRepository.vectorSearch) {
-        // Apply standard filters
-        const filter: Record<string, any> = {};
-
-        if (params.platform) {
-          filter.platform = params.platform;
-        }
-
-        if (params.sourceId) {
-          filter.id = { $regex: new RegExp(`^${params.sourceId}-`) };
-        }
-
-        if (params.startDate || params.endDate) {
-          filter.timestamp = {};
-          if (params.startDate) {
-            filter.timestamp.$gte = params.startDate;
+        // Perform vector search
+        const searchResults = await this.contentRepository.vectorSearch(
+          'embedding',
+          queryEmbedding,
+          {
+            limit: params.limit || 20,
+            minScore: params.minScore || 0.6, // Lower threshold for search queries
+            collection: CONTENT_COLLECTION_NAME,
           }
-          if (params.endDate) {
-            filter.timestamp.$lte = params.endDate;
-          }
-        }
-
-        // Perform vector search with filters
-        const results =
-          await this.contentRepository.vectorSearch<ExtendedContentNode>(
-            'embedding',
-            embedding,
-            {
-              limit: params.limit || 20,
-              minScore: params.minScore || 0.7,
-            }
-          );
-
-        // If we have exact-match query too, boost items that match both
-        if (params.query) {
-          const textResults = await this.searchContent({
-            ...params,
-            limit: 100, // Get more items to have better chance of overlap
-          });
-
-          const textResultIds = new Set(textResults.map((item) => item.id));
-
-          // Boost items that match both text and semantic search
-          return results
-            .sort((a, b) => {
-              const aMatchesText = textResultIds.has((a.item as any).id)
-                ? 1
-                : 0;
-              const bMatchesText = textResultIds.has((b.item as any).id)
-                ? 1
-                : 0;
-
-              // First sort by text match, then by similarity score
-              return bMatchesText - aMatchesText || b.score - a.score;
-            })
-            .map((result) => result.item)
-            .slice(0, params.limit || 20);
-        }
-
-        // Return vector search results
-        return results.map((result) => result.item);
-      } else {
-        // Fall back to traditional search if vector search not available
-        const results = await this.searchContent(params);
-
-        // If we have embedding service, re-rank results by similarity
-        const scoredResults = await Promise.all(
-          results.map(async (item) => {
-            // Get or generate item embedding
-            let itemEmbedding: EmbeddingVector;
-            if ((item as any).embedding) {
-              itemEmbedding = (item as any).embedding;
-            } else {
-              itemEmbedding = await this.embeddingsService!.generateEmbedding(
-                item.text
-              );
-              // Store for future use
-              await this.updateEmbedding(item.id, itemEmbedding);
-            }
-
-            // Calculate similarity
-            const score = this.embeddingsService!.calculateSimilarity(
-              embedding,
-              itemEmbedding
-            );
-            return { item, score };
-          })
         );
 
-        // Filter by minimum score and sort by similarity
-        return scoredResults
-          .filter((result) => result.score >= (params.minScore || 0.7))
-          .sort((a, b) => b.score - a.score)
-          .map((result) => result.item);
+        // Extract just the documents from the search results
+        return searchResults.map((result) => result.item || result.document);
+      } else {
+        // Fallback: Manual similarity calculation when vectorSearch is not available
+        this.logger.warn(
+          'Repository does not support vector search, using manual similarity calculation'
+        );
+
+        // Get all content (with a reasonable limit)
+        const allContent = await this.contentRepository.find(
+          {},
+          { limit: params.limit || 100 }
+        );
+
+        // Calculate similarity for each item
+        const contentWithSimilarity: Array<{
+          content: ExtendedContentNode;
+          score: number;
+        }> = [];
+
+        for (const content of allContent) {
+          // Skip content without embeddings
+          if (!content.embedding) {
+            // Try to generate embedding on the fly
+            const embedding = await this.embeddingsService.generateEmbedding(
+              content.text
+            );
+            if (!embedding || embedding.length === 0) continue;
+
+            // Calculate similarity
+            const score = this.embeddingsService.calculateSimilarity(
+              queryEmbedding,
+              embedding
+            );
+            if (score >= (params.minScore || 0.6)) {
+              contentWithSimilarity.push({ content, score });
+            }
+          } else {
+            // Calculate similarity
+            const score = this.embeddingsService.calculateSimilarity(
+              queryEmbedding,
+              content.embedding
+            );
+            if (score >= (params.minScore || 0.6)) {
+              contentWithSimilarity.push({ content, score });
+            }
+          }
+        }
+
+        // Sort by score (descending)
+        contentWithSimilarity.sort((a, b) => b.score - a.score);
+
+        // Limit results
+        const limitedResults = contentWithSimilarity.slice(
+          0,
+          params.limit || 20
+        );
+
+        // Return just the content
+        return limitedResults.map((item) => item.content);
       }
     } catch (error) {
       this.logger.error(
-        `Error in semantic search: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        error instanceof Error ? error.stack : undefined
+        `Error in semantic search: ${error.message}`,
+        error.stack
       );
-
-      // Fall back to standard search on error
+      // Fall back to regular search on error
       return this.searchContent(params);
     }
   }

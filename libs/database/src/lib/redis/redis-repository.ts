@@ -23,7 +23,7 @@ export class RedisRepository<T extends { id: string }>
     private readonly entityName: string
   ) {
     // Create a namespace prefix for keys
-    this.prefix = `${entityName}:`;
+    this.prefix = `${entityName.toLowerCase()}:`;
   }
 
   /**
@@ -319,5 +319,306 @@ export class RedisRepository<T extends { id: string }>
       this.logger.error(`Error deleting entities: ${err.message}`, err.stack);
       throw error;
     }
+  }
+
+  /**
+   * Perform vector similarity search on Redis
+   * @param field Field containing the vector to search against
+   * @param vector The query vector
+   * @param options Search options
+   * @returns Matching items with similarity scores
+   */
+  async vectorSearch<R = T>(
+    field: string,
+    vector: number[],
+    options: VectorSearchOptions = {}
+  ): Promise<VectorSearchResult<R>[]> {
+    const { limit = 10, minScore = 0.7 } = options;
+
+    this.logger.debug(
+      `Performing vector search on ${this.entityName} with field ${field}, limit ${limit}, minScore ${minScore}`
+    );
+
+    try {
+      // Check if Redis has vector search capability
+      const hasVectorSearch = await this.hasVectorSearchCapability();
+
+      if (hasVectorSearch) {
+        // Try to create index if it doesn't exist
+        await this.tryCreateVectorIndex(field);
+
+        // Use Redis Vector Search if available
+        return this.performRedisVectorSearch<R>(field, vector, limit, minScore);
+      } else {
+        this.logger.warn(
+          `Redis Vector Search not available, falling back to in-memory search for ${this.entityName}`
+        );
+        return this.performInMemoryVectorSearch<R>(
+          field,
+          vector,
+          limit,
+          minScore
+        );
+      }
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(
+        `Error during vector search on ${this.entityName}: ${errorMessage}`,
+        errorStack
+      );
+      // Fall back to in-memory search on error
+      return this.performInMemoryVectorSearch<R>(
+        field,
+        vector,
+        limit,
+        minScore
+      );
+    }
+  }
+
+  /**
+   * Check if Redis has Vector Search capability
+   */
+  private async hasVectorSearchCapability(): Promise<boolean> {
+    try {
+      // Try to get info about a dummy index to see if FT module is loaded
+      await this.client.sendCommand(['FT.INFO', '_dummy_index_']);
+      return true;
+    } catch (error: unknown) {
+      // If error includes "unknown command" or "unknown index", FT module is not available
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      if (
+        errorMessage.includes('unknown command') ||
+        errorMessage.includes('unknown index name')
+      ) {
+        return errorMessage.includes('unknown index name'); // If it's just unknown index, FT is available
+      }
+      throw error; // Rethrow other errors
+    }
+  }
+
+  /**
+   * Try to create a vector index for the entity type if it doesn't exist
+   */
+  private async tryCreateVectorIndex(field: string): Promise<void> {
+    try {
+      const indexName = `idx:${this.entityName.toLowerCase()}:${field}`;
+
+      // Check if index already exists
+      try {
+        await this.client.sendCommand(['FT.INFO', indexName]);
+        return; // Index exists, nothing to do
+      } catch (error: unknown) {
+        // If error is not "unknown index", rethrow it
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+
+        if (!errorMessage.includes('unknown index name')) {
+          throw error;
+        }
+      }
+
+      // Create index if it doesn't exist
+      const createIndexCmd = [
+        'FT.CREATE',
+        indexName,
+        'ON',
+        'HASH',
+        'PREFIX',
+        '1',
+        this.prefix,
+        'SCHEMA',
+        field,
+        'VECTOR',
+        'FLAT',
+        '6',
+        'TYPE',
+        'FLOAT32',
+        'DIM',
+        '384',
+        'DISTANCE_METRIC',
+        'COSINE',
+      ];
+
+      await this.client.sendCommand(createIndexCmd);
+      this.logger.debug(
+        `Created vector index ${indexName} for ${this.entityName}`
+      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(
+        `Failed to create vector index for ${this.entityName}: ${errorMessage}`,
+        errorStack
+      );
+      // Non-blocking error - we'll fall back to in-memory search
+    }
+  }
+
+  /**
+   * Perform vector search using Redis
+   */
+  private async performRedisVectorSearch<R>(
+    field: string,
+    vector: number[],
+    limit: number,
+    minScore: number
+  ): Promise<VectorSearchResult<R>[]> {
+    const indexName = `idx:${this.entityName.toLowerCase()}:${field}`;
+    const query = `*=>[KNN ${limit} @${field} $vector AS score]`;
+
+    // Convert vector to string format for Redis
+    const vectorStr = vector.join(',');
+
+    // Execute search command
+    const results = (await this.client.sendCommand([
+      'FT.SEARCH',
+      indexName,
+      query,
+      'PARAMS',
+      '2',
+      'vector',
+      vectorStr,
+      'RETURN',
+      '2',
+      'score',
+      '$',
+    ])) as any[];
+
+    if (!results || !Array.isArray(results) || results.length === 0) {
+      return [];
+    }
+
+    // Parse results - Redis returns in format: [totalCount, key1, [field1, value1, ...], key2, ...]
+    const totalCount = results[0] as number;
+    if (totalCount === 0) {
+      return [];
+    }
+
+    const items: VectorSearchResult<R>[] = [];
+
+    // Process each result pair (key and values)
+    for (let i = 1; i < results.length; i += 2) {
+      const key = results[i] as string;
+      const values = results[i + 1] as string[];
+
+      // Find score in values array
+      let score = 0;
+      let itemJson = '';
+
+      for (let j = 0; j < values.length; j += 2) {
+        if (values[j] === 'score') {
+          score = 1 - parseFloat(values[j + 1]); // Convert cosine distance to similarity
+        } else if (values[j] === '$') {
+          itemJson = values[j + 1];
+        }
+      }
+
+      // Skip items below minimum score
+      if (score < minScore) {
+        continue;
+      }
+
+      // Parse the item and add to results
+      try {
+        const item = JSON.parse(itemJson) as R;
+        items.push({ item, score });
+      } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        this.logger.error(`Failed to parse item from Redis: ${errorMessage}`);
+      }
+    }
+
+    return items;
+  }
+
+  /**
+   * Perform vector search in memory as fallback
+   */
+  private async performInMemoryVectorSearch<R>(
+    field: string,
+    vector: number[],
+    limit: number,
+    minScore: number
+  ): Promise<VectorSearchResult<R>[]> {
+    // Retrieve all entities
+    const allEntities = await this.find();
+
+    const results: VectorSearchResult<R>[] = [];
+
+    // Compare each entity's vector with the query vector
+    for (const entity of allEntities) {
+      const entityVector = this.getNestedProperty(entity, field);
+
+      // Skip entities without the vector field
+      if (!entityVector || !Array.isArray(entityVector)) {
+        continue;
+      }
+
+      // Calculate similarity
+      const score = this.calculateCosineSimilarity(vector, entityVector);
+
+      // Add to results if above minimum score
+      if (score >= minScore) {
+        results.push({ item: entity as unknown as R, score });
+      }
+    }
+
+    // Sort by score descending and limit results
+    return results.sort((a, b) => b.score - a.score).slice(0, limit);
+  }
+
+  /**
+   * Calculate cosine similarity between two vectors
+   */
+  private calculateCosineSimilarity(vecA: number[], vecB: number[]): number {
+    if (vecA.length !== vecB.length) {
+      throw new Error('Vectors must have the same dimensions');
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
+    }
+
+    // Handle zero vectors
+    if (normA === 0 || normB === 0) {
+      return 0;
+    }
+
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  /**
+   * Get a nested property from an object using dot notation
+   */
+  private getNestedProperty(obj: any, path: string): any {
+    if (!obj || !path) {
+      return undefined;
+    }
+
+    const pathParts = path.split('.');
+    let current = obj;
+
+    for (const part of pathParts) {
+      if (current === null || current === undefined) {
+        return undefined;
+      }
+      current = current[part];
+    }
+
+    return current;
   }
 }

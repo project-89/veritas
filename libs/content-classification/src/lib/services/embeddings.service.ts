@@ -50,7 +50,7 @@ export class EmbeddingsService {
   private readonly logger = new Logger(EmbeddingsService.name);
   private readonly embeddingEndpoint: string | null = null;
   private readonly apiKey: string | null = null;
-  private readonly embeddingDimension = 384; // Default for many models like MiniLM
+  private readonly embeddingDimension: number = 384; // Default for many models like MiniLM
   private readonly cacheTTL = 86400000; // 24 hours in milliseconds
   private embeddingsCache: Map<
     string,
@@ -183,15 +183,19 @@ export class EmbeddingsService {
       // Use vector search from database if available
       if (this.databaseService) {
         const contentRepository = this.databaseService.getRepository('Content');
-        if (
-          contentRepository &&
-          typeof contentRepository.vectorSearch === 'function'
-        ) {
-          return await contentRepository.vectorSearch<T>(
-            'embedding', // Field name containing the vector
-            queryVector,
-            { limit, minScore }
-          );
+        if (contentRepository.vectorSearch) {
+          try {
+            return (await contentRepository.vectorSearch(
+              'embedding', // Field name containing the vector
+              queryVector,
+              { limit, minScore }
+            )) as VectorSearchResult<T>[];
+          } catch (error) {
+            this.logger.error(
+              `Error performing vector search: ${error.message}`,
+              error.stack
+            );
+          }
         }
       }
 

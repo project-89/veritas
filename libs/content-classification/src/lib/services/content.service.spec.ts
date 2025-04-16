@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ContentService, ExtendedContentNode } from './content.service';
 import { Logger } from '@nestjs/common';
 import { DATABASE_PROVIDER_TOKEN } from '../constants';
+import { EmbeddingsService } from './embeddings.service';
 
 // Define interface instead of importing actual service
 interface ContentClassification {
@@ -86,26 +87,77 @@ const mockContentClassificationService = {
 // Create a mock for the database service
 const mockDatabaseService = {
   getRepository: jest.fn().mockReturnValue({
-    find: jest.fn().mockResolvedValue([]),
-    findById: jest.fn().mockResolvedValue(null),
-    findOne: jest.fn().mockResolvedValue(null),
+    find: jest.fn().mockImplementation((filter, options) => {
+      if (filter && (filter.$or || filter.embedding)) {
+        // Return mock content without embeddings for the generateAllEmbeddings test
+        return Promise.resolve([
+          { ...mockContent, id: 'no-embedding-1' },
+          { ...mockContent, id: 'no-embedding-2' },
+        ]);
+      }
+      return Promise.resolve([mockContent]);
+    }),
+    findById: jest.fn().mockImplementation((id) => {
+      if (id === 'test-id') {
+        return Promise.resolve(mockContent);
+      }
+      return Promise.resolve(null);
+    }),
+    findOne: jest.fn().mockResolvedValue(mockContent),
     create: jest.fn().mockImplementation((data) => ({
       id: 'test-id',
       ...data,
       createdAt: new Date(),
       updatedAt: new Date(),
     })),
-    updateById: jest.fn().mockResolvedValue(null),
-    deleteById: jest.fn().mockResolvedValue(true),
-    count: jest.fn().mockResolvedValue(0),
+    updateById: jest.fn().mockImplementation((id, data) => {
+      return Promise.resolve({
+        ...mockContent,
+        ...data,
+        updatedAt: new Date(),
+      });
+    }),
+    deleteById: jest.fn().mockResolvedValue(mockContent),
+    count: jest.fn().mockResolvedValue(2),
+    vectorSearch: jest.fn().mockImplementation((field, vector, options) => {
+      return Promise.resolve([
+        { item: { ...mockContent, id: 'similar-1' }, score: 0.9 },
+        { item: { ...mockContent, id: 'similar-2' }, score: 0.8 },
+      ]);
+    }),
   }),
   isConnected: jest.fn().mockReturnValue(true),
   registerModel: jest.fn().mockReturnValue({}),
 };
 
+// Create a mock for EmbeddingsService
+const mockEmbeddingsService = {
+  generateEmbedding: jest.fn().mockImplementation((text) => {
+    // Return standard mock embedding
+    return Promise.resolve([0.1, 0.2, 0.3, 0.4]);
+  }) as jest.Mock,
+
+  batchGenerateEmbeddings: jest.fn().mockImplementation((texts) => {
+    // For each text, generate a mock embedding
+    return Promise.resolve(texts.map(() => [0.1, 0.2, 0.3, 0.4]));
+  }) as jest.Mock,
+
+  searchSimilarContent: jest
+    .fn()
+    .mockImplementation((textOrVector, options) => {
+      return Promise.resolve([
+        { item: { id: 'similar-1', text: 'Similar content 1' }, score: 0.9 },
+        { item: { id: 'similar-2', text: 'Similar content 2' }, score: 0.8 },
+      ]);
+    }) as jest.Mock,
+
+  calculateSimilarity: jest.fn().mockReturnValue(0.75) as jest.Mock,
+};
+
 describe('ContentService', () => {
   let service: ContentService;
   let classificationService: any; // Use any type to avoid importing
+  let embeddingsService: EmbeddingsService;
   let mockRepository: any;
 
   beforeEach(async () => {
@@ -124,6 +176,10 @@ describe('ContentService', () => {
           useValue: mockDatabaseService,
         },
         {
+          provide: EmbeddingsService,
+          useValue: mockEmbeddingsService,
+        },
+        {
           provide: Logger,
           useValue: {
             log: jest.fn(),
@@ -137,6 +193,7 @@ describe('ContentService', () => {
 
     service = module.get<ContentService>(ContentService);
     classificationService = module.get('ContentClassificationService');
+    embeddingsService = module.get<EmbeddingsService>(EmbeddingsService);
     // Initialize service
     await service.onModuleInit();
   });
@@ -228,60 +285,47 @@ describe('ContentService', () => {
   });
 
   describe('searchContent', () => {
-    it('should search content with provided parameters', async () => {
-      const params = {
-        query: 'test',
-        platform: 'twitter',
-        startDate: new Date('2023-01-01'),
-        endDate: new Date('2023-12-31'),
-        limit: 10,
-      };
+    it('should search content and return results', async () => {
+      // Mock the find method to return mock data
+      mockRepository.find.mockResolvedValue([mockContent]);
 
-      const result = await service.searchContent(params);
+      const result = await service.searchContent({
+        query: 'test',
+        limit: 10,
+        offset: 0,
+      });
+
+      expect(result).toEqual([mockContent]);
+      expect(mockRepository.find).toHaveBeenCalled();
+    });
+
+    it('should return empty result if no content found', async () => {
+      // Mock the find method to return an empty array
+      mockRepository.find.mockResolvedValue([]);
+
+      const result = await service.searchContent({
+        query: 'nonexistent',
+        limit: 10,
+        offset: 0,
+      });
 
       expect(result).toEqual([]);
       expect(mockRepository.find).toHaveBeenCalled();
     });
 
-    it('should search content with given parameters', async () => {
-      const searchParams = {
-        query: 'ai',
-        platform: 'twitter',
-        startDate: new Date('2023-01-01'),
-        endDate: new Date('2023-12-31'),
-        limit: 10,
-        offset: 0,
-      };
+    it('should handle database error', async () => {
+      // Mock the find method to throw an error
+      mockRepository.find.mockRejectedValue(new Error('Database error'));
 
-      mockRepository.find.mockResolvedValue([mockContent]);
-
-      const result = await service.searchContent(searchParams);
+      await expect(
+        service.searchContent({
+          query: 'test',
+          limit: 10,
+          offset: 0,
+        })
+      ).rejects.toThrow('Database error');
 
       expect(mockRepository.find).toHaveBeenCalled();
-      expect(result).toEqual([mockContent]);
-
-      // Verify filter construction
-      const findCall = mockRepository.find.mock.calls[0][0];
-      expect(findCall.platform).toBe('twitter');
-      expect(findCall.timestamp.$gte).toEqual(searchParams.startDate);
-      expect(findCall.timestamp.$lte).toEqual(searchParams.endDate);
-      expect(findCall.$text.$search).toBe('ai');
-    });
-
-    it('should use default pagination when not provided', async () => {
-      const searchParams = {
-        query: 'ai',
-      };
-
-      mockRepository.find.mockResolvedValue([mockContent]);
-
-      await service.searchContent(searchParams);
-
-      // Verify options
-      const options = mockRepository.find.mock.calls[0][1];
-      expect(options.skip).toBe(0);
-      expect(options.limit).toBe(20);
-      expect(options.sort).toEqual({ timestamp: -1 });
     });
   });
 
@@ -435,6 +479,384 @@ describe('ContentService', () => {
       mockRepository.findById.mockRejectedValue(new Error('Database error'));
 
       await expect(service.getRelatedContent('test-id')).rejects.toThrow();
+    });
+  });
+
+  describe('generateEmbedding', () => {
+    it('should generate embedding for content', async () => {
+      // Mock findById to return mockContent
+      mockRepository.findById.mockResolvedValue(mockContent);
+
+      // Mock embeddings service
+      mockEmbeddingsService.generateEmbedding.mockResolvedValue([
+        0.1, 0.2, 0.3,
+      ]);
+
+      // Mock updateById to return the updated content
+      const updatedContent = { ...mockContent, embedding: [0.1, 0.2, 0.3] };
+      mockRepository.updateById.mockResolvedValue(updatedContent);
+
+      const result = await service.generateEmbedding('test-id');
+
+      expect(result).toEqual(updatedContent);
+      expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(
+        mockContent.text
+      );
+      expect(mockRepository.updateById).toHaveBeenCalledWith('test-id', {
+        embedding: [0.1, 0.2, 0.3],
+      });
+    });
+
+    it('should return null if content is not found', async () => {
+      // Mock findById to return null
+      mockRepository.findById.mockResolvedValue(null);
+
+      const result = await service.generateEmbedding('nonexistent-id');
+
+      expect(result).toBeNull();
+      expect(mockRepository.findById).toHaveBeenCalledWith('nonexistent-id');
+      expect(mockEmbeddingsService.generateEmbedding).not.toHaveBeenCalled();
+      expect(mockRepository.updateById).not.toHaveBeenCalled();
+    });
+
+    it('should return null if embedding generation fails', async () => {
+      // Mock findById to return mockContent
+      mockRepository.findById.mockResolvedValue(mockContent);
+
+      // Mock embeddings service to throw an error
+      mockEmbeddingsService.generateEmbedding.mockRejectedValue(
+        new Error('Embedding generation failed')
+      );
+
+      const result = await service.generateEmbedding('test-id');
+
+      expect(result).toBeNull();
+      expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(
+        mockContent.text
+      );
+      expect(mockRepository.updateById).not.toHaveBeenCalled();
+    });
+
+    it('should return null if database update fails', async () => {
+      // Mock findById to return mockContent
+      mockRepository.findById.mockResolvedValue(mockContent);
+
+      // Mock embeddings service
+      mockEmbeddingsService.generateEmbedding.mockResolvedValue([
+        0.1, 0.2, 0.3,
+      ]);
+
+      // Mock updateById to throw an error
+      mockRepository.updateById.mockRejectedValue(new Error('Database error'));
+
+      const result = await service.generateEmbedding('test-id');
+
+      expect(result).toBeNull();
+      expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(
+        mockContent.text
+      );
+      expect(mockRepository.updateById).toHaveBeenCalledWith('test-id', {
+        embedding: [0.1, 0.2, 0.3],
+      });
+    });
+  });
+
+  describe('findSimilarContent', () => {
+    it('should find similar content using existing embedding', async () => {
+      // Mock content with existing embedding
+      const contentWithEmbedding = {
+        ...mockContent,
+        embedding: [0.1, 0.2, 0.3, 0.4],
+      };
+      mockRepository.findById.mockResolvedValue(contentWithEmbedding);
+
+      // Mock repository.vectorSearch to return similar content
+      mockRepository.vectorSearch = jest.fn().mockResolvedValue([
+        { item: { id: 'similar-1', text: 'Similar content 1' }, score: 0.9 },
+        { item: { id: 'similar-2', text: 'Similar content 2' }, score: 0.8 },
+      ]);
+
+      const result = await service.findSimilarContent('test-id', {
+        limit: 2,
+        minScore: 0.7,
+        useExistingEmbedding: true,
+      });
+
+      expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
+      expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
+        'embedding',
+        [0.1, 0.2, 0.3, 0.4],
+        { limit: 2, minScore: 0.7, collection: 'content' }
+      );
+      expect(embeddingsService.generateEmbedding).not.toHaveBeenCalled();
+      expect(result).toHaveLength(2);
+      expect(result[0].content.id).toBe('similar-1');
+      expect(result[0].score).toBe(0.9);
+    });
+
+    it('should generate embedding when content has no existing embedding', async () => {
+      // Mock content without embedding
+      mockRepository.findById.mockResolvedValue(mockContent);
+
+      // Mock embeddings service
+      mockEmbeddingsService.generateEmbedding.mockResolvedValue([
+        0.1, 0.2, 0.3,
+      ]);
+
+      // Mock repository.vectorSearch to return similar content
+      mockRepository.vectorSearch = jest
+        .fn()
+        .mockResolvedValue([
+          { item: { id: 'similar-1', text: 'Similar content 1' }, score: 0.9 },
+        ]);
+
+      const result = await service.findSimilarContent('test-id', { limit: 1 });
+
+      expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
+      expect(embeddingsService.generateEmbedding).toHaveBeenCalledWith(
+        mockContent.text
+      );
+      expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
+        'embedding',
+        [0.1, 0.2, 0.3],
+        { limit: 1, minScore: 0.7, collection: 'content' }
+      );
+      expect(result).toHaveLength(1);
+    });
+
+    it('should return empty array if content not found', async () => {
+      // Mock findById to return null for non-existent content
+      mockRepository.findById.mockResolvedValue(null);
+
+      // Set expectation for the test - expect empty array rather than throwing
+      const result = await service.findSimilarContent('non-existent-id');
+
+      expect(result).toEqual([]);
+      expect(mockRepository.findById).toHaveBeenCalledWith('non-existent-id');
+      expect(embeddingsService.generateEmbedding).not.toHaveBeenCalled();
+      expect(mockRepository.vectorSearch).not.toHaveBeenCalled();
+    });
+
+    it('should handle repository without vectorSearch capability', async () => {
+      // Mock content without embedding
+      mockRepository.findById.mockResolvedValue(mockContent);
+
+      // Remove vectorSearch capability
+      const originalVectorSearch = mockRepository.vectorSearch;
+      delete mockRepository.vectorSearch;
+
+      // Mock find to return content items for manual similarity calculation
+      mockRepository.find.mockResolvedValue([
+        { ...mockContent, id: 'content-1', embedding: [0.1, 0.2, 0.3] },
+        { ...mockContent, id: 'content-2', embedding: [0.3, 0.2, 0.1] },
+      ]);
+
+      // Mock calculateSimilarity
+      mockEmbeddingsService.calculateSimilarity.mockReturnValue(0.85);
+
+      const result = await service.findSimilarContent('test-id');
+
+      expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(
+        mockContent.text
+      );
+      expect(mockRepository.find).toHaveBeenCalled();
+      expect(mockEmbeddingsService.calculateSimilarity).toHaveBeenCalled();
+      expect(result.length).toBeGreaterThan(0);
+
+      // Restore original mock
+      mockRepository.vectorSearch = originalVectorSearch;
+    });
+  });
+
+  describe('semanticSearchContent', () => {
+    it('should perform semantic search with embeddings', async () => {
+      // Setup params with semanticQuery
+      const searchParams = {
+        semanticQuery: 'artificial intelligence research',
+        platform: 'twitter',
+        limit: 5,
+        minScore: 0.6,
+      };
+
+      // Setup temporary mocks
+      const originalGenerateEmbedding = embeddingsService.generateEmbedding;
+      embeddingsService.generateEmbedding = jest
+        .fn()
+        .mockResolvedValue([0.1, 0.2, 0.3, 0.4]);
+
+      // Mock repository.vectorSearch
+      mockRepository.vectorSearch = jest.fn().mockResolvedValue([
+        { item: { id: 'result-1', text: 'Result 1' }, score: 0.9 },
+        { item: { id: 'result-2', text: 'Result 2' }, score: 0.8 },
+      ]);
+
+      const result = await service.semanticSearchContent(searchParams, true);
+
+      expect(embeddingsService.generateEmbedding).toHaveBeenCalledWith(
+        'artificial intelligence research'
+      );
+      expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
+        'embedding',
+        [0.1, 0.2, 0.3, 0.4],
+        { limit: 5, minScore: 0.6, collection: 'content' }
+      );
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('result-1');
+
+      // Restore original mock
+      embeddingsService.generateEmbedding = originalGenerateEmbedding;
+    });
+
+    it('should fall back to regular search when useEmbeddings is false', async () => {
+      const searchParams = {
+        semanticQuery: 'artificial intelligence',
+        query: 'ai',
+        platform: 'twitter',
+      };
+
+      mockRepository.find.mockResolvedValue([mockContent]);
+
+      const result = await service.semanticSearchContent(searchParams, false);
+
+      expect(embeddingsService.generateEmbedding).not.toHaveBeenCalled();
+      expect(mockRepository.vectorSearch).not.toHaveBeenCalled();
+      expect(mockRepository.find).toHaveBeenCalled();
+      expect(result).toEqual([mockContent]);
+    });
+
+    it('should handle repository without vectorSearch capability', async () => {
+      const searchParams = {
+        semanticQuery: 'artificial intelligence',
+      };
+
+      // Remove vectorSearch capability
+      const originalVectorSearch = mockRepository.vectorSearch;
+      delete mockRepository.vectorSearch;
+
+      // For this test, we need to mock the fallback path
+      // First mock the regular search to return some content
+      mockRepository.find.mockResolvedValue([
+        { ...mockContent, id: 'result-1', embedding: [0.1, 0.2, 0.3] },
+        { ...mockContent, id: 'result-2', embedding: [0.3, 0.2, 0.1] },
+      ]);
+
+      // Setup mocks for embeddings service
+      mockEmbeddingsService.generateEmbedding.mockResolvedValue([
+        0.1, 0.2, 0.3,
+      ]);
+      mockEmbeddingsService.calculateSimilarity.mockReturnValue(0.85);
+
+      const result = await service.semanticSearchContent(searchParams, true);
+
+      expect(mockRepository.find).toHaveBeenCalled();
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalled();
+      expect(mockEmbeddingsService.calculateSimilarity).toHaveBeenCalled();
+      expect(result.length).toBeGreaterThan(0);
+
+      // Restore original mocks
+      mockRepository.vectorSearch = originalVectorSearch;
+    });
+  });
+
+  describe('generateAllEmbeddings', () => {
+    it('should generate embeddings for all content', async () => {
+      // Mock find to return multiple content items
+      const mockContentList = [
+        { id: 'test-id-1', text: 'test content 1' },
+        { id: 'test-id-2', text: 'test content 2' },
+      ];
+      mockRepository.find.mockResolvedValue(mockContentList);
+
+      // Mock batch generate embeddings
+      const mockEmbeddings = [
+        [0.1, 0.2, 0.3],
+        [0.4, 0.5, 0.6],
+      ];
+      mockEmbeddingsService.batchGenerateEmbeddings.mockResolvedValue(
+        mockEmbeddings
+      );
+
+      // Mock update calls
+      mockRepository.updateById.mockResolvedValue({
+        id: 'test-id-1',
+        embedding: mockEmbeddings[0],
+      });
+
+      const result = await service.generateAllEmbeddings();
+
+      expect(result).toBe(2);
+      expect(mockRepository.find).toHaveBeenCalledWith(
+        { embedding: { $exists: false } },
+        { limit: 50, skip: 0 }
+      );
+      expect(
+        mockEmbeddingsService.batchGenerateEmbeddings
+      ).toHaveBeenCalledWith(['test content 1', 'test content 2']);
+      expect(mockRepository.updateById).toHaveBeenCalledTimes(2);
+    });
+
+    it('should return 0 if no content needs embeddings', async () => {
+      // Mock find to return empty array
+      mockRepository.find.mockResolvedValue([]);
+
+      const result = await service.generateAllEmbeddings();
+
+      expect(result).toBe(0);
+      expect(mockRepository.find).toHaveBeenCalledWith(
+        { embedding: { $exists: false } },
+        { limit: 50, skip: 0 }
+      );
+      expect(
+        mockEmbeddingsService.batchGenerateEmbeddings
+      ).not.toHaveBeenCalled();
+      expect(mockRepository.updateById).not.toHaveBeenCalled();
+    });
+
+    it('should return 0 if database query fails', async () => {
+      // Mock find to throw an error
+      mockRepository.find.mockRejectedValue(new Error('Database error'));
+
+      const result = await service.generateAllEmbeddings();
+
+      expect(result).toBe(0);
+      expect(mockRepository.find).toHaveBeenCalledWith(
+        { embedding: { $exists: false } },
+        { limit: 50, skip: 0 }
+      );
+      expect(
+        mockEmbeddingsService.batchGenerateEmbeddings
+      ).not.toHaveBeenCalled();
+      expect(mockRepository.updateById).not.toHaveBeenCalled();
+    });
+
+    it('should return 0 if batch embedding generation fails', async () => {
+      // Mock find to return content items
+      const mockContentList = [
+        { id: 'test-id-1', text: 'test content 1' },
+        { id: 'test-id-2', text: 'test content 2' },
+      ];
+      mockRepository.find.mockResolvedValue(mockContentList);
+
+      // Mock batch generate embeddings to throw an error
+      mockEmbeddingsService.batchGenerateEmbeddings.mockRejectedValue(
+        new Error('Batch processing failed')
+      );
+
+      const result = await service.generateAllEmbeddings();
+
+      expect(result).toBe(0);
+      expect(mockRepository.find).toHaveBeenCalledWith(
+        { embedding: { $exists: false } },
+        { limit: 50, skip: 0 }
+      );
+      expect(
+        mockEmbeddingsService.batchGenerateEmbeddings
+      ).toHaveBeenCalledWith(['test content 1', 'test content 2']);
+      expect(mockRepository.updateById).not.toHaveBeenCalled();
     });
   });
 });

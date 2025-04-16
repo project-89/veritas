@@ -134,17 +134,16 @@ export class ContentController {
     });
   }
 
-  @Get('semantic/search')
-  @ApiOperation({ summary: 'Semantic search using embeddings' })
+  @Get('semantic-search')
+  @ApiOperation({ summary: 'Semantic search content' })
   @ApiResponse({
     status: 200,
-    description:
-      'The semantically similar content has been successfully retrieved.',
+    description: 'Content has been successfully searched.',
   })
   @ApiQuery({
     name: 'semanticQuery',
     required: true,
-    description: 'The semantic search query',
+    description: 'Semantic search query',
   })
   @ApiQuery({
     name: 'minScore',
@@ -164,15 +163,15 @@ export class ContentController {
   ): Promise<ExtendedContentNode[]> {
     this.ensureContentService();
 
-    return this.contentService.semanticSearchContent(
-      {
-        ...params,
-        semanticQuery,
-        minScore: minScore !== undefined ? Number(minScore) : undefined,
-        limit: limit !== undefined ? Number(limit) : undefined,
-      },
-      true // use embeddings for semantic search
-    );
+    // Create search params with semantic query
+    const searchParams: ContentSearchParams = {
+      ...params,
+      semanticQuery,
+      minScore: minScore !== undefined ? Number(minScore) : undefined,
+      limit: limit !== undefined ? Number(limit) : undefined,
+    };
+
+    return this.contentService.semanticSearchContent(searchParams, true);
   }
 
   @Get(':id/similar')
