@@ -85,7 +85,41 @@ Improve the TransformOnIngestService to better integrate with:
 - Database repositories 
 - Maintain data privacy at the edge
 
-### 6. Implement Proper Testing
+### 6. Integrate Embeddings Capabilities
+
+Currently, the transform-on-ingest implementation does not leverage text embeddings for enhanced content analysis. We'll improve it to:
+
+- Generate embeddings during content ingestion
+- Store embeddings with narrative insights for semantic search
+- Use embeddings for improved trend detection and content clustering
+
+This will require:
+
+```typescript
+// Update TransformOnIngestService to use EmbeddingsService
+constructor(
+  private readonly configService: ConfigService,
+  private readonly narrativeRepository: NarrativeRepository,
+  private readonly contentClassificationService: ContentClassificationService,
+  @Optional() private readonly embeddingsService?: EmbeddingsService
+) {}
+
+// Update NarrativeInsight schema to include embeddings
+export class NarrativeInsightSchema extends Document {
+  // Existing fields
+  
+  @Prop({ type: [Number] })
+  embedding?: number[];
+}
+```
+
+Benefits:
+- Enhanced semantic understanding of content
+- Improved trend detection through vector similarity
+- Privacy-preserving content representation
+- Better content recommendation capabilities
+
+### 7. Implement Proper Testing
 
 Add comprehensive tests for:
 - Each connector implementation
@@ -93,7 +127,7 @@ Add comprehensive tests for:
 - Repository implementations
 - Integration between components
 
-### 7. Add Documentation
+### 8. Add Documentation
 
 Create detailed documentation explaining:
 - The transform-on-ingest pattern
@@ -105,19 +139,52 @@ Create detailed documentation explaining:
 ## Implementation Plan
 
 1. **Phase 1: Core Architecture Updates**
-   - Update the module configuration
-   - Replace mocks with proper dependency injection
-   - Integrate with database library
+   - ✅ Update the module configuration
+   - ✅ Replace mocks with proper dependency injection
+   - ✅ Integrate with database library
 
 2. **Phase 2: Connector Improvements**
-   - Standardize connector implementations
-   - Improve error handling
-   - Add proper validation
+   - ✅ Standardize connector implementations
+   - ✅ Improve error handling
+   - ✅ Add proper validation
 
-3. **Phase 3: Testing and Documentation**
+3. **Phase 3: Embeddings Integration**
+   - ✅ Update NarrativeInsight schema to include embeddings
+   - ✅ Extend TransformOnIngestService to generate and store embeddings
+   - ✅ Add vector search capabilities to repositories
+   - ✅ Implement semantic similarity features
+
+4. **Phase 4: Testing and Documentation**
    - Add unit tests for all components
    - Add integration tests
    - Create comprehensive documentation
+
+## Progress Report
+
+### Completed: Embeddings Integration (Phase 3)
+
+We've successfully integrated vector embeddings capabilities into the ingestion library:
+
+1. **Schema Updates**: 
+   - Added embedding vector field to NarrativeInsight schema and interface
+   - Set up MongoDB Atlas vector index support
+
+2. **TransformOnIngestService Enhancements**:
+   - Added EmbeddingsService integration
+   - Implemented embedding generation during content transformation
+   - Ensured fault tolerance when embeddings service is unavailable
+
+3. **Repository Improvements**:
+   - Added vector search capabilities to the NarrativeRepository interface
+   - Implemented native vector search in MongoNarrativeRepository with fallback
+   - Added in-memory vector search for development environments
+
+4. **Module Configuration**:
+   - Updated IngestionModule to support embeddings configuration
+   - Added proper integration with ContentClassificationModule
+   - Ensured proper dependency injection for EmbeddingsService
+
+These improvements enable powerful new semantic analysis capabilities while maintaining the privacy-focused transform-on-ingest pattern.
 
 ## Expected Benefits
 

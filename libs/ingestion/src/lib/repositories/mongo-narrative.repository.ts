@@ -466,4 +466,98 @@ export class MongoNarrativeRepository implements NarrativeRepository {
       platformDiversityScore * 0.1
     );
   }
+
+  /**
+   * Find content similar to the provided embedding vector using vector search
+   * This will use native database vector search if available, or fall back to in-memory
+   */
+  async findSimilarContent(
+    embedding: number[],
+    options?: { limit?: number; minScore?: number }
+  ): Promise<Array<{ insight: NarrativeInsight; score: number }>> {
+    try {
+      const limit = options?.limit || 10;
+      const minScore = options?.minScore || 0.7;
+
+      // Check if the repository supports vector search (MongoDB Atlas)
+      if (this.insightRepository.vectorSearch) {
+        this.logger.debug('Using native database vector search');
+
+        // Use native vector search capability
+        const results =
+          await this.insightRepository.vectorSearch<NarrativeInsight>(
+            'embedding',
+            embedding,
+            { limit, minScore }
+          );
+
+        return results.map((result) => ({
+          insight: result.item,
+          score: result.score,
+        }));
+      } else {
+        this.logger.debug('Falling back to in-memory vector search');
+
+        // Fall back to in-memory search for databases without vector search capability
+        // Get all insights with embeddings
+        const insights = await this.insightRepository.find({
+          embedding: { $exists: true },
+        });
+
+        if (insights.length === 0) {
+          return [];
+        }
+
+        // Filter out insights without valid embeddings
+        const insightsWithEmbeddings = insights.filter(
+          (insight) => insight.embedding && insight.embedding.length > 0
+        );
+
+        // Calculate cosine similarity for each insight
+        const results = insightsWithEmbeddings
+          .map((insight) => ({
+            insight,
+            score: this.calculateCosineSimilarity(
+              embedding,
+              insight.embedding!
+            ),
+          }))
+          .filter((result) => result.score >= minScore)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, limit);
+
+        return results;
+      }
+    } catch (error: any) {
+      this.logger.error(
+        `Error finding similar content: ${error.message}`,
+        error.stack
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate cosine similarity between two vectors
+   */
+  private calculateCosineSimilarity(vecA: number[], vecB: number[]): number {
+    if (vecA.length !== vecB.length) {
+      throw new Error('Vectors must have the same dimensions');
+    }
+
+    // Calculate dot product
+    const dotProduct = vecA.reduce((sum, val, i) => sum + val * vecB[i], 0);
+
+    // Calculate magnitudes
+    const magnitudeA = Math.sqrt(vecA.reduce((sum, val) => sum + val * val, 0));
+    const magnitudeB = Math.sqrt(vecB.reduce((sum, val) => sum + val * val, 0));
+
+    // Handle zero magnitudes to avoid division by zero
+    if (magnitudeA === 0 || magnitudeB === 0) {
+      return 0;
+    }
+
+    // Return cosine similarity
+    return dotProduct / (magnitudeA * magnitudeB);
+  }
 }

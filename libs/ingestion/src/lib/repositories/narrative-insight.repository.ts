@@ -43,6 +43,20 @@ export abstract class NarrativeRepository {
    * Returns the number of deleted insights
    */
   abstract deleteOlderThan(cutoffDate: Date): Promise<number>;
+
+  /**
+   * Find content similar to the provided embedding vector
+   * This uses vector similarity search to find semantically similar content
+   *
+   * @param embedding The embedding vector to search with
+   * @param options.limit Maximum number of results to return (default: 10)
+   * @param options.minScore Minimum similarity score threshold (default: 0.7)
+   * @returns Promise resolving to array of insights with similarity scores
+   */
+  abstract findSimilarContent(
+    embedding: number[],
+    options?: { limit?: number; minScore?: number }
+  ): Promise<Array<{ insight: NarrativeInsight; score: number }>>;
 }
 
 /**
@@ -241,5 +255,59 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
 
     // Adjust final score (max 1.0)
     return Math.min(avgScore + volumeBoost, 1.0);
+  }
+
+  async findSimilarContent(
+    embedding: number[],
+    options?: { limit?: number; minScore?: number }
+  ): Promise<Array<{ insight: NarrativeInsight; score: number }>> {
+    // Default options
+    const limit = options?.limit || 10;
+    const minScore = options?.minScore || 0.7;
+
+    // Filter insights that have embeddings
+    const insightsWithEmbeddings = Array.from(this.insights.values()).filter(
+      (insight) => insight.embedding && insight.embedding.length > 0
+    );
+
+    if (insightsWithEmbeddings.length === 0) {
+      return [];
+    }
+
+    // Calculate cosine similarity for each insight
+    const results = insightsWithEmbeddings
+      .map((insight) => ({
+        insight,
+        score: this.calculateCosineSimilarity(embedding, insight.embedding!),
+      }))
+      .filter((result) => result.score >= minScore)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    return results;
+  }
+
+  /**
+   * Calculate cosine similarity between two vectors
+   */
+  private calculateCosineSimilarity(vecA: number[], vecB: number[]): number {
+    if (vecA.length !== vecB.length) {
+      throw new Error('Vectors must have the same dimensions');
+    }
+
+    // Calculate dot product
+    const dotProduct = vecA.reduce((sum, val, i) => sum + val * vecB[i], 0);
+
+    // Calculate magnitudes
+    const magnitudeA = Math.sqrt(vecA.reduce((sum, val) => sum + val * val, 0));
+    const magnitudeB = Math.sqrt(vecB.reduce((sum, val) => sum + val * val, 0));
+
+    // Handle zero magnitudes to avoid division by zero
+    if (magnitudeA === 0 || magnitudeB === 0) {
+      return 0;
+    }
+
+    // Return cosine similarity
+    return dotProduct / (magnitudeA * magnitudeB);
   }
 }

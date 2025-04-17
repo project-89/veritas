@@ -84,6 +84,9 @@ export class NarrativeInsightSchema extends Document {
 
   @Prop({ required: true, type: Date, index: true })
   expiresAt!: Date;
+
+  @Prop({ type: [Number] })
+  embedding?: number[];
 }
 
 export const NarrativeInsightModel = SchemaFactory.createForClass(
@@ -95,3 +98,7 @@ NarrativeInsightModel.index({ timestamp: -1 });
 NarrativeInsightModel.index({ 'sentiment.score': 1 });
 NarrativeInsightModel.index({ themes: 1 });
 NarrativeInsightModel.index({ platform: 1, timestamp: -1 });
+
+// We'll set up the vector index at runtime in the MongoNarrativeRepository
+// instead of here to avoid TypeScript errors with the mongoose schema
+// The vector index requires MongoDB Atlas or MongoDB 6.0+ with vector search capability

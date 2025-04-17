@@ -109,4 +109,11 @@ export interface NarrativeInsight {
    * When this insight should be automatically deleted
    */
   expiresAt: Date;
+
+  /**
+   * Vector embedding representation of the content text
+   * Used for semantic search and content similarity analysis
+   * This is optional as it depends on the embeddings service availability
+   */
+  embedding?: number[];
 }

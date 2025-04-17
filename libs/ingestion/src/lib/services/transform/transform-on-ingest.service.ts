@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import {
   ContentClassificationService,
   ContentClassification,
+  EmbeddingsService,
+  EmbeddingVector,
 } from '@veritas/content-classification';
 import { NarrativeInsight } from '../../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../../types/social-media.types';
@@ -22,7 +24,8 @@ export class TransformOnIngestService {
   constructor(
     private readonly configService: ConfigService,
     private readonly narrativeRepository: NarrativeRepository,
-    private readonly contentClassificationService: ContentClassificationService
+    private readonly contentClassificationService: ContentClassificationService,
+    @Optional() private readonly embeddingsService?: EmbeddingsService
   ) {
     // Get hash salt from config or generate a secure random one
     this.hashSalt =
@@ -34,6 +37,16 @@ export class TransformOnIngestService {
       this.configService.get<number>('RETENTION_PERIOD_DAYS') || 90;
 
     this.logger.log('TransformOnIngestService initialized');
+
+    if (this.embeddingsService) {
+      this.logger.log(
+        'Embeddings service is available for enhanced content analysis'
+      );
+    } else {
+      this.logger.warn(
+        'Embeddings service not available - some features will be limited'
+      );
+    }
 
     // Schedule daily cleanup of expired data
     setInterval(() => this.cleanupExpiredData(), 24 * 60 * 60 * 1000);
@@ -127,6 +140,21 @@ export class TransformOnIngestService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + this.retentionPeriodDays);
 
+    // Step 5: Generate embedding if embeddings service is available
+    let embedding: EmbeddingVector | undefined;
+    if (this.embeddingsService) {
+      try {
+        embedding = await this.embeddingsService.generateEmbedding(post.text);
+        this.logger.debug(
+          `Generated embedding for content: ${contentHash.substring(0, 8)}`
+        );
+      } catch (error) {
+        const err = error as Error;
+        this.logger.warn(`Failed to generate embedding: ${err.message}`);
+        // Continue without embedding - it's an enhancement, not critical
+      }
+    }
+
     // Create the anonymized narrative insight
     return {
       id: `insight-${contentHash.substring(0, 8)}`,
@@ -148,6 +176,7 @@ export class TransformOnIngestService {
       narrativeScore,
       processedAt: new Date(),
       expiresAt,
+      embedding, // Include the embedding vector if available
     };
   }
 

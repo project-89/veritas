@@ -13,6 +13,7 @@ import { IngestionService } from './services/ingestion.service';
 import {
   ContentClassificationModule,
   ContentClassificationService,
+  EmbeddingsService,
 } from '@veritas/content-classification';
 import {
   NarrativeRepository,
@@ -40,6 +41,33 @@ export interface IngestionModuleOptions {
    * - 'mongodb': MongoDB repository for production
    */
   repositoryType?: 'memory' | 'mongodb';
+
+  /**
+   * Enable embeddings for enhanced content analysis
+   * @default false
+   */
+  enableEmbeddings?: boolean;
+
+  /**
+   * Embeddings configuration options
+   */
+  embeddingsOptions?: {
+    /**
+     * Endpoint for embeddings service
+     */
+    endpointUrl?: string;
+
+    /**
+     * API key for embeddings service
+     */
+    apiKey?: string;
+
+    /**
+     * Dimension of embeddings
+     * @default 384
+     */
+    embeddingDim?: number;
+  };
 
   /**
    * Enable or disable specific connectors
@@ -87,7 +115,19 @@ export class IngestionModule {
 
     // Add content classification module if not provided
     if (!options?.contentClassificationProvider) {
-      imports.push(ContentClassificationModule.forRoot());
+      imports.push(
+        ContentClassificationModule.forRoot({
+          // Pass through embedding options if embeddings are enabled
+          enableEmbeddings: options?.enableEmbeddings || false,
+          embeddingsOptions: options?.enableEmbeddings
+            ? {
+                endpointUrl: options.embeddingsOptions?.endpointUrl,
+                apiKey: options.embeddingsOptions?.apiKey,
+                embeddingDim: options.embeddingsOptions?.embeddingDim,
+              }
+            : undefined,
+        })
+      );
     }
 
     // Configure providers
@@ -143,16 +183,20 @@ export class IngestionModule {
       });
     }
 
+    const exports = [
+      IngestionService,
+      NarrativeRepository,
+      TransformOnIngestService,
+      // Only export EmbeddingsService if it's enabled
+      ...(options?.enableEmbeddings ? [EmbeddingsService] : []),
+    ];
+
     return {
       module: IngestionModule,
       imports,
       controllers: [IngestionController],
       providers,
-      exports: [
-        IngestionService,
-        NarrativeRepository,
-        TransformOnIngestService,
-      ],
+      exports,
       global: options?.isGlobal || false,
     };
   }
@@ -164,6 +208,7 @@ export class IngestionModule {
   static register(): DynamicModule {
     return this.forRoot({
       repositoryType: 'memory',
+      enableEmbeddings: false,
       isGlobal: false,
     });
   }
