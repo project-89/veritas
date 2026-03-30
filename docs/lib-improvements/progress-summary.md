@@ -52,6 +52,25 @@ We're currently focusing on the next phase of improvements:
 
 1. Implementation of concrete connector classes that extend the social media connector base class
 2. Update of the IngestionModule to use the new services and repositories
+3. Integration of embeddings capabilities with the ingestion pipeline
+
+## Completed Improvements
+
+### Phase 3: Embeddings Integration in Ingestion Library
+
+We've successfully integrated vector embeddings capabilities into the ingestion library:
+
+- **Enhanced Transform-on-Ingest**: Updated TransformOnIngestService to generate embeddings during content processing 
+- **Extended Repository**: Added vector search capabilities to NarrativeRepository implementations
+- **Schema Updates**: Updated NarrativeInsight schema to support embedding vectors
+- **MongoDB Integration**: Added support for MongoDB Atlas vector search with appropriate index
+- **Configuration Updates**: Enhanced IngestionModule to properly configure embeddings services
+
+These improvements enable several new capabilities:
+- Semantic similarity search for narrative insights
+- Enhanced trend detection through vector similarity
+- More powerful content recommendation
+- Improved topic clustering
 
 ## Next Steps
 

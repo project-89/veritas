@@ -15,6 +15,16 @@ import { SocialMediaPost } from '../../types/social-media.types';
 import { SocialMediaContentNode } from '../../types/social-media.types';
 import * as crypto from 'crypto';
 
+/** Interface for the graph database service */
+interface GraphDatabaseService {
+  executeQuery(query: string, params: Record<string, unknown>): Promise<Record<string, unknown>[]>;
+}
+
+/** Interface for the event streaming client */
+interface EventStreamingClient {
+  emit(event: string, data: Record<string, unknown>): Promise<void>;
+}
+
 @ApiTags('ingestion')
 @Controller('ingestion')
 export class IngestionController {
@@ -23,8 +33,8 @@ export class IngestionController {
   constructor(
     private readonly narrativeRepository: NarrativeRepository,
     private readonly transformService: TransformOnIngestService,
-    @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: any,
-    @Inject('KAFKA_SERVICE') private readonly kafkaClient: any
+    @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: GraphDatabaseService,
+    @Inject('KAFKA_SERVICE') private readonly kafkaClient: EventStreamingClient
   ) {}
 
   @Post('content')
@@ -95,10 +105,11 @@ export class IngestionController {
       });
 
       return result[0]?.s;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error verifying source: ${error.message}`,
-        error.stack
+        `Error verifying source: ${err.message}`,
+        err.stack
       );
       throw error;
     }

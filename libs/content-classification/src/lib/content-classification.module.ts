@@ -6,13 +6,18 @@ import { ContentController } from './controllers/content.controller';
 import { ContentResolver } from './resolvers/content.resolver';
 import { getContentModel } from './models';
 import { EmbeddingsService } from './services/embeddings.service';
+import type {
+  DatabaseProvider,
+  DatabaseProviderOptions,
+  Repository,
+} from '@veritas/database';
 
 /**
  * Database provider options
  */
 export interface DatabaseOptions {
   providerType: 'mongodb' | 'memgraph' | 'redis';
-  providerOptions?: any;
+  providerOptions?: DatabaseProviderOptions;
 }
 
 /**
@@ -24,36 +29,10 @@ export interface EmbeddingsOptions {
   dimension?: number;
 }
 
-// Define provider interfaces without direct imports
-interface RepositoryInterface {
-  find: (query?: any, options?: any) => Promise<any[]>;
-  findById: (id: string, options?: any) => Promise<any>;
-  findOne: (query: any, options?: any) => Promise<any>;
-  count: (query?: any) => Promise<number>;
-  create: (data: any) => Promise<any>;
-  createMany: (data: any[]) => Promise<any[]>;
-  updateById: (id: string, data: any) => Promise<any>;
-  updateMany: (query: any, data: any) => Promise<number>;
-  deleteById: (id: string) => Promise<any>;
-  deleteMany: (query: any) => Promise<number>;
-  vectorSearch?: (embedding: number[], options?: any) => Promise<any[]>;
-}
-
-interface DatabaseProviderInterface {
-  connect: () => Promise<any>;
-  disconnect: () => Promise<void>;
-  isConnected: () => boolean;
-  registerModel: (name: string, schema: any) => any;
-  getRepository: (name: string) => RepositoryInterface;
-}
-
 // Factory function type to create a provider
-type ProviderFactory = (options: any) => Promise<DatabaseProviderInterface>;
-
-// Database provider implementation types
-type MongoDBProvider = DatabaseProviderInterface;
-type MemgraphProvider = DatabaseProviderInterface;
-type RedisProvider = DatabaseProviderInterface;
+type ProviderFactory = (
+  options: DatabaseProviderOptions
+) => Promise<DatabaseProvider>;
 
 /**
  * Provides options for configuring the ContentClassificationModule
@@ -68,7 +47,7 @@ export interface ContentClassificationModuleOptions {
   /**
    * Provider specific options
    */
-  providerOptions?: any;
+  providerOptions?: DatabaseProviderOptions;
 
   /**
    * Provider factories to use for creating database providers
@@ -129,9 +108,9 @@ export class ContentClassificationModule {
    */
   static async createDatabaseProvider(
     providerType: 'mongodb' | 'memgraph' | 'redis',
-    providerOptions: any,
+    providerOptions: DatabaseProviderOptions,
     providerFactories: Record<string, ProviderFactory>
-  ): Promise<DatabaseProviderInterface> {
+  ): Promise<DatabaseProvider> {
     try {
       if (!providerFactories[providerType]) {
         throw new Error(`Provider factory for ${providerType} not found`);
@@ -153,19 +132,20 @@ export class ContentClassificationModule {
         disconnect: async () => Promise.resolve(),
         isConnected: () => true,
         registerModel: () => ({}),
-        getRepository: () => ({
-          find: async () => [],
-          findById: async () => null,
-          findOne: async () => null,
-          count: async () => 0,
-          create: async (data: any) => data,
-          createMany: async (data: any) => data,
-          updateById: async () => null,
-          updateMany: async () => 0,
-          deleteById: async () => null,
-          deleteMany: async () => 0,
-          vectorSearch: async () => [],
-        }),
+        getRepository: <T>() =>
+          ({
+            find: async () => [],
+            findById: async () => null,
+            findOne: async () => null,
+            count: async () => 0,
+            create: async (data: Partial<T>) => data as T,
+            createMany: async (data: Partial<T>[]) => data as T[],
+            updateById: async () => null,
+            updateMany: async () => 0,
+            deleteById: async () => null,
+            deleteMany: async () => 0,
+            vectorSearch: async () => [],
+          }) as Repository<T>,
       };
     }
   }
@@ -207,7 +187,7 @@ export class ContentClassificationModule {
     if (options.enableEmbeddings) {
       providers.push({
         provide: EmbeddingsService,
-        useFactory: (config: ConfigService, dbProvider: any) => {
+        useFactory: (config: ConfigService, dbProvider: DatabaseProvider) => {
           // Set environment variables for the embeddings service if provided
           if (options.embeddingsOptions?.endpointUrl) {
             process.env.EMBEDDING_SERVICE_ENDPOINT =

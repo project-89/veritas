@@ -63,10 +63,11 @@ export class MongoNarrativeRepository implements NarrativeRepository {
         this.databaseService.getRepository<NarrativeTrend>('NarrativeTrend');
 
       this.logger.debug('Successfully acquired Narrative repositories');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Failed to initialize repositories: ${error.message}`,
-        error.stack
+        `Failed to initialize repositories: ${err.message}`,
+        err.stack
       );
       throw error;
     }
@@ -79,10 +80,11 @@ export class MongoNarrativeRepository implements NarrativeRepository {
     try {
       await this.insightRepository.create(insight);
       this.logger.debug(`Saved narrative insight: ${insight.id}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error saving narrative insight: ${error.message}`,
-        error.stack
+        `Error saving narrative insight: ${err.message}`,
+        err.stack
       );
       throw error;
     }
@@ -95,10 +97,11 @@ export class MongoNarrativeRepository implements NarrativeRepository {
     try {
       await this.insightRepository.createMany(insights);
       this.logger.debug(`Saved ${insights.length} narrative insights`);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error saving narrative insights batch: ${error.message}`,
-        error.stack
+        `Error saving narrative insights batch: ${err.message}`,
+        err.stack
       );
       throw error;
     }
@@ -112,10 +115,11 @@ export class MongoNarrativeRepository implements NarrativeRepository {
   ): Promise<NarrativeInsight | null> {
     try {
       return await this.insightRepository.findOne({ contentHash });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error finding insight by content hash: ${error.message}`,
-        error.stack
+        `Error finding insight by content hash: ${err.message}`,
+        err.stack
       );
       throw error;
     }
@@ -145,10 +149,11 @@ export class MongoNarrativeRepository implements NarrativeRepository {
           sort: { timestamp: -1 },
         }
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error finding insights by timeframe: ${error.message}`,
-        error.stack
+        `Error finding insights by timeframe: ${err.message}`,
+        err.stack
       );
       throw error;
     }
@@ -191,10 +196,11 @@ export class MongoNarrativeRepository implements NarrativeRepository {
       await this.trendRepository.createMany(trends);
 
       return trends;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error getting trends by timeframe: ${error.message}`,
-        error.stack
+        `Error getting trends by timeframe: ${err.message}`,
+        err.stack
       );
       throw error;
     }
@@ -211,10 +217,11 @@ export class MongoNarrativeRepository implements NarrativeRepository {
       });
 
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error deleting old insights: ${error.message}`,
-        error.stack
+        `Error deleting old insights: ${err.message}`,
+        err.stack
       );
       throw error;
     }
@@ -264,10 +271,11 @@ export class MongoNarrativeRepository implements NarrativeRepository {
       }
 
       return { startDate, endDate };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error parsing timeframe: ${error.message}`,
-        error.stack
+        `Error parsing timeframe: ${err.message}`,
+        err.stack
       );
 
       // Default to current day as fallback
@@ -528,10 +536,11 @@ export class MongoNarrativeRepository implements NarrativeRepository {
 
         return results;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error finding similar content: ${error.message}`,
-        error.stack
+        `Error finding similar content: ${err.message}`,
+        err.stack
       );
       throw error;
     }

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { ConfigService } from '@nestjs/config';
 import { SocialMediaConnector } from '../interfaces/social-media-connector.interface';
-import { DataConnector } from '../interfaces/data-connector.interface';
+import { DataConnector, ConnectorSearchOptions } from '../interfaces/data-connector.interface';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
@@ -24,7 +24,7 @@ export abstract class BaseSocialMediaConnector
 {
   protected readonly logger: Logger;
   protected isConnected = false;
-  protected streamConnections: Map<string, any> = new Map();
+  protected streamConnections: Map<string, NodeJS.Timeout | ExtendedEventEmitter> = new Map();
 
   /**
    * The platform this connector is for. Must be implemented by child classes.
@@ -47,11 +47,12 @@ export abstract class BaseSocialMediaConnector
       await this.connectToApi();
       this.isConnected = true;
       this.logger.log(`Successfully connected to ${this.platform}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.isConnected = false;
+      const err = error as Error;
       this.logger.error(
-        `Failed to connect to ${this.platform}: ${error.message}`,
-        error.stack
+        `Failed to connect to ${this.platform}: ${err.message}`,
+        err.stack
       );
       throw error;
     }
@@ -84,10 +85,11 @@ export abstract class BaseSocialMediaConnector
         this.isConnected = false;
         this.logger.log(`Successfully disconnected from ${this.platform}`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error disconnecting from ${this.platform}: ${error.message}`,
-        error.stack
+        `Error disconnecting from ${this.platform}: ${err.message}`,
+        err.stack
       );
       throw error;
     }
@@ -125,10 +127,11 @@ export abstract class BaseSocialMediaConnector
       );
 
       return insights;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error searching and transforming ${this.platform} content: ${error.message}`,
-        error.stack
+        `Error searching and transforming ${this.platform} content: ${err.message}`,
+        err.stack
       );
       throw error;
     }
@@ -153,10 +156,11 @@ export abstract class BaseSocialMediaConnector
         try {
           const insight = await this.transformService.transform(post);
           emitter.emit('data', insight);
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const err = error as Error;
           this.logger.error(
-            `Error transforming streamed post: ${error.message}`,
-            error.stack
+            `Error transforming streamed post: ${err.message}`,
+            err.stack
           );
           // Don't emit transformation errors, just log them
         }
@@ -182,10 +186,11 @@ export abstract class BaseSocialMediaConnector
           }
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error setting up ${this.platform} stream: ${error.message}`,
-        error.stack
+        `Error setting up ${this.platform} stream: ${err.message}`,
+        err.stack
       );
 
       // Emit error asynchronously to match EventEmitter behavior
@@ -215,10 +220,11 @@ export abstract class BaseSocialMediaConnector
       }
 
       return isValid;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error validating ${this.platform} credentials: ${error.message}`,
-        error.stack
+        `Error validating ${this.platform} credentials: ${err.message}`,
+        err.stack
       );
       return false;
     }
@@ -246,12 +252,7 @@ export abstract class BaseSocialMediaConnector
    */
   abstract searchContent(
     query: string,
-    options?: {
-      startDate?: Date;
-      endDate?: Date;
-      limit?: number;
-      [key: string]: any;
-    }
+    options?: ConnectorSearchOptions
   ): Promise<SocialMediaPost[]>;
 
   /**

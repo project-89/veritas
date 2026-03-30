@@ -13,8 +13,8 @@ import { Repository } from '../interfaces/repository.interface';
 @Injectable()
 export class MongoDBProvider implements DatabaseProvider {
   private connection: Connection | null = null;
-  private models: Map<string, Model<any>> = new Map();
-  private repositories: Map<string, Repository<any>> = new Map();
+  private models: Map<string, Model<unknown>> = new Map();
+  private repositories: Map<string, Repository<unknown>> = new Map();
   private readonly logger = new Logger(MongoDBProvider.name);
 
   constructor(private readonly options: DatabaseProviderOptions) {}
@@ -76,7 +76,7 @@ export class MongoDBProvider implements DatabaseProvider {
    * @param name The name of the model
    * @param schema The Mongoose schema for the model
    */
-  registerModel(name: string, schema?: any): Model<any> {
+  registerModel(name: string, schema?: unknown): unknown {
     if (!this.connection) {
       throw new Error('Cannot register model: MongoDB is not connected');
     }

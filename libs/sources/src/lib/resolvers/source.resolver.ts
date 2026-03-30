@@ -5,7 +5,7 @@ import {
   SourceUpdateInput,
   SourceSearchParams,
 } from '../services/source.service';
-import { SourceNode } from '@veritas/shared';
+import { SourceNode, ContentNode } from '@veritas/shared';
 import {
   SourceType,
   SourceCreateInputType,
@@ -33,7 +33,7 @@ export class SourceResolver {
   async sourceContent(
     @Args('id') id: string,
     @Args('limit', { nullable: true }) limit?: number
-  ): Promise<any[]> {
+  ): Promise<ContentNode[]> {
     return this.sourceService.getSourceContent(id, limit);
   }
 

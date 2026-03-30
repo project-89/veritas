@@ -302,9 +302,9 @@ export class MongoDBRepository<T> implements Repository<T> {
       });
 
       // Map results to our standard interface
-      return (result.results || []).map((item: any) => ({
-        item: item as unknown as R,
-        score: item._score || 0,
+      return (result.results || []).map((item: Record<string, unknown>) => ({
+        item: item as R,
+        score: (item['_score'] as number) || 0,
       }));
     } catch (error) {
       this.logger.error(
@@ -390,15 +390,15 @@ export class MongoDBRepository<T> implements Repository<T> {
   /**
    * Access nested property in an object using dot notation
    */
-  private getNestedProperty(obj: any, path: string): any {
+  private getNestedProperty(obj: Record<string, unknown>, path: string): unknown {
     const parts = path.split('.');
-    let current = obj;
+    let current: unknown = obj;
 
     for (const part of parts) {
       if (current === null || current === undefined) {
         return undefined;
       }
-      current = current[part];
+      current = (current as Record<string, unknown>)[part];
     }
 
     return current;

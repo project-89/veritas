@@ -85,8 +85,7 @@ export class ContentSchema extends Document {
   classification: ClassificationData;
 
   @Prop({ type: Object })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   @Prop({ type: [Number] })
   embedding?: number[];

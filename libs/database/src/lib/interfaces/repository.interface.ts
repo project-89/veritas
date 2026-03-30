@@ -31,6 +31,11 @@ export interface VectorSearchResult<T> {
 }
 
 /**
+ * Filter query type for repository operations
+ */
+export type FilterQuery<T> = Partial<T> & Record<string, unknown>;
+
+/**
  * Generic repository interface for CRUD operations
  */
 export interface Repository<T> {
@@ -40,7 +45,7 @@ export interface Repository<T> {
    * @param options Options for pagination and sorting
    * @returns Array of entities
    */
-  find(filter?: any, options?: FindOptions): Promise<T[]>;
+  find(filter?: FilterQuery<T>, options?: FindOptions): Promise<T[]>;
 
   /**
    * Find a single entity by its ID
@@ -54,14 +59,14 @@ export interface Repository<T> {
    * @param filter Filter criteria
    * @returns The first matching entity or null if none found
    */
-  findOne(filter: any): Promise<T | null>;
+  findOne(filter: FilterQuery<T>): Promise<T | null>;
 
   /**
    * Count entities matching the given filter
    * @param filter Filter criteria
    * @returns The count of matching entities
    */
-  count(filter?: any): Promise<number>;
+  count(filter?: FilterQuery<T>): Promise<number>;
 
   /**
    * Create a new entity
@@ -83,7 +88,7 @@ export interface Repository<T> {
    * @param data The update data
    * @returns The updated entity or null if not found
    */
-  updateById(id: string, data: any): Promise<T | null>;
+  updateById(id: string, data: Partial<T>): Promise<T | null>;
 
   /**
    * Update entities matching the given filter
@@ -91,7 +96,7 @@ export interface Repository<T> {
    * @param data The update data
    * @returns The number of updated entities
    */
-  updateMany(filter: any, data: any): Promise<number>;
+  updateMany(filter: FilterQuery<T>, data: Partial<T>): Promise<number>;
 
   /**
    * Delete an entity by ID
@@ -105,7 +110,7 @@ export interface Repository<T> {
    * @param filter Filter criteria
    * @returns The number of deleted entities
    */
-  deleteMany(filter: any): Promise<number>;
+  deleteMany(filter: FilterQuery<T>): Promise<number>;
 
   /**
    * Perform vector similarity search

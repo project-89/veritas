@@ -5,7 +5,7 @@ import { Document } from 'mongoose';
   collection: 'narrative_trends',
   timestamps: true,
   toJSON: {
-    transform: (_: any, ret: any) => {
+    transform: (_: unknown, ret: Record<string, unknown>) => {
       delete ret._id;
       return ret;
     },

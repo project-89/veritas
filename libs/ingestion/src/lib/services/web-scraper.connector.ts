@@ -26,7 +26,7 @@ interface ScrapedArticle {
   publishDate?: Date;
   source: string;
   sourceUrl: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface ScrapeConfig {

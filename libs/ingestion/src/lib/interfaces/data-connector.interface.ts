@@ -4,6 +4,16 @@ import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SourceNode } from '../schemas';
 
 /**
+ * Options for connector search operations
+ */
+export interface ConnectorSearchOptions {
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+  [key: string]: unknown;
+}
+
+/**
  * Interface for data connectors that provide content to the ingestion system
  * All connectors must implement this interface
  */
@@ -32,12 +42,7 @@ export interface DataConnector {
    */
   searchAndTransform(
     query: string,
-    options?: {
-      startDate?: Date;
-      endDate?: Date;
-      limit?: number;
-      [key: string]: any;
-    }
+    options?: ConnectorSearchOptions
   ): Promise<NarrativeInsight[]>;
 
   /**

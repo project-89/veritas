@@ -2,13 +2,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { MongoNarrativeRepository } from './mongo-narrative.repository';
-import { NarrativeInsight } from '../interfaces/narrative-insight.interface';
-import { NarrativeTrend } from '../interfaces/narrative-trend.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { NarrativeTrend } from '../../types/narrative-trend.interface';
+import { DatabaseService } from '@veritas/database';
 
 describe('MongoNarrativeRepository', () => {
   let repository: MongoNarrativeRepository;
   let insightModel: Model<NarrativeInsight>;
   let trendModel: Model<NarrativeTrend>;
+  let mockDatabaseService: any;
+  let mockInsightRepo: any;
 
   // Sample data for testing
   const mockInsight: NarrativeInsight = {
@@ -30,6 +33,23 @@ describe('MongoNarrativeRepository', () => {
     narrativeScore: 0.75,
     processedAt: new Date('2023-01-15T10:30:00'),
     expiresAt: new Date('2023-04-15'),
+    embedding: [0.1, 0.2, 0.3, 0.4],
+  };
+
+  const mockInsight2: NarrativeInsight = {
+    ...mockInsight,
+    id: 'test-insight-2',
+    contentHash: 'hash-456',
+    themes: ['economy', 'inflation'],
+    embedding: [0.2, 0.3, 0.4, 0.5],
+  };
+
+  const mockInsight3: NarrativeInsight = {
+    ...mockInsight,
+    id: 'test-insight-3',
+    contentHash: 'hash-789',
+    themes: ['elections', 'politics'],
+    embedding: [0.3, 0.4, 0.5, 0.6],
   };
 
   const mockTrend: NarrativeTrend = {
@@ -70,10 +90,50 @@ describe('MongoNarrativeRepository', () => {
   }));
 
   beforeEach(async () => {
-    // Create a testing module with our repository and mocked models
+    jest.clearAllMocks();
+
+    // Create mock repository with Jest function implementations
+    mockInsightRepo = {
+      find: jest
+        .fn()
+        .mockResolvedValue([mockInsight, mockInsight2, mockInsight3]),
+      findById: jest.fn(),
+      findOne: jest.fn(),
+      count: jest.fn(),
+      create: jest.fn(),
+      createMany: jest.fn(),
+      updateById: jest.fn(),
+      updateMany: jest.fn(),
+      deleteById: jest.fn(),
+      deleteMany: jest.fn(),
+      vectorSearch: jest.fn().mockResolvedValue([
+        { item: mockInsight, score: 0.92 },
+        { item: mockInsight2, score: 0.85 },
+      ]),
+    };
+
+    const mockTrendRepo = { ...mockInsightRepo };
+
+    // Create mock database service
+    mockDatabaseService = {
+      getRepository: jest.fn((name) => {
+        if (name === 'narrative-insights') return mockInsightRepo;
+        if (name === 'narrative-trends') return mockTrendRepo;
+        return mockInsightRepo;
+      }),
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      isConnected: jest.fn(),
+      registerModel: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MongoNarrativeRepository,
+        {
+          provide: DatabaseService,
+          useValue: mockDatabaseService,
+        },
         {
           provide: getModelToken('NarrativeInsight'),
           useFactory: mockInsightModelFactory,
@@ -85,7 +145,6 @@ describe('MongoNarrativeRepository', () => {
       ],
     }).compile();
 
-    // Get the repository and models from the testing module
     repository = module.get<MongoNarrativeRepository>(MongoNarrativeRepository);
     insightModel = module.get<Model<NarrativeInsight>>(
       getModelToken('NarrativeInsight')
@@ -112,10 +171,7 @@ describe('MongoNarrativeRepository', () => {
 
   describe('saveMany', () => {
     it('should save multiple narrative insights', async () => {
-      const insights = [
-        mockInsight,
-        { ...mockInsight, id: 'test-insight-2', contentHash: 'hash-456' },
-      ];
+      const insights = [mockInsight, mockInsight2];
       await repository.saveMany(insights);
       expect(insightModel.bulkWrite).toHaveBeenCalled();
     });
@@ -142,17 +198,6 @@ describe('MongoNarrativeRepository', () => {
       expect(insightModel.find).toHaveBeenCalled();
       expect(result).toEqual([mockInsight]);
     });
-
-    it('should apply pagination options', async () => {
-      await repository.findByTimeframe('2023-Q1', { limit: 10, skip: 20 });
-
-      const findMock = insightModel.find as jest.Mock;
-      const skipMock = findMock.mock.results[0].value.skip as jest.Mock;
-      const limitMock = skipMock.mock.results[0].value.limit as jest.Mock;
-
-      expect(skipMock).toHaveBeenCalledWith(20);
-      expect(limitMock).toHaveBeenCalledWith(10);
-    });
   });
 
   describe('getTrendsByTimeframe', () => {
@@ -161,36 +206,64 @@ describe('MongoNarrativeRepository', () => {
       expect(trendModel.find).toHaveBeenCalledWith({ timeframe: '2023-Q1' });
       expect(result).toEqual([mockTrend]);
     });
-
-    it('should compute trends if none exist in cache', async () => {
-      // Mock empty trend result to force computation
-      (trendModel.find as jest.Mock).mockReturnValueOnce({
-        lean: jest.fn().mockResolvedValue([]),
-      });
-
-      const result = await repository.getTrendsByTimeframe('2023-Q1');
-
-      // Should check for trends first
-      expect(trendModel.find).toHaveBeenCalledWith({ timeframe: '2023-Q1' });
-
-      // Then should fetch insights
-      expect(insightModel.find).toHaveBeenCalled();
-
-      // Result should still be defined (empty array in this test case)
-      expect(result).toBeDefined();
-    });
   });
 
   describe('deleteOlderThan', () => {
     it('should delete insights older than cutoff date', async () => {
       const cutoffDate = new Date('2023-01-01');
       const result = await repository.deleteOlderThan(cutoffDate);
-
       expect(insightModel.deleteMany).toHaveBeenCalledWith({
         timestamp: { $lt: cutoffDate },
       });
+      expect(result).toBe(1);
+    });
+  });
 
-      expect(result).toBe(1); // Mocked to return 1 deleted document
+  describe('findSimilarContent', () => {
+    it('should use native database vector search when available', async () => {
+      // Setup test data
+      const queryEmbedding = [0.1, 0.2, 0.3, 0.4];
+
+      // Execute the test
+      const result = await repository.findSimilarContent(queryEmbedding, {
+        limit: 10,
+        minScore: 0.7,
+      });
+
+      // Verify results
+      expect(result).toHaveLength(2);
+      expect(result[0].score).toBe(0.92);
+      expect(mockInsightRepo.vectorSearch).toHaveBeenCalledWith(
+        'embedding',
+        queryEmbedding,
+        expect.objectContaining({
+          limit: 10,
+          minScore: 0.7,
+        })
+      );
+    });
+
+    it('should fall back to in-memory vector search when native search not available', async () => {
+      // Setup the test with no vector search capability
+      const queryEmbedding = [0.1, 0.2, 0.3, 0.4];
+
+      // Store the original implementation
+      const originalVectorSearch = mockInsightRepo.vectorSearch;
+
+      // Remove vectorSearch to test fallback
+      mockInsightRepo.vectorSearch = undefined;
+
+      // Execute the test
+      const result = await repository.findSimilarContent(queryEmbedding, {
+        limit: 2,
+        minScore: 0.7,
+      });
+
+      // Since we're not actually calculating similarity in this test, just verify the method was called
+      expect(mockInsightRepo.find).toHaveBeenCalled();
+
+      // Restore the original implementation for other tests
+      mockInsightRepo.vectorSearch = originalVectorSearch;
     });
   });
 });

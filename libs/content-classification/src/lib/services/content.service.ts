@@ -18,30 +18,8 @@ import {
 } from './embeddings.service';
 import { VectorSearchResult } from '../../index';
 import { CONTENT_COLLECTION_NAME } from '../models/content.model';
-
-// Use type-only imports to avoid module resolution issues
-// This only imports the TypeScript types, not the actual implementation
-type DatabaseService = any;
-type Repository<T> = any;
-
-// Define ContentClassification interface locally to avoid importing from service with franc-min dependency
-interface ContentClassification {
-  categories: string[];
-  sentiment: {
-    score: number;
-    label: 'positive' | 'negative' | 'neutral';
-    confidence: number;
-  };
-  toxicity: number;
-  subjectivity: number;
-  language: string;
-  topics: string[];
-  entities: Array<{
-    text: string;
-    type: string;
-    confidence: number;
-  }>;
-}
+import type { DatabaseProvider, Repository } from '@veritas/database';
+import { ContentClassification } from './content-classification.service';
 
 // Content node with classification data
 export interface ExtendedContentNode {
@@ -64,7 +42,8 @@ export interface ExtendedContentNode {
     topics: string[];
     entities: Array<{ text: string; type: string; confidence: number }>;
   };
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
+  embedding?: number[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -93,10 +72,12 @@ export class ContentService implements OnModuleInit {
 
   constructor(
     @Inject('ContentClassificationService')
-    private readonly classificationService: any,
+    private readonly classificationService: {
+      classifyContent(text: string): Promise<ContentClassification>;
+    },
     @Optional()
     @Inject(DATABASE_PROVIDER_TOKEN)
-    private readonly databaseService?: DatabaseService,
+    private readonly databaseService?: DatabaseProvider,
     @Optional()
     private readonly embeddingsService?: EmbeddingsService
   ) {}
@@ -273,7 +254,7 @@ export class ContentService implements OnModuleInit {
       this.logger.debug(
         `Searching content with params: ${JSON.stringify(params)}`
       );
-      const filter: Record<string, any> = {};
+      const filter: Record<string, unknown> = {};
 
       // Apply filters based on provided parameters
       if (params.platform) {
@@ -285,13 +266,14 @@ export class ContentService implements OnModuleInit {
       }
 
       if (params.startDate || params.endDate) {
-        filter.timestamp = {};
+        const timestampFilter: { $gte?: Date; $lte?: Date } = {};
         if (params.startDate) {
-          filter.timestamp.$gte = params.startDate;
+          timestampFilter.$gte = params.startDate;
         }
         if (params.endDate) {
-          filter.timestamp.$lte = params.endDate;
+          timestampFilter.$lte = params.endDate;
         }
+        filter.timestamp = timestampFilter;
       }
 
       // Text search is handled differently depending on database
@@ -462,7 +444,7 @@ export class ContentService implements OnModuleInit {
       }
 
       // Get content with similar topics, excluding the source
-      const filter: Record<string, any> = {
+      const filter: Record<string, unknown> = {
         id: { $ne: id },
         'classification.topics': { $in: content.classification.topics },
       };
@@ -582,7 +564,7 @@ export class ContentService implements OnModuleInit {
       }
 
       // Use existing embedding if available and requested, otherwise generate new one
-      let embedding: number[] = (content as any).embedding;
+      let embedding: number[] = content.embedding;
       if (!embedding || !options.useExistingEmbedding) {
         embedding = await this.embeddingsService.generateEmbedding(
           content.text
@@ -634,7 +616,7 @@ export class ContentService implements OnModuleInit {
         }> = [];
 
         for (const item of allContent) {
-          let itemEmbedding = (item as any).embedding;
+          let itemEmbedding = item.embedding;
 
           // Generate embedding if needed
           if (!itemEmbedding) {
@@ -642,9 +624,9 @@ export class ContentService implements OnModuleInit {
               itemEmbedding = await this.embeddingsService.generateEmbedding(
                 item.text
               );
-            } catch (error) {
+            } catch (error: unknown) {
               this.logger.debug(
-                `Error generating embedding for content ${item.id}: ${error.message}`
+                `Error generating embedding for content ${item.id}: ${error instanceof Error ? error.message : String(error)}`
               );
               continue; // Skip this item
             }
@@ -670,10 +652,10 @@ export class ContentService implements OnModuleInit {
         // Limit results if needed
         return contentWithSimilarity.slice(0, options.limit || 10);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error(
-        `Error finding similar content for ${contentId}: ${error.message}`,
-        error.stack
+        `Error finding similar content for ${contentId}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined
       );
       return []; // Return empty array on error instead of throwing
     }
@@ -789,10 +771,10 @@ export class ContentService implements OnModuleInit {
         // Return just the content
         return limitedResults.map((item) => item.content);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       this.logger.error(
-        `Error in semantic search: ${error.message}`,
-        error.stack
+        `Error in semantic search: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined
       );
       // Fall back to regular search on error
       return this.searchContent(params);

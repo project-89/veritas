@@ -13,7 +13,11 @@ export {
   DatabaseProvider,
   DatabaseProviderOptions,
 } from './lib/interfaces/database-provider.interface';
-export { Repository, FindOptions } from './lib/interfaces/repository.interface';
+export {
+  Repository,
+  FindOptions,
+  FilterQuery,
+} from './lib/interfaces/repository.interface';
 export { MongoDBProvider } from './lib/mongodb/mongodb-provider';
 export { MemgraphProvider } from './lib/memgraph/memgraph-provider';
 export { RedisProvider } from './lib/redis/redis-provider';

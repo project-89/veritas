@@ -19,7 +19,7 @@ export interface ContentNode extends BaseNode {
   authorId?: string;
   url?: string;
   engagementMetrics?: EngagementMetrics;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // Source node representing a content source
@@ -29,7 +29,7 @@ export interface SourceNode extends BaseNode {
   url?: string;
   description?: string;
   trustScore?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // Engagement metrics for content

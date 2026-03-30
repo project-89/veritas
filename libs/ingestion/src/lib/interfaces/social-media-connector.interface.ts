@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '@veritas/shared/types';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { ConnectorSearchOptions } from './data-connector.interface';
 
 /**
  * Interface for social media connectors
@@ -32,12 +33,7 @@ export interface SocialMediaConnector {
    */
   searchContent(
     query: string,
-    options?: {
-      startDate?: Date;
-      endDate?: Date;
-      limit?: number;
-      [key: string]: any;
-    }
+    options?: ConnectorSearchOptions
   ): Promise<SocialMediaPost[]>;
 
   /**

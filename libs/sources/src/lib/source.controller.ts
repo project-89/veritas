@@ -15,7 +15,7 @@ import {
   SourceUpdateInput,
   SourceSearchParams,
 } from './services/source.service';
-import { SourceNode } from '@veritas/shared';
+import { SourceNode, ContentNode } from '@veritas/shared';
 
 @ApiTags('sources')
 @Controller('sources')
@@ -86,7 +86,7 @@ export class SourceController {
   async getSourceContent(
     @Param('id') id: string,
     @Query('limit') limit?: number
-  ): Promise<any[]> {
+  ): Promise<ContentNode[]> {
     return this.sourceService.getSourceContent(id, limit);
   }
 

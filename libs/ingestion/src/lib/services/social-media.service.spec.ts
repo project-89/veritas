@@ -11,6 +11,14 @@ import {
   SocialMediaConnector,
 } from '../interfaces/social-media-connector.interface';
 import { EventEmitter } from 'events';
+import { TransformOnIngestService } from './transform/transform-on-ingest.service';
+import { ConfigService } from '@nestjs/config';
+import { NarrativeRepository } from '../repositories/narrative-insight.repository';
+import {
+  ContentClassificationService,
+  EmbeddingsService,
+} from '@veritas/content-classification';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 
 // Define mockSourceNode locally instead of importing
 const mockSourceNode = {
@@ -36,6 +44,8 @@ describe('SocialMediaService', () => {
   let twitterConnector: TwitterConnector;
   let facebookConnector: FacebookConnector;
   let redditConnector: RedditConnector;
+  let transformService: TransformOnIngestService;
+  let embeddingsService: EmbeddingsService;
 
   const mockPost: SocialMediaPost = {
     id: '123',
@@ -53,6 +63,38 @@ describe('SocialMediaService', () => {
       reach: 1000,
       viralityScore: 0.5,
     },
+  };
+
+  const mockEmbedding = new Array(384).fill(0).map(() => Math.random() * 2 - 1);
+
+  const mockNarrativeInsight: NarrativeInsight = {
+    id: 'insight-123',
+    contentHash: 'hash123',
+    sourceHash: 'sourceHash456',
+    platform: 'twitter',
+    timestamp: new Date('2023-06-01T12:00:00Z'),
+    themes: ['climate', 'technology'],
+    entities: [
+      { name: 'climate change', type: 'topic', relevance: 0.9 },
+      { name: 'technology', type: 'topic', relevance: 0.8 },
+    ],
+    sentiment: {
+      score: 0.75,
+      label: 'positive',
+      confidence: 0.85,
+    },
+    engagement: {
+      total: 175,
+      breakdown: {
+        likes: 0.57,
+        shares: 0.29,
+        comments: 0.14,
+      },
+    },
+    narrativeScore: 0.82,
+    processedAt: new Date('2023-06-01T12:05:00Z'),
+    expiresAt: new Date('2023-09-01T12:00:00Z'),
+    embedding: mockEmbedding,
   };
 
   beforeEach(async () => {
@@ -94,9 +136,78 @@ describe('SocialMediaService', () => {
       disconnect: jest.fn().mockResolvedValue(undefined),
     };
 
+    const mockNarrativeRepository = {
+      save: jest.fn().mockResolvedValue(undefined),
+      saveMany: jest.fn().mockResolvedValue(undefined),
+      findByContentHash: jest.fn().mockResolvedValue(null),
+      findByTimeframe: jest.fn().mockResolvedValue([]),
+      getTrendsByTimeframe: jest.fn().mockResolvedValue([]),
+      deleteOlderThan: jest.fn().mockResolvedValue(0),
+      findSimilarContent: jest
+        .fn()
+        .mockResolvedValue([{ insight: mockNarrativeInsight, score: 0.95 }]),
+    };
+
+    const mockContentClassificationService = {
+      classifyContent: jest.fn().mockResolvedValue({
+        categories: ['technology', 'environment'],
+        sentiment: {
+          score: 0.75,
+          label: 'positive',
+          confidence: 0.85,
+        },
+        toxicity: 0.05,
+        subjectivity: 0.3,
+        language: 'en',
+        topics: ['climate change', 'technology', 'sustainability'],
+        entities: [
+          { text: 'climate change', type: 'topic', confidence: 0.9 },
+          { text: 'technology', type: 'topic', confidence: 0.85 },
+        ],
+      }),
+      batchClassify: jest.fn().mockImplementation(async (texts) => {
+        return texts.map(() => ({
+          categories: ['technology', 'environment'],
+          sentiment: {
+            score: 0.75,
+            label: 'positive',
+            confidence: 0.85,
+          },
+          toxicity: 0.05,
+          subjectivity: 0.3,
+          language: 'en',
+          topics: ['climate change', 'technology', 'sustainability'],
+          entities: [
+            { text: 'climate change', type: 'topic', confidence: 0.9 },
+            { text: 'technology', type: 'topic', confidence: 0.85 },
+          ],
+        }));
+      }),
+    };
+
+    const mockEmbeddingsService = {
+      generateEmbedding: jest.fn().mockResolvedValue(mockEmbedding),
+      batchGenerateEmbeddings: jest.fn().mockImplementation(async (texts) => {
+        return texts.map(() => mockEmbedding);
+      }),
+      calculateSimilarity: jest.fn().mockReturnValue(0.95),
+      searchSimilarContent: jest
+        .fn()
+        .mockResolvedValue([{ item: mockNarrativeInsight, score: 0.95 }]),
+    };
+
+    const mockConfigService = {
+      get: jest.fn((key: string) => {
+        if (key === 'HASH_SALT') return 'test-salt';
+        if (key === 'RETENTION_PERIOD_DAYS') return 90;
+        return null;
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SocialMediaService,
+        TransformOnIngestService,
         {
           provide: TwitterConnector,
           useValue: mockTwitterConnector,
@@ -109,6 +220,22 @@ describe('SocialMediaService', () => {
           provide: RedditConnector,
           useValue: mockRedditConnector,
         },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
+        {
+          provide: NarrativeRepository,
+          useValue: mockNarrativeRepository,
+        },
+        {
+          provide: ContentClassificationService,
+          useValue: mockContentClassificationService,
+        },
+        {
+          provide: EmbeddingsService,
+          useValue: mockEmbeddingsService,
+        },
       ],
     }).compile();
 
@@ -116,6 +243,10 @@ describe('SocialMediaService', () => {
     twitterConnector = module.get<TwitterConnector>(TwitterConnector);
     facebookConnector = module.get<FacebookConnector>(FacebookConnector);
     redditConnector = module.get<RedditConnector>(RedditConnector);
+    transformService = module.get<TransformOnIngestService>(
+      TransformOnIngestService
+    );
+    embeddingsService = module.get<EmbeddingsService>(EmbeddingsService);
   });
 
   describe('Module Lifecycle', () => {
@@ -339,6 +470,23 @@ describe('SocialMediaService', () => {
 
       expect(value).toEqual(mockPost);
       expect(done).toBe(false);
+    });
+  });
+
+  describe('embeddings integration', () => {
+    it('should indirectly use embeddings service through transform service', async () => {
+      // Create a spy on the transformService to see if it calls the embeddingsService
+      const transformSpy = jest.spyOn(transformService, 'transform');
+
+      // Trigger a search that will use the transform service
+      await service.searchAllPlatforms('climate change');
+
+      // Verify that the transform service was used
+      expect(transformSpy).toHaveBeenCalled();
+
+      // Note: We can't directly verify that embeddingsService was called from here
+      // because it's called inside the TransformOnIngestService
+      // That verification should be part of the TransformOnIngestService tests
     });
   });
 });

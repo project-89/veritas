@@ -27,7 +27,9 @@ interface RSSItem {
   guid?: string;
   categories?: string[];
   isoDate?: string;
-  [key: string]: any;
+  sourceName?: string;
+  sourceUrl?: string;
+  [key: string]: unknown;
 }
 
 interface SearchOptions {

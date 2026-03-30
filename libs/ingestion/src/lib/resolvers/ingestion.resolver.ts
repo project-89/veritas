@@ -3,6 +3,16 @@ import { NarrativeRepository } from '../repositories/narrative-insight.repositor
 import { SourceNode } from '@veritas/shared/types';
 import { Inject, Logger } from '@nestjs/common';
 
+/** Interface for the graph database service */
+interface GraphDatabaseService {
+  executeQuery(query: string, params: Record<string, unknown>): Promise<Record<string, unknown>[]>;
+}
+
+/** Interface for the event streaming client */
+interface EventStreamingClient {
+  emit(event: string, data: Record<string, unknown>): Promise<void>;
+}
+
 class SourceType implements SourceNode {
   id!: string;
   name!: string;
@@ -36,8 +46,8 @@ export class IngestionResolver {
   constructor(
     private readonly transformService: TransformOnIngestService,
     private readonly narrativeRepository: NarrativeRepository,
-    @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: any,
-    @Inject('KAFKA_SERVICE') private readonly kafkaClient: any
+    @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: GraphDatabaseService,
+    @Inject('KAFKA_SERVICE') private readonly kafkaClient: EventStreamingClient
   ) {}
 
   private mapVerificationStatus(
@@ -60,7 +70,7 @@ export class IngestionResolver {
       id: crypto.randomUUID(),
       text: content.text,
       timestamp: new Date(),
-      platform: content.platform as any,
+      platform: content.platform,
       authorId: source.name, // Using name as authorId for consistency
       authorName: source.name,
       engagementMetrics: content.engagementMetrics
@@ -143,11 +153,12 @@ export class IngestionResolver {
         timestamp: new Date(),
       });
 
-      return result[0]?.s;
-    } catch (error: any) {
+      return result[0]?.s as SourceNode;
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error verifying source: ${error.message}`,
-        error.stack
+        `Error verifying source: ${err.message}`,
+        err.stack
       );
       throw error;
     }

@@ -47,9 +47,10 @@ export class SubprocessUtil {
         stderr: result.stderr,
         exitCode: 0,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Record<string, unknown>;
       // execFile errors include stdout/stderr on failure
-      if (error.code === 'ETIMEDOUT') {
+      if (err.code === 'ETIMEDOUT') {
         this.logger.error(
           `Command timed out after ${timeout}ms: ${command} ${args.join(' ')}`
         );
@@ -59,11 +60,11 @@ export class SubprocessUtil {
       }
 
       // Command executed but returned non-zero exit code
-      if (error.stdout !== undefined || error.stderr !== undefined) {
+      if (err.stdout !== undefined || err.stderr !== undefined) {
         return {
-          stdout: error.stdout || '',
-          stderr: error.stderr || '',
-          exitCode: error.code ?? 1,
+          stdout: (err.stdout as string) || '',
+          stderr: (err.stderr as string) || '',
+          exitCode: (err.code as number) ?? 1,
         };
       }
 

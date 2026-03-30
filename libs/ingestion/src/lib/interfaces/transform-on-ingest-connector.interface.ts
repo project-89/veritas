@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { SocialMediaConnector } from './social-media-connector.interface';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { ConnectorSearchOptions } from './data-connector.interface';
 
 /**
  * Interface for connectors that implement the transform-on-ingest pattern
@@ -16,12 +17,7 @@ export interface TransformOnIngestConnector extends SocialMediaConnector {
    */
   searchAndTransform(
     query: string,
-    options?: {
-      startDate?: Date;
-      endDate?: Date;
-      limit?: number;
-      [key: string]: any;
-    }
+    options?: ConnectorSearchOptions
   ): Promise<NarrativeInsight[]>;
 
   /**

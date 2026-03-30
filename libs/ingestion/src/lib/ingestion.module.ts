@@ -41,12 +41,12 @@ export interface IngestionModuleOptions {
   /**
    * Database provider instance to use
    */
-  databaseProvider?: any;
+  databaseProvider?: unknown;
 
   /**
    * Content classification provider to use
    */
-  contentClassificationProvider?: any;
+  contentClassificationProvider?: unknown;
 
   /**
    * Repository type to use for narrative insights

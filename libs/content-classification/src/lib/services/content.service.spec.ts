@@ -3,6 +3,7 @@ import { ContentService, ExtendedContentNode } from './content.service';
 import { Logger } from '@nestjs/common';
 import { DATABASE_PROVIDER_TOKEN } from '../constants';
 import { EmbeddingsService } from './embeddings.service';
+import { ContentClassificationService } from './content-classification.service';
 
 // Define interface instead of importing actual service
 interface ContentClassification {

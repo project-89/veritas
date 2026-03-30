@@ -6,12 +6,12 @@ export interface ContentCreateInput {
   timestamp: Date;
   platform: string;
   sourceId: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ContentUpdateInput {
   text?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   engagementMetrics?: {
     likes?: number;
     shares?: number;
@@ -25,7 +25,7 @@ const ContentCreateSchema = z.object({
   timestamp: z.date(),
   platform: z.enum(['twitter', 'facebook', 'reddit', 'other']),
   sourceId: z.string().uuid(),
-  metadata: z.record(z.string(), z.any()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const EngagementMetricsSchema = z.object({
@@ -37,7 +37,7 @@ const EngagementMetricsSchema = z.object({
 
 const ContentUpdateSchema = z.object({
   text: z.string().min(1).max(10000).optional(),
-  metadata: z.record(z.string(), z.any()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   engagementMetrics: EngagementMetricsSchema.optional(),
 });
 

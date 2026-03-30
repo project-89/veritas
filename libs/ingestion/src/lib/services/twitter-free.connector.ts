@@ -110,7 +110,7 @@ export class TwitterFreeConnector
       startDate?: Date;
       endDate?: Date;
       limit?: number;
-      [key: string]: any;
+      [key: string]: unknown;
     }
   ): Promise<SocialMediaPost[]> {
     const limit = options?.limit || 50;

@@ -157,7 +157,7 @@ export class TransformedSocialMediaService
             timestamp: new Date(),
           });
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         hasError = true;
         this.logger.error(
           `Failed to start ${connector.platform} stream: ${error.message}`,
@@ -189,7 +189,7 @@ export class TransformedSocialMediaService
 
     try {
       return await connector.getAuthorDetails(authorId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
         `Error getting author details from ${platform}: ${error.message}`,
         error.stack

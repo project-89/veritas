@@ -52,7 +52,7 @@ export class JinaReaderService {
       'X-Return-Format': format,
     };
 
-    let lastError: Error | null = null;
+    let lastError: Error = new Error(`Failed to read URL: ${url}`);
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
@@ -78,13 +78,13 @@ export class JinaReaderService {
           content: typeof data === 'string' ? data : JSON.stringify(data),
           url,
         };
-      } catch (error: any) {
-        lastError = error;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
 
         if (attempt < this.maxRetries - 1) {
           const delay = this.baseDelayMs * Math.pow(2, attempt);
           this.logger.warn(
-            `Jina Reader request failed (attempt ${attempt + 1}/${this.maxRetries}), retrying in ${delay}ms: ${error.message}`
+            `Jina Reader request failed (attempt ${attempt + 1}/${this.maxRetries}), retrying in ${delay}ms: ${lastError.message}`
           );
           await this.sleep(delay);
         }
@@ -92,7 +92,7 @@ export class JinaReaderService {
     }
 
     this.logger.error(`Jina Reader failed after ${this.maxRetries} attempts for URL: ${url}`);
-    throw lastError || new Error(`Failed to read URL: ${url}`);
+    throw lastError;
   }
 
   /**

@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TwitterApi, TweetV2, UserV2, TwitterApiv2 } from 'twitter-api-v2';
+import { TwitterApi, TweetV2, UserV2, TwitterApiv2, Tweetv2SearchParams } from 'twitter-api-v2';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '../schemas';
 import { EventEmitter } from 'events';
@@ -8,6 +8,7 @@ import { TransformOnIngestService } from './transform/transform-on-ingest.servic
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { TwitterUser } from '../../types/twitter-metrics.interface';
 import { BaseSocialMediaConnector } from './base-social-media.connector';
+import { ConnectorSearchOptions } from '../interfaces/data-connector.interface';
 
 type TweetWithIncludes = TweetV2 & {
   includes?: {
@@ -91,12 +92,7 @@ export class TwitterConnector
    */
   async searchContent(
     query: string,
-    options?: {
-      startDate?: Date;
-      endDate?: Date;
-      limit?: number;
-      [key: string]: any;
-    }
+    options?: ConnectorSearchOptions
   ): Promise<SocialMediaPost[]> {
     if (!this.v2Client) {
       await this.connect();
@@ -222,7 +218,7 @@ export class TwitterConnector
     }
 
     try {
-      const queryParams: any = {
+      const queryParams: Partial<Tweetv2SearchParams> = {
         'tweet.fields': [
           'created_at',
           'public_metrics',
@@ -299,7 +295,7 @@ export class TwitterConnector
     const verified = user?.verified || false;
 
     // Extract engagement metrics
-    const publicMetrics = (tweet as any).public_metrics || {};
+    const publicMetrics = tweet.public_metrics ?? {};
 
     const timestamp = tweet.created_at
       ? new Date(tweet.created_at)
@@ -322,11 +318,12 @@ export class TwitterConnector
           (publicMetrics.retweet_count || 0) + (publicMetrics.quote_count || 0),
         comments: publicMetrics.reply_count || 0,
         reach: publicMetrics.impression_count || 0,
+        viralityScore: 0,
       },
       metadata: {
-        tweetType: (tweet as any).type || 'unknown',
-        replyTo: (tweet as any).in_reply_to_user_id || null,
-        quotedTweet: (tweet as any).quoted_status_id || null,
+        tweetType: tweet.reply_settings || 'unknown',
+        replyTo: tweet.in_reply_to_user_id || null,
+        quotedTweet: tweet.referenced_tweets?.find(r => r.type === 'quoted')?.id || null,
       },
     };
   }

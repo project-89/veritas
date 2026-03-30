@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { MemgraphService } from '@/database';
-import { SourceNode } from '@veritas/shared';
+import { MemgraphProvider } from '@veritas/database';
+import { SourceNode, ContentNode } from '@veritas/shared';
 import { SourceValidationService } from '../services/source-validation.service';
 
 export interface SourceCreateInput {
@@ -8,14 +8,14 @@ export interface SourceCreateInput {
   platform: 'twitter' | 'facebook' | 'reddit' | 'other';
   credibilityScore?: number;
   verificationStatus?: 'verified' | 'unverified' | 'disputed';
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SourceUpdateInput {
   name?: string;
   credibilityScore?: number;
   verificationStatus?: 'verified' | 'unverified' | 'disputed';
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SourceSearchParams {
@@ -30,7 +30,7 @@ export interface SourceSearchParams {
 @Injectable()
 export class SourceService {
   constructor(
-    private readonly memgraphService: MemgraphService,
+    private readonly memgraphService: MemgraphProvider,
     private readonly validationService: SourceValidationService
   ) {}
 
@@ -96,7 +96,7 @@ export class SourceService {
       WHERE 1=1
     `;
 
-    const queryParams: Record<string, any> = {};
+    const queryParams: Record<string, unknown> = {};
 
     if (params.platform) {
       query += ` AND s.platform = $platform`;
@@ -144,7 +144,7 @@ export class SourceService {
     return result[0]?.deleted > 0;
   }
 
-  async getSourceContent(id: string, limit = 10): Promise<any[]> {
+  async getSourceContent(id: string, limit = 10): Promise<ContentNode[]> {
     const query = `
       MATCH (s:Source { id: $id })-[:PUBLISHED]->(c:Content)
       RETURN c

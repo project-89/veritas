@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Injectable, Logger } from '@nestjs/common';
 import {
   Driver,
@@ -10,6 +9,7 @@ import {
   Result,
 } from 'neo4j-driver';
 import {
+  FilterQuery,
   FindOptions,
   Repository,
   VectorSearchOptions,
@@ -54,7 +54,7 @@ export class MemgraphRepository<T> implements Repository<T> {
    */
   private async executeQuery(
     query: string,
-    params?: Record<string, any>
+    params?: Record<string, unknown>
   ): Promise<Neo4jRecord[]> {
     let session: Session | null = null;
     try {
@@ -74,7 +74,7 @@ export class MemgraphRepository<T> implements Repository<T> {
    * Find all entities matching the given filter
    */
   async find(
-    filter: Record<string, any> = {},
+    filter: FilterQuery<T> = {},
     options?: FindOptions
   ): Promise<T[]> {
     try {
@@ -146,7 +146,7 @@ export class MemgraphRepository<T> implements Repository<T> {
   /**
    * Find a single entity matching the given filter
    */
-  async findOne(filter: Record<string, any>): Promise<T | null> {
+  async findOne(filter: FilterQuery<T>): Promise<T | null> {
     try {
       // Build WHERE clause from filter
       const whereConditions = Object.entries(filter).map(([key]) => {
@@ -177,7 +177,7 @@ export class MemgraphRepository<T> implements Repository<T> {
   /**
    * Count entities matching the given filter
    */
-  async count(filter: Record<string, any> = {}): Promise<number> {
+  async count(filter: FilterQuery<T> = {}): Promise<number> {
     try {
       // Build WHERE clause from filter
       const whereConditions = Object.entries(filter).map(([key]) => {
@@ -277,7 +277,7 @@ export class MemgraphRepository<T> implements Repository<T> {
    * Update entities matching the given filter
    */
   async updateMany(
-    filter: Record<string, any>,
+    filter: FilterQuery<T>,
     updateData: Partial<T>
   ): Promise<number> {
     try {
@@ -345,7 +345,7 @@ export class MemgraphRepository<T> implements Repository<T> {
   /**
    * Delete entities matching the given filter
    */
-  async deleteMany(filter: Record<string, any>): Promise<number> {
+  async deleteMany(filter: FilterQuery<T>): Promise<number> {
     try {
       // Build WHERE clause from filter
       const whereConditions = Object.entries(filter).map(([key]) => {
@@ -462,7 +462,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       // Calculate similarity for each entity
       const results = entities
         .map((entity) => {
-          const entityVector = this.getNestedProperty(entity, field);
+          const entityVector = this.getNestedProperty(entity as unknown as Record<string, unknown>, field);
           if (
             !Array.isArray(entityVector) ||
             entityVector.length !== vector.length
@@ -525,15 +525,15 @@ export class MemgraphRepository<T> implements Repository<T> {
   /**
    * Access nested property in an object using dot notation
    */
-  private getNestedProperty(obj: any, path: string): any {
+  private getNestedProperty(obj: Record<string, unknown>, path: string): unknown {
     const parts = path.split('.');
-    let current = obj;
+    let current: unknown = obj;
 
     for (const part of parts) {
       if (current === null || current === undefined) {
         return undefined;
       }
-      current = current[part];
+      current = (current as Record<string, unknown>)[part];
     }
 
     return current;

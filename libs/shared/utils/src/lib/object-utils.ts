@@ -34,7 +34,7 @@ export function deepClone<T>(obj: T): T {
  * @returns Property value or default value
  */
 export function getNestedProperty<T>(
-  obj: any,
+  obj: Record<string, unknown>,
   path: string,
   defaultValue?: T
 ): T | undefined {
@@ -43,7 +43,7 @@ export function getNestedProperty<T>(
   }
 
   const keys = path.split('.');
-  let current = obj;
+  let current: unknown = obj;
 
   for (const key of keys) {
     if (
@@ -54,7 +54,7 @@ export function getNestedProperty<T>(
       return defaultValue;
     }
 
-    current = current[key];
+    current = (current as Record<string, unknown>)[key];
 
     if (current === undefined) {
       return defaultValue;
@@ -72,26 +72,26 @@ export function getNestedProperty<T>(
  * @param value Value to set
  * @returns Modified object
  */
-export function setNestedProperty<T>(obj: T, path: string, value: any): T {
+export function setNestedProperty<T>(obj: T, path: string, value: unknown): T {
   if (!obj || !path) {
     return obj;
   }
 
   const keys = path.split('.');
   const objectToModify = deepClone(obj);
-  let current: any = objectToModify;
+  let current: Record<string, unknown> = objectToModify as Record<string, unknown>;
 
   for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i];
+    const key = keys[i] as string;
 
     if (!current[key] || typeof current[key] !== 'object') {
       current[key] = {};
     }
 
-    current = current[key];
+    current = current[key] as Record<string, unknown>;
   }
 
-  const lastKey = keys[keys.length - 1];
+  const lastKey = keys[keys.length - 1] as string;
   current[lastKey] = value;
 
   return objectToModify;
@@ -103,7 +103,7 @@ export function setNestedProperty<T>(obj: T, path: string, value: any): T {
  * @param sources Source objects to merge
  * @returns Merged object
  */
-export function deepMerge<T>(target: T, ...sources: any[]): T {
+export function deepMerge<T>(target: T, ...sources: Partial<T>[]): T {
   if (!sources.length) {
     return target;
   }
@@ -116,13 +116,13 @@ export function deepMerge<T>(target: T, ...sources: any[]): T {
     }
 
     Object.keys(source).forEach((key) => {
-      const sourceValue = source[key];
       const typedKey = key as keyof T;
+      const sourceValue = (source as Record<string, unknown>)[key];
 
       if (Array.isArray(sourceValue)) {
-        (result as any)[typedKey] = sourceValue.map((item) => {
+        (result as Record<string, unknown>)[key] = sourceValue.map((item: unknown) => {
           return typeof item === 'object' && item !== null
-            ? deepMerge({}, item)
+            ? deepMerge({}, item as Record<string, unknown>)
             : item;
         });
       } else if (
@@ -131,12 +131,12 @@ export function deepMerge<T>(target: T, ...sources: any[]): T {
         result[typedKey] &&
         typeof result[typedKey] === 'object'
       ) {
-        (result as any)[typedKey] = deepMerge(
+        (result as Record<string, unknown>)[key] = deepMerge(
           result[typedKey] as object,
-          sourceValue
+          sourceValue as Partial<object>
         );
       } else {
-        (result as any)[typedKey] = sourceValue;
+        (result as Record<string, unknown>)[key] = sourceValue;
       }
     });
   }
@@ -168,9 +168,9 @@ export function removeEmptyValues<T extends object>(obj: T): Partial<T> {
  * @returns Flattened object
  */
 export function flattenObject(
-  obj: Record<string, any>,
+  obj: Record<string, unknown>,
   prefix = ''
-): Record<string, any> {
+): Record<string, unknown> {
   return Object.keys(obj).reduce((acc, key) => {
     const pre = prefix.length ? `${prefix}.` : '';
 
@@ -179,11 +179,11 @@ export function flattenObject(
       obj[key] !== null &&
       !Array.isArray(obj[key])
     ) {
-      Object.assign(acc, flattenObject(obj[key], `${pre}${key}`));
+      Object.assign(acc, flattenObject(obj[key] as Record<string, unknown>, `${pre}${key}`));
     } else {
       acc[`${pre}${key}`] = obj[key];
     }
 
     return acc;
-  }, {} as Record<string, any>);
+  }, {} as Record<string, unknown>);
 }

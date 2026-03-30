@@ -120,6 +120,6 @@ export interface YouTubeComment extends SocialMediaContentNode {
   updatedAt?: Date;
   metadata?: {
     replyCount?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }

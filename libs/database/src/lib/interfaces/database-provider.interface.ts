@@ -24,7 +24,7 @@ export interface DatabaseProvider {
    * @param name The name of the model
    * @param schema The schema definition for the model
    */
-  registerModel(name: string, schema?: any): any;
+  registerModel(name: string, schema?: unknown): unknown;
 
   /**
    * Get a repository for a specific entity type
@@ -60,5 +60,5 @@ export interface DatabaseProviderOptions {
   /**
    * Optional additional connection options
    */
-  options?: Record<string, any>;
+  options?: Record<string, unknown>;
 }

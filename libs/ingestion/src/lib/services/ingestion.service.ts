@@ -7,7 +7,8 @@ import {
   Optional,
 } from '@nestjs/common';
 import { DatabaseService } from '@veritas/database';
-import { DataConnector } from '../interfaces/data-connector.interface';
+import { DataConnector, ConnectorSearchOptions } from '../interfaces/data-connector.interface';
+import { ContentNode, SourceNode } from '../schemas/base.schema';
 import { RSSConnector } from './rss.connector';
 import { WebScraperConnector } from './web-scraper.connector';
 import { Repository } from '@veritas/database';
@@ -29,8 +30,8 @@ import {
 export class IngestionService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IngestionService.name);
   private connectors: Map<string, DataConnector> = new Map();
-  private contentRepository: Repository<any>;
-  private sourceRepository: Repository<any>;
+  private contentRepository: Repository<ContentNode>;
+  private sourceRepository: Repository<SourceNode>;
 
   constructor(
     @Optional() @Inject(REDDIT_CONNECTOR) private readonly redditConnector: DataConnector,
@@ -69,14 +70,15 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
 
       // Get repositories
       this.contentRepository =
-        this.databaseService.getRepository<any>('Content');
-      this.sourceRepository = this.databaseService.getRepository<any>('Source');
+        this.databaseService.getRepository<ContentNode>('Content');
+      this.sourceRepository = this.databaseService.getRepository<SourceNode>('Source');
 
       this.logger.log('Repositories initialized successfully');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Failed to initialize repositories: ${error.message}`,
-        error.stack
+        `Failed to initialize repositories: ${err.message}`,
+        err.stack
       );
     }
   }
@@ -117,10 +119,11 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         `Registered connector for platform: ${connector.platform}`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
         `Failed to register connector for platform: ${connector.platform}`,
-        error.stack
+        err.stack
       );
     }
   }
@@ -143,28 +146,28 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
    * Save content to the content repository
    * This should only be used for internal content that doesn't need anonymization
    */
-  async saveContent(content: any): Promise<any> {
+  async saveContent(content: ContentNode): Promise<ContentNode> {
     return this.contentRepository.create(content);
   }
 
   /**
    * Save source to the source repository
    */
-  async saveSource(source: any): Promise<any> {
+  async saveSource(source: SourceNode): Promise<SourceNode> {
     return this.sourceRepository.create(source);
   }
 
   /**
    * Find content by ID
    */
-  async findContentById(id: string): Promise<any> {
+  async findContentById(id: string): Promise<ContentNode | null> {
     return this.contentRepository.findById(id);
   }
 
   /**
    * Find source by ID
    */
-  async findSourceById(id: string): Promise<any> {
+  async findSourceById(id: string): Promise<SourceNode | null> {
     return this.sourceRepository.findById(id);
   }
 
@@ -174,10 +177,7 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
    */
   async searchAndTransformAll(
     query: string,
-    options?: {
-      startDate?: Date;
-      endDate?: Date;
-      limit?: number;
+    options?: ConnectorSearchOptions & {
       platforms?: string[];
     }
   ): Promise<NarrativeInsight[]> {

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RedisClientType } from 'redis';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  FilterQuery,
   FindOptions,
   Repository,
   VectorSearchOptions,
@@ -40,7 +41,7 @@ export class RedisRepository<T extends { id: string }>
    * performs a scan + client-side filtering
    */
   async find(
-    filter: Record<string, any> = {},
+    filter: FilterQuery<T> = {},
     options?: FindOptions
   ): Promise<T[]> {
     try {
@@ -136,7 +137,7 @@ export class RedisRepository<T extends { id: string }>
   /**
    * Find a single entity matching the given filter
    */
-  async findOne(filter: Record<string, any>): Promise<T | null> {
+  async findOne(filter: FilterQuery<T>): Promise<T | null> {
     const entities = await this.find(filter, { limit: 1 });
     return entities.length > 0 ? entities[0] : null;
   }
@@ -144,7 +145,7 @@ export class RedisRepository<T extends { id: string }>
   /**
    * Count entities matching the given filter
    */
-  async count(filter: Record<string, any> = {}): Promise<number> {
+  async count(filter: FilterQuery<T> = {}): Promise<number> {
     try {
       const entities = await this.find(filter);
       return entities.length;
@@ -238,7 +239,7 @@ export class RedisRepository<T extends { id: string }>
    * Update entities matching the given filter
    */
   async updateMany(
-    filter: Record<string, any>,
+    filter: FilterQuery<T>,
     data: Partial<T>
   ): Promise<number> {
     try {
@@ -295,7 +296,7 @@ export class RedisRepository<T extends { id: string }>
   /**
    * Delete entities matching the given filter
    */
-  async deleteMany(filter: Record<string, any>): Promise<number> {
+  async deleteMany(filter: FilterQuery<T>): Promise<number> {
     try {
       // Find all matching entities
       const entities = await this.find(filter);
@@ -490,7 +491,7 @@ export class RedisRepository<T extends { id: string }>
       '2',
       'score',
       '$',
-    ])) as any[];
+    ])) as unknown[];
 
     if (!results || !Array.isArray(results) || results.length === 0) {
       return [];
@@ -555,7 +556,7 @@ export class RedisRepository<T extends { id: string }>
 
     // Compare each entity's vector with the query vector
     for (const entity of allEntities) {
-      const entityVector = this.getNestedProperty(entity, field);
+      const entityVector = this.getNestedProperty(entity as unknown as Record<string, unknown>, field);
 
       // Skip entities without the vector field
       if (!entityVector || !Array.isArray(entityVector)) {
@@ -604,19 +605,19 @@ export class RedisRepository<T extends { id: string }>
   /**
    * Get a nested property from an object using dot notation
    */
-  private getNestedProperty(obj: any, path: string): any {
+  private getNestedProperty(obj: Record<string, unknown>, path: string): unknown {
     if (!obj || !path) {
       return undefined;
     }
 
     const pathParts = path.split('.');
-    let current = obj;
+    let current: unknown = obj;
 
     for (const part of pathParts) {
       if (current === null || current === undefined) {
         return undefined;
       }
-      current = current[part];
+      current = (current as Record<string, unknown>)[part];
     }
 
     return current;

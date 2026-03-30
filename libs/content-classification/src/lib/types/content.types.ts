@@ -110,7 +110,7 @@ export class ContentType {
   classification: ContentClassificationType;
 
   @Field(() => Object, { nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   @Field()
   createdAt: Date;
@@ -134,7 +134,7 @@ export class ContentCreateInputType {
   sourceId: string;
 
   @Field(() => Object, { nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 @InputType('ContentUpdateInput')
@@ -143,7 +143,7 @@ export class ContentUpdateInputType {
   text?: string;
 
   @Field(() => Object, { nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   @Field(() => EngagementMetricsInputType, { nullable: true })
   engagementMetrics?: EngagementMetricsInputType;

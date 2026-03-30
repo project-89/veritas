@@ -400,7 +400,7 @@ export const NarrativeMyceliumVisualization: React.FC<
       .attr('class', 'node')
       .call(
         d3
-          .drag<any, any>()
+          .drag<SVGGElement, SimulationNode>()
           .on('start', dragstarted)
           .on('drag', dragged)
           .on('end', dragended)
@@ -595,18 +595,18 @@ export const NarrativeMyceliumVisualization: React.FC<
     });
 
     // Drag functions
-    function dragstarted(event: any, d: any) {
+    function dragstarted(event: d3.D3DragEvent<SVGGElement, SimulationNode, SimulationNode>, d: SimulationNode) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
       d.fx = d.x;
       d.fy = d.y;
     }
 
-    function dragged(event: any, d: any) {
+    function dragged(event: d3.D3DragEvent<SVGGElement, SimulationNode, SimulationNode>, d: SimulationNode) {
       d.fx = event.x;
       d.fy = event.y;
     }
 
-    function dragended(event: any, d: any) {
+    function dragended(event: d3.D3DragEvent<SVGGElement, SimulationNode, SimulationNode>, d: SimulationNode) {
       if (!event.active) simulation.alphaTarget(0);
       d.fx = null;
       d.fy = null;

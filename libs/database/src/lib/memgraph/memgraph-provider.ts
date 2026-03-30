@@ -14,7 +14,7 @@ import { Repository } from '../interfaces/repository.interface';
 @Injectable()
 export class MemgraphProvider implements DatabaseProvider {
   private driver: Driver | null = null;
-  private repositories: Map<string, Repository<any>> = new Map();
+  private repositories: Map<string, Repository<unknown>> = new Map();
   private readonly logger = new Logger(MemgraphProvider.name);
 
   constructor(private readonly options: DatabaseProviderOptions) {}
@@ -80,7 +80,7 @@ export class MemgraphProvider implements DatabaseProvider {
    * Register a model with the Memgraph provider
    * This is a no-op for Memgraph as it doesn't use schemas
    */
-  registerModel(name: string, schema?: any): any {
+  registerModel(name: string, schema?: unknown): unknown {
     this.logger.log(`Registering model ${name} for Memgraph (no-op)`);
     return null;
   }
@@ -107,7 +107,7 @@ export class MemgraphProvider implements DatabaseProvider {
    * @param query The Cypher query to execute
    * @param params Parameters for the query
    */
-  async query(query: string, params?: Record<string, any>): Promise<Result> {
+  async query(query: string, params?: Record<string, unknown>): Promise<Result> {
     if (!this.driver) {
       throw new Error('Cannot execute query: Memgraph is not connected');
     }

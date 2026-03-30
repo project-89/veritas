@@ -1,7 +1,7 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DATABASE_PROVIDER_TOKEN } from '../constants';
-import { Inject } from '@nestjs/common';
+import type { DatabaseProvider } from '@veritas/database';
 
 /**
  * Vector embedding dimensions
@@ -61,7 +61,7 @@ export class EmbeddingsService {
     private readonly configService: ConfigService,
     @Optional()
     @Inject(DATABASE_PROVIDER_TOKEN)
-    private readonly databaseService?: any
+    private readonly databaseService?: DatabaseProvider
   ) {
     // Initialize embeddings service configuration
     this.embeddingEndpoint =
@@ -190,10 +190,10 @@ export class EmbeddingsService {
               queryVector,
               { limit, minScore }
             )) as VectorSearchResult<T>[];
-          } catch (error) {
+          } catch (error: unknown) {
             this.logger.error(
-              `Error performing vector search: ${error.message}`,
-              error.stack
+              `Error performing vector search: ${error instanceof Error ? error.message : String(error)}`,
+              error instanceof Error ? error.stack : undefined
             );
           }
         }
@@ -333,7 +333,9 @@ export class EmbeddingsService {
 
       if (Array.isArray(data.data)) {
         // Handle OpenAI-like format
-        embeddings = data.data.map((item: any) => item.embedding);
+        embeddings = data.data.map(
+          (item: { embedding: EmbeddingVector }) => item.embedding
+        );
       } else if (Array.isArray(data.embeddings)) {
         // Handle format with direct embeddings array
         embeddings = data.embeddings;
@@ -439,14 +441,20 @@ export class EmbeddingsService {
 
       // Filter content that has embeddings
       const contentWithEmbeddings = allContent.filter(
-        (item: any) => item.embedding && Array.isArray(item.embedding)
+        (item: { embedding?: number[] }) =>
+          item.embedding && Array.isArray(item.embedding)
       );
 
       // Calculate similarity for each item
-      const results = contentWithEmbeddings.map((item: any) => ({
-        item: item as unknown as T,
-        score: this.calculateSimilarity(queryVector, item.embedding),
-      }));
+      const results = contentWithEmbeddings.map(
+        (item: { embedding?: number[] }) => ({
+          item: item as unknown as T,
+          score: this.calculateSimilarity(
+            queryVector,
+            item.embedding as number[]
+          ),
+        })
+      );
 
       // Filter by minimum score and sort by similarity (descending)
       return results

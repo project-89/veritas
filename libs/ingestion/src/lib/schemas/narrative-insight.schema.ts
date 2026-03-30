@@ -42,7 +42,7 @@ class Engagement {
   collection: 'narrative_insights',
   timestamps: true,
   toJSON: {
-    transform: (_: any, ret: any) => {
+    transform: (_: unknown, ret: Record<string, unknown>) => {
       delete ret._id;
       return ret;
     },
