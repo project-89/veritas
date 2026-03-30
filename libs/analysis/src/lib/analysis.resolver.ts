@@ -1,44 +1,36 @@
 import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
 import { Inject } from '@nestjs/common';
-// import { AnalysisService } from "../../services/analysis.service";
 import {
-  DeviationMetrics,
-  Pattern,
-  TimeFrame,
-  ExtendedContentNode,
-} from './analysis.types';
+  ANALYSIS_SERVICE,
+  AnalysisServiceInterface,
+} from './interfaces/analysis-service.interface';
+import { DeviationMetrics, Pattern, TimeFrame, ExtendedContentNode } from './analysis.types';
 import { ContentAnalysisInput } from './dto/content-analysis.input';
-import {
-  ContentAnalysisResult,
-  RelatedContent,
-} from './dto/content-analysis.result';
+import { ContentAnalysisResult, RelatedContent } from './dto/content-analysis.result';
 
 @Resolver()
 export class AnalysisResolver {
   constructor(
-    @Inject('AnalysisService') private readonly analysisService: any
+    @Inject(ANALYSIS_SERVICE)
+    private readonly analysisService: AnalysisServiceInterface,
   ) {}
 
   @Query(() => [Pattern])
-  async detectPatterns(
-    @Args('timeframe') timeframe: TimeFrame
-  ): Promise<Pattern[]> {
+  async detectPatterns(@Args('timeframe') timeframe: TimeFrame): Promise<Pattern[]> {
     return this.analysisService.detectPatterns(timeframe);
   }
 
   @Query(() => DeviationMetrics)
   async getRealityDeviation(
-    @Args('narrativeId') narrativeId: string
+    @Args('narrativeId') narrativeId: string,
   ): Promise<DeviationMetrics> {
-    const metrics = await this.analysisService.measureRealityDeviation(
-      narrativeId
-    );
+    const metrics = await this.analysisService.measureRealityDeviation(narrativeId);
     return { ...metrics, timeframe: { start: new Date(), end: new Date() } };
   }
 
   @Mutation(() => ContentAnalysisResult)
   async analyzeContent(
-    @Args('input') input: ContentAnalysisInput
+    @Args('input') input: ContentAnalysisInput,
   ): Promise<ContentAnalysisResult> {
     const content = await this.analysisService.getContentById(input.contentId);
     if (!content) {
@@ -55,9 +47,8 @@ export class AnalysisResolver {
       timeframe: { start: new Date(), end: new Date() },
     };
 
-    const relatedContent = (
-      await this.analysisService.findRelatedContent(content)
-    ).map((node: any) => ({
+    const relatedNodes = await this.analysisService.findRelatedContent(content);
+    const relatedContent: RelatedContent[] = relatedNodes.map((node) => ({
       id: node.id,
       text: node.text,
       timestamp: node.timestamp,
@@ -70,12 +61,10 @@ export class AnalysisResolver {
       metadata: node.metadata,
     }));
 
-    const sourceCredibility =
-      await this.analysisService.calculateSourceCredibility(
-        content.sourceId || ''
-      );
-    const trustScore =
-      sourceCredibility * 0.8 + (1 - (content.toxicity || 0)) * 0.2;
+    const sourceCredibility = await this.analysisService.calculateSourceCredibility(
+      content.sourceId || '',
+    );
+    const trustScore = sourceCredibility * 0.8 + (1 - (content.toxicity ?? 0)) * 0.2;
 
     return {
       contentId: content.id,

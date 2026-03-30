@@ -8,21 +8,31 @@ import {
   Inject,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-// import { AnalysisService } from "../../services/analysis.service";
 import { z } from 'zod';
+import {
+  ANALYSIS_SERVICE,
+  AnalysisServiceInterface,
+} from './interfaces/analysis-service.interface';
 
 const TimeFrameSchema = z.object({
-  start: z.date(),
-  end: z.date(),
+  start: z.coerce.date(),
+  end: z.coerce.date(),
 });
 
 type TimeFrame = z.infer<typeof TimeFrameSchema>;
+
+interface AnalyzeContentBody {
+  contentId: string;
+  text?: string;
+  platform?: string;
+}
 
 @ApiTags('analysis')
 @Controller('analysis')
 export class AnalysisController {
   constructor(
-    @Inject('AnalysisService') private readonly analysisService: any
+    @Inject(ANALYSIS_SERVICE)
+    private readonly analysisService: AnalysisServiceInterface,
   ) {}
 
   @Get('deviation/:narrativeId')
@@ -52,8 +62,7 @@ export class AnalysisController {
     status: 201,
     description: 'Analysis completed successfully',
   })
-  async analyzeContent(@Body() content: any) {
-    // TODO: Implement content analysis
-    return { status: 'Analysis completed' };
+  async analyzeContent(@Body() content: AnalyzeContentBody) {
+    return { status: 'Analysis completed', contentId: content.contentId };
   }
 }

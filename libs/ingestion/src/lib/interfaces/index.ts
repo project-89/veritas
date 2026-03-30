@@ -13,4 +13,7 @@ export * from './social-media-connector.interface';
 // Transform-on-ingest connectors that anonymize data during ingestion
 export * from './transform-on-ingest-connector.interface';
 
+// Injection tokens for swappable connectors
+export * from './connector-tokens';
+
 // Export other interfaces as needed

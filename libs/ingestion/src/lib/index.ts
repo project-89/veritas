@@ -2,9 +2,6 @@
  * Main index file for the ingestion library
  */
 
-// Module exports
-export * from './modules';
-
 // Service exports
 export * from './services';
 

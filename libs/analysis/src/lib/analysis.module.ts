@@ -1,28 +1,17 @@
 import { Module } from '@nestjs/common';
-// import { AnalysisService } from "@/services/analysis.service";
 import { AnalysisController } from './analysis.controller';
 import { AnalysisResolver } from './analysis.resolver';
-// import { DatabaseModule } from "@/database";
-
-// Create stub implementations
-class StubDatabaseModule {}
-
-class StubAnalysisService {
-  analyze() {
-    return { result: 'analysis completed' };
-  }
-}
+import { ANALYSIS_SERVICE } from './interfaces/analysis-service.interface';
 
 @Module({
-  imports: [StubDatabaseModule],
   providers: [
     {
-      provide: 'AnalysisService',
-      useClass: StubAnalysisService,
+      provide: ANALYSIS_SERVICE,
+      useValue: null, // TODO: Replace with real AnalysisService implementation
     },
     AnalysisResolver,
   ],
   controllers: [AnalysisController],
-  exports: ['AnalysisService'],
+  exports: [ANALYSIS_SERVICE],
 })
 export class AnalysisModule {}

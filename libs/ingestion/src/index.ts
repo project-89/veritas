@@ -16,6 +16,16 @@ export * from './lib/controllers/ingestion.controller';
 export * from './lib/services/ingestion.service';
 export * from './lib/services/transform/transform-on-ingest.service';
 
+// API-free connectors
+export { RedditFreeConnector } from './lib/services/reddit-free.connector';
+export { TwitterFreeConnector } from './lib/services/twitter-free.connector';
+export { YouTubeFreeConnector } from './lib/services/youtube-free.connector';
+export { FacebookJinaConnector } from './lib/services/facebook-jina.connector';
+
+// Utilities
+export { SubprocessUtil } from './lib/services/utils/subprocess.util';
+export { JinaReaderService } from './lib/services/utils/jina-reader.service';
+
 // Re-export from external packages
 export {
   ContentClassificationModule,

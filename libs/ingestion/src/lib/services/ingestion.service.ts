@@ -8,15 +8,18 @@ import {
 } from '@nestjs/common';
 import { DatabaseService } from '@veritas/database';
 import { DataConnector } from '../interfaces/data-connector.interface';
-import { RedditConnector } from './reddit.connector';
-import { FacebookConnector } from './facebook.connector';
 import { RSSConnector } from './rss.connector';
 import { WebScraperConnector } from './web-scraper.connector';
-import { YouTubeConnector } from './youtube.connector';
 import { Repository } from '@veritas/database';
 import { NarrativeRepository } from '../repositories/narrative-insight.repository';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import {
+  REDDIT_CONNECTOR,
+  TWITTER_CONNECTOR,
+  YOUTUBE_CONNECTOR,
+  FACEBOOK_CONNECTOR,
+} from '../interfaces/connector-tokens';
 
 /**
  * Service that manages ingestion connections and data flow
@@ -30,11 +33,12 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
   private sourceRepository: Repository<any>;
 
   constructor(
-    @Optional() private readonly redditConnector: RedditConnector,
-    @Optional() private readonly facebookConnector: FacebookConnector,
+    @Optional() @Inject(REDDIT_CONNECTOR) private readonly redditConnector: DataConnector,
+    @Optional() @Inject(TWITTER_CONNECTOR) private readonly twitterConnector: DataConnector,
+    @Optional() @Inject(FACEBOOK_CONNECTOR) private readonly facebookConnector: DataConnector,
+    @Optional() @Inject(YOUTUBE_CONNECTOR) private readonly youtubeConnector: DataConnector,
     @Optional() private readonly rssFeedConnector: RSSConnector,
     @Optional() private readonly webScraperConnector: WebScraperConnector,
-    @Optional() private readonly youtubeConnector: YouTubeConnector,
     private readonly databaseService: DatabaseService,
     private readonly narrativeRepository: NarrativeRepository
   ) {}
@@ -83,10 +87,11 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
   private async registerAvailableConnectors() {
     const connectors = [
       this.redditConnector,
+      this.twitterConnector,
       this.facebookConnector,
+      this.youtubeConnector,
       this.rssFeedConnector,
       this.webScraperConnector,
-      this.youtubeConnector,
     ].filter((connector) => connector !== undefined);
 
     for (const connector of connectors) {
