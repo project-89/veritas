@@ -25,10 +25,6 @@ import { DatabaseService } from '@veritas/database';
       autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
       sortSchema: true,
       playground: process.env['NODE_ENV'] !== 'production',
-      definitions: {
-        path: join(process.cwd(), 'src/graphql.ts'),
-        outputAs: 'class',
-      },
     }),
 
     // Database Modules
@@ -62,7 +58,7 @@ import { DatabaseService } from '@veritas/database';
     // Feature Modules
     IngestionModule.forRoot(),
     AnalysisModule,
-    ContentClassificationModule,
+    ContentClassificationModule.forRoot(),
   ],
   providers: [
     LoggingService,

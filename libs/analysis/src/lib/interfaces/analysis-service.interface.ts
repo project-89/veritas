@@ -2,6 +2,7 @@ import {
   DeviationMetrics,
   Pattern,
   TimeFrame,
+  TimeFrameInput,
   ExtendedContentNode,
 } from '../analysis.types';
 
@@ -9,7 +10,7 @@ export const ANALYSIS_SERVICE = Symbol('ANALYSIS_SERVICE');
 
 export interface AnalysisServiceInterface {
   measureRealityDeviation(narrativeId: string): Promise<Omit<DeviationMetrics, 'timeframe'>>;
-  detectPatterns(timeframe: TimeFrame): Promise<Pattern[]>;
+  detectPatterns(timeframe: TimeFrame | TimeFrameInput): Promise<Pattern[]>;
   detectPatternsForContent(content: ExtendedContentNode): Promise<Pattern[]>;
   calculateContentDeviation(
     content: ExtendedContentNode,

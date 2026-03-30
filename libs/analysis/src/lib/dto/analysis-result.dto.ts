@@ -4,7 +4,7 @@ import { Pattern } from './pattern.dto';
 
 @ObjectType('AnalysisResult')
 export class AnalysisResult {
-  @Field()
+  @Field(() => String)
   status = 'pending';
 
   @Field(() => DeviationMetrics, { nullable: true })

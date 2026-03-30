@@ -1,4 +1,5 @@
-import { Field, ObjectType, Float, Int } from '@nestjs/graphql';
+import { Field, ObjectType, InputType, Float, Int } from '@nestjs/graphql';
+import GraphQLJSON from 'graphql-type-json';
 // Use local ContentNode rather than importing from a problematic path
 // import { ContentNode } from '../../../shared/types/src/lib/types';
 
@@ -14,10 +15,19 @@ interface ContentNode {
 
 @ObjectType()
 export class TimeFrame {
-  @Field()
+  @Field(() => Date)
   start!: Date;
 
-  @Field()
+  @Field(() => Date)
+  end!: Date;
+}
+
+@InputType()
+export class TimeFrameInput {
+  @Field(() => Date)
+  start!: Date;
+
+  @Field(() => Date)
   end!: Date;
 }
 
@@ -26,7 +36,7 @@ export class Pattern {
   @Field()
   id!: string;
 
-  @Field()
+  @Field(() => String)
   type!: 'organic' | 'coordinated' | 'automated';
 
   @Field(() => Float)
@@ -95,10 +105,10 @@ export class ExtendedContentNode implements ContentNode {
   createdAt: Date = new Date();
   updatedAt: Date = new Date();
 
-  @Field()
+  @Field(() => Date)
   timestamp!: Date;
 
-  @Field()
+  @Field(() => String)
   platform!: 'twitter' | 'facebook' | 'reddit' | 'other';
 
   @Field(() => String, { nullable: true })
@@ -119,7 +129,7 @@ export class ExtendedContentNode implements ContentNode {
   @Field(() => ContentMetadata, { nullable: true })
   metadata?: ContentMetadata;
 
-  @Field(() => Object, { nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   classification?: {
     categories: string[];
     sentiment: 'positive' | 'negative' | 'neutral';

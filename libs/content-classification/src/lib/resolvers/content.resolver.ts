@@ -18,6 +18,7 @@ import {
   ContentSearchParamsType,
   SimilarContentResultType,
   SemanticSearchParamsType,
+  EngagementMetricsInputType,
 } from '../types/content.types';
 
 @Resolver(() => ContentType)
@@ -44,7 +45,7 @@ export class ContentResolver {
 
   @Query(() => [ContentType])
   async searchContent(
-    @Args('params') params: ContentSearchParamsType
+    @Args('params', { type: () => ContentSearchParamsType }) params: ContentSearchParamsType
   ): Promise<ExtendedContentNode[]> {
     this.ensureContentService();
     return this.contentService.searchContent(params);
@@ -61,7 +62,7 @@ export class ContentResolver {
 
   @Mutation(() => ContentType)
   async createContent(
-    @Args('input') input: ContentCreateInputType
+    @Args('input', { type: () => ContentCreateInputType }) input: ContentCreateInputType
   ): Promise<ExtendedContentNode> {
     this.ensureContentService();
     return this.contentService.createContent(input);
@@ -70,7 +71,7 @@ export class ContentResolver {
   @Mutation(() => ContentType)
   async updateContent(
     @Args('id') id: string,
-    @Args('input') input: ContentUpdateInputType
+    @Args('input', { type: () => ContentUpdateInputType }) input: ContentUpdateInputType
   ): Promise<ExtendedContentNode | null> {
     this.ensureContentService();
     return this.contentService.updateContent(id, input);
@@ -85,7 +86,7 @@ export class ContentResolver {
   @Mutation(() => ContentType)
   async updateEngagementMetrics(
     @Args('id') id: string,
-    @Args('metrics') metrics: ContentUpdateInputType['engagementMetrics']
+    @Args('metrics', { type: () => EngagementMetricsInputType }) metrics: EngagementMetricsInputType
   ): Promise<ExtendedContentNode | null> {
     this.ensureContentService();
     return this.contentService.updateContent(id, {
@@ -95,7 +96,7 @@ export class ContentResolver {
 
   @Query(() => [ContentType])
   async semanticSearch(
-    @Args('params') params: SemanticSearchParamsType
+    @Args('params', { type: () => SemanticSearchParamsType }) params: SemanticSearchParamsType
   ): Promise<ExtendedContentNode[]> {
     this.ensureContentService();
 

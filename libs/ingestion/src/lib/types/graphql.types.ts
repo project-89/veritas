@@ -1,4 +1,5 @@
 import { Field, ObjectType, Float } from '@nestjs/graphql';
+import GraphQLJSON from 'graphql-type-json';
 
 /**
  * GraphQL type for sentiment analysis
@@ -8,7 +9,7 @@ export class SentimentAnalysisType {
   @Field(() => Float)
   score = 0.0;
 
-  @Field()
+  @Field(() => String)
   label = 'neutral';
 
   @Field(() => Float)
@@ -20,10 +21,10 @@ export class SentimentAnalysisType {
  */
 @ObjectType()
 export class EntityType {
-  @Field()
+  @Field(() => String)
   name = '';
 
-  @Field()
+  @Field(() => String)
   type = '';
 
   @Field(() => Float)
@@ -38,7 +39,7 @@ export class EngagementType {
   @Field(() => Float)
   total = 0;
 
-  @Field(() => Object)
+  @Field(() => GraphQLJSON, { nullable: true })
   breakdown: Record<string, number> = {};
 }
 
@@ -48,19 +49,19 @@ export class EngagementType {
  */
 @ObjectType('NarrativeInsight')
 export class NarrativeInsightType {
-  @Field()
+  @Field(() => String)
   id = '';
 
-  @Field()
+  @Field(() => String)
   contentHash = '';
 
-  @Field()
+  @Field(() => String)
   sourceHash = '';
 
-  @Field()
+  @Field(() => String)
   platform = '';
 
-  @Field()
+  @Field(() => Date)
   timestamp: Date = new Date();
 
   @Field(() => [String])
@@ -78,10 +79,10 @@ export class NarrativeInsightType {
   @Field(() => Float)
   narrativeScore = 0.0;
 
-  @Field()
+  @Field(() => Date)
   processedAt: Date = new Date();
 
-  @Field()
+  @Field(() => Date)
   expiresAt: Date = new Date();
 }
 
@@ -90,7 +91,7 @@ export class NarrativeInsightType {
  */
 @ObjectType()
 export class PlatformDistributionType {
-  @Field(() => Object)
+  @Field(() => GraphQLJSON, { nullable: true })
   distribution: Record<string, number> = {};
 }
 
@@ -100,13 +101,13 @@ export class PlatformDistributionType {
  */
 @ObjectType('NarrativeTrend')
 export class NarrativeTrendType {
-  @Field()
+  @Field(() => String)
   id = '';
 
-  @Field()
+  @Field(() => String)
   timeframe = '';
 
-  @Field()
+  @Field(() => String)
   primaryTheme = '';
 
   @Field(() => [String])
@@ -121,12 +122,12 @@ export class NarrativeTrendType {
   @Field(() => Float)
   sentimentTrend = 0.0;
 
-  @Field(() => Object)
+  @Field(() => GraphQLJSON, { nullable: true })
   platformDistribution: Record<string, number> = {};
 
   @Field(() => Float)
   narrativeScore = 0.0;
 
-  @Field()
+  @Field(() => Date)
   detectedAt: Date = new Date();
 }

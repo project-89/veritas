@@ -24,7 +24,7 @@ export class SourceResolver {
 
   @Query(() => [SourceType])
   async searchSources(
-    @Args('params') params: SourceSearchParamsType
+    @Args('params', { type: () => SourceSearchParamsType }) params: SourceSearchParamsType
   ): Promise<SourceNode[]> {
     return this.sourceService.searchSources(params);
   }
@@ -39,7 +39,7 @@ export class SourceResolver {
 
   @Mutation(() => SourceType)
   async createSource(
-    @Args('input') input: SourceCreateInputType
+    @Args('input', { type: () => SourceCreateInputType }) input: SourceCreateInputType
   ): Promise<SourceNode> {
     return this.sourceService.createSource(input);
   }
@@ -47,7 +47,7 @@ export class SourceResolver {
   @Mutation(() => SourceType)
   async updateSource(
     @Args('id') id: string,
-    @Args('input') input: SourceUpdateInputType
+    @Args('input', { type: () => SourceUpdateInputType }) input: SourceUpdateInputType
   ): Promise<SourceNode> {
     return this.sourceService.updateSource(id, input);
   }
@@ -60,7 +60,7 @@ export class SourceResolver {
   @Mutation(() => SourceType)
   async updateSourceCredibility(
     @Args('id') id: string,
-    @Args('score') score: number
+    @Args('score', { type: () => Float }) score: number
   ): Promise<SourceNode> {
     return this.sourceService.updateCredibilityScore(id, score);
   }

@@ -1,7 +1,8 @@
-import { Resolver, Mutation, Args, Query } from '@nestjs/graphql';
+import { Resolver, Mutation, Args, Query, ObjectType, Field, Float } from '@nestjs/graphql';
+import GraphQLJSON from 'graphql-type-json';
 import { NarrativeRepository } from '../repositories/narrative-insight.repository';
 import { SourceNode } from '@veritas/shared/types';
-import { Inject, Logger } from '@nestjs/common';
+import { Inject, Logger, Optional } from '@nestjs/common';
 
 /** Interface for the graph database service */
 interface GraphDatabaseService {
@@ -13,11 +14,33 @@ interface EventStreamingClient {
   emit(event: string, data: Record<string, unknown>): Promise<void>;
 }
 
+@ObjectType('IngestionSource')
 class SourceType implements SourceNode {
+  @Field(() => String)
   id!: string;
+
+  @Field(() => String)
   name!: string;
+
+  @Field(() => String)
   type!: 'social' | 'news' | 'blog' | 'forum' | 'other';
+
+  @Field(() => String, { nullable: true })
+  url?: string;
+
+  @Field(() => String, { nullable: true })
+  description?: string;
+
+  @Field(() => Float, { nullable: true })
+  trustScore?: number;
+
+  @Field(() => GraphQLJSON, { nullable: true })
+  metadata?: Record<string, unknown>;
+
+  @Field(() => Date)
   createdAt!: Date;
+
+  @Field(() => Date)
   updatedAt!: Date;
 }
 
@@ -46,8 +69,8 @@ export class IngestionResolver {
   constructor(
     private readonly transformService: TransformOnIngestService,
     private readonly narrativeRepository: NarrativeRepository,
-    @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: GraphDatabaseService,
-    @Inject('KAFKA_SERVICE') private readonly kafkaClient: EventStreamingClient
+    @Optional() @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: GraphDatabaseService,
+    @Optional() @Inject('KAFKA_SERVICE') private readonly kafkaClient: EventStreamingClient
   ) {}
 
   private mapVerificationStatus(
@@ -62,8 +85,8 @@ export class IngestionResolver {
    */
   @Mutation(() => NarrativeInsightType)
   async ingestSocialContent(
-    @Args('content') content: ContentIngestionInput,
-    @Args('source') source: SourceIngestionInput
+    @Args('content', { type: () => ContentIngestionInput }) content: ContentIngestionInput,
+    @Args('source', { type: () => SourceIngestionInput }) source: SourceIngestionInput
   ): Promise<NarrativeInsight> {
     // First convert to SocialMediaPost format
     const socialMediaPost: SocialMediaPost = {
@@ -128,7 +151,7 @@ export class IngestionResolver {
   @Mutation(() => SourceType)
   async verifySource(
     @Args('sourceId') sourceId: string,
-    @Args('status') status: VerificationStatus
+    @Args('status', { type: () => VerificationStatus }) status: VerificationStatus
   ): Promise<SourceNode> {
     try {
       // Update graph database

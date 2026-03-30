@@ -4,7 +4,7 @@ import {
   ANALYSIS_SERVICE,
   AnalysisServiceInterface,
 } from './interfaces/analysis-service.interface';
-import { DeviationMetrics, Pattern, TimeFrame, ExtendedContentNode } from './analysis.types';
+import { DeviationMetrics, Pattern, TimeFrame, TimeFrameInput, ExtendedContentNode } from './analysis.types';
 import { ContentAnalysisInput } from './dto/content-analysis.input';
 import { ContentAnalysisResult, RelatedContent } from './dto/content-analysis.result';
 
@@ -16,7 +16,7 @@ export class AnalysisResolver {
   ) {}
 
   @Query(() => [Pattern])
-  async detectPatterns(@Args('timeframe') timeframe: TimeFrame): Promise<Pattern[]> {
+  async detectPatterns(@Args('timeframe', { type: () => TimeFrameInput }) timeframe: TimeFrameInput): Promise<Pattern[]> {
     return this.analysisService.detectPatterns(timeframe);
   }
 
@@ -30,7 +30,7 @@ export class AnalysisResolver {
 
   @Mutation(() => ContentAnalysisResult)
   async analyzeContent(
-    @Args('input') input: ContentAnalysisInput,
+    @Args('input', { type: () => ContentAnalysisInput }) input: ContentAnalysisInput,
   ): Promise<ContentAnalysisResult> {
     const content = await this.analysisService.getContentById(input.contentId);
     if (!content) {

@@ -6,6 +6,7 @@ import {
   Param,
   Logger,
   Inject,
+  Optional,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { NarrativeRepository } from '../repositories/narrative-insight.repository';
@@ -33,8 +34,8 @@ export class IngestionController {
   constructor(
     private readonly narrativeRepository: NarrativeRepository,
     private readonly transformService: TransformOnIngestService,
-    @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: GraphDatabaseService,
-    @Inject('KAFKA_SERVICE') private readonly kafkaClient: EventStreamingClient
+    @Optional() @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: GraphDatabaseService,
+    @Optional() @Inject('KAFKA_SERVICE') private readonly kafkaClient: EventStreamingClient
   ) {}
 
   @Post('content')

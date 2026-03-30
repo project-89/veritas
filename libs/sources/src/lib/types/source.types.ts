@@ -6,6 +6,7 @@ import {
   Float,
   registerEnumType,
 } from "@nestjs/graphql";
+import GraphQLJSON from 'graphql-type-json';
 
 export enum SourcePlatform {
   TWITTER = "twitter",
@@ -47,13 +48,13 @@ export class SourceType {
   @Field(() => VerificationStatus)
   verificationStatus: VerificationStatus;
 
-  @Field(() => Object, { nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   metadata?: Record<string, any>;
 
-  @Field()
+  @Field(() => Date)
   createdAt: Date;
 
-  @Field()
+  @Field(() => Date)
   updatedAt: Date;
 }
 
@@ -71,7 +72,7 @@ export class SourceCreateInputType {
   @Field(() => VerificationStatus, { nullable: true })
   verificationStatus?: VerificationStatus;
 
-  @Field(() => Object, { nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   metadata?: Record<string, any>;
 }
 
@@ -86,7 +87,7 @@ export class SourceUpdateInputType {
   @Field(() => VerificationStatus, { nullable: true })
   verificationStatus?: VerificationStatus;
 
-  @Field(() => Object, { nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   metadata?: Record<string, any>;
 }
 

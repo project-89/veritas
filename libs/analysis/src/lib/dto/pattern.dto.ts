@@ -6,7 +6,7 @@ export class Pattern {
   @Field(() => ID)
   id = '';
 
-  @Field()
+  @Field(() => String)
   type = 'organic';
 
   @Field(() => Float)

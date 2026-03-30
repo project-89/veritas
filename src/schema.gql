@@ -1,0 +1,276 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type Content {
+  classification: ContentClassification!
+  createdAt: DateTime!
+  engagementMetrics: EngagementMetrics!
+  id: ID!
+  metadata: JSON
+  platform: String!
+  text: String!
+  timestamp: DateTime!
+  updatedAt: DateTime!
+}
+
+input ContentAnalysisInput {
+  contentId: String!
+}
+
+type ContentAnalysisResult {
+  analysisTimestamp: DateTime!
+  contentId: String!
+  deviationMetrics: DeviationMetrics!
+  patterns: [Pattern!]!
+  relatedContent: [RelatedContent!]!
+  sourceCredibility: Float!
+  trustScore: Float!
+}
+
+type ContentClassification {
+  categories: [String!]!
+  entities: [Entity!]!
+  language: String!
+  sentiment: String!
+  subjectivity: Float!
+  topics: [String!]!
+  toxicity: Float!
+}
+
+input ContentCreateInput {
+  metadata: JSON
+  platform: String!
+  sourceId: String!
+  text: String!
+  timestamp: DateTime!
+}
+
+input ContentEngagementMetricsInput {
+  comments: Float
+  likes: Float
+  reach: Float
+  shares: Float
+}
+
+input ContentIngestionInput {
+  engagementMetrics: EngagementMetricsInput
+  metadata: JSON
+  platform: String! = "twitter"
+  text: String! = ""
+}
+
+type ContentMetadata {
+  links: [String!]
+  media: [String!]
+  reach: Int
+  verified: Boolean
+}
+
+input ContentSearchParams {
+  endDate: DateTime
+  limit: Float
+  offset: Float
+  platform: String
+  query: String
+  sourceId: String
+  startDate: DateTime
+}
+
+input ContentUpdateInput {
+  engagementMetrics: ContentEngagementMetricsInput
+  metadata: JSON
+  text: String
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type DeviationMetrics {
+  baselineScore: Float!
+  crossReferenceScore: Float!
+  deviationMagnitude: Float!
+  impactScore: Float!
+  propagationVelocity: Float!
+  sourceCredibility: Float!
+  timeframe: TimeFrame!
+}
+
+type EngagementMetrics {
+  comments: Float!
+  likes: Float!
+  reach: Float!
+  shares: Float!
+}
+
+input EngagementMetricsInput {
+  comments: Float! = 0
+  likes: Float! = 0
+  reach: Float! = 0
+  shares: Float! = 0
+  viralityScore: Float! = 0
+}
+
+type EngagementType {
+  breakdown: JSON
+  total: Float!
+}
+
+type Entity {
+  confidence: Float!
+  text: String!
+  type: String!
+}
+
+type EntityType {
+  name: String!
+  relevance: Float!
+  type: String!
+}
+
+type IngestionSource {
+  createdAt: DateTime!
+  description: String
+  id: String!
+  metadata: JSON
+  name: String!
+  trustScore: Float
+  type: String!
+  updatedAt: DateTime!
+  url: String
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
+
+type Mutation {
+  analyzeContent(input: ContentAnalysisInput!): ContentAnalysisResult!
+  createContent(input: ContentCreateInput!): Content!
+  deleteContent(id: String!): Boolean!
+  generateAllEmbeddings(batchSize: Int): Int!
+  generateEmbedding(id: String!): Content!
+  ingestSocialContent(content: ContentIngestionInput!, source: SourceIngestionInput!): NarrativeInsight!
+  updateContent(id: String!, input: ContentUpdateInput!): Content!
+  updateEngagementMetrics(id: String!, metrics: ContentEngagementMetricsInput!): Content!
+  verifySource(sourceId: String!, status: VerificationStatus!): IngestionSource!
+}
+
+type NarrativeInsight {
+  contentHash: String!
+  engagement: EngagementType!
+  entities: [EntityType!]!
+  expiresAt: DateTime!
+  id: String!
+  narrativeScore: Float!
+  platform: String!
+  processedAt: DateTime!
+  sentiment: SentimentAnalysisType!
+  sourceHash: String!
+  themes: [String!]!
+  timestamp: DateTime!
+}
+
+type NarrativeTrend {
+  detectedAt: DateTime!
+  id: String!
+  insightCount: Float!
+  narrativeScore: Float!
+  platformDistribution: JSON
+  primaryTheme: String!
+  relatedThemes: [String!]!
+  sentimentTrend: Float!
+  timeframe: String!
+  uniqueSourcesCount: Float!
+}
+
+type Pattern {
+  confidence: Float!
+  edges: [String!]!
+  id: String!
+  nodes: [String!]!
+  timeframe: TimeFrame!
+  type: String!
+}
+
+type Query {
+  content(id: String!): Content
+  detectPatterns(timeframe: TimeFrameInput!): [Pattern!]!
+  getNarrativeInsights(limit: Float, skip: Float, timeframe: String!): [NarrativeInsight!]!
+  getNarrativeTrends(timeframe: String!): [NarrativeTrend!]!
+  getRealityDeviation(narrativeId: String!): DeviationMetrics!
+  relatedContent(id: String!, limit: Float): [Content!]!
+  searchContent(params: ContentSearchParams!): [Content!]!
+  semanticSearch(params: SemanticSearchParams!): [Content!]!
+  similarContent(id: String!, limit: Int, minScore: Float, useExistingEmbedding: Boolean): [SimilarContentResult!]!
+}
+
+type RelatedContent {
+  categories: [String!]
+  id: String!
+  metadata: JSON
+  platform: String!
+  sentiment: String
+  sourceId: String
+  text: String!
+  timestamp: DateTime!
+  topics: [String!]
+  toxicity: Float
+}
+
+input SemanticSearchParams {
+  endDate: DateTime
+  limit: Float
+
+  """Minimum similarity score threshold (0-1)"""
+  minScore: Float
+  offset: Float
+  platform: String
+  query: String
+
+  """Semantic query text for vector similarity search"""
+  semanticQuery: String!
+  sourceId: String
+  startDate: DateTime
+}
+
+type SentimentAnalysisType {
+  confidence: Float!
+  label: String!
+  score: Float!
+}
+
+type SimilarContentResult {
+  content: Content!
+
+  """Similarity score between 0-1"""
+  score: Float!
+}
+
+input SourceIngestionInput {
+  credibilityScore: Float! = 0.5
+  metadata: JSON
+  name: String! = ""
+  platform: String! = "twitter"
+  verificationStatus: VerificationStatus! = UNVERIFIED
+}
+
+type TimeFrame {
+  end: DateTime!
+  start: DateTime!
+}
+
+input TimeFrameInput {
+  end: DateTime!
+  start: DateTime!
+}
+
+"""The verification status of a source"""
+enum VerificationStatus {
+  SUSPICIOUS
+  UNVERIFIED
+  VERIFIED
+}

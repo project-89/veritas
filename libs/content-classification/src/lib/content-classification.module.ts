@@ -159,9 +159,10 @@ export class ContentClassificationModule {
     options: ContentClassificationModuleOptions = {}
   ): DynamicModule {
     const providers: Provider[] = [
+      ContentClassificationService,
       {
         provide: 'ContentClassificationService',
-        useClass: ContentClassificationService,
+        useExisting: ContentClassificationService,
       },
       ContentService,
       ContentResolver,

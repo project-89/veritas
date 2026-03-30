@@ -1,4 +1,5 @@
 import { ObjectType, InputType, Field, ID, Float } from '@nestjs/graphql';
+import GraphQLJSON from 'graphql-type-json';
 import { ContentClassification } from '../services/content-classification.service';
 
 /**
@@ -38,7 +39,7 @@ export class EngagementMetricsType {
   reach!: number;
 }
 
-@InputType('EngagementMetricsInput')
+@InputType('ContentEngagementMetricsInput')
 export class EngagementMetricsInputType {
   @Field(() => Float, { nullable: true })
   likes?: number;
@@ -97,10 +98,10 @@ export class ContentType {
   @Field()
   text!: string;
 
-  @Field()
+  @Field(() => Date)
   timestamp!: Date;
 
-  @Field()
+  @Field(() => String)
   platform!: string;
 
   @Field(() => EngagementMetricsType)
@@ -109,31 +110,31 @@ export class ContentType {
   @Field(() => ContentClassificationType)
   classification!: ContentClassificationType;
 
-  @Field(() => Object, { nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   metadata?: Record<string, unknown>;
 
-  @Field()
+  @Field(() => Date)
   createdAt!: Date;
 
-  @Field()
+  @Field(() => Date)
   updatedAt!: Date;
 }
 
 @InputType('ContentCreateInput')
 export class ContentCreateInputType {
-  @Field()
+  @Field(() => String)
   text!: string;
 
-  @Field()
+  @Field(() => Date)
   timestamp!: Date;
 
-  @Field()
+  @Field(() => String)
   platform!: string;
 
-  @Field()
+  @Field(() => String)
   sourceId!: string;
 
-  @Field(() => Object, { nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   metadata?: Record<string, unknown>;
 }
 
@@ -142,7 +143,7 @@ export class ContentUpdateInputType {
   @Field({ nullable: true })
   text?: string;
 
-  @Field(() => Object, { nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   metadata?: Record<string, unknown>;
 
   @Field(() => EngagementMetricsInputType, { nullable: true })
@@ -157,10 +158,10 @@ export class ContentSearchParamsType {
   @Field({ nullable: true })
   platform?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   startDate?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   endDate?: Date;
 
   @Field({ nullable: true })

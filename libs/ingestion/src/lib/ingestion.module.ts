@@ -12,7 +12,6 @@ import { TwitterConnector } from './services/twitter.connector';
 import { TwitterFreeConnector } from './services/twitter-free.connector';
 import { RSSConnector } from './services/rss.connector';
 import { WebScraperConnector } from './services/web-scraper.connector';
-import { YouTubeConnector } from './services/youtube.connector';
 import { YouTubeFreeConnector } from './services/youtube-free.connector';
 import { IngestionService } from './services/ingestion.service';
 import { SubprocessUtil } from './services/utils/subprocess.util';
@@ -211,11 +210,12 @@ export class IngestionModule {
       providers.push(FacebookJinaConnector);
     }
 
-    // YouTube connector: 'api' = googleapis (needs API key), 'free'/true = yt-dlp
+    // YouTube connector: always uses yt-dlp (YouTubeFreeConnector), no API key needed
     const youtubeMode = connectorConfig.youtube;
     if (youtubeMode === 'api') {
-      providers.push({ provide: YOUTUBE_CONNECTOR, useClass: YouTubeConnector });
-      providers.push(YouTubeConnector);
+      // 'api' mode now also uses YouTubeFreeConnector (googleapis connector removed)
+      providers.push({ provide: YOUTUBE_CONNECTOR, useClass: YouTubeFreeConnector });
+      providers.push(YouTubeFreeConnector);
     } else if (youtubeMode) {
       providers.push({ provide: YOUTUBE_CONNECTOR, useClass: YouTubeFreeConnector });
       providers.push(YouTubeFreeConnector);

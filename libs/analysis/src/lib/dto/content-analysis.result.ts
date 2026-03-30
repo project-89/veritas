@@ -1,4 +1,5 @@
 import { Field, ObjectType, Float } from '@nestjs/graphql';
+import GraphQLJSON from 'graphql-type-json';
 import { Pattern, DeviationMetrics } from '../analysis.types';
 
 // Define a local interface instead of importing from @veritas/shared
@@ -23,10 +24,10 @@ export class RelatedContent implements ContentNode {
   @Field()
   text!: string;
 
-  @Field()
+  @Field(() => Date)
   timestamp: Date = new Date();
 
-  @Field()
+  @Field(() => String)
   platform: 'twitter' | 'facebook' | 'reddit' | 'other' = 'other';
 
   @Field(() => Float, { nullable: true })
@@ -44,7 +45,7 @@ export class RelatedContent implements ContentNode {
   @Field(() => String, { nullable: true })
   sourceId?: string = '';
 
-  @Field(() => Object, { nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   metadata?: Record<string, any>;
 }
 
@@ -68,6 +69,6 @@ export class ContentAnalysisResult {
   @Field(() => Float)
   trustScore = 0.0;
 
-  @Field()
+  @Field(() => Date)
   analysisTimestamp: Date = new Date();
 }

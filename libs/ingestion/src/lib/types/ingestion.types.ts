@@ -1,4 +1,5 @@
-import { InputType, registerEnumType } from '@nestjs/graphql';
+import { InputType, Field, registerEnumType, Float } from '@nestjs/graphql';
+import GraphQLJSON from 'graphql-type-json';
 import {
   IsString,
   IsEnum,
@@ -18,19 +19,6 @@ export interface EngagementMetrics {
   comments: number;
   reach: number;
   viralityScore: number;
-}
-
-// Create local decorator implementations for testing
-export function Field(typeFunc?: any, options?: any): PropertyDecorator {
-  return (target: any, propertyKey: string | symbol) => {
-    // This is a mock implementation
-  };
-}
-
-export function Type(typeFunction: () => any): PropertyDecorator {
-  return (target: any, propertyKey: string | symbol) => {
-    // This is a mock implementation
-  };
 }
 
 export enum VerificationStatus {
@@ -57,27 +45,27 @@ registerEnumType(Platform, {
 
 @InputType()
 export class EngagementMetricsInput {
-  @Field()
+  @Field(() => Float)
   @IsNumber()
   @Min(0)
   likes = 0;
 
-  @Field()
+  @Field(() => Float)
   @IsNumber()
   @Min(0)
   shares = 0;
 
-  @Field()
+  @Field(() => Float)
   @IsNumber()
   @Min(0)
   comments = 0;
 
-  @Field()
+  @Field(() => Float)
   @IsNumber()
   @Min(0)
   reach = 0;
 
-  @Field()
+  @Field(() => Float)
   @IsNumber()
   @Min(0)
   @Max(1)
@@ -86,39 +74,38 @@ export class EngagementMetricsInput {
 
 @InputType()
 export class ContentIngestionInput {
-  @Field()
+  @Field(() => String)
   @IsString()
   @IsNotEmpty()
   text = '';
 
-  @Field()
+  @Field(() => String)
   @IsEnum(Platform)
   platform: 'twitter' | 'facebook' | 'reddit' | 'other' = 'twitter';
 
   @Field(() => EngagementMetricsInput, { nullable: true })
   @IsOptional()
   @ValidateNested()
-  @Type(() => EngagementMetricsInput)
   engagementMetrics?: EngagementMetricsInput;
 
-  @Field(() => Object, { nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   @IsOptional()
   @IsObject()
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 @InputType()
 export class SourceIngestionInput {
-  @Field()
+  @Field(() => String)
   @IsString()
   @IsNotEmpty()
   name = '';
 
-  @Field()
+  @Field(() => String)
   @IsEnum(Platform)
   platform: 'twitter' | 'facebook' | 'reddit' | 'other' = 'twitter';
 
-  @Field()
+  @Field(() => Float)
   @IsNumber()
   @Min(0)
   @Max(1)
@@ -128,8 +115,8 @@ export class SourceIngestionInput {
   @IsEnum(VerificationStatus)
   verificationStatus: VerificationStatus = VerificationStatus.UNVERIFIED;
 
-  @Field(() => Object, { nullable: true })
+  @Field(() => GraphQLJSON, { nullable: true })
   @IsOptional()
   @IsObject()
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
