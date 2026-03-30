@@ -37,23 +37,23 @@ import { DatabaseService } from '@veritas/database';
       isGlobal: true,
     }),
 
-    DatabaseModule.register({
-      providerType: 'memgraph',
-      providerOptions: {
-        uri: process.env['MEMGRAPH_URI'] || 'bolt://localhost:7687',
-        databaseName: 'veritas',
-        username: process.env['MEMGRAPH_USERNAME'],
-        password: process.env['MEMGRAPH_PASSWORD'],
-      },
-    }),
-
-    DatabaseModule.register({
-      providerType: 'redis',
-      providerOptions: {
-        uri: process.env['REDIS_URI'] || 'redis://localhost:6379',
-        databaseName: '0',
-      },
-    }),
+    // Memgraph and Redis are optional — uncomment when available
+    // DatabaseModule.register({
+    //   providerType: 'memgraph',
+    //   providerOptions: {
+    //     uri: process.env['MEMGRAPH_URI'] || 'bolt://localhost:7687',
+    //     databaseName: 'veritas',
+    //     username: process.env['MEMGRAPH_USERNAME'],
+    //     password: process.env['MEMGRAPH_PASSWORD'],
+    //   },
+    // }),
+    // DatabaseModule.register({
+    //   providerType: 'redis',
+    //   providerOptions: {
+    //     uri: process.env['REDIS_URI'] || 'redis://localhost:6379',
+    //     databaseName: '0',
+    //   },
+    // }),
 
     // Feature Modules
     IngestionModule.forRoot(),
@@ -68,20 +68,11 @@ import { DatabaseService } from '@veritas/database';
         dbService,
       inject: [ConfigService, DatabaseService],
     },
-    {
-      provide: 'MEMGRAPH_SERVICE',
-      useFactory: (configService: ConfigService, dbService: DatabaseService) =>
-        dbService,
-      inject: [ConfigService, DatabaseService],
-    },
-    {
-      provide: 'REDIS_SERVICE',
-      useFactory: (configService: ConfigService, dbService: DatabaseService) =>
-        dbService,
-      inject: [ConfigService, DatabaseService],
-    },
+    // Uncomment when Memgraph/Redis are available
+    // { provide: 'MEMGRAPH_SERVICE', useFactory: (db: DatabaseService) => db, inject: [DatabaseService] },
+    // { provide: 'REDIS_SERVICE', useFactory: (db: DatabaseService) => db, inject: [DatabaseService] },
   ],
-  exports: ['MONGODB_SERVICE', 'MEMGRAPH_SERVICE', 'REDIS_SERVICE'],
+  exports: ['MONGODB_SERVICE'],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
