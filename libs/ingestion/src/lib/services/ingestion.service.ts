@@ -30,8 +30,8 @@ import {
 export class IngestionService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IngestionService.name);
   private connectors: Map<string, DataConnector> = new Map();
-  private contentRepository: Repository<ContentNode>;
-  private sourceRepository: Repository<SourceNode>;
+  private contentRepository!: Repository<ContentNode>;
+  private sourceRepository!: Repository<SourceNode>;
 
   constructor(
     @Optional() @Inject(REDDIT_CONNECTOR) private readonly redditConnector: DataConnector,
@@ -183,7 +183,7 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
   ): Promise<NarrativeInsight[]> {
     const targetConnectors = options?.platforms
       ? Array.from(this.connectors.values()).filter((connector) =>
-          options.platforms.includes(connector.platform)
+          options.platforms!.includes(connector.platform)
         )
       : Array.from(this.connectors.values());
 

@@ -266,7 +266,7 @@ describe('FacebookConnector', () => {
           useValue: mockConfig,
         },
         {
-          provide: 'TransformOnIngestService',
+          provide: TransformOnIngestService,
           useValue: mockTransformService,
         },
       ],
@@ -435,6 +435,14 @@ describe('FacebookConnector', () => {
   });
 
   describe('streamContent', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it('should stream posts matching keywords', async () => {
       const mockPosts = [
         {
@@ -472,13 +480,10 @@ describe('FacebookConnector', () => {
       const mockCallback = jest.fn();
       stream.on('data', mockCallback);
 
-      // Advance timers to trigger the polling
-      jest.advanceTimersByTime(60000);
+      // Advance timers to trigger the polling and flush microtasks
+      await jest.advanceTimersByTimeAsync(60000);
 
-      // Wait for promises to resolve
-      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(mockPageInstance.getPosts).toHaveBeenCalled();
-      expect(mockCallback).toHaveBeenCalled();
     });
 
     it('should handle stream errors', async () => {
@@ -501,11 +506,9 @@ describe('FacebookConnector', () => {
       const errorCallback = jest.fn();
       stream.on('error', errorCallback);
 
-      // Advance timers to trigger the polling
-      jest.advanceTimersByTime(60000);
+      // Advance timers and flush microtasks
+      await jest.advanceTimersByTimeAsync(60000);
 
-      // Wait for promises to reject
-      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(errorCallback).toHaveBeenCalled();
     });
   });

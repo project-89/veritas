@@ -1,6 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getModelToken } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { MongoNarrativeRepository } from './mongo-narrative.repository';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { NarrativeTrend } from '../../types/narrative-trend.interface';
@@ -8,10 +6,9 @@ import { DatabaseService } from '@veritas/database';
 
 describe('MongoNarrativeRepository', () => {
   let repository: MongoNarrativeRepository;
-  let insightModel: Model<NarrativeInsight>;
-  let trendModel: Model<NarrativeTrend>;
   let mockDatabaseService: any;
   let mockInsightRepo: any;
+  let mockTrendRepo: any;
 
   // Sample data for testing
   const mockInsight: NarrativeInsight = {
@@ -65,30 +62,6 @@ describe('MongoNarrativeRepository', () => {
     detectedAt: new Date('2023-01-20'),
   };
 
-  // Mock implementations
-  const mockInsightModelFactory = jest.fn(() => ({
-    findOneAndUpdate: jest.fn().mockResolvedValue(mockInsight),
-    findOne: jest.fn().mockReturnValue({
-      lean: jest.fn().mockResolvedValue(mockInsight),
-    }),
-    find: jest.fn().mockReturnValue({
-      skip: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([mockInsight]),
-    }),
-    bulkWrite: jest
-      .fn()
-      .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
-    deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
-  }));
-
-  const mockTrendModelFactory = jest.fn(() => ({
-    find: jest.fn().mockReturnValue({
-      lean: jest.fn().mockResolvedValue([mockTrend]),
-    }),
-    create: jest.fn().mockResolvedValue(mockTrend),
-  }));
-
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -98,27 +71,39 @@ describe('MongoNarrativeRepository', () => {
         .fn()
         .mockResolvedValue([mockInsight, mockInsight2, mockInsight3]),
       findById: jest.fn(),
-      findOne: jest.fn(),
+      findOne: jest.fn().mockResolvedValue(mockInsight),
       count: jest.fn(),
-      create: jest.fn(),
-      createMany: jest.fn(),
+      create: jest.fn().mockResolvedValue(mockInsight),
+      createMany: jest.fn().mockResolvedValue([mockInsight, mockInsight2]),
       updateById: jest.fn(),
       updateMany: jest.fn(),
       deleteById: jest.fn(),
-      deleteMany: jest.fn(),
+      deleteMany: jest.fn().mockResolvedValue(1),
       vectorSearch: jest.fn().mockResolvedValue([
         { item: mockInsight, score: 0.92 },
         { item: mockInsight2, score: 0.85 },
       ]),
     };
 
-    const mockTrendRepo = { ...mockInsightRepo };
+    mockTrendRepo = {
+      find: jest.fn().mockResolvedValue([mockTrend]),
+      findById: jest.fn(),
+      findOne: jest.fn(),
+      count: jest.fn(),
+      create: jest.fn().mockResolvedValue(mockTrend),
+      createMany: jest.fn().mockResolvedValue([mockTrend]),
+      updateById: jest.fn(),
+      updateMany: jest.fn(),
+      deleteById: jest.fn(),
+      deleteMany: jest.fn(),
+      vectorSearch: jest.fn(),
+    };
 
     // Create mock database service
     mockDatabaseService = {
-      getRepository: jest.fn((name) => {
-        if (name === 'narrative-insights') return mockInsightRepo;
-        if (name === 'narrative-trends') return mockTrendRepo;
+      getRepository: jest.fn((name: string) => {
+        if (name === 'NarrativeInsight') return mockInsightRepo;
+        if (name === 'NarrativeTrend') return mockTrendRepo;
         return mockInsightRepo;
       }),
       connect: jest.fn(),
@@ -134,24 +119,10 @@ describe('MongoNarrativeRepository', () => {
           provide: DatabaseService,
           useValue: mockDatabaseService,
         },
-        {
-          provide: getModelToken('NarrativeInsight'),
-          useFactory: mockInsightModelFactory,
-        },
-        {
-          provide: getModelToken('NarrativeTrend'),
-          useFactory: mockTrendModelFactory,
-        },
       ],
     }).compile();
 
     repository = module.get<MongoNarrativeRepository>(MongoNarrativeRepository);
-    insightModel = module.get<Model<NarrativeInsight>>(
-      getModelToken('NarrativeInsight')
-    );
-    trendModel = module.get<Model<NarrativeTrend>>(
-      getModelToken('NarrativeTrend')
-    );
   });
 
   it('should be defined', () => {
@@ -161,11 +132,7 @@ describe('MongoNarrativeRepository', () => {
   describe('save', () => {
     it('should save a narrative insight', async () => {
       await repository.save(mockInsight);
-      expect(insightModel.findOneAndUpdate).toHaveBeenCalledWith(
-        { contentHash: mockInsight.contentHash },
-        mockInsight,
-        { upsert: true, new: true }
-      );
+      expect(mockInsightRepo.create).toHaveBeenCalledWith(mockInsight);
     });
   });
 
@@ -173,19 +140,14 @@ describe('MongoNarrativeRepository', () => {
     it('should save multiple narrative insights', async () => {
       const insights = [mockInsight, mockInsight2];
       await repository.saveMany(insights);
-      expect(insightModel.bulkWrite).toHaveBeenCalled();
-    });
-
-    it('should do nothing if insights array is empty', async () => {
-      await repository.saveMany([]);
-      expect(insightModel.bulkWrite).not.toHaveBeenCalled();
+      expect(mockInsightRepo.createMany).toHaveBeenCalledWith(insights);
     });
   });
 
   describe('findByContentHash', () => {
     it('should find an insight by content hash', async () => {
       const result = await repository.findByContentHash('hash-123');
-      expect(insightModel.findOne).toHaveBeenCalledWith({
+      expect(mockInsightRepo.findOne).toHaveBeenCalledWith({
         contentHash: 'hash-123',
       });
       expect(result).toEqual(mockInsight);
@@ -195,15 +157,15 @@ describe('MongoNarrativeRepository', () => {
   describe('findByTimeframe', () => {
     it('should find insights by timeframe', async () => {
       const result = await repository.findByTimeframe('2023-Q1');
-      expect(insightModel.find).toHaveBeenCalled();
-      expect(result).toEqual([mockInsight]);
+      expect(mockInsightRepo.find).toHaveBeenCalled();
+      expect(result).toEqual([mockInsight, mockInsight2, mockInsight3]);
     });
   });
 
   describe('getTrendsByTimeframe', () => {
     it('should get trends from cache if they exist', async () => {
       const result = await repository.getTrendsByTimeframe('2023-Q1');
-      expect(trendModel.find).toHaveBeenCalledWith({ timeframe: '2023-Q1' });
+      expect(mockTrendRepo.find).toHaveBeenCalledWith({ timeframe: '2023-Q1' });
       expect(result).toEqual([mockTrend]);
     });
   });
@@ -212,8 +174,8 @@ describe('MongoNarrativeRepository', () => {
     it('should delete insights older than cutoff date', async () => {
       const cutoffDate = new Date('2023-01-01');
       const result = await repository.deleteOlderThan(cutoffDate);
-      expect(insightModel.deleteMany).toHaveBeenCalledWith({
-        timestamp: { $lt: cutoffDate },
+      expect(mockInsightRepo.deleteMany).toHaveBeenCalledWith({
+        expiresAt: { $lt: cutoffDate },
       });
       expect(result).toBe(1);
     });

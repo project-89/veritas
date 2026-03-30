@@ -5,24 +5,8 @@ import { TransformOnIngestService } from '../services/transform/transform-on-ing
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { NarrativeTrend } from '../../types/narrative-trend.interface';
 
-interface NarrativeControllerInterface {
-  getInsight(contentHash: string): Promise<NarrativeInsight | null>;
-  getInsightsByTimeframe(
-    timeframe: string,
-    limit?: number,
-    skip?: number
-  ): Promise<NarrativeInsight[]>;
-  getTrendsByTimeframe(timeframe: string): Promise<NarrativeTrend[]>;
-  findSimilarContent(params: {
-    embedding?: number[];
-    limit?: number;
-    minScore?: number;
-  }): Promise<Array<{ insight: NarrativeInsight; score: number }>>;
-  cleanupExpiredData(): Promise<{ deletedCount: number }>;
-}
-
 describe('NarrativeController', () => {
-  let controller: NarrativeController & NarrativeControllerInterface;
+  let controller: NarrativeController;
   let mockNarrativeRepository: jest.Mocked<NarrativeRepository>;
   let mockTransformService: jest.Mocked<TransformOnIngestService>;
 
@@ -105,28 +89,26 @@ describe('NarrativeController', () => {
       ],
     }).compile();
 
-    controller = module.get<NarrativeController>(
-      NarrativeController
-    ) as NarrativeController & NarrativeControllerInterface;
+    controller = module.get<NarrativeController>(NarrativeController);
   });
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
   });
 
-  describe('getInsight', () => {
+  describe('getInsightByHash', () => {
     it('should return a narrative insight by content hash', async () => {
-      const result = await controller.getInsight('hash-123');
+      const result = await controller.getInsightByHash('hash-123');
       expect(result).toEqual(mockInsight);
       expect(mockNarrativeRepository.findByContentHash).toHaveBeenCalledWith(
         'hash-123'
       );
     });
 
-    it('should return null when insight not found', async () => {
+    it('should return error object when insight not found', async () => {
       mockNarrativeRepository.findByContentHash.mockResolvedValueOnce(null);
-      const result = await controller.getInsight('non-existent-hash');
-      expect(result).toBeNull();
+      const result = await controller.getInsightByHash('non-existent-hash');
+      expect(result).toEqual({ error: 'Insight not found' });
     });
   });
 
@@ -136,7 +118,7 @@ describe('NarrativeController', () => {
       expect(result).toEqual([mockInsight, mockInsight2]);
       expect(mockNarrativeRepository.findByTimeframe).toHaveBeenCalledWith(
         '2023-Q1',
-        undefined
+        { limit: undefined, skip: undefined }
       );
     });
 
@@ -159,48 +141,18 @@ describe('NarrativeController', () => {
     });
   });
 
-  describe('findSimilarContent', () => {
-    it('should return similar content when embedding is provided', async () => {
-      const result = await controller.findSimilarContent({
-        embedding: mockEmbedding,
-      });
-
-      expect(result).toHaveLength(2);
-      expect(result[0]!.insight).toEqual(mockInsight);
-      expect(result[0]!.score).toEqual(0.92);
-      expect(mockNarrativeRepository.findSimilarContent).toHaveBeenCalledWith(
-        mockEmbedding,
-        { limit: 10, minScore: 0.7 }
-      );
-    });
-
-    it('should apply custom limit and minScore', async () => {
-      await controller.findSimilarContent({
-        embedding: mockEmbedding,
-        limit: 5,
-        minScore: 0.8,
-      });
-
-      expect(mockNarrativeRepository.findSimilarContent).toHaveBeenCalledWith(
-        mockEmbedding,
-        { limit: 5, minScore: 0.8 }
-      );
-    });
-
-    it('should return empty array when no embedding is provided', async () => {
-      const result = await controller.findSimilarContent({});
-      expect(result).toEqual([]);
-      expect(mockNarrativeRepository.findSimilarContent).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('cleanupExpiredData', () => {
-    it('should delete expired insights', async () => {
-      const result = await controller.cleanupExpiredData();
+  describe('deleteOldInsights', () => {
+    it('should delete old insights', async () => {
+      const result = await controller.deleteOldInsights('2023-01-01');
       expect(result).toEqual({ deletedCount: 1 });
       expect(mockNarrativeRepository.deleteOlderThan).toHaveBeenCalledWith(
         expect.any(Date)
       );
+    });
+
+    it('should handle invalid date', async () => {
+      const result = await controller.deleteOldInsights('invalid-date');
+      expect(result).toEqual({ deletedCount: 0 });
     });
   });
 });

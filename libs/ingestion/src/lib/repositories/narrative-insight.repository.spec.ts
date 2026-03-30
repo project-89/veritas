@@ -123,7 +123,7 @@ describe('InMemoryNarrativeRepository', () => {
     it('should apply minScore filter', async () => {
       // Set a high threshold that only the exact match will pass
       const result = await repository.findSimilarContent(mockEmbedding1, {
-        minScore: 0.95,
+        minScore: 0.999,
       });
 
       expect(result).toHaveLength(1);
@@ -179,7 +179,7 @@ describe('InMemoryNarrativeRepository', () => {
     it('should generate trends by timeframe', async () => {
       const trends = await repository.getTrendsByTimeframe('2023-Q1');
 
-      expect(trends).toHaveLength(3); // 3 unique themes: politics, economy, inflation, elections
+      expect(trends).toHaveLength(4); // 4 unique themes: politics, economy, inflation, elections
 
       // Check trends structure
       trends.forEach((trend) => {

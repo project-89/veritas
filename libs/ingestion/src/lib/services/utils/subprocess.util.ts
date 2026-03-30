@@ -50,7 +50,7 @@ export class SubprocessUtil {
     } catch (error: unknown) {
       const err = error as Record<string, unknown>;
       // execFile errors include stdout/stderr on failure
-      if (err.code === 'ETIMEDOUT') {
+      if (err['code'] === 'ETIMEDOUT') {
         this.logger.error(
           `Command timed out after ${timeout}ms: ${command} ${args.join(' ')}`
         );
@@ -60,11 +60,11 @@ export class SubprocessUtil {
       }
 
       // Command executed but returned non-zero exit code
-      if (err.stdout !== undefined || err.stderr !== undefined) {
+      if (err['stdout'] !== undefined || err['stderr'] !== undefined) {
         return {
-          stdout: (err.stdout as string) || '',
-          stderr: (err.stderr as string) || '',
-          exitCode: (err.code as number) ?? 1,
+          stdout: (err['stdout'] as string) || '',
+          stderr: (err['stderr'] as string) || '',
+          exitCode: (err['code'] as number) ?? 1,
         };
       }
 

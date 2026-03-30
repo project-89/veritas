@@ -451,7 +451,9 @@ export class RSSConnector
       }
 
       // Try to fetch the first feed
-      const [feedName, feedUrl] = [...this.feedUrls.entries()][0];
+      const firstEntry = [...this.feedUrls.entries()][0];
+      if (!firstEntry) return false;
+      const [feedName, feedUrl] = firstEntry;
       await this.parser.parseURL(feedUrl);
 
       this.logger.log(`RSS feed validation successful for ${feedName}`);

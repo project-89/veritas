@@ -590,7 +590,7 @@ describe('ContentService', () => {
       expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
         'embedding',
         [0.1, 0.2, 0.3, 0.4],
-        { limit: 2, minScore: 0.7, collection: 'content' }
+        { limit: 2, minScore: 0.7 }
       );
       expect(embeddingsService.generateEmbedding).not.toHaveBeenCalled();
       expect(result).toHaveLength(2);
@@ -623,7 +623,7 @@ describe('ContentService', () => {
       expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
         'embedding',
         [0.1, 0.2, 0.3],
-        { limit: 1, minScore: 0.7, collection: 'content' }
+        { limit: 1, minScore: 0.7 }
       );
       expect(result).toHaveLength(1);
     });
@@ -703,7 +703,7 @@ describe('ContentService', () => {
       expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
         'embedding',
         [0.1, 0.2, 0.3, 0.4],
-        { limit: 5, minScore: 0.6, collection: 'content' }
+        { limit: 5, minScore: 0.6 }
       );
       expect(result).toHaveLength(2);
       expect(result[0]!.id).toBe('result-1');

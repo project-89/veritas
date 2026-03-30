@@ -1,18 +1,16 @@
-import { Test, TestingModule } from "@nestjs/testing";
 import { SourceService } from "./source.service";
 import { SourceValidationService } from "./source-validation.service";
-import { MemgraphProvider } from "@veritas/database";
 
 // Inline mock for MemgraphProvider (with additional methods used by SourceService)
-class MockMemgraphProvider {
-  createNode = jest.fn();
-  executeQuery = jest.fn();
-  connect = jest.fn();
-  disconnect = jest.fn();
-  isConnected = jest.fn().mockReturnValue(true);
-  registerModel = jest.fn();
-  getRepository = jest.fn();
-}
+const mockMemgraphProvider = {
+  createNode: jest.fn(),
+  executeQuery: jest.fn(),
+  connect: jest.fn(),
+  disconnect: jest.fn(),
+  isConnected: jest.fn().mockReturnValue(true),
+  registerModel: jest.fn(),
+  getRepository: jest.fn(),
+};
 
 // Inline mock source node
 const mockSourceNode = {
@@ -30,25 +28,17 @@ describe("SourceService", () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let memgraphProvider: any;
   let validationService: SourceValidationService;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  type AnyResult = any;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SourceService,
-        SourceValidationService,
-        {
-          provide: MemgraphProvider,
-          useClass: MockMemgraphProvider,
-        },
-      ],
-    }).compile();
+  beforeEach(() => {
+    jest.clearAllMocks();
 
-    service = module.get<SourceService>(SourceService);
-    memgraphProvider = module.get<MemgraphProvider>(MemgraphProvider);
-    validationService = module.get<SourceValidationService>(
-      SourceValidationService
+    validationService = new SourceValidationService();
+    memgraphProvider = mockMemgraphProvider;
+
+    // Instantiate directly to avoid NestJS DI issues with intersection types
+    service = new SourceService(
+      memgraphProvider as any,
+      validationService
     );
   });
 

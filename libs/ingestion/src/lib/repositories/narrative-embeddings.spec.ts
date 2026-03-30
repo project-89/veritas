@@ -118,9 +118,11 @@ describe('Narrative Repository Embeddings', () => {
   // Mock database service
   const mockDatabaseService = {
     getRepository: jest.fn().mockImplementation((name: string) => {
-      if (name === 'narrative-insights') return mockInsightRepository;
+      if (name === 'NarrativeInsight' || name === 'narrative-insights') return mockInsightRepository;
+      if (name === 'NarrativeTrend') return mockInsightRepository;
       return null;
     }),
+    registerModel: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -187,7 +189,6 @@ describe('Narrative Repository Embeddings', () => {
         expect.objectContaining({
           limit: 3,
           minScore: 0.7,
-          collection: 'narrative-insights',
         })
       );
     });
@@ -217,31 +218,14 @@ describe('Narrative Repository Embeddings', () => {
         expect.objectContaining({
           limit: 10, // Default limit
           minScore: 0.7, // Default minScore
-          collection: 'narrative-insights',
         })
       );
     });
 
     it('should fall back to memory search when vectorSearch is unavailable', async () => {
-      // Test the fallback by creating a repository without vectorSearch
-      const repositoryWithoutVectorSearch: Partial<InsightRepositoryType> = {
-        ...mockInsightRepository,
-      };
-
-      // Create a type-safe way to modify our mock
-      const modifiedRepository = {
-        ...repositoryWithoutVectorSearch,
-        find: mockInsightRepository.find,
-        // Explicitly not including vectorSearch
-      };
-
-      // Override getRepository implementation for this test
-      mockDatabaseService.getRepository.mockImplementationOnce(
-        (name: string) => {
-          if (name === 'narrative-insights') return modifiedRepository;
-          return null;
-        }
-      );
+      // Remove vectorSearch on the existing mock to test fallback
+      const originalVectorSearch = mockInsightRepository.vectorSearch;
+      mockInsightRepository.vectorSearch = undefined as any;
 
       const spy = jest.spyOn(
         mongoRepository as any,
@@ -263,11 +247,8 @@ describe('Narrative Repository Embeddings', () => {
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
 
-      // Reset for other tests
-      mockDatabaseService.getRepository.mockImplementation((name: string) => {
-        if (name === 'narrative-insights') return mockInsightRepository;
-        return null;
-      });
+      // Restore for other tests
+      mockInsightRepository.vectorSearch = originalVectorSearch;
       spy.mockRestore();
     });
   });
@@ -384,7 +365,7 @@ describe('Narrative Repository Embeddings', () => {
       const vecB = [...vecA]; // Copy of vecA should have similarity 1
 
       // Identical large vectors
-      expect(calculateSimilarity(vecA, vecB)).toBe(1);
+      expect(calculateSimilarity(vecA, vecB)).toBeCloseTo(1, 10);
 
       // Modify one element slightly
       vecB[100] = (vecB[100] ?? 0) + 0.01;

@@ -110,7 +110,7 @@ export function parseTimeframe(timeframe: string): {
   } else if (timeframe.startsWith('custom:')) {
     // Parse custom timeframe in format 'custom:YYYY-MM-DD:YYYY-MM-DD'
     const dates = timeframe.substring(7).split(':');
-    if (dates.length === 2) {
+    if (dates.length === 2 && dates[0] && dates[1]) {
       startDate = new Date(dates[0]);
       endDate = new Date(dates[1]);
     }

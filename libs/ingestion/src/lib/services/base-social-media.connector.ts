@@ -69,10 +69,10 @@ export abstract class BaseSocialMediaConnector
         // Close all stream connections
         for (const [keyword, connection] of this.streamConnections.entries()) {
           if (connection) {
-            if (typeof connection.close === 'function') {
-              connection.close();
-            } else if (typeof connection.destroy === 'function') {
-              connection.destroy();
+            if (typeof (connection as ExtendedEventEmitter).close === 'function') {
+              (connection as ExtendedEventEmitter).close!();
+            } else if (typeof (connection as ExtendedEventEmitter).destroy === 'function') {
+              (connection as ExtendedEventEmitter).destroy!();
             } else if (connection instanceof EventEmitter) {
               connection.removeAllListeners();
             }

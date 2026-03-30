@@ -7,4 +7,7 @@ export default {
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/libs/ingestion',
+  moduleNameMapper: {
+    '^franc-min$': '<rootDir>/src/__mocks__/franc-min.ts',
+  },
 };

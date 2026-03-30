@@ -200,7 +200,7 @@ export class YouTubeConnector
         throw new Error(`YouTube channel ${authorId} not found`);
       }
 
-      const channel = response.data.items[0];
+      const channel = response.data.items[0]!;
       const snippet = channel.snippet;
       const statistics = channel.statistics;
 
