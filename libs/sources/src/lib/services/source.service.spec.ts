@@ -1,12 +1,31 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { SourceService } from "./source.service";
 import { SourceValidationService } from "./source-validation.service";
-import { MemgraphService } from "@/database";
-import { mockSourceNode, MockMemgraphService } from "test/test-utils";
+import { MemgraphProvider } from "@veritas/database";
+
+// Inline mock for MemgraphProvider
+class MockMemgraphProvider {
+  createNode = jest.fn();
+  executeQuery = jest.fn();
+  connect = jest.fn();
+  disconnect = jest.fn();
+  getRepository = jest.fn();
+}
+
+// Inline mock source node
+const mockSourceNode = {
+  id: "123",
+  name: "Test Source",
+  platform: "twitter",
+  credibilityScore: 0.8,
+  verificationStatus: "unverified",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
 describe("SourceService", () => {
   let service: SourceService;
-  let memgraphService: MemgraphService;
+  let memgraphProvider: MemgraphProvider;
   let validationService: SourceValidationService;
 
   beforeEach(async () => {
@@ -15,14 +34,14 @@ describe("SourceService", () => {
         SourceService,
         SourceValidationService,
         {
-          provide: MemgraphService,
-          useClass: MockMemgraphService,
+          provide: MemgraphProvider,
+          useClass: MockMemgraphProvider,
         },
       ],
     }).compile();
 
     service = module.get<SourceService>(SourceService);
-    memgraphService = module.get<MemgraphService>(MemgraphService);
+    memgraphProvider = module.get<MemgraphProvider>(MemgraphProvider);
     validationService = module.get<SourceValidationService>(
       SourceValidationService
     );
@@ -45,7 +64,7 @@ describe("SourceService", () => {
         .spyOn(validationService, "validateSourceInput")
         .mockResolvedValueOnce();
       jest
-        .spyOn(memgraphService, "createNode")
+        .spyOn(memgraphProvider, "createNode")
         .mockResolvedValueOnce(mockSourceNode);
 
       const result = await service.createSource(createInput);
@@ -86,7 +105,7 @@ describe("SourceService", () => {
         .spyOn(validationService, "validateSourceUpdate")
         .mockResolvedValueOnce();
       jest
-        .spyOn(memgraphService, "executeQuery")
+        .spyOn(memgraphProvider, "executeQuery")
         .mockResolvedValueOnce([{ s: mockSourceNode }])
         .mockResolvedValueOnce([{ s: updatedSource }]);
 
@@ -99,7 +118,7 @@ describe("SourceService", () => {
     });
 
     it("should throw error when source not found", async () => {
-      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([]);
+      jest.spyOn(memgraphProvider, "executeQuery").mockResolvedValueOnce([]);
 
       await expect(service.updateSource("123", updateInput)).rejects.toThrow(
         "Source not found"
@@ -118,7 +137,7 @@ describe("SourceService", () => {
 
     it("should return search results", async () => {
       jest
-        .spyOn(memgraphService, "executeQuery")
+        .spyOn(memgraphProvider, "executeQuery")
         .mockResolvedValueOnce([{ s: mockSourceNode }]);
 
       const results = await service.searchSources(searchParams);
@@ -132,7 +151,7 @@ describe("SourceService", () => {
     });
 
     it("should handle empty search results", async () => {
-      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([]);
+      jest.spyOn(memgraphProvider, "executeQuery").mockResolvedValueOnce([]);
 
       const results = await service.searchSources(searchParams);
 
@@ -144,7 +163,7 @@ describe("SourceService", () => {
   describe("getSourceById", () => {
     it("should return source by id", async () => {
       jest
-        .spyOn(memgraphService, "executeQuery")
+        .spyOn(memgraphProvider, "executeQuery")
         .mockResolvedValueOnce([{ s: mockSourceNode }]);
 
       const result = await service.getSourceById("123");
@@ -154,7 +173,7 @@ describe("SourceService", () => {
     });
 
     it("should return null when source not found", async () => {
-      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([]);
+      jest.spyOn(memgraphProvider, "executeQuery").mockResolvedValueOnce([]);
 
       const result = await service.getSourceById("123");
 
@@ -165,7 +184,7 @@ describe("SourceService", () => {
   describe("deleteSource", () => {
     it("should delete source successfully", async () => {
       jest
-        .spyOn(memgraphService, "executeQuery")
+        .spyOn(memgraphProvider, "executeQuery")
         .mockResolvedValueOnce([{ deleted: 1 }]);
 
       const result = await service.deleteSource("123");
@@ -175,7 +194,7 @@ describe("SourceService", () => {
 
     it("should return false when source not found", async () => {
       jest
-        .spyOn(memgraphService, "executeQuery")
+        .spyOn(memgraphProvider, "executeQuery")
         .mockResolvedValueOnce([{ deleted: 0 }]);
 
       const result = await service.deleteSource("123");
@@ -188,7 +207,7 @@ describe("SourceService", () => {
     it("should return source content", async () => {
       const mockContent = [{ id: "1", text: "test" }];
       jest
-        .spyOn(memgraphService, "executeQuery")
+        .spyOn(memgraphProvider, "executeQuery")
         .mockResolvedValueOnce([{ c: mockContent[0] }]);
 
       const results = await service.getSourceContent("123");
@@ -208,7 +227,7 @@ describe("SourceService", () => {
         credibilityScore: 0.9,
       };
       jest
-        .spyOn(memgraphService, "executeQuery")
+        .spyOn(memgraphProvider, "executeQuery")
         .mockResolvedValueOnce([{ s: mockSourceNode }])
         .mockResolvedValueOnce([{ s: updatedSource }]);
 
@@ -219,7 +238,7 @@ describe("SourceService", () => {
     });
 
     it("should throw error when source not found", async () => {
-      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([]);
+      jest.spyOn(memgraphProvider, "executeQuery").mockResolvedValueOnce([]);
 
       await expect(service.updateCredibilityScore("123", 0.9)).rejects.toThrow(
         "Source not found"
@@ -229,7 +248,7 @@ describe("SourceService", () => {
 
   describe("calculateAggregateCredibility", () => {
     it("should calculate aggregate credibility", async () => {
-      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([
+      jest.spyOn(memgraphProvider, "executeQuery").mockResolvedValueOnce([
         {
           contentCount: 100,
           verifiedContentCount: 80,
@@ -245,7 +264,7 @@ describe("SourceService", () => {
     });
 
     it("should return default score when no data available", async () => {
-      jest.spyOn(memgraphService, "executeQuery").mockResolvedValueOnce([]);
+      jest.spyOn(memgraphProvider, "executeQuery").mockResolvedValueOnce([]);
 
       const score = await service.calculateAggregateCredibility("123");
 

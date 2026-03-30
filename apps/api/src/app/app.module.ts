@@ -4,12 +4,9 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { join } from 'path';
 import { DatabaseModule } from '@veritas/database';
-import { AnalysisModule } from '@/modules/analysis/analysis.module';
+import { AnalysisModule } from '@veritas/analysis';
 import { ContentClassificationModule } from '@veritas/content-classification';
-import { SourcesModule } from '@/modules/sources/sources.module';
-import { MonitoringModule } from '@/modules/monitoring/monitoring.module';
-import { IngestionModule } from '@/modules/ingestion/ingestion.module';
-import { VisualizationModule } from '@/modules/visualization/visualization.module';
+import { IngestionModule } from '@veritas/ingestion';
 import { LoggingService } from './services/logging.service';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { DatabaseService } from '@veritas/database';
@@ -63,12 +60,9 @@ import { DatabaseService } from '@veritas/database';
     }),
 
     // Feature Modules
-    IngestionModule,
+    IngestionModule.forRoot(),
     AnalysisModule,
     ContentClassificationModule,
-    SourcesModule,
-    MonitoringModule,
-    VisualizationModule,
   ],
   providers: [
     LoggingService,
