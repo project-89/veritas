@@ -153,7 +153,7 @@ export class IngestionResolver {
         timestamp: new Date(),
       });
 
-      return result[0]?.s as SourceNode;
+      return result[0]?.['s'] as SourceNode;
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(

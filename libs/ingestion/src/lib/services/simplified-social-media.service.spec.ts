@@ -355,8 +355,8 @@ describe('TransformOnIngestService', () => {
 
       // Only check the length to avoid date comparison issues
       expect(results.length).toBe(1);
-      expect(results[0].id).toBe(mockInsight.id);
-      expect(results[0].platform).toBe(mockInsight.platform);
+      expect(results[0]!.id).toBe(mockInsight.id);
+      expect(results[0]!.platform).toBe(mockInsight.platform);
     });
 
     it('should search content across all platforms', async () => {

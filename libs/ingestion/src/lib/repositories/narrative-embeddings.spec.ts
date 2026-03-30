@@ -17,7 +17,7 @@ describe('Narrative Repository Embeddings', () => {
     id,
     contentHash: `content-hash-${id}`,
     sourceHash: `source-hash-${id.substring(0, 1)}`, // Group some by same source
-    platform: ['twitter', 'facebook', 'reddit'][Math.floor(Math.random() * 3)],
+    platform: (['twitter', 'facebook', 'reddit'] as const)[Math.floor(Math.random() * 3)] as string,
     timestamp: new Date(),
     themes,
     entities: themes.map((theme) => ({
@@ -59,10 +59,10 @@ describe('Narrative Repository Embeddings', () => {
   ];
 
   // Create a similar embedding vector to the 'climate' related insights
-  const climateRelatedEmbedding = [...(mockInsights[0].embedding || [])];
+  const climateRelatedEmbedding = [...(mockInsights[0]!.embedding || [])];
   // Slightly modify it to avoid exact match
   for (let i = 0; i < climateRelatedEmbedding.length; i++) {
-    climateRelatedEmbedding[i] += (Math.random() - 0.5) * 0.1;
+    climateRelatedEmbedding[i] = (climateRelatedEmbedding[i] ?? 0) + (Math.random() - 0.5) * 0.1;
   }
 
   // Create repository mocks
@@ -90,9 +90,9 @@ describe('Narrative Repository Embeddings', () => {
           let normB = 0;
 
           for (let i = 0; i < vecA.length; i++) {
-            dotProduct += vecA[i] * vecB[i];
-            normA += vecA[i] * vecA[i];
-            normB += vecB[i] * vecB[i];
+            dotProduct += (vecA[i] ?? 0) * (vecB[i] ?? 0);
+            normA += (vecA[i] ?? 0) * (vecA[i] ?? 0);
+            normB += (vecB[i] ?? 0) * (vecB[i] ?? 0);
           }
 
           if (normA === 0 || normB === 0) return 0;
@@ -177,7 +177,7 @@ describe('Narrative Repository Embeddings', () => {
 
       // Verify sorted by score (descending)
       for (let i = 1; i < result.length; i++) {
-        expect(result[i - 1].score).toBeGreaterThanOrEqual(result[i].score);
+        expect(result[i - 1]!.score).toBeGreaterThanOrEqual(result[i]!.score);
       }
 
       // Verify repository method was called
@@ -298,7 +298,7 @@ describe('Narrative Repository Embeddings', () => {
 
       // Verify sorted by score (descending)
       for (let i = 1; i < result.length; i++) {
-        expect(result[i - 1].score).toBeGreaterThanOrEqual(result[i].score);
+        expect(result[i - 1]!.score).toBeGreaterThanOrEqual(result[i]!.score);
       }
     });
 
@@ -387,7 +387,7 @@ describe('Narrative Repository Embeddings', () => {
       expect(calculateSimilarity(vecA, vecB)).toBe(1);
 
       // Modify one element slightly
-      vecB[100] += 0.01;
+      vecB[100] = (vecB[100] ?? 0) + 0.01;
 
       // Close but not identical vectors
       const similarity = calculateSimilarity(vecA, vecB);

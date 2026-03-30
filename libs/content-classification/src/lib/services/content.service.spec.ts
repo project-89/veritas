@@ -454,7 +454,7 @@ describe('ContentService', () => {
       expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
       expect(mockRepository.find).toHaveBeenCalled();
       expect(result).toHaveLength(2);
-      expect(result[0].id).toBe('related-1');
+      expect(result[0]!.id).toBe('related-1');
     });
 
     it('should return empty array when source content not found', async () => {
@@ -594,8 +594,8 @@ describe('ContentService', () => {
       );
       expect(embeddingsService.generateEmbedding).not.toHaveBeenCalled();
       expect(result).toHaveLength(2);
-      expect(result[0].content.id).toBe('similar-1');
-      expect(result[0].score).toBe(0.9);
+      expect(result[0]!.content.id).toBe('similar-1');
+      expect(result[0]!.score).toBe(0.9);
     });
 
     it('should generate embedding when content has no existing embedding', async () => {
@@ -706,7 +706,7 @@ describe('ContentService', () => {
         { limit: 5, minScore: 0.6, collection: 'content' }
       );
       expect(result).toHaveLength(2);
-      expect(result[0].id).toBe('result-1');
+      expect(result[0]!.id).toBe('result-1');
 
       // Restore original mock
       embeddingsService.generateEmbedding = originalGenerateEmbedding;

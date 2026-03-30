@@ -6,7 +6,13 @@
     "types": ["jest", "node"],
     "declaration": true,
     "esModuleInterop": true,
-    "allowJs": true
+    "allowJs": true,
+    "baseUrl": "../..",
+    "paths": {
+      "@veritas/shared/types": ["libs/shared/types/src/index.ts"],
+      "@veritas/shared": ["libs/shared/types/src/index.ts"],
+      "@veritas/database": ["libs/database/src/index.ts"]
+    }
   },
   "include": [
     "jest.config.ts",

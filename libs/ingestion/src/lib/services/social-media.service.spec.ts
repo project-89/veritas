@@ -426,13 +426,14 @@ describe('SocialMediaService', () => {
 
       const stream = service.streamAllPlatforms(['test']);
 
-      try {
-        // Just try to get the first value, which should trigger the error
-        await stream.next();
-        fail('Expected an error to be thrown');
-      } catch (error) {
-        expect(error).toEqual(mockError);
-      }
+      await new Promise<void>((resolve, reject) => {
+        stream.on('error', (error) => {
+          expect(error).toEqual(mockError);
+          resolve();
+        });
+        // Timeout fallback
+        setTimeout(() => reject(new Error('Timeout waiting for error event')), 5000);
+      });
     }, 15000); // Increase timeout for this specific test
 
     it('should aggregate content from all platforms', async () => {
@@ -466,10 +467,13 @@ describe('SocialMediaService', () => {
         });
 
       const stream = service.streamAllPlatforms(['test']);
-      const { value, done } = await stream.next();
 
-      expect(value).toEqual(mockPost);
-      expect(done).toBe(false);
+      await new Promise<void>((resolve) => {
+        stream.on('data', (value) => {
+          expect(value).toEqual(mockPost);
+          resolve();
+        });
+      });
     });
   });
 

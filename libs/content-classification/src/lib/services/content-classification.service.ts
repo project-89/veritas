@@ -281,7 +281,7 @@ export class ContentClassificationService {
       const dataArray = await response.json();
 
       // Map each response to our internal format
-      return dataArray.map((data) =>
+      return dataArray.map((data: any) =>
         this.mapServiceResponseToClassification(data)
       );
     } catch (error) {
@@ -306,7 +306,7 @@ export class ContentClassificationService {
       categories: data.categories || [],
       sentiment: {
         score: data.sentiment?.score || 0,
-        label: this.mapSentimentLabel(data.sentiment?.label),
+        label: this.mapSentimentLabel(data.sentiment?.label ?? ''),
         confidence: data.sentiment?.confidence || 0.5,
       },
       toxicity: data.toxicity || 0,

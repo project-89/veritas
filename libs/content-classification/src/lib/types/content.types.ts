@@ -26,16 +26,16 @@ export interface NlpServiceResponse {
 @ObjectType('EngagementMetrics')
 export class EngagementMetricsType {
   @Field(() => Float)
-  likes: number;
+  likes!: number;
 
   @Field(() => Float)
-  shares: number;
+  shares!: number;
 
   @Field(() => Float)
-  comments: number;
+  comments!: number;
 
   @Field(() => Float)
-  reach: number;
+  reach!: number;
 }
 
 @InputType('EngagementMetricsInput')
@@ -56,82 +56,82 @@ export class EngagementMetricsInputType {
 @ObjectType('ContentClassification')
 export class ContentClassificationType {
   @Field(() => [String])
-  categories: string[];
+  categories!: string[];
 
   @Field()
-  sentiment: string;
+  sentiment!: string;
 
   @Field(() => Float)
-  toxicity: number;
+  toxicity!: number;
 
   @Field(() => Float)
-  subjectivity: number;
+  subjectivity!: number;
 
   @Field()
-  language: string;
+  language!: string;
 
   @Field(() => [String])
-  topics: string[];
+  topics!: string[];
 
   @Field(() => [EntityType])
-  entities: Array<{ text: string; type: string; confidence: number }>;
+  entities!: Array<{ text: string; type: string; confidence: number }>;
 }
 
 @ObjectType('Entity')
 export class EntityType {
   @Field()
-  text: string;
+  text!: string;
 
   @Field()
-  type: string;
+  type!: string;
 
   @Field(() => Float)
-  confidence: number;
+  confidence!: number;
 }
 
 @ObjectType('Content')
 export class ContentType {
   @Field(() => ID)
-  id: string;
+  id!: string;
 
   @Field()
-  text: string;
+  text!: string;
 
   @Field()
-  timestamp: Date;
+  timestamp!: Date;
 
   @Field()
-  platform: string;
+  platform!: string;
 
   @Field(() => EngagementMetricsType)
-  engagementMetrics: EngagementMetricsType;
+  engagementMetrics!: EngagementMetricsType;
 
   @Field(() => ContentClassificationType)
-  classification: ContentClassificationType;
+  classification!: ContentClassificationType;
 
   @Field(() => Object, { nullable: true })
   metadata?: Record<string, unknown>;
 
   @Field()
-  createdAt: Date;
+  createdAt!: Date;
 
   @Field()
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 @InputType('ContentCreateInput')
 export class ContentCreateInputType {
   @Field()
-  text: string;
+  text!: string;
 
   @Field()
-  timestamp: Date;
+  timestamp!: Date;
 
   @Field()
-  platform: string;
+  platform!: string;
 
   @Field()
-  sourceId: string;
+  sourceId!: string;
 
   @Field(() => Object, { nullable: true })
   metadata?: Record<string, unknown>;
@@ -179,7 +179,7 @@ export class ContentSearchParamsType {
 @InputType('SemanticSearchParams')
 export class SemanticSearchParamsType extends ContentSearchParamsType {
   @Field({ description: 'Semantic query text for vector similarity search' })
-  semanticQuery: string;
+  semanticQuery!: string;
 
   @Field(() => Float, {
     nullable: true,
@@ -194,8 +194,8 @@ export class SemanticSearchParamsType extends ContentSearchParamsType {
 @ObjectType('SimilarContentResult')
 export class SimilarContentResultType {
   @Field(() => ContentType)
-  content: ContentType;
+  content!: ContentType;
 
   @Field(() => Float, { description: 'Similarity score between 0-1' })
-  score: number;
+  score!: number;
 }

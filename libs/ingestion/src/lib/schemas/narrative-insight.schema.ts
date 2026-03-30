@@ -43,7 +43,7 @@ class Engagement {
   timestamps: true,
   toJSON: {
     transform: (_: unknown, ret: Record<string, unknown>) => {
-      delete ret._id;
+      delete ret['_id'];
       return ret;
     },
   },

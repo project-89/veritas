@@ -1,55 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { FacebookConnector } from './facebook.connector';
-import { FacebookAdsApi, Page, Post } from 'facebook-nodejs-business-sdk';
-import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
-import { NarrativeInsight } from '../interfaces/narrative-insight.interface';
+import { FacebookAdsApi, Page } from 'facebook-nodejs-business-sdk';
+import { SocialMediaPost } from '../../types/social-media.types';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { EventEmitter } from 'events';
 import { Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
-
-// Type declaration for the facebook-nodejs-business-sdk module
-declare module 'facebook-nodejs-business-sdk' {
-  export class FacebookAdsApi {
-    static init(accessToken: string): any;
-  }
-  export class Page {
-    constructor(id: string, api?: any);
-    get(options?: any): Promise<any>;
-    getPosts(options?: any): Promise<{ data: Post[] }>;
-  }
-  export interface Post {
-    id: string;
-    message?: string;
-    created_time: string;
-    from?: {
-      id: string;
-      name: string;
-    };
-    permalink_url?: string;
-    reactions?: {
-      summary: {
-        total_count: number;
-      };
-    };
-    shares?: {
-      count: number;
-    };
-    comments?: {
-      summary: {
-        total_count: number;
-      };
-    };
-    insights?: {
-      data: Array<{
-        name?: string;
-        values: Array<{
-          value: number;
-        }>;
-      }>;
-    };
-  }
-}
 
 // Define mockSourceNode locally instead of importing
 const mockSourceNode = {
@@ -205,7 +163,7 @@ describe('FacebookConnector', () => {
   let facebookApi: jest.Mocked<FacebookAdsApi>;
   let mockTransformService: MockTransformOnIngestService;
 
-  const mockPost: Post = {
+  const mockPost: any = {
     id: '123',
     message: 'Test post',
     created_time: new Date().toISOString(),
@@ -376,7 +334,7 @@ describe('FacebookConnector', () => {
         getPage: jest.fn().mockReturnValue(mockPageInstance),
       });
 
-      const connector = new FacebookConnector(mockConfig, mockTransformService);
+      const connector = new FacebookConnector(mockConfig, mockTransformService as unknown as TransformOnIngestService);
       await connector.connect();
 
       const results = await connector.searchContent('test');
@@ -391,7 +349,7 @@ describe('FacebookConnector', () => {
           likes: mockPost.reactions.summary.total_count,
           shares: mockPost.shares.count,
           comments: mockPost.comments.summary.total_count,
-          reach: mockPost.insights.data[0].values[0].value,
+          reach: mockPost.insights.data[0]!.values[0]!.value,
           viralityScore: expect.any(Number),
         },
       });
@@ -410,7 +368,7 @@ describe('FacebookConnector', () => {
         getPage: jest.fn().mockReturnValue(mockPageInstance),
       });
 
-      const connector = new FacebookConnector(mockConfig, mockTransformService);
+      const connector = new FacebookConnector(mockConfig, mockTransformService as unknown as TransformOnIngestService);
       await connector.connect();
 
       await expect(connector.searchContent('test')).rejects.toThrow(
@@ -439,7 +397,7 @@ describe('FacebookConnector', () => {
         getPage: jest.fn().mockReturnValue(mockPageInstance),
       });
 
-      const connector = new FacebookConnector(mockConfig, mockTransformService);
+      const connector = new FacebookConnector(mockConfig, mockTransformService as unknown as TransformOnIngestService);
       await connector.connect();
 
       const result = await connector.getAuthorDetails('123');
@@ -467,7 +425,7 @@ describe('FacebookConnector', () => {
         getPage: jest.fn().mockReturnValue(mockPageInstance),
       });
 
-      const connector = new FacebookConnector(mockConfig, mockTransformService);
+      const connector = new FacebookConnector(mockConfig, mockTransformService as unknown as TransformOnIngestService);
       await connector.connect();
 
       await expect(connector.getAuthorDetails('nonexistent')).rejects.toThrow(
@@ -507,7 +465,7 @@ describe('FacebookConnector', () => {
         getPage: jest.fn().mockReturnValue(mockPageInstance),
       });
 
-      const connector = new FacebookConnector(mockConfig, mockTransformService);
+      const connector = new FacebookConnector(mockConfig, mockTransformService as unknown as TransformOnIngestService);
       await connector.connect();
 
       const stream = connector.streamContent(['keyword']);
@@ -536,7 +494,7 @@ describe('FacebookConnector', () => {
         getPage: jest.fn().mockReturnValue(mockPageInstance),
       });
 
-      const connector = new FacebookConnector(mockConfig, mockTransformService);
+      const connector = new FacebookConnector(mockConfig, mockTransformService as unknown as TransformOnIngestService);
       await connector.connect();
 
       const stream = connector.streamContent(['keyword']);
@@ -565,7 +523,7 @@ describe('FacebookConnector', () => {
         getPage: jest.fn().mockReturnValue(mockPageInstance),
       });
 
-      const connector = new FacebookConnector(mockConfig, mockTransformService);
+      const connector = new FacebookConnector(mockConfig, mockTransformService as unknown as TransformOnIngestService);
       await connector.connect();
 
       const result = await connector.validateCredentials();
@@ -587,7 +545,7 @@ describe('FacebookConnector', () => {
         getPage: jest.fn().mockReturnValue(mockPageInstance),
       });
 
-      const connector = new FacebookConnector(mockConfig, mockTransformService);
+      const connector = new FacebookConnector(mockConfig, mockTransformService as unknown as TransformOnIngestService);
       await connector.connect();
 
       const result = await connector.validateCredentials();
@@ -628,7 +586,7 @@ describe('FacebookConnector', () => {
         getPage: jest.fn().mockReturnValue(mockPageInstance),
       });
 
-      const connector = new FacebookConnector(mockConfig, mockTransformService);
+      const connector = new FacebookConnector(mockConfig, mockTransformService as unknown as TransformOnIngestService);
       await connector.connect();
 
       const result = await connector.searchAndTransform('test');
@@ -642,7 +600,7 @@ describe('FacebookConnector', () => {
 
   describe('streamAndTransform', () => {
     it('should stream content and transform it to narrative insights', () => {
-      const connector = new FacebookConnector(mockConfig, mockTransformService);
+      const connector = new FacebookConnector(mockConfig, mockTransformService as unknown as TransformOnIngestService);
       const emitter = connector.streamAndTransform(['test']);
       expect(emitter).toBeInstanceOf(EventEmitter);
     });

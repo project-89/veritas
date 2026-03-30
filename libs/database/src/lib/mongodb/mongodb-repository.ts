@@ -260,7 +260,7 @@ export class MongoDBRepository<T> implements Repository<T> {
     try {
       // Attempt to access the vector search command to check if it's available
       // This is a basic check, may need to be refined based on exact MongoDB version
-      const db = this.model.db;
+      const db = this.model.db as any;
       return (
         typeof db.command === 'function' &&
         typeof db.collection('system.indexes').find === 'function'
@@ -283,7 +283,7 @@ export class MongoDBRepository<T> implements Repository<T> {
     minScore: number
   ): Promise<VectorSearchResult<R>[]> {
     try {
-      const db = this.model.db;
+      const db = this.model.db as any;
       const result = await db.command({
         $search: {
           index: 'vector',
@@ -333,7 +333,7 @@ export class MongoDBRepository<T> implements Repository<T> {
     minScore: number
   ): Promise<VectorSearchResult<R>[]> {
     // Get all documents that have the vector field
-    const filter: FilterQuery<T & Document> = {};
+    const filter: any = {};
     filter[field] = { $exists: true };
 
     const documents = await this.model.find(filter).lean().exec();
@@ -375,9 +375,11 @@ export class MongoDBRepository<T> implements Repository<T> {
     let normB = 0;
 
     for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
+      const a = vecA[i] ?? 0;
+      const b = vecB[i] ?? 0;
+      dotProduct += a * b;
+      normA += a * a;
+      normB += b * b;
     }
 
     if (normA === 0 || normB === 0) {

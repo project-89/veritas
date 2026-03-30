@@ -283,7 +283,7 @@ describe('TransformOnIngestService', () => {
 
       // Verify the result
       expect(result).toHaveLength(posts.length);
-      expect(result[0].embedding).toEqual(mockEmbedding);
+      expect(result[0]!.embedding).toEqual(mockEmbedding);
 
       // Verify service calls
       expect(contentClassificationService.batchClassify).toHaveBeenCalledWith(

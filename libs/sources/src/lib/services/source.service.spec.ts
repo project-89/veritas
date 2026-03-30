@@ -3,12 +3,14 @@ import { SourceService } from "./source.service";
 import { SourceValidationService } from "./source-validation.service";
 import { MemgraphProvider } from "@veritas/database";
 
-// Inline mock for MemgraphProvider
+// Inline mock for MemgraphProvider (with additional methods used by SourceService)
 class MockMemgraphProvider {
   createNode = jest.fn();
   executeQuery = jest.fn();
   connect = jest.fn();
   disconnect = jest.fn();
+  isConnected = jest.fn().mockReturnValue(true);
+  registerModel = jest.fn();
   getRepository = jest.fn();
 }
 
@@ -25,8 +27,11 @@ const mockSourceNode = {
 
 describe("SourceService", () => {
   let service: SourceService;
-  let memgraphProvider: MemgraphProvider;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let memgraphProvider: any;
   let validationService: SourceValidationService;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type AnyResult = any;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -62,12 +67,12 @@ describe("SourceService", () => {
     it("should create new source", async () => {
       jest
         .spyOn(validationService, "validateSourceInput")
-        .mockResolvedValueOnce();
+        .mockResolvedValueOnce(undefined);
       jest
         .spyOn(memgraphProvider, "createNode")
         .mockResolvedValueOnce(mockSourceNode);
 
-      const result = await service.createSource(createInput);
+      const result = await service.createSource(createInput) as any;
 
       expect(result).toBeDefined();
       expect(result.id).toBeDefined();
@@ -103,13 +108,13 @@ describe("SourceService", () => {
       };
       jest
         .spyOn(validationService, "validateSourceUpdate")
-        .mockResolvedValueOnce();
+        .mockResolvedValueOnce(undefined);
       jest
         .spyOn(memgraphProvider, "executeQuery")
         .mockResolvedValueOnce([{ s: mockSourceNode }])
         .mockResolvedValueOnce([{ s: updatedSource }]);
 
-      const result = await service.updateSource("123", updateInput);
+      const result = await service.updateSource("123", updateInput) as any;
 
       expect(result).toBeDefined();
       expect(result.name).toBe(updateInput.name);
@@ -231,7 +236,7 @@ describe("SourceService", () => {
         .mockResolvedValueOnce([{ s: mockSourceNode }])
         .mockResolvedValueOnce([{ s: updatedSource }]);
 
-      const result = await service.updateCredibilityScore("123", 0.9);
+      const result = await service.updateCredibilityScore("123", 0.9) as any;
 
       expect(result).toBeDefined();
       expect(result.credibilityScore).toBe(0.9);

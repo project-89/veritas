@@ -229,9 +229,11 @@ export class EmbeddingsService {
     let normB = 0;
 
     for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
+      const a = vecA[i] ?? 0;
+      const b = vecB[i] ?? 0;
+      dotProduct += a * b;
+      normA += a * a;
+      normB += b * b;
     }
 
     // Handle zero vectors
@@ -383,7 +385,7 @@ export class EmbeddingsService {
     // Simple character-level approach for generating pseudo-embeddings
     // This does NOT produce meaningful semantic vectors but serves as a fallback
     for (let i = 0; i < words.length; i++) {
-      const word = words[i];
+      const word = words[i]!;
 
       for (let j = 0; j < word.length && j < this.embeddingDimension; j++) {
         // Use character code as a simple feature
@@ -436,19 +438,19 @@ export class EmbeddingsService {
     }
 
     try {
-      const contentRepository = this.databaseService.getRepository('Content');
+      const contentRepository = this.databaseService.getRepository<any>('Content');
       const allContent = await contentRepository.find();
 
       // Filter content that has embeddings
       const contentWithEmbeddings = allContent.filter(
-        (item: { embedding?: number[] }) =>
+        (item: any) =>
           item.embedding && Array.isArray(item.embedding)
       );
 
       // Calculate similarity for each item
       const results = contentWithEmbeddings.map(
-        (item: { embedding?: number[] }) => ({
-          item: item as unknown as T,
+        (item: any) => ({
+          item: item as T,
           score: this.calculateSimilarity(
             queryVector,
             item.embedding as number[]
@@ -458,8 +460,8 @@ export class EmbeddingsService {
 
       // Filter by minimum score and sort by similarity (descending)
       return results
-        .filter((result) => result.score >= minScore)
-        .sort((a, b) => b.score - a.score)
+        .filter((result: any) => result.score >= minScore)
+        .sort((a: any, b: any) => b.score - a.score)
         .slice(0, limit);
     } catch (error) {
       this.logger.error(

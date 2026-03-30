@@ -190,15 +190,15 @@ export class ContentClassificationModule {
         useFactory: (config: ConfigService, dbProvider: DatabaseProvider) => {
           // Set environment variables for the embeddings service if provided
           if (options.embeddingsOptions?.endpointUrl) {
-            process.env.EMBEDDING_SERVICE_ENDPOINT =
+            process.env['EMBEDDING_SERVICE_ENDPOINT'] =
               options.embeddingsOptions.endpointUrl;
           }
           if (options.embeddingsOptions?.apiKey) {
-            process.env.EMBEDDING_SERVICE_API_KEY =
+            process.env['EMBEDDING_SERVICE_API_KEY'] =
               options.embeddingsOptions.apiKey;
           }
           if (options.embeddingsOptions?.embeddingDim) {
-            process.env.EMBEDDING_DIMENSION = String(
+            process.env['EMBEDDING_DIMENSION'] = String(
               options.embeddingsOptions.embeddingDim
             );
           }

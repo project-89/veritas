@@ -71,7 +71,7 @@ export class ContentResolver {
   async updateContent(
     @Args('id') id: string,
     @Args('input') input: ContentUpdateInputType
-  ): Promise<ExtendedContentNode> {
+  ): Promise<ExtendedContentNode | null> {
     this.ensureContentService();
     return this.contentService.updateContent(id, input);
   }
@@ -86,7 +86,7 @@ export class ContentResolver {
   async updateEngagementMetrics(
     @Args('id') id: string,
     @Args('metrics') metrics: ContentUpdateInputType['engagementMetrics']
-  ): Promise<ExtendedContentNode> {
+  ): Promise<ExtendedContentNode | null> {
     this.ensureContentService();
     return this.contentService.updateContent(id, {
       engagementMetrics: metrics,

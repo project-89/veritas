@@ -18,60 +18,13 @@ import { ConfigService } from '@nestjs/config';
 import { RedditConnector } from './reddit.connector';
 import { Submission, RedditUser } from 'snoowrap';
 import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
+import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { EventEmitter } from 'events';
-import { NarrativeInsight } from '../interfaces/narrative-insight.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 
-// Type declaration for Snoowrap
-declare module 'snoowrap' {
-  export interface Submission {
-    id: string;
-    title: string;
-    selftext: string;
-    author: string;
-    created_utc: number;
-    permalink: string;
-    score: number;
-    num_comments: number;
-    view_count: number;
-    subreddit_name_prefixed: string;
-    clicked?: boolean;
-    comments?: any[];
-    content_categories?: string[];
-    contest_mode?: boolean;
-  }
-
-  export interface RedditUser {
-    id: string;
-    name: string;
-    created_utc: number;
-    link_karma: number;
-    comment_karma: number;
-    has_verified_email: boolean;
-    is_mod: boolean;
-    is_gold: boolean;
-    has_mod_mail?: boolean;
-    has_subscribed?: boolean;
-    has_verified_mail?: boolean;
-    hide_from_robots?: boolean;
-  }
-
-  export default class Snoowrap {
-    constructor(options: {
-      userAgent: string;
-      clientId: string;
-      clientSecret: string;
-      username?: string;
-      password?: string;
-      refreshToken?: string;
-    });
-
-    getMe(): Promise<RedditUser>;
-    getUser(username: string): Promise<RedditUser>;
-    search(query: string, options?: any): Promise<Submission[]>;
-  }
-}
+// Note: Type declarations for snoowrap come from the project's type definitions
 
 // Mock NarrativeRepository
 class MockNarrativeRepository {
@@ -212,7 +165,7 @@ describe('RedditConnector', () => {
   let configService: ConfigService;
   let mockTransformService: MockTransformOnIngestService;
 
-  const mockSubmission: Submission = {
+  const mockSubmission = {
     id: '123',
     title: 'Test Title',
     selftext: 'Test content',
@@ -223,9 +176,9 @@ describe('RedditConnector', () => {
     num_comments: 25,
     view_count: 1000,
     subreddit_name_prefixed: 'r/test',
-  } as Submission;
+  } as unknown as Submission;
 
-  const mockUser: RedditUser = {
+  const mockUser = {
     id: 'author123',
     name: 'testauthor',
     created_utc: Date.now() / 1000,
@@ -234,7 +187,7 @@ describe('RedditConnector', () => {
     has_verified_email: true,
     is_mod: true,
     is_gold: true,
-  } as RedditUser;
+  } as unknown as RedditUser;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -303,7 +256,7 @@ describe('RedditConnector', () => {
 
       const errorConnector = new RedditConnector(
         configService,
-        mockTransformService
+        mockTransformService as unknown as TransformOnIngestService
       );
       await expect(errorConnector.connect()).rejects.toThrow(
         'Connection failed'
@@ -338,7 +291,7 @@ describe('RedditConnector', () => {
           likes: mockSubmission.score,
           shares: 0,
           comments: mockSubmission.num_comments,
-          reach: mockSubmission.view_count,
+          reach: (mockSubmission as any).view_count,
           viralityScore: expect.any(Number),
         },
       });

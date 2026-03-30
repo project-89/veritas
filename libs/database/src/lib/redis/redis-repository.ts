@@ -85,7 +85,7 @@ export class RedisRepository<T extends { id: string }>
       let filteredEntities = entities;
 
       if (options?.sort) {
-        const [sortKey, sortOrder] = Object.entries(options.sort)[0];
+        const [sortKey, sortOrder] = Object.entries(options.sort)[0]!;
         filteredEntities = filteredEntities.sort((a, b) => {
           if (sortOrder === 1) {
             return a[sortKey as keyof T] > b[sortKey as keyof T] ? 1 : -1;
@@ -139,7 +139,7 @@ export class RedisRepository<T extends { id: string }>
    */
   async findOne(filter: FilterQuery<T>): Promise<T | null> {
     const entities = await this.find(filter, { limit: 1 });
-    return entities.length > 0 ? entities[0] : null;
+    return entities.length > 0 ? entities[0]! : null;
   }
 
   /**
@@ -516,9 +516,9 @@ export class RedisRepository<T extends { id: string }>
 
       for (let j = 0; j < values.length; j += 2) {
         if (values[j] === 'score') {
-          score = 1 - parseFloat(values[j + 1]); // Convert cosine distance to similarity
+          score = 1 - parseFloat(values[j + 1] ?? '0'); // Convert cosine distance to similarity
         } else if (values[j] === '$') {
-          itemJson = values[j + 1];
+          itemJson = values[j + 1] ?? '';
         }
       }
 
@@ -589,9 +589,11 @@ export class RedisRepository<T extends { id: string }>
     let normB = 0;
 
     for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
+      const a = vecA[i] ?? 0;
+      const b = vecB[i] ?? 0;
+      dotProduct += a * b;
+      normA += a * a;
+      normB += b * b;
     }
 
     // Handle zero vectors

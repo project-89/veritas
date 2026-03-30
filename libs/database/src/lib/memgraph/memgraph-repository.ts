@@ -132,7 +132,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, { id: int(id) });
-      return records.length > 0 ? this.recordToEntity(records[0]) : null;
+      return records.length > 0 ? this.recordToEntity(records[0]!) : null;
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
@@ -166,7 +166,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, filter);
-      return records.length > 0 ? this.recordToEntity(records[0]) : null;
+      return records.length > 0 ? this.recordToEntity(records[0]!) : null;
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error finding entity: ${err.message}`, err.stack);
@@ -196,7 +196,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, filter);
-      const count = records[0].get('count');
+      const count = records[0]!.get('count');
       return isInt(count) ? (count as Integer).toNumber() : (count as number);
     } catch (error: unknown) {
       const err = error as Error;
@@ -216,7 +216,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, { data });
-      return this.recordToEntity(records[0]);
+      return this.recordToEntity(records[0]!);
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error creating entity: ${err.message}`, err.stack);
@@ -262,7 +262,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, { id: int(id), data });
-      return records.length > 0 ? this.recordToEntity(records[0]) : null;
+      return records.length > 0 ? this.recordToEntity(records[0]!) : null;
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
@@ -300,7 +300,7 @@ export class MemgraphRepository<T> implements Repository<T> {
 
       const params = { ...filter, data: updateData };
       const records = await this.executeQuery(query, params);
-      const count = records[0].get('count');
+      const count = records[0]!.get('count');
       return isInt(count) ? (count as Integer).toNumber() : (count as number);
     } catch (error: unknown) {
       const err = error as Error;
@@ -330,7 +330,7 @@ export class MemgraphRepository<T> implements Repository<T> {
         return null;
       }
 
-      const props = records[0].get('props');
+      const props = records[0]!.get('props');
       return { ...props, id } as unknown as T;
     } catch (error: unknown) {
       const err = error as Error;
@@ -366,7 +366,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, filter);
-      const count = records[0].get('count');
+      const count = records[0]!.get('count');
       return isInt(count) ? (count as Integer).toNumber() : (count as number);
     } catch (error: unknown) {
       const err = error as Error;
@@ -510,9 +510,11 @@ export class MemgraphRepository<T> implements Repository<T> {
     let normB = 0;
 
     for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
+      const a = vecA[i] ?? 0;
+      const b = vecB[i] ?? 0;
+      dotProduct += a * b;
+      normA += a * a;
+      normB += b * b;
     }
 
     if (normA === 0 || normB === 0) {

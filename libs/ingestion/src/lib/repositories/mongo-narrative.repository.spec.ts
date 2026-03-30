@@ -232,7 +232,7 @@ describe('MongoNarrativeRepository', () => {
 
       // Verify results
       expect(result).toHaveLength(2);
-      expect(result[0].score).toBe(0.92);
+      expect(result[0]!.score).toBe(0.92);
       expect(mockInsightRepo.vectorSearch).toHaveBeenCalledWith(
         'embedding',
         queryEmbedding,

@@ -76,7 +76,7 @@ describe('ContentResolver', () => {
         true
       );
       expect(result).toHaveLength(2);
-      expect(result[0].id).toBe('result-1');
+      expect(result[0]!.id).toBe('result-1');
     });
 
     it('should throw an error when service is not available', async () => {
@@ -122,8 +122,8 @@ describe('ContentResolver', () => {
         useExistingEmbedding,
       });
       expect(result).toEqual(similarContent);
-      expect(result[0].content.id).toBe('similar-1');
-      expect(result[0].score).toBe(0.9);
+      expect(result[0]!.content.id).toBe('similar-1');
+      expect(result[0]!.score).toBe(0.9);
     });
 
     it('should use default parameters when not provided', async () => {

@@ -88,7 +88,7 @@ export class ContentController {
   async updateContent(
     @Param('id') id: string,
     @Body() input: ContentUpdateInput
-  ): Promise<ExtendedContentNode> {
+  ): Promise<ExtendedContentNode | null> {
     this.ensureContentService();
     return this.contentService.updateContent(id, input);
   }
@@ -127,7 +127,7 @@ export class ContentController {
   async updateEngagementMetrics(
     @Param('id') id: string,
     @Body() metrics: ContentUpdateInput['engagementMetrics']
-  ): Promise<ExtendedContentNode> {
+  ): Promise<ExtendedContentNode | null> {
     this.ensureContentService();
     return this.contentService.updateContent(id, {
       engagementMetrics: metrics,

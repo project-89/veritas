@@ -166,8 +166,8 @@ describe('NarrativeController', () => {
       });
 
       expect(result).toHaveLength(2);
-      expect(result[0].insight).toEqual(mockInsight);
-      expect(result[0].score).toEqual(0.92);
+      expect(result[0]!.insight).toEqual(mockInsight);
+      expect(result[0]!.score).toEqual(0.92);
       expect(mockNarrativeRepository.findSimilarContent).toHaveBeenCalledWith(
         mockEmbedding,
         { limit: 10, minScore: 0.7 }

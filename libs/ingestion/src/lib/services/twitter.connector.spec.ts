@@ -4,6 +4,7 @@ import { TwitterConnector } from './twitter.connector';
 import { TwitterApi, TweetV2, UserV2, TwitterApiv2 } from 'twitter-api-v2';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { EventEmitter } from 'events';
 import { Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
@@ -261,7 +262,7 @@ describe('TwitterConnector', () => {
       });
       const errorConnector = new TwitterConnector(
         configService,
-        mockTransformService
+        mockTransformService as unknown as TransformOnIngestService
       );
       await expect(errorConnector.connect()).rejects.toThrow(
         'Connection failed'
@@ -305,7 +306,7 @@ describe('TwitterConnector', () => {
 
       const errorConnector = new TwitterConnector(
         configService,
-        mockTransformService
+        mockTransformService as unknown as TransformOnIngestService
       );
       await errorConnector.connect();
       await expect(errorConnector.searchContent('test')).rejects.toThrow(
@@ -334,7 +335,7 @@ describe('TwitterConnector', () => {
 
       const testConnector = new TwitterConnector(
         configService,
-        mockTransformService
+        mockTransformService as unknown as TransformOnIngestService
       );
       await testConnector.connect();
       const result = await testConnector.getAuthorDetails(authorId);
@@ -406,7 +407,7 @@ describe('TwitterConnector', () => {
 
       const testConnector = new TwitterConnector(
         configService,
-        mockTransformService
+        mockTransformService as unknown as TransformOnIngestService
       );
       await testConnector.connect();
 
@@ -441,7 +442,7 @@ describe('TwitterConnector', () => {
 
       const errorConnector = new TwitterConnector(
         configService,
-        mockTransformService
+        mockTransformService as unknown as TransformOnIngestService
       );
       await errorConnector.connect();
 

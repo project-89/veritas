@@ -40,7 +40,7 @@ describe("Ingestion Types", () => {
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0].property).toBe("text");
+      expect(errors[0]!.property).toBe("text");
     });
 
     it("should fail validation with invalid platform", async () => {
@@ -57,7 +57,7 @@ describe("Ingestion Types", () => {
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0].property).toBe("platform");
+      expect(errors[0]!.property).toBe("platform");
     });
 
     it("should fail validation with invalid engagement metrics", async () => {
@@ -78,7 +78,7 @@ describe("Ingestion Types", () => {
         validationError: { target: false },
       });
       expect(errors).toHaveLength(1);
-      expect(errors[0].property).toBe("engagementMetrics");
+      expect(errors[0]!.property).toBe("engagementMetrics");
     });
   });
 
@@ -104,7 +104,7 @@ describe("Ingestion Types", () => {
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0].property).toBe("name");
+      expect(errors[0]!.property).toBe("name");
     });
 
     it("should fail validation with invalid credibility score", async () => {
@@ -116,7 +116,7 @@ describe("Ingestion Types", () => {
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0].property).toBe("credibilityScore");
+      expect(errors[0]!.property).toBe("credibilityScore");
     });
 
     it("should fail validation with invalid verification status", async () => {
@@ -128,7 +128,7 @@ describe("Ingestion Types", () => {
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0].property).toBe("verificationStatus");
+      expect(errors[0]!.property).toBe("verificationStatus");
     });
   });
 
@@ -155,7 +155,7 @@ describe("Ingestion Types", () => {
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0].property).toBe("likes");
+      expect(errors[0]!.property).toBe("likes");
     });
 
     it("should fail validation with invalid virality score", async () => {
@@ -168,7 +168,7 @@ describe("Ingestion Types", () => {
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0].property).toBe("viralityScore");
+      expect(errors[0]!.property).toBe("viralityScore");
     });
   });
 });

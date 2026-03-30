@@ -54,7 +54,7 @@ const mockConfigService = {
       EMBEDDING_SERVICE_API_KEY: 'mock-api-key',
       EMBEDDING_DIMENSION: '1536',
     };
-    return config[key];
+    return (config as any)[key];
   }),
 };
 
@@ -78,7 +78,7 @@ describe('ContentClassificationModule', () => {
     it('should create a module with database provider', async () => {
       const options: ContentClassificationModuleOptions = {
         providerType: 'mongodb',
-        providerOptions: { url: 'mongodb://localhost:27017/test' },
+        providerOptions: { uri: 'mongodb://localhost:27017/test', databaseName: 'test' },
       };
 
       const module = await Test.createTestingModule({
@@ -98,7 +98,7 @@ describe('ContentClassificationModule', () => {
     it('should create a module with embeddings service when enabled', async () => {
       const options: ContentClassificationModuleOptions = {
         providerType: 'mongodb',
-        providerOptions: { url: 'mongodb://localhost:27017/test' },
+        providerOptions: { uri: 'mongodb://localhost:27017/test', databaseName: 'test' },
         enableEmbeddings: true,
         embeddingsOptions: {
           endpointUrl: 'http://custom.api/embeddings',

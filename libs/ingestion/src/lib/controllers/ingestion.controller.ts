@@ -104,7 +104,7 @@ export class IngestionController {
         timestamp: new Date(),
       });
 
-      return result[0]?.s;
+      return result[0]?.['s'];
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(

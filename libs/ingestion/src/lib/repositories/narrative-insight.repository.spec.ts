@@ -106,18 +106,18 @@ describe('InMemoryNarrativeRepository', () => {
       expect(result).toHaveLength(3);
 
       // First result should be mockInsight1 (exact match)
-      expect(result[0].insight.id).toBe(mockInsight1.id);
-      expect(result[0].score).toBe(1); // Perfect match with itself
+      expect(result[0]!.insight.id).toBe(mockInsight1.id);
+      expect(result[0]!.score).toBe(1); // Perfect match with itself
 
       // Second should be mockInsight2 (more similar than mockInsight3)
-      expect(result[1].insight.id).toBe(mockInsight2.id);
+      expect(result[1]!.insight.id).toBe(mockInsight2.id);
 
       // Third should be mockInsight3
-      expect(result[2].insight.id).toBe(mockInsight3.id);
+      expect(result[2]!.insight.id).toBe(mockInsight3.id);
 
       // Scores should be descending
-      expect(result[0].score).toBeGreaterThan(result[1].score);
-      expect(result[1].score).toBeGreaterThan(result[2].score);
+      expect(result[0]!.score).toBeGreaterThan(result[1]!.score);
+      expect(result[1]!.score).toBeGreaterThan(result[2]!.score);
     });
 
     it('should apply minScore filter', async () => {
@@ -127,7 +127,7 @@ describe('InMemoryNarrativeRepository', () => {
       });
 
       expect(result).toHaveLength(1);
-      expect(result[0].insight.id).toBe(mockInsight1.id);
+      expect(result[0]!.insight.id).toBe(mockInsight1.id);
     });
 
     it('should apply limit filter', async () => {
@@ -136,8 +136,8 @@ describe('InMemoryNarrativeRepository', () => {
       });
 
       expect(result).toHaveLength(2);
-      expect(result[0].insight.id).toBe(mockInsight1.id);
-      expect(result[1].insight.id).toBe(mockInsight2.id);
+      expect(result[0]!.insight.id).toBe(mockInsight1.id);
+      expect(result[1]!.insight.id).toBe(mockInsight2.id);
     });
 
     it('should ignore insights without embeddings', async () => {

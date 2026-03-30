@@ -26,7 +26,7 @@ describe('EmbeddingsService', () => {
         EMBEDDING_SERVICE_API_KEY: 'test-api-key',
         EMBEDDING_DIMENSION: 384,
       };
-      return config[key];
+      return (config as any)[key];
     }),
   };
 
@@ -195,7 +195,7 @@ describe('EmbeddingsService', () => {
       });
 
       expect(results).toHaveLength(1);
-      expect(results[0].score).toBe(0.95);
+      expect(results[0]!.score).toBe(0.95);
       expect(mockDatabaseService.getRepository).toHaveBeenCalledWith('Content');
       expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
         'embedding',

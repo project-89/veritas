@@ -39,6 +39,7 @@ export class TwitterConnector
   override platform = 'twitter' as const;
   private client: TwitterApi | null = null;
   private v2Client: TwitterApiv2 | null = null;
+  private readonly pollingInterval = 60000; // 1 minute
 
   constructor(
     protected override readonly configService: ConfigService,
@@ -289,13 +290,13 @@ export class TwitterConnector
     tweet: TweetWithIncludes
   ): SocialMediaPost {
     const user = tweet.includes?.users?.[0] || tweet.user;
-    const authorId = tweet.author_id || user?.id_str || 'unknown';
-    const authorName = user?.name || 'Unknown User';
-    const authorUsername = user?.username || user?.screen_name || 'unknown';
-    const verified = user?.verified || false;
+    const userAny = user as any;
+    const authorId = tweet.author_id || userAny?.id_str || 'unknown';
+    const authorName = userAny?.name || 'Unknown User';
+    const authorUsername = userAny?.username || userAny?.screen_name || 'unknown';
 
     // Extract engagement metrics
-    const publicMetrics = tweet.public_metrics ?? {};
+    const publicMetrics = (tweet.public_metrics ?? {}) as any;
 
     const timestamp = tweet.created_at
       ? new Date(tweet.created_at)
@@ -307,8 +308,7 @@ export class TwitterConnector
       text: tweet.text,
       authorId,
       authorName,
-      authorUsername,
-      verified,
+      authorHandle: authorUsername,
       platform: this.platform,
       timestamp,
       url: `https://twitter.com/${authorUsername}/status/${tweet.id}`,
@@ -319,11 +319,6 @@ export class TwitterConnector
         comments: publicMetrics.reply_count || 0,
         reach: publicMetrics.impression_count || 0,
         viralityScore: 0,
-      },
-      metadata: {
-        tweetType: tweet.reply_settings || 'unknown',
-        replyTo: tweet.in_reply_to_user_id || null,
-        quotedTweet: tweet.referenced_tweets?.find(r => r.type === 'quoted')?.id || null,
       },
     };
   }

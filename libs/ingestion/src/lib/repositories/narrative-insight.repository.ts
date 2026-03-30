@@ -233,7 +233,7 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
     // Convert to percentages
     const total = insights.length;
     for (const platform in distribution) {
-      distribution[platform] = distribution[platform] / total;
+      distribution[platform] = (distribution[platform] ?? 0) / total;
     }
 
     return distribution;
@@ -296,7 +296,7 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
     }
 
     // Calculate dot product
-    const dotProduct = vecA.reduce((sum, val, i) => sum + val * vecB[i], 0);
+    const dotProduct = vecA.reduce((sum, val, i) => sum + val * (vecB[i] ?? 0), 0);
 
     // Calculate magnitudes
     const magnitudeA = Math.sqrt(vecA.reduce((sum, val) => sum + val * val, 0));

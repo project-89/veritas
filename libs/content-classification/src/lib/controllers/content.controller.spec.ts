@@ -70,7 +70,7 @@ describe('ContentController', () => {
         true
       );
       expect(result).toHaveLength(2);
-      expect(result[0].id).toBe('result-1');
+      expect(result[0]!.id).toBe('result-1');
     });
 
     it('should handle undefined optional parameters', async () => {
@@ -134,7 +134,7 @@ describe('ContentController', () => {
         useExistingEmbedding: true,
       });
       expect(result).toHaveLength(2);
-      expect(result[0].id).toBe('similar-1');
+      expect(result[0]!.id).toBe('similar-1');
     });
 
     it('should return content objects without scores', async () => {
@@ -146,7 +146,7 @@ describe('ContentController', () => {
 
       // Ensure we get just the content objects
       expect(result[0]).not.toHaveProperty('score');
-      expect(result[0].id).toBe('similar-1');
+      expect(result[0]!.id).toBe('similar-1');
     });
   });
 

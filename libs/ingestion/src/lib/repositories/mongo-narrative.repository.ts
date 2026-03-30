@@ -19,8 +19,8 @@ import {
 @Injectable()
 export class MongoNarrativeRepository implements NarrativeRepository {
   private readonly logger = new Logger(MongoNarrativeRepository.name);
-  private insightRepository: Repository<NarrativeInsight>;
-  private trendRepository: Repository<NarrativeTrend>;
+  private insightRepository!: Repository<NarrativeInsight>;
+  private trendRepository!: Repository<NarrativeTrend>;
 
   constructor(private readonly databaseService: DatabaseService) {
     this.logger.log('Initializing MongoDB narrative repository');
@@ -142,7 +142,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
             $gte: startDate,
             $lte: endDate,
           },
-        },
+        } as any,
         {
           limit: options?.limit,
           skip: options?.skip,
@@ -183,7 +183,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
           $gte: startDate,
           $lte: endDate,
         },
-      });
+      } as any);
 
       if (insights.length === 0) {
         return [];
@@ -214,7 +214,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
     try {
       const result = await this.insightRepository.deleteMany({
         expiresAt: { $lt: cutoffDate },
-      });
+      } as any);
 
       return result;
     } catch (error: unknown) {
@@ -357,7 +357,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
       if (!insight.themes || insight.themes.length === 0) continue;
 
       // Use the first theme as the primary theme
-      const primaryTheme = insight.themes[0];
+      const primaryTheme = insight.themes[0]!;
 
       if (!themeGroups.has(primaryTheme)) {
         themeGroups.set(primaryTheme, []);
@@ -425,7 +425,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
     // Convert to percentages
     const total = insights.length;
     Object.keys(platformCounts).forEach((platform) => {
-      platformCounts[platform] = platformCounts[platform] / total;
+      platformCounts[platform] = (platformCounts[platform] ?? 0) / total;
     });
 
     return platformCounts;
@@ -510,7 +510,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
         // Get all insights with embeddings
         const insights = await this.insightRepository.find({
           embedding: { $exists: true },
-        });
+        } as any);
 
         if (insights.length === 0) {
           return [];
@@ -555,7 +555,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
     }
 
     // Calculate dot product
-    const dotProduct = vecA.reduce((sum, val, i) => sum + val * vecB[i], 0);
+    const dotProduct = vecA.reduce((sum, val, i) => sum + val * (vecB[i] ?? 0), 0);
 
     // Calculate magnitudes
     const magnitudeA = Math.sqrt(vecA.reduce((sum, val) => sum + val * val, 0));

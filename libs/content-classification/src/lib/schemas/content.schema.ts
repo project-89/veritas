@@ -5,54 +5,54 @@ import { Document } from 'mongoose';
 @Schema({ _id: false })
 class Entity {
   @Prop({ required: true })
-  text: string;
+  text!: string;
 
   @Prop({ required: true })
-  type: string;
+  type!: string;
 
   @Prop({ required: true, type: Number })
-  confidence: number;
+  confidence!: number;
 }
 
 // Classification data schema
 @Schema({ _id: false })
 class ClassificationData {
   @Prop({ type: [String], required: true })
-  categories: string[];
+  categories!: string[];
 
   @Prop({ required: true })
-  sentiment: string;
+  sentiment!: string;
 
   @Prop({ required: true, type: Number })
-  toxicity: number;
+  toxicity!: number;
 
   @Prop({ required: true, type: Number })
-  subjectivity: number;
+  subjectivity!: number;
 
   @Prop({ required: true })
-  language: string;
+  language!: string;
 
   @Prop({ type: [String], required: true })
-  topics: string[];
+  topics!: string[];
 
   @Prop({ type: [Object], required: true })
-  entities: Entity[];
+  entities!: Entity[];
 }
 
 // Engagement metrics schema
 @Schema({ _id: false })
 class EngagementMetrics {
   @Prop({ type: Number, default: 0 })
-  likes: number;
+  likes!: number;
 
   @Prop({ type: Number, default: 0 })
-  shares: number;
+  shares!: number;
 
   @Prop({ type: Number, default: 0 })
-  comments: number;
+  comments!: number;
 
   @Prop({ type: Number, default: 0 })
-  reach: number;
+  reach!: number;
 }
 
 // Main content schema
@@ -61,28 +61,28 @@ class EngagementMetrics {
   timestamps: true,
   toJSON: {
     virtuals: true,
-    transform: (_, ret) => {
-      ret.id = ret._id;
-      delete ret._id;
+    transform: (_: any, ret: any) => {
+      ret['id'] = ret['_id'];
+      delete ret['_id'];
       return ret;
     },
   },
 })
 export class ContentSchema extends Document {
   @Prop({ required: true })
-  text: string;
+  text!: string;
 
   @Prop({ required: true, type: Date, index: true })
-  timestamp: Date;
+  timestamp!: Date;
 
   @Prop({ required: true, index: true })
-  platform: string;
+  platform!: string;
 
   @Prop({ type: EngagementMetrics, required: true })
-  engagementMetrics: EngagementMetrics;
+  engagementMetrics!: EngagementMetrics;
 
   @Prop({ type: ClassificationData, required: true })
-  classification: ClassificationData;
+  classification!: ClassificationData;
 
   @Prop({ type: Object })
   metadata?: Record<string, unknown>;

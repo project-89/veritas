@@ -59,7 +59,7 @@ export class TransformOnIngestService {
   public async transform(post: SocialMediaPost): Promise<NarrativeInsight> {
     try {
       // Step 1: Classify the content
-      const classification = await this.contentClassificationService.classify(
+      const classification = await this.contentClassificationService.classifyContent(
         post.text
       );
 
@@ -98,7 +98,7 @@ export class TransformOnIngestService {
       // Step 3: Transform each post with its classification
       const insights = await Promise.all(
         posts.map((post, index) =>
-          this.transformWithClassification(post, classifications[index])
+          this.transformWithClassification(post, classifications[index]!)
         )
       );
 

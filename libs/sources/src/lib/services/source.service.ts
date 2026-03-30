@@ -3,6 +3,14 @@ import { MemgraphProvider } from '@veritas/database';
 import { SourceNode, ContentNode } from '@veritas/shared';
 import { SourceValidationService } from '../services/source-validation.service';
 
+/**
+ * Extended Memgraph service interface with graph-specific methods
+ */
+interface MemgraphService {
+  createNode(label: string, properties: Record<string, unknown>): Promise<any>;
+  executeQuery(query: string, params?: Record<string, unknown>): Promise<any[]>;
+}
+
 export interface SourceCreateInput {
   name: string;
   platform: 'twitter' | 'facebook' | 'reddit' | 'other';
@@ -30,7 +38,7 @@ export interface SourceSearchParams {
 @Injectable()
 export class SourceService {
   constructor(
-    private readonly memgraphService: MemgraphProvider,
+    private readonly memgraphService: MemgraphProvider & MemgraphService,
     private readonly validationService: SourceValidationService
   ) {}
 

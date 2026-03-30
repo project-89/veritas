@@ -1,4 +1,4 @@
-import { Module, DynamicModule, Provider } from '@nestjs/common';
+import { Module, DynamicModule, Provider, Type, ForwardReference } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { IngestionController } from './controllers/ingestion.controller';
 import { DatabaseModule, DatabaseService } from '@veritas/database';
@@ -112,7 +112,7 @@ export class IngestionModule {
    * @param options Module configuration options
    */
   static forRoot(options?: IngestionModuleOptions): DynamicModule {
-    const imports = [
+    const imports: Array<Type<any> | DynamicModule | Promise<DynamicModule> | ForwardReference> = [
       ConfigModule.forRoot({
         isGlobal: true,
       }),
@@ -124,7 +124,7 @@ export class IngestionModule {
         DatabaseModule.register({
           providerType: 'mongodb',
           providerOptions: {
-            uri: process.env.MONGODB_URI || 'mongodb://localhost:27017',
+            uri: process.env['MONGODB_URI'] || 'mongodb://localhost:27017',
             databaseName: 'veritas',
           },
         })

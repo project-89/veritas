@@ -13,7 +13,8 @@ import { Repository } from '../interfaces/repository.interface';
 @Injectable()
 export class MongoDBProvider implements DatabaseProvider {
   private connection: Connection | null = null;
-  private models: Map<string, Model<unknown>> = new Map();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private models: Map<string, Model<any>> = new Map();
   private repositories: Map<string, Repository<unknown>> = new Map();
   private readonly logger = new Logger(MongoDBProvider.name);
 
@@ -83,7 +84,7 @@ export class MongoDBProvider implements DatabaseProvider {
 
     if (!this.models.has(name)) {
       this.logger.log(`Registering model: ${name}`);
-      const model = this.connection.model(name, schema);
+      const model = this.connection.model(name, schema as any);
       this.models.set(name, model);
     }
 
@@ -105,7 +106,7 @@ export class MongoDBProvider implements DatabaseProvider {
 
     if (!this.repositories.has(entityName)) {
       const model = this.models.get(entityName)!;
-      const repository = new MongoDBRepository<T>(model);
+      const repository = new MongoDBRepository<T>(model as any);
       this.repositories.set(entityName, repository);
     }
 
