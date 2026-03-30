@@ -326,7 +326,7 @@ export class ContentService implements OnModuleInit {
       }
 
       // If text is updated, reclassify
-      let classificationUpdate = undefined;
+      let classificationUpdate: ExtendedContentNode['classification'] | undefined = undefined;
       if (input.text) {
         this.logger.debug(
           `Reclassifying updated content text: "${input.text.substring(

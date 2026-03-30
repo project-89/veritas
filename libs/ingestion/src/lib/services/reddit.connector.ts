@@ -61,7 +61,8 @@ export class RedditConnector
       });
 
       // Verify connection by making a test call
-      await this.client.getMe();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- snoowrap has recursive Promise types (TS1062)
+      await (this.client.getMe as () => Promise<any>)();
     } catch (error) {
       this.client = null;
       this.logger.error('Error connecting to Reddit:', error);
@@ -236,7 +237,8 @@ export class RedditConnector
         throw new Error('Reddit client not initialized');
       }
 
-      const userData = await this.client.getUser(authorId).fetch();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- snoowrap has recursive Promise types (TS1062)
+      const userData = await (this.client.getUser(authorId) as any).fetch();
 
       return {
         id: userData.id,
@@ -382,7 +384,8 @@ export class RedditConnector
         return false;
       }
 
-      const me = await this.client.getMe();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- snoowrap has recursive Promise types (TS1062)
+      const me = await (this.client.getMe as () => Promise<any>)();
 
       if (!me || !me.name) {
         this.logger.error(
@@ -506,7 +509,7 @@ export class RedditConnector
     const normalizedAge = Math.min(accountAgeYears / 5, 1);
 
     // Verified email bonus
-    const verifiedBonus = userData.has_verified_email ? 0.1 : 0;
+    const verifiedBonus = userData.has_verified_mail ? 0.1 : 0;
 
     // Base score depends on total karma (logarithmic scale)
     const karmaScore = Math.min(Math.log10(totalKarma + 1) / 4, 0.5);

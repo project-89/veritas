@@ -24,7 +24,7 @@ import { DatabaseService } from '@veritas/database';
       driver: ApolloDriver,
       autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
       sortSchema: true,
-      playground: process.env.NODE_ENV !== 'production',
+      playground: process.env['NODE_ENV'] !== 'production',
       definitions: {
         path: join(process.cwd(), 'src/graphql.ts'),
         outputAs: 'class',
@@ -35,7 +35,7 @@ import { DatabaseService } from '@veritas/database';
     DatabaseModule.register({
       providerType: 'mongodb',
       providerOptions: {
-        uri: process.env.MONGODB_URI || 'mongodb://localhost:27017',
+        uri: process.env['MONGODB_URI'] || 'mongodb://localhost:27017',
         databaseName: 'veritas',
       },
       isGlobal: true,
@@ -44,17 +44,17 @@ import { DatabaseService } from '@veritas/database';
     DatabaseModule.register({
       providerType: 'memgraph',
       providerOptions: {
-        uri: process.env.MEMGRAPH_URI || 'bolt://localhost:7687',
+        uri: process.env['MEMGRAPH_URI'] || 'bolt://localhost:7687',
         databaseName: 'veritas',
-        username: process.env.MEMGRAPH_USERNAME,
-        password: process.env.MEMGRAPH_PASSWORD,
+        username: process.env['MEMGRAPH_USERNAME'],
+        password: process.env['MEMGRAPH_PASSWORD'],
       },
     }),
 
     DatabaseModule.register({
       providerType: 'redis',
       providerOptions: {
-        uri: process.env.REDIS_URI || 'redis://localhost:6379',
+        uri: process.env['REDIS_URI'] || 'redis://localhost:6379',
         databaseName: '0',
       },
     }),

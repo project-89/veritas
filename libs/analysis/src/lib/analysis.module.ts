@@ -1,17 +1,19 @@
 import { Module } from '@nestjs/common';
 import { AnalysisController } from './analysis.controller';
 import { AnalysisResolver } from './analysis.resolver';
+import { AnalysisService } from './services/analysis.service';
 import { ANALYSIS_SERVICE } from './interfaces/analysis-service.interface';
 
 @Module({
   providers: [
+    AnalysisService,
     {
       provide: ANALYSIS_SERVICE,
-      useValue: null, // TODO: Replace with real AnalysisService implementation
+      useExisting: AnalysisService,
     },
     AnalysisResolver,
   ],
   controllers: [AnalysisController],
-  exports: [ANALYSIS_SERVICE],
+  exports: [ANALYSIS_SERVICE, AnalysisService],
 })
 export class AnalysisModule {}

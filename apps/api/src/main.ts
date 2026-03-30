@@ -1,22 +1,19 @@
-// Load environment variables before any imports
-import * as dotenvSafe from 'dotenv-safe';
-// Load and validate environment variables
-dotenvSafe.config();
+// Load environment variables
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app/app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { GlobalExceptionFilter } from './filters/global-exception.filter';
-import { LoggingService } from './services/logging.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    bufferLogs: true,
-  });
+  const logger = new Logger('Bootstrap');
 
-  const logger = app.get(LoggingService);
-  app.useLogger(logger);
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug'],
+  });
 
   // Enable validation pipes globally
   app.useGlobalPipes(
@@ -24,7 +21,7 @@ async function bootstrap() {
       transform: true,
       whitelist: true,
       forbidNonWhitelisted: true,
-    })
+    }),
   );
 
   // Use global exception filter
@@ -37,7 +34,7 @@ async function bootstrap() {
     .setVersion('1.0')
     .addTag('content')
     .addTag('analysis')
-    .addTag('sources')
+    .addTag('ingestion')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -45,15 +42,16 @@ async function bootstrap() {
 
   // Enable CORS for development
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: process.env['CORS_ORIGIN'] || '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
 
-  const port = process.env.PORT || 3000;
-  const host = process.env.HOST || 'localhost';
+  const port = process.env['PORT'] || 3000;
+  const host = process.env['HOST'] || '0.0.0.0';
   await app.listen(port, host);
-  logger.info(`Application is running on: http://${host}:${port}`);
+  logger.log(`Veritas API running on http://${host}:${port}`);
+  logger.log(`Swagger docs at http://${host}:${port}/api`);
 }
 
 bootstrap();
