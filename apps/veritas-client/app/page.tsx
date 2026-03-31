@@ -1,182 +1,78 @@
-import Link from 'next/link';
+'use client';
+
+import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { SearchConfigPanel, DEFAULT_CONFIG } from '../components/search-config';
+import type { SearchConfig } from '../components/search-config';
 
 export default function HomePage() {
+  const router = useRouter();
+  const [query, setQuery] = useState('');
+  const [config, setConfig] = useState<SearchConfig>(DEFAULT_CONFIG);
+
+  const handleSearch = useCallback(() => {
+    const q = query.trim();
+    if (!q) return;
+    const params = new URLSearchParams({ q });
+    if (config.platforms.length > 0 && config.platforms.length < 3) {
+      params.set('platforms', config.platforms.join(','));
+    }
+    if (config.limit !== 100) {
+      params.set('limit', String(config.limit));
+    }
+    if (config.timeRange !== '7d') {
+      params.set('timeRange', config.timeRange);
+    }
+    router.push(`/results?${params.toString()}`);
+  }, [query, config, router]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSearch();
+  };
+
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <div className="bg-gradient-to-br from-indigo-600 to-purple-700 overflow-hidden shadow-lg rounded-lg col-span-1 sm:col-span-2 lg:col-span-3">
-        <div className="p-5">
-          <h3 className="text-lg font-medium text-white">
-            Live Narrative Analysis
-          </h3>
-          <p className="mt-1 text-sm text-indigo-200">
-            Search any topic across Reddit, Twitter/X, YouTube and more.
-            Content is scraped, classified, and visualized in real-time.
-          </p>
-          <div className="mt-4">
-            <Link
-              href="/search"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-indigo-700 bg-white hover:bg-indigo-50"
-            >
-              Start Analyzing
-            </Link>
-          </div>
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-3.5rem)] px-4">
+      {/* Hero / Search */}
+      <div className="w-full max-w-2xl text-center mb-12">
+        <h1 className="text-4xl sm:text-5xl font-bold text-white mb-3 tracking-tight">
+          Veritas
+        </h1>
+        <p className="text-slate-400 text-lg mb-8">
+          Search any topic. Analyze narratives across Reddit, Twitter/X, and YouTube.
+        </p>
+
+        {/* Search bar */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Enter a topic to analyze..."
+            autoFocus
+            className="flex-1 px-5 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-base placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+          />
+          <button
+            onClick={handleSearch}
+            disabled={!query.trim()}
+            className="px-6 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-semibold text-base transition-colors"
+          >
+            Analyze
+          </button>
         </div>
+
+        {/* Search config */}
+        <SearchConfigPanel config={config} onChange={setConfig} />
       </div>
 
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="p-5">
-          <h3 className="text-lg font-medium text-gray-900">
-            Network Graph
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Visualize network relationships between entities
-          </p>
-          <div className="mt-4">
-            <Link
-              href="/network"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-            >
-              View Demo
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="p-5">
-          <h3 className="text-lg font-medium text-gray-900">
-            Reality Tunnel
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Explore how narratives and perspectives evolve over time
-          </p>
-          <div className="mt-4">
-            <Link
-              href="/reality-tunnel"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-            >
-              View Demo
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="p-5">
-          <h3 className="text-lg font-medium text-gray-900">
-            Temporal Narrative
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Visualize how multiple narratives evolve in strength over
-            time
-          </p>
-          <div className="mt-4">
-            <Link
-              href="/temporal"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-            >
-              View Demo
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="p-5">
-          <h3 className="text-lg font-medium text-gray-900">
-            Narrative Mycelium
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Visualize narratives as organic, interconnected
-            mycelium-like structures
-          </p>
-          <div className="mt-4">
-            <Link
-              href="/mycelium"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-            >
-              View Demo
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="p-5">
-          <h3 className="text-lg font-medium text-gray-900">
-            Narrative Landscape
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Explore narratives as a topographical landscape with peaks
-            and valleys
-          </p>
-          <div className="mt-4">
-            <Link
-              href="/landscape"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-            >
-              View Demo
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="p-5">
-          <h3 className="text-lg font-medium text-gray-900">
-            Enhanced Reality Tunnel
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Advanced visualization of reality tunnels with enhanced
-            features
-          </p>
-          <div className="mt-4">
-            <Link
-              href="/enhanced-tunnel"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-            >
-              View Demo
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white overflow-hidden shadow rounded-lg">
-        <div className="p-5">
-          <h3 className="text-lg font-medium text-gray-900">
-            Narrative Flow
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Visualize how narratives emerge from, diverge from, and
-            sometimes return to consensus reality
-          </p>
-          <div className="mt-4">
-            <Link
-              href="/narrative-flow"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-            >
-              View Demo
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white overflow-hidden shadow rounded-lg col-span-1 sm:col-span-2 lg:col-span-3">
-        <div className="p-5">
-          <h3 className="text-lg font-medium text-gray-900">
-            All Visualizations Demo
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Interactive demo showcasing all visualization types in one
-            place
-          </p>
-          <div className="mt-4">
-            <Link
-              href="/demo"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-            >
-              View Demo
-            </Link>
+      {/* Recent scans placeholder */}
+      <div className="w-full max-w-2xl">
+        <div className="border border-slate-800 rounded-xl p-8 text-center">
+          <div className="text-slate-600 text-sm">
+            <svg className="w-8 h-8 mx-auto mb-2 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            No previous scans
           </div>
         </div>
       </div>

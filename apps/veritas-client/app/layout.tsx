@@ -8,21 +8,11 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
-        <div className="min-h-screen bg-gray-100">
-          <header className="bg-white shadow-md">
-            <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-              <h1 className="text-3xl font-bold text-gray-900">Veritas</h1>
-              <p className="mt-2 text-gray-600">
-                Narrative tracking and analysis across digital platforms
-              </p>
-            </div>
-          </header>
+    <html lang="en" className="dark">
+      <body className="bg-slate-950 text-slate-100">
+        <div className="min-h-screen flex flex-col">
           <NavBar />
-          <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-            {children}
-          </main>
+          <main className="flex-1">{children}</main>
         </div>
       </body>
     </html>

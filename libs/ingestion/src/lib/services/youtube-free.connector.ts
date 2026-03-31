@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
+import { readFile, unlink } from 'fs/promises';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '../schemas';
@@ -18,7 +19,12 @@ interface SearchOptions {
   endDate?: Date;
   limit?: number;
   maxResults?: number;
+  /** Fetch video transcripts/subtitles via yt-dlp (slower but richer content). Default: true */
+  fetchTranscripts?: boolean;
 }
+
+const TRANSCRIPT_MAX_CHARS = 5000;
+const TRANSCRIPT_TEMP_PREFIX = '/tmp/veritas-yt-';
 
 interface YtDlpVideoInfo {
   id: string;
@@ -241,6 +247,7 @@ export class YouTubeFreeConnector
     options?: SearchOptions
   ): Promise<SocialMediaPost[]> {
     const limit = options?.maxResults || options?.limit || 10;
+    const fetchTranscripts = options?.fetchTranscripts ?? true;
 
     try {
       const args = [
@@ -270,7 +277,28 @@ export class YouTubeFreeConnector
         { timeout: 60000 }
       );
 
-      return videos.map((video) => this.transformVideoToSocialMediaPost(video));
+      // Second pass: fetch transcripts for each video in parallel
+      const transcriptMap = new Map<string, string>();
+      if (fetchTranscripts) {
+        const transcriptResults = await Promise.allSettled(
+          videos.map((video) => this.getVideoTranscript(video.id))
+        );
+
+        for (let i = 0; i < videos.length; i++) {
+          const result = transcriptResults[i];
+          if (result.status === 'fulfilled' && result.value) {
+            transcriptMap.set(videos[i].id, result.value);
+          }
+        }
+
+        this.logger.log(
+          `Fetched transcripts for ${transcriptMap.size}/${videos.length} videos`
+        );
+      }
+
+      return videos.map((video) =>
+        this.transformVideoToSocialMediaPost(video, transcriptMap.get(video.id))
+      );
     } catch (error) {
       this.logger.error('Error searching YouTube with yt-dlp:', error);
       throw error;
@@ -278,12 +306,15 @@ export class YouTubeFreeConnector
   }
 
   private transformVideoToSocialMediaPost(
-    video: YtDlpVideoInfo
+    video: YtDlpVideoInfo,
+    transcript?: string
   ): SocialMediaPost {
-    const text = [video.title, video.description]
+    // Prefer transcript over description when available for richer content
+    const body = transcript || video.description;
+    const text = [video.title, body]
       .filter(Boolean)
       .join('\n\n')
-      .slice(0, 2000);
+      .slice(0, transcript ? TRANSCRIPT_MAX_CHARS : 2000);
 
     return {
       id: video.id,
@@ -301,6 +332,112 @@ export class YouTubeFreeConnector
         viralityScore: this.calculateVideoViralityScore(video),
       },
     };
+  }
+
+  /**
+   * Fetch auto-generated or manual subtitles for a video using yt-dlp.
+   * Downloads a .vtt file to /tmp, reads it, cleans the VTT formatting,
+   * and returns plain text. Returns empty string if no subtitles available.
+   */
+  async getVideoTranscript(videoId: string): Promise<string> {
+    const outputTemplate = `${TRANSCRIPT_TEMP_PREFIX}${videoId}`;
+    const vttPath = `${outputTemplate}.en.vtt`;
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+
+    try {
+      const result = await this.subprocessUtil.exec(
+        this.ytDlpPath,
+        [
+          '--skip-download',
+          '--write-subs',
+          '--write-auto-subs',
+          '--sub-lang', 'en',
+          '--sub-format', 'vtt',
+          '-o', outputTemplate,
+          url,
+        ],
+        { timeout: 30000 }
+      );
+
+      if (result.exitCode !== 0) {
+        this.logger.debug(
+          `No subtitles available for video ${videoId}: ${result.stderr}`
+        );
+        return '';
+      }
+
+      // Read the downloaded VTT file
+      let vttContent: string;
+      try {
+        vttContent = await readFile(vttPath, 'utf-8');
+      } catch {
+        this.logger.debug(`No subtitle file found at ${vttPath} for video ${videoId}`);
+        return '';
+      }
+
+      // Clean up the temp file
+      await unlink(vttPath).catch(() => {
+        /* ignore cleanup errors */
+      });
+
+      return this.cleanVttSubtitles(vttContent);
+    } catch (error) {
+      this.logger.debug(`Failed to fetch transcript for video ${videoId}:`, error);
+      return '';
+    }
+  }
+
+  /**
+   * Strip VTT formatting to produce clean plain text.
+   * Removes WEBVTT header, timestamps, positioning tags, <c> tags,
+   * and deduplicates consecutive identical lines.
+   */
+  private cleanVttSubtitles(vttContent: string): string {
+    const lines = vttContent.split('\n');
+    const textLines: string[] = [];
+    let previousLine = '';
+
+    for (const rawLine of lines) {
+      let line = rawLine.trim();
+
+      // Skip WEBVTT header, NOTE blocks, and empty lines
+      if (
+        line === 'WEBVTT' ||
+        line.startsWith('Kind:') ||
+        line.startsWith('Language:') ||
+        line.startsWith('NOTE') ||
+        line === ''
+      ) {
+        continue;
+      }
+
+      // Skip timestamp lines (e.g., "00:00:01.000 --> 00:00:04.000")
+      if (/^\d{2}:\d{2}:\d{2}\.\d{3}\s*-->/.test(line)) {
+        continue;
+      }
+
+      // Skip numeric cue identifiers
+      if (/^\d+$/.test(line)) {
+        continue;
+      }
+
+      // Strip positioning/alignment tags like <c>, </c>, <00:00:01.000>, align:start, position:0%
+      line = line.replace(/<\/?c[^>]*>/g, '');
+      line = line.replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '');
+      line = line.replace(/align:\w+/g, '');
+      line = line.replace(/position:\d+%/g, '');
+      line = line.trim();
+
+      if (!line) continue;
+
+      // Deduplicate consecutive identical lines (common in auto-subs)
+      if (line !== previousLine) {
+        textLines.push(line);
+        previousLine = line;
+      }
+    }
+
+    return textLines.join(' ').slice(0, TRANSCRIPT_MAX_CHARS);
   }
 
   private calculateVideoViralityScore(video: YtDlpVideoInfo): number {
