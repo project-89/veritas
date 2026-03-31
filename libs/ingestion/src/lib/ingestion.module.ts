@@ -4,11 +4,8 @@ import { IngestionController } from './controllers/ingestion.controller';
 import { DatabaseModule, DatabaseService } from '@veritas/database';
 import { IngestionResolver } from './resolvers/ingestion.resolver';
 import { TransformOnIngestService } from './services/transform/transform-on-ingest.service';
-import { RedditConnector } from './services/reddit.connector';
 import { RedditFreeConnector } from './services/reddit-free.connector';
-import { FacebookConnector } from './services/facebook.connector';
 import { FacebookJinaConnector } from './services/facebook-jina.connector';
-import { TwitterConnector } from './services/twitter.connector';
 import { TwitterFreeConnector } from './services/twitter-free.connector';
 import { RSSConnector } from './services/rss.connector';
 import { WebScraperConnector } from './services/web-scraper.connector';
@@ -83,19 +80,17 @@ export interface IngestionModuleOptions {
 
   /**
    * Enable or disable specific connectors.
-   * - true: Use API-free connector (default, no API keys needed)
-   * - 'free': Explicitly use API-free connector
-   * - 'api': Use original API-key-based connector
-   * - 'jina': (Facebook only) Use Jina Reader fallback
+   * All connectors are API-free (no paid API keys needed).
+   * - true: Enable connector (default)
    * - false: Disable connector
    */
   connectors?: {
-    twitter?: boolean | 'api' | 'free';
-    facebook?: boolean | 'api' | 'jina';
-    reddit?: boolean | 'api' | 'free';
+    twitter?: boolean;
+    facebook?: boolean;
+    reddit?: boolean;
     rss?: boolean;
     webScraper?: boolean;
-    youtube?: boolean | 'api' | 'free';
+    youtube?: boolean;
   };
 
   /**
@@ -180,43 +175,23 @@ export class IngestionModule {
       youtube: true,
     };
 
-    // Reddit connector: 'api' = Snoowrap (needs API keys), 'free'/true = public JSON API
-    const redditMode = connectorConfig.reddit;
-    if (redditMode === 'api') {
-      providers.push({ provide: REDDIT_CONNECTOR, useClass: RedditConnector });
-      providers.push(RedditConnector);
-    } else if (redditMode) {
+    // All connectors are API-free — no paid API keys needed
+    if (connectorConfig.reddit) {
       providers.push({ provide: REDDIT_CONNECTOR, useClass: RedditFreeConnector });
       providers.push(RedditFreeConnector);
     }
 
-    // Twitter connector: 'api' = twitter-api-v2 (needs bearer token), 'free'/true = bird CLI
-    const twitterMode = connectorConfig.twitter;
-    if (twitterMode === 'api') {
-      providers.push({ provide: TWITTER_CONNECTOR, useClass: TwitterConnector });
-      providers.push(TwitterConnector);
-    } else if (twitterMode) {
+    if (connectorConfig.twitter) {
       providers.push({ provide: TWITTER_CONNECTOR, useClass: TwitterFreeConnector });
       providers.push(TwitterFreeConnector);
     }
 
-    // Facebook connector: 'api' = Facebook SDK (needs access token), 'jina'/true = Jina Reader
-    const facebookMode = connectorConfig.facebook;
-    if (facebookMode === 'api') {
-      providers.push({ provide: FACEBOOK_CONNECTOR, useClass: FacebookConnector });
-      providers.push(FacebookConnector);
-    } else if (facebookMode) {
+    if (connectorConfig.facebook) {
       providers.push({ provide: FACEBOOK_CONNECTOR, useClass: FacebookJinaConnector });
       providers.push(FacebookJinaConnector);
     }
 
-    // YouTube connector: always uses yt-dlp (YouTubeFreeConnector), no API key needed
-    const youtubeMode = connectorConfig.youtube;
-    if (youtubeMode === 'api') {
-      // 'api' mode now also uses YouTubeFreeConnector (googleapis connector removed)
-      providers.push({ provide: YOUTUBE_CONNECTOR, useClass: YouTubeFreeConnector });
-      providers.push(YouTubeFreeConnector);
-    } else if (youtubeMode) {
+    if (connectorConfig.youtube) {
       providers.push({ provide: YOUTUBE_CONNECTOR, useClass: YouTubeFreeConnector });
       providers.push(YouTubeFreeConnector);
     }

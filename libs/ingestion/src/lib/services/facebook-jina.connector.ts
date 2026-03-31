@@ -199,7 +199,7 @@ export class FacebookJinaConnector
 
   // --- Private helpers ---
 
-  private async searchContent(
+  async searchContent(
     query: string,
     options?: SearchOptions
   ): Promise<SocialMediaPost[]> {

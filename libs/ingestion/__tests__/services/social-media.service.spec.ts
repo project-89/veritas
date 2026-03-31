@@ -3,9 +3,9 @@ import {
   SocialMediaService,
   SocialMediaPlatform,
 } from '../../src/lib/services/social-media.service';
-import { TwitterConnector } from '../../src/lib/services/twitter.connector';
-import { FacebookConnector } from '../../src/lib/services/facebook.connector';
-import { RedditConnector } from '../../src/lib/services/reddit.connector';
+import { TwitterFreeConnector } from '../../src/lib/services/twitter-free.connector';
+import { FacebookJinaConnector } from '../../src/lib/services/facebook-jina.connector';
+import { RedditFreeConnector } from '../../src/lib/services/reddit-free.connector';
 import {
   SocialMediaPost,
   SocialMediaConnector,
@@ -41,9 +41,9 @@ const mockSourceNode = {
 
 describe('SocialMediaService', () => {
   let service: SocialMediaService;
-  let twitterConnector: TwitterConnector;
-  let facebookConnector: FacebookConnector;
-  let redditConnector: RedditConnector;
+  let twitterConnector: TwitterFreeConnector;
+  let facebookConnector: FacebookJinaConnector;
+  let redditConnector: RedditFreeConnector;
   let transformService: TransformOnIngestService;
   let embeddingsService: EmbeddingsService;
 
@@ -98,7 +98,7 @@ describe('SocialMediaService', () => {
   };
 
   beforeEach(async () => {
-    const mockTwitterConnector = {
+    const mockTwitterFreeConnector = {
       platform: 'twitter',
       validateCredentials: jest.fn().mockResolvedValue(true),
       searchContent: jest.fn().mockResolvedValue([mockPost]),
@@ -114,7 +114,7 @@ describe('SocialMediaService', () => {
       disconnect: jest.fn().mockResolvedValue(undefined),
     };
 
-    const mockFacebookConnector = {
+    const mockFacebookJinaConnector = {
       platform: 'facebook',
       validateCredentials: jest.fn().mockResolvedValue(true),
       searchContent: jest.fn().mockResolvedValue([]),
@@ -125,7 +125,7 @@ describe('SocialMediaService', () => {
       disconnect: jest.fn().mockResolvedValue(undefined),
     };
 
-    const mockRedditConnector = {
+    const mockRedditFreeConnector = {
       platform: 'reddit',
       validateCredentials: jest.fn().mockResolvedValue(true),
       searchContent: jest.fn().mockResolvedValue([]),
@@ -207,13 +207,13 @@ describe('SocialMediaService', () => {
     // Instantiate SocialMediaService directly to avoid NestJS DI issues
     // with interface-typed constructor parameters (SocialMediaConnector)
     service = new SocialMediaService(
-      mockTwitterConnector as any,
-      mockFacebookConnector as any,
-      mockRedditConnector as any
+      mockTwitterFreeConnector as any,
+      mockFacebookJinaConnector as any,
+      mockRedditFreeConnector as any
     );
-    twitterConnector = mockTwitterConnector as any;
-    facebookConnector = mockFacebookConnector as any;
-    redditConnector = mockRedditConnector as any;
+    twitterConnector = mockTwitterFreeConnector as any;
+    facebookConnector = mockFacebookJinaConnector as any;
+    redditConnector = mockRedditFreeConnector as any;
     transformService = {
       transform: jest.fn().mockResolvedValue(mockNarrativeInsight),
       transformBatch: jest.fn().mockResolvedValue([mockNarrativeInsight]),
