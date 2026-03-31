@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { NarrativeFlowVisualization } from '@veritas-nx/visualization';
+import { NarrativeFlow } from '@veritas-nx/visualization';
 import { searchNarratives } from '../services/api';
 import {
   transformToNarrativeFlow,
@@ -8,6 +8,7 @@ import {
 } from '../services/transform';
 import type { NarrativeInsight } from '../services/api';
 import type { NarrativeFlowData } from '@veritas-nx/visualization';
+// NarrativeFlow component is exported as NarrativeFlow, not NarrativeFlowVisualization
 
 type ViewMode = 'flow' | 'network' | 'temporal';
 
@@ -262,7 +263,7 @@ export default function SearchPage() {
             }}
           >
             {flowData && viewMode === 'flow' && (
-              <NarrativeFlowVisualization
+              <NarrativeFlow
                 data={flowData}
                 width={1100}
                 height={600}
