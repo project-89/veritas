@@ -7,4 +7,5 @@ export default {
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/libs/database',
+  roots: ['<rootDir>/src', '<rootDir>/__tests__'],
 };

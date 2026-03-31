@@ -15,6 +15,7 @@ export default {
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/libs/content-classification',
+  roots: ['<rootDir>/src', '<rootDir>/__tests__'],
   transformIgnorePatterns: [
     '/node_modules/(?!franc-min|trigram-utils).+\\.js$',
   ],
