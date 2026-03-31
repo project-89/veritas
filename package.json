@@ -111,6 +111,7 @@
     "@nestjs/mongoose": "^11.0.2",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.1.0",
+    "@the-convocation/twitter-scraper": "^0.22.2",
     "axios": "^1.6.0",
     "cheerio": "^1.0.0",
     "class-transformer": "^0.5.1",

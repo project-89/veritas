@@ -13,13 +13,13 @@ describe("Ingestion Types", () => {
       const input = new ContentIngestionInput();
       input.text = "Valid content text";
       input.platform = Platform.TWITTER;
-      input.engagementMetrics = {
-        likes: 100,
-        shares: 50,
-        comments: 25,
-        reach: 1000,
-        viralityScore: 0.75,
-      };
+      const metrics = new EngagementMetricsInput();
+      metrics.likes = 100;
+      metrics.shares = 50;
+      metrics.comments = 25;
+      metrics.reach = 1000;
+      metrics.viralityScore = 0.75;
+      input.engagementMetrics = metrics;
       input.metadata = { source: "test" };
 
       const errors = await validate(input);
@@ -30,13 +30,13 @@ describe("Ingestion Types", () => {
       const input = new ContentIngestionInput();
       input.text = "";
       input.platform = Platform.TWITTER;
-      input.engagementMetrics = {
-        likes: 100,
-        shares: 50,
-        comments: 25,
-        reach: 1000,
-        viralityScore: 0.75,
-      };
+      const metrics = new EngagementMetricsInput();
+      metrics.likes = 100;
+      metrics.shares = 50;
+      metrics.comments = 25;
+      metrics.reach = 1000;
+      metrics.viralityScore = 0.75;
+      input.engagementMetrics = metrics;
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
@@ -47,13 +47,13 @@ describe("Ingestion Types", () => {
       const input = new ContentIngestionInput();
       input.text = "Valid content";
       (input as any).platform = "invalid_platform";
-      input.engagementMetrics = {
-        likes: 100,
-        shares: 50,
-        comments: 25,
-        reach: 1000,
-        viralityScore: 0.75,
-      };
+      const metrics = new EngagementMetricsInput();
+      metrics.likes = 100;
+      metrics.shares = 50;
+      metrics.comments = 25;
+      metrics.reach = 1000;
+      metrics.viralityScore = 0.75;
+      input.engagementMetrics = metrics;
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);

@@ -1,42 +1,19 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
+import { Scraper, SearchMode, Tweet, Profile } from '@the-convocation/twitter-scraper';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { BaseSocialMediaConnector } from './base-social-media.connector';
-import { SubprocessUtil } from './utils/subprocess.util';
-
-interface BirdTweet {
-  id: string;
-  text: string;
-  created_at: string;
-  author_id: string;
-  author_name: string;
-  author_username: string;
-  like_count: number;
-  retweet_count: number;
-  reply_count: number;
-  quote_count: number;
-  impression_count: number;
-  url: string;
-}
-
-interface BirdUser {
-  id: string;
-  name: string;
-  username: string;
-  followers_count: number;
-  following_count: number;
-  verified: boolean;
-  description: string;
-}
 
 /**
- * API-free Twitter/X connector using the bird CLI.
- * Uses browser cookie authentication — no API key needed.
- * Requires: npm install -g @steipete/bird
- * Requires: Browser cookies exported to a file (use Cookie-Editor extension)
+ * API-free Twitter/X connector using @the-convocation/twitter-scraper.
+ * Uses Twitter's internal API via a free account — no paid API key needed.
+ *
+ * Authentication options (configure via env vars):
+ * - TWITTER_USERNAME + TWITTER_PASSWORD (+ optional TWITTER_EMAIL, TWITTER_2FA_SECRET)
+ * - TWITTER_COOKIES (JSON array of cookie strings)
  */
 @Injectable()
 export class TwitterFreeConnector
@@ -44,16 +21,15 @@ export class TwitterFreeConnector
   implements OnModuleInit, OnModuleDestroy
 {
   override platform = 'twitter' as const;
-  private birdPath: string;
+  private scraper: Scraper;
   private readonly pollingInterval = 60000;
 
   constructor(
     protected override readonly configService: ConfigService,
     protected override readonly transformService: TransformOnIngestService,
-    private readonly subprocessUtil: SubprocessUtil
   ) {
     super(configService, transformService);
-    this.birdPath = this.configService.get<string>('BIRD_CLI_PATH') || 'bird';
+    this.scraper = new Scraper();
   }
 
   async onModuleInit() {
@@ -65,40 +41,49 @@ export class TwitterFreeConnector
   }
 
   protected async connectToApi(): Promise<void> {
-    const available = await this.subprocessUtil.checkAvailability(
-      this.birdPath
+    // Try cookie-based auth first
+    const cookiesJson = this.configService.get<string>('TWITTER_COOKIES');
+    if (cookiesJson) {
+      try {
+        const cookies: string[] = JSON.parse(cookiesJson);
+        await this.scraper.setCookies(cookies);
+        if (await this.scraper.isLoggedIn()) {
+          this.logger.log('Twitter scraper authenticated via cookies');
+          return;
+        }
+      } catch (error: unknown) {
+        this.logger.warn(
+          `Failed to authenticate with cookies: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    // Fall back to username/password login
+    const username = this.configService.get<string>('TWITTER_USERNAME');
+    const password = this.configService.get<string>('TWITTER_PASSWORD');
+
+    if (username && password) {
+      const email = this.configService.get<string>('TWITTER_EMAIL');
+      const twoFactorSecret = this.configService.get<string>('TWITTER_2FA_SECRET');
+      await this.scraper.login(username, password, email, twoFactorSecret);
+      this.logger.log(`Twitter scraper authenticated as @${username}`);
+      return;
+    }
+
+    throw new Error(
+      'Twitter connector requires authentication. Set either:\n' +
+        '  - TWITTER_USERNAME + TWITTER_PASSWORD (free Twitter account)\n' +
+        '  - TWITTER_COOKIES (JSON array of cookie strings from browser)',
     );
-    if (!available) {
-      throw new Error(
-        `bird CLI is not installed or not found at "${this.birdPath}". ` +
-          'Install it with: npm install -g @steipete/bird'
-      );
-    }
-
-    // Verify cookies are valid
-    const cookiesValid = await this.checkCredentialsValidity();
-    if (!cookiesValid) {
-      throw new Error(
-        'bird CLI cookies are invalid or expired. ' +
-          'Export fresh cookies from your browser using the Cookie-Editor extension.'
-      );
-    }
-
-    this.logger.log('bird CLI connected with valid cookies');
   }
 
   protected async disconnectFromApi(): Promise<void> {
-    // No persistent connection to close
+    await this.scraper.logout();
   }
 
   protected async checkCredentialsValidity(): Promise<boolean> {
     try {
-      const result = await this.subprocessUtil.exec(
-        this.birdPath,
-        ['whoami'],
-        { timeout: 15000 }
-      );
-      return result.exitCode === 0 && result.stdout.trim().length > 0;
+      return await this.scraper.isLoggedIn();
     } catch {
       return false;
     }
@@ -111,52 +96,40 @@ export class TwitterFreeConnector
       endDate?: Date;
       limit?: number;
       [key: string]: unknown;
-    }
+    },
   ): Promise<SocialMediaPost[]> {
     const limit = options?.limit || 50;
 
     try {
-      const args = ['search', query, '--count', String(limit), '--format', 'json'];
+      const tweets: Tweet[] = [];
+      const generator = this.scraper.searchTweets(query, limit, SearchMode.Latest);
 
-      const result = await this.subprocessUtil.exec(this.birdPath, args, {
-        timeout: 30000,
-      });
-
-      if (result.exitCode !== 0) {
-        throw new Error(`bird search failed: ${result.stderr}`);
+      for await (const tweet of generator) {
+        tweets.push(tweet);
+        if (tweets.length >= limit) break;
       }
 
-      let tweets: BirdTweet[];
-      try {
-        tweets = JSON.parse(result.stdout);
-      } catch {
-        // bird may output one tweet per line
-        tweets = result.stdout
-          .split('\n')
-          .filter((line) => line.trim())
-          .map((line) => JSON.parse(line));
-      }
-
-      // Filter by date client-side if needed
-      let filteredTweets = tweets;
+      // Filter by date client-side
+      let filtered = tweets;
       if (options?.startDate) {
         const start = options.startDate.getTime();
-        filteredTweets = filteredTweets.filter(
-          (t) => new Date(t.created_at).getTime() >= start
+        filtered = filtered.filter(
+          (t) => t.timeParsed && t.timeParsed.getTime() >= start,
         );
       }
       if (options?.endDate) {
         const end = options.endDate.getTime();
-        filteredTweets = filteredTweets.filter(
-          (t) => new Date(t.created_at).getTime() <= end
+        filtered = filtered.filter(
+          (t) => t.timeParsed && t.timeParsed.getTime() <= end,
         );
       }
 
-      return filteredTweets.map((tweet) =>
-        this.transformTweetToSocialMediaPost(tweet)
+      return filtered.map((tweet) => this.transformTweetToSocialMediaPost(tweet));
+    } catch (error: unknown) {
+      this.logger.error(
+        'Error searching Twitter:',
+        error instanceof Error ? error.message : String(error),
       );
-    } catch (error) {
-      this.logger.error('Error searching Twitter with bird CLI:', error);
       throw error;
     }
   }
@@ -173,7 +146,7 @@ export class TwitterFreeConnector
         });
 
         const filteredPosts = posts.filter((post) =>
-          this.postMatchesKeywords(post, keywords)
+          this.postMatchesKeywords(post, keywords),
         );
 
         for (const post of filteredPosts) {
@@ -200,80 +173,71 @@ export class TwitterFreeConnector
 
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
     try {
-      const result = await this.subprocessUtil.exec(
-        this.birdPath,
-        ['user', authorId, '--format', 'json'],
-        { timeout: 15000 }
-      );
-
-      if (result.exitCode !== 0) {
-        throw new Error(`bird user lookup failed: ${result.stderr}`);
-      }
-
-      const user = JSON.parse(result.stdout) as BirdUser;
+      const profile = await this.scraper.getProfile(authorId);
 
       return {
-        id: user.id,
-        name: user.name,
+        id: profile.userId,
+        name: profile.name || authorId,
         platform: this.platform,
-        url: `https://twitter.com/${user.username}`,
-        description: user.description,
-        credibilityScore: this.calculateCredibilityScore(user),
-        verificationStatus: user.verified ? 'verified' : 'unverified',
+        url: `https://twitter.com/${profile.username}`,
+        description: profile.biography || '',
+        credibilityScore: this.calculateCredibilityScore(profile),
+        verificationStatus: profile.isVerified || profile.isBlueVerified
+          ? 'verified'
+          : 'unverified',
         metadata: {
-          followersCount: user.followers_count,
-          followingCount: user.following_count,
+          followersCount: profile.followersCount,
+          followingCount: profile.followingCount,
+          tweetsCount: profile.tweetsCount,
+          isBlueVerified: profile.isBlueVerified,
         },
       } as Partial<SourceNode>;
-    } catch (error) {
-      this.logger.error('Error fetching Twitter author details:', error);
+    } catch (error: unknown) {
+      this.logger.error(
+        'Error fetching Twitter author details:',
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }
 
   // --- Private helpers ---
 
-  private transformTweetToSocialMediaPost(tweet: BirdTweet): SocialMediaPost {
+  private transformTweetToSocialMediaPost(tweet: Tweet): SocialMediaPost {
     return {
-      id: tweet.id,
-      text: tweet.text,
+      id: tweet.id || '',
+      text: tweet.text || '',
       platform: this.platform,
-      authorId: tweet.author_id,
-      authorName: tweet.author_name,
-      authorHandle: tweet.author_username,
-      url: tweet.url || `https://twitter.com/${tweet.author_username}/status/${tweet.id}`,
-      timestamp: new Date(tweet.created_at),
+      authorId: tweet.userId || '',
+      authorName: tweet.name || '',
+      authorHandle: tweet.username || '',
+      url: tweet.permanentUrl || `https://twitter.com/${tweet.username}/status/${tweet.id}`,
+      timestamp: tweet.timeParsed || new Date(),
       engagementMetrics: {
-        likes: tweet.like_count || 0,
-        shares: (tweet.retweet_count || 0) + (tweet.quote_count || 0),
-        comments: tweet.reply_count || 0,
-        reach: tweet.impression_count || 0,
+        likes: tweet.likes || 0,
+        shares: tweet.retweets || 0,
+        comments: tweet.replies || 0,
+        reach: tweet.views || 0,
         viralityScore: this.calculateTweetViralityScore(tweet),
       },
     };
   }
 
-  private calculateTweetViralityScore(tweet: BirdTweet): number {
-    const impressions = tweet.impression_count || 0;
-    if (impressions === 0) return 0;
+  private calculateTweetViralityScore(tweet: Tweet): number {
+    const views = tweet.views || 0;
+    if (views === 0) return 0;
 
-    const engagement =
-      (tweet.like_count || 0) +
-      (tweet.retweet_count || 0) +
-      (tweet.reply_count || 0);
-    return Math.min(engagement / impressions * 10, 1);
+    const engagement = (tweet.likes || 0) + (tweet.retweets || 0) + (tweet.replies || 0);
+    return Math.min((engagement / views) * 10, 1);
   }
 
-  private calculateCredibilityScore(user: BirdUser): number {
-    const verificationScore = user.verified ? 0.5 : 0.0;
-    const followerScore = Math.min((user.followers_count || 0) / 10000, 0.5);
+  private calculateCredibilityScore(profile: Profile): number {
+    const verificationScore = profile.isVerified ? 0.5 : profile.isBlueVerified ? 0.3 : 0.0;
+    const followerScore = Math.min((profile.followersCount || 0) / 10000, 0.5);
     return verificationScore + followerScore;
   }
 
-  private postMatchesKeywords(
-    post: SocialMediaPost,
-    keywords: string[]
-  ): boolean {
+  private postMatchesKeywords(post: SocialMediaPost, keywords: string[]): boolean {
     if (!post.text || !keywords.length) return false;
     const text = post.text.toLowerCase();
     return keywords.some((keyword) => text.includes(keyword.toLowerCase()));

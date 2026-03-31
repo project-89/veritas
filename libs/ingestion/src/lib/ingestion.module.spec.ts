@@ -1,15 +1,3 @@
-// Mock googleapis to avoid native module issues in test environment
-jest.mock('googleapis', () => ({
-  google: {
-    youtube: jest.fn().mockReturnValue({
-      search: { list: jest.fn() },
-      videos: { list: jest.fn() },
-      channels: { list: jest.fn() },
-    }),
-  },
-  youtube_v3: {},
-}));
-
 import { Test } from '@nestjs/testing';
 import { Module, Global } from '@nestjs/common';
 import { IngestionModule } from './ingestion.module';
