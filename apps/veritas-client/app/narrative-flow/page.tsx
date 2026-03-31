@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-// Using the correct import path as defined in tsconfig.base.json
-import {
-  NarrativeFlow,
-  NarrativeBranch,
-  NarrativeConnection,
-  generateSampleNarrativeFlowData,
-} from '@veritas-nx/visualization';
+'use client';
 
-export const NarrativeFlowPage: React.FC = () => {
+import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
+import type { NarrativeBranch, NarrativeConnection } from '@veritas-nx/visualization';
+import { generateSampleNarrativeFlowData } from '@veritas-nx/visualization';
+
+const NarrativeFlow = dynamic(
+  () => import('@veritas-nx/visualization').then(mod => ({ default: mod.NarrativeFlow })),
+  { ssr: false }
+);
+
+export default function NarrativeFlowPage() {
   const [data, setData] = useState(generateSampleNarrativeFlowData());
   const [timeWindow, setTimeWindow] = useState<
     { start: Date; end: Date } | undefined
@@ -507,6 +510,4 @@ export const NarrativeFlowPage: React.FC = () => {
       </style>
     </div>
   );
-};
-
-export default NarrativeFlowPage;
+}

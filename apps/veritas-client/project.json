@@ -1,65 +1,34 @@
 {
   "name": "veritas-client",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/veritas-client/src",
+  "sourceRoot": "apps/veritas-client",
   "projectType": "application",
   "tags": [],
-  "// targets": "to see all targets run: nx show project veritas-client --web",
   "targets": {
     "build": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/next:build",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
       "options": {
-        "commands": [
-          "echo 'Skipping build for veritas-client application'"
-        ]
+        "outputPath": "dist/apps/veritas-client"
       }
     },
     "serve": {
-      "executor": "@nx/vite:dev-server",
+      "executor": "@nx/next:server",
       "defaultConfiguration": "development",
       "options": {
-        "buildTarget": "veritas-client:build"
+        "buildTarget": "veritas-client:build",
+        "dev": true,
+        "port": 4200
       },
       "configurations": {
-        "development": {
-          "buildTarget": "veritas-client:build:development",
-          "hmr": true
-        },
-        "production": {
-          "buildTarget": "veritas-client:build:production",
-          "hmr": false
-        }
-      }
-    },
-    "preview": {
-      "executor": "@nx/vite:preview-server",
-      "defaultConfiguration": "development",
-      "options": {
-        "buildTarget": "veritas-client:build"
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "veritas-client:build:development"
-        },
-        "production": {
-          "buildTarget": "veritas-client:build:production"
-        }
+        "development": { "buildTarget": "veritas-client:build:development", "dev": true },
+        "production": { "buildTarget": "veritas-client:build:production", "dev": false }
       }
     },
     "test": {
-      "executor": "@nx/vite:test",
-      "outputs": ["{options.reportsDirectory}"],
-      "options": {
-        "passWithNoTests": true,
-        "reportsDirectory": "../../coverage/apps/veritas-client"
-      }
-    },
-    "lint": {
-      "executor": "@nx/eslint:lint",
-      "outputs": ["{options.outputFile}"],
-      "options": {
-        "lintFilePatterns": ["apps/veritas-client/**/*.{ts,tsx,js,jsx}"]
-      }
+      "executor": "@nx/jest:jest",
+      "options": { "passWithNoTests": true }
     }
   }
 }

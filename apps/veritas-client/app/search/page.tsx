@@ -1,14 +1,20 @@
+'use client';
+
 import { useState, useCallback } from 'react';
-import { NarrativeFlow } from '@veritas-nx/visualization';
-import { searchNarratives } from '../services/api';
+import dynamic from 'next/dynamic';
+import { searchNarratives } from '../../lib/api';
 import {
   transformToNarrativeFlow,
   transformToNetworkGraph,
   transformToTemporalData,
-} from '../services/transform';
-import type { NarrativeInsight } from '../services/api';
+} from '../../lib/transform';
+import type { NarrativeInsight } from '../../lib/api';
 import type { NarrativeFlowData } from '@veritas-nx/visualization';
-// NarrativeFlow component is exported as NarrativeFlow, not NarrativeFlowVisualization
+
+const NarrativeFlow = dynamic(
+  () => import('@veritas-nx/visualization').then(mod => ({ default: mod.NarrativeFlow })),
+  { ssr: false }
+);
 
 type ViewMode = 'flow' | 'network' | 'temporal';
 

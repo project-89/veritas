@@ -7,12 +7,12 @@ import type {
   NarrativeFlowData,
   NarrativeBranch,
   NarrativeConnection,
-} from '@veritas/visualization';
+} from '@veritas-nx/visualization';
 import type {
   NetworkGraph,
   NetworkNode,
   NetworkEdge,
-} from '@veritas/visualization';
+} from '@veritas-nx/visualization';
 
 // ---------------------------------------------------------------------------
 // Temporal data types (stream-graph style)
@@ -22,7 +22,7 @@ export interface TemporalStream {
   id: string;
   label: string;
   color: string;
-  values: number[]; // strength at each time point (0–1)
+  values: number[]; // strength at each time point (0-1)
 }
 
 export interface TemporalData {
@@ -31,7 +31,7 @@ export interface TemporalData {
 }
 
 // ---------------------------------------------------------------------------
-// Color palette – sourced from the visualization lib color-utils
+// Color palette - sourced from the visualization lib color-utils
 // ---------------------------------------------------------------------------
 
 const BRANCH_COLORS = [
@@ -247,7 +247,7 @@ export function transformToNarrativeFlow(
     const key = bucketKeys[bi];
     const items = buckets.get(key) ?? [];
 
-    // Build theme → entities map for this bucket
+    // Build theme -> entities map for this bucket
     const themeEntities = new Map<string, Set<string>>();
     for (const item of items) {
       for (const theme of item.themes) {
@@ -443,7 +443,7 @@ export function transformToNetworkGraph(
   };
 }
 
-/** Map sentiment (-1…1) to a color from red (negative) through yellow to green (positive). */
+/** Map sentiment (-1...1) to a color from red (negative) through yellow to green (positive). */
 function sentimentToColor(sentiment: number): string {
   if (sentiment > 0.3) return '#48BB78'; // Green
   if (sentiment > 0) return '#ECC94B'; // Yellow
@@ -483,7 +483,7 @@ export function transformToTemporalData(
     const values: number[] = bucketKeys.map((key) => {
       const items = buckets.get(key) ?? [];
       const count = items.filter((i) => i.themes.includes(theme)).length;
-      return count / maxCount; // normalized 0–1
+      return count / maxCount; // normalized 0-1
     });
 
     return {

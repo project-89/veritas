@@ -2,7 +2,7 @@
 // Provides a fetch-based client for narrative search, insights, and trends.
 
 // ---------------------------------------------------------------------------
-// Response types – these mirror the shapes returned by the backend API.
+// Response types -- these mirror the shapes returned by the backend API.
 // ---------------------------------------------------------------------------
 
 export interface NarrativeInsight {
@@ -11,8 +11,8 @@ export interface NarrativeInsight {
   content: string;
   platform: string;
   timestamp: string; // ISO-8601
-  sentiment: number; // -1 … 1
-  narrativeScore: number; // 0 … 1
+  sentiment: number; // -1 ... 1
+  narrativeScore: number; // 0 ... 1
   themes: string[];
   entities: string[];
   sourceUrl?: string;
@@ -22,8 +22,8 @@ export interface NarrativeInsight {
 export interface NarrativeTrend {
   theme: string;
   direction: 'rising' | 'falling' | 'stable';
-  magnitude: number; // 0 … 1
-  sentiment: number; // -1 … 1
+  magnitude: number; // 0 ... 1
+  sentiment: number; // -1 ... 1
   insightCount: number;
   startDate: string;
   endDate: string;
@@ -34,6 +34,13 @@ export interface SearchResult {
   total: number;
   page: number;
   pageSize: number;
+  summary: {
+    total: number;
+    positive: number;
+    negative: number;
+    neutral: number;
+    byPlatform: Record<string, number>;
+  };
 }
 
 export interface InsightsResponse {
