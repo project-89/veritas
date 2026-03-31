@@ -12,6 +12,7 @@ import { NarrativeRepository } from '../repositories/narrative-insight.repositor
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { NarrativeTrend } from '../../types/narrative-trend.interface';
 import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
+import { IngestionService } from '../services/ingestion.service';
 import { SocialMediaPost } from '../../types/social-media.types';
 
 /**
@@ -24,7 +25,8 @@ export class NarrativeController {
 
   constructor(
     private readonly narrativeRepository: NarrativeRepository,
-    private readonly transformService: TransformOnIngestService
+    private readonly transformService: TransformOnIngestService,
+    private readonly ingestionService: IngestionService
   ) {}
 
   /**
@@ -46,6 +48,46 @@ export class NarrativeController {
     this.logger.log(`Ingesting batch of ${posts.length} posts`);
     const insights = await this.transformService.transformBatch(posts);
     return { count: insights.length };
+  }
+
+  /**
+   * Search across all registered connectors and return classified narrative insights
+   */
+  @Post('search')
+  async searchNarratives(
+    @Body() body: { query: string; platforms?: string[]; limit?: number }
+  ): Promise<{
+    insights: NarrativeInsight[];
+    summary: {
+      total: number;
+      positive: number;
+      negative: number;
+      neutral: number;
+      byPlatform: Record<string, number>;
+    };
+  }> {
+    this.logger.log(`Searching narratives with query: "${body.query}"`);
+
+    const insights = await this.ingestionService.searchAndTransformAll(
+      body.query,
+      {
+        platforms: body.platforms,
+        limit: body.limit,
+      }
+    );
+
+    const summary = {
+      total: insights.length,
+      positive: insights.filter((i) => i.sentiment.label === 'positive').length,
+      negative: insights.filter((i) => i.sentiment.label === 'negative').length,
+      neutral: insights.filter((i) => i.sentiment.label === 'neutral').length,
+      byPlatform: insights.reduce<Record<string, number>>((acc, i) => {
+        acc[i.platform] = (acc[i.platform] || 0) + 1;
+        return acc;
+      }, {}),
+    };
+
+    return { insights, summary };
   }
 
   /**

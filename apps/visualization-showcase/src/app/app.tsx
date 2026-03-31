@@ -18,6 +18,7 @@ import {
   generateTemporalData,
 } from './mock-data';
 import NarrativeFlowPage from './pages/narrative-flow-page';
+import SearchPage from './pages/search-page';
 
 export function App() {
   const location = useLocation();
@@ -54,6 +55,16 @@ export function App() {
               } px-3 py-2 text-sm font-medium whitespace-nowrap`}
             >
               Home
+            </Link>
+            <Link
+              to="/search"
+              className={`${
+                location.pathname === '/search'
+                  ? 'text-indigo-600 border-b-2 border-indigo-600'
+                  : 'text-indigo-500 hover:text-indigo-700 font-semibold'
+              } px-3 py-2 text-sm font-medium whitespace-nowrap`}
+            >
+              Live Analysis
             </Link>
             <Link
               to="/network"
@@ -145,6 +156,26 @@ export function App() {
             path="/"
             element={
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="bg-gradient-to-br from-indigo-600 to-purple-700 overflow-hidden shadow-lg rounded-lg col-span-1 sm:col-span-2 lg:col-span-3">
+                  <div className="p-5">
+                    <h3 className="text-lg font-medium text-white">
+                      Live Narrative Analysis
+                    </h3>
+                    <p className="mt-1 text-sm text-indigo-200">
+                      Search any topic across Reddit, Twitter/X, YouTube and more.
+                      Content is scraped, classified, and visualized in real-time.
+                    </p>
+                    <div className="mt-4">
+                      <Link
+                        to="/search"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-indigo-700 bg-white hover:bg-indigo-50"
+                      >
+                        Start Analyzing
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="p-5">
                     <h3 className="text-lg font-medium text-gray-900">
@@ -456,6 +487,7 @@ export function App() {
               </div>
             }
           />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/narrative-flow" element={<NarrativeFlowPage />} />
           <Route
             path="/demo"

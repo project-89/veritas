@@ -1,6 +1,7 @@
 import { Module, DynamicModule, Provider, Type, ForwardReference } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { IngestionController } from './controllers/ingestion.controller';
+import { NarrativeController } from './controllers/narrative.controller';
 import { DatabaseModule, DatabaseService } from '@veritas/database';
 import { IngestionResolver } from './resolvers/ingestion.resolver';
 import { TransformOnIngestService } from './services/transform/transform-on-ingest.service';
@@ -227,7 +228,7 @@ export class IngestionModule {
     return {
       module: IngestionModule,
       imports,
-      controllers: [IngestionController],
+      controllers: [IngestionController, NarrativeController],
       providers,
       exports,
       global: options?.isGlobal || false,
