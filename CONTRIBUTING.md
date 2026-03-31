@@ -53,11 +53,9 @@ We welcome pull requests for bug fixes, enhancements, and documentation improvem
 
 ### Prerequisites
 
-- Node.js 16+
-- Docker and Docker Compose
-- Google Cloud SDK (for deployment)
-- Terraform 1.0+ (for deployment)
-- kubectl (for Kubernetes deployment)
+- Node.js 22+
+- Docker (for MongoDB)
+- yt-dlp (`pip install yt-dlp` or `brew install yt-dlp`) for YouTube connector
 
 ### Local Development
 
@@ -81,26 +79,26 @@ We welcome pull requests for bug fixes, enhancements, and documentation improvem
 
 ## Coding Standards
 
-### JavaScript/TypeScript
+### TypeScript
 
-- Use TypeScript for all new code
-- Follow the ESLint configuration provided in the project
-- Use async/await for asynchronous code
-- Use meaningful variable and function names
-- Add JSDoc comments for functions and complex code blocks
+- TypeScript strict mode is enabled — no `any` types
+- Use Biome for formatting (`npm run biome:check`)
+- Use `Record<string, unknown>` instead of `Record<string, any>`
+- Use `catch (error: unknown)` with instanceof guards
+- Prefer `@veritas/*` path aliases for cross-lib imports
 
 ### React
 
 - Use functional components with hooks
 - Use TypeScript for component props and state
 - Follow the component structure used in the project
-- Use CSS modules for styling
 
 ### Testing
 
-- Write unit tests for all new functionality
-- Ensure all tests pass before submitting a pull request
-- Use Jest and React Testing Library for testing
+- Write tests in `__tests__/` directories (mirrors `src/lib/` structure)
+- Ensure all 740+ tests pass before submitting: `npm test`
+- Use Jest with proper mocking of external dependencies
+- Target 80%+ coverage per library
 
 ### Git Workflow
 

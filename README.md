@@ -1,112 +1,177 @@
-# Veritas System
+# Veritas
 
-![Veritas Logo](docs/assets/veritas-logo.png)
-
-## Overview
-
-Veritas is an advanced narrative tracking and analysis system designed to identify, track, and visualize the flow of information across digital platforms. By leveraging graph database technology and sophisticated analysis algorithms, Veritas provides insights into how narratives form, evolve, and spread across the digital landscape.
+Advanced narrative tracking and analysis system. Identifies, tracks, and visualizes information flow across digital platforms using graph database technology, content classification, and multi-source data ingestion.
 
 ## Key Features
 
-- **Narrative Detection**: Automatically identify emerging narratives from content across multiple sources
-- **Relationship Mapping**: Visualize connections between content, sources, and narratives
-- **Temporal Analysis**: Track how narratives evolve and change over time
-- **Source Attribution**: Identify original sources and key amplifiers of narratives
-- **Branch Detection**: Recognize when narratives split into sub-narratives or merge
-- **Consensus Visualization**: See where different viewpoints converge or diverge
-- **Real-time Monitoring**: Track narrative development as it happens
-- **Historical Analysis**: Examine past narrative patterns and evolution
+- **Multi-Source Ingestion** - Reddit, Twitter/X, YouTube, RSS, web scraping (all API-free, no paid keys needed)
+- **Transform-on-Ingest** - Content is anonymized and classified immediately on ingestion for privacy compliance
+- **Content Classification** - Automatic topic extraction, sentiment analysis, entity recognition, and embedding generation
+- **Narrative Analysis** - Reality deviation detection, pattern recognition, source credibility scoring
+- **GraphQL + REST APIs** - 13 REST endpoints + 18 GraphQL queries/mutations
+- **Visualization** - React/D3.js components for narrative flow, network graphs, and temporal analysis
 
-## System Architecture
+## Architecture
 
-Veritas is built on a modern, cloud-native architecture:
+NX monorepo with 7 libraries and 2 applications:
 
-- **Frontend**: React-based web application with D3.js visualizations
-- **Backend API**: Node.js/Express RESTful API
-- **Graph Database**: Memgraph for storing and querying relationship data
-- **Cache**: Redis for performance optimization
-- **Message Queue**: Kafka for event-driven processing
-- **Infrastructure**: Deployed on Google Cloud Platform using Terraform and Kubernetes
+```
+apps/
+  api/                          # NestJS backend (REST + GraphQL)
+  visualization-showcase/       # React/Vite frontend
 
-## Documentation
+libs/
+  database/                     # Multi-database adapter (MongoDB, Memgraph, Redis)
+  ingestion/                    # Data connectors and transform-on-ingest pipeline
+  content-classification/       # NLP classification, embeddings, vector search
+  analysis/                     # Narrative analysis and deviation detection
+  sources/                      # Source management and credibility
+  visualization/                # React/D3.js visualization components
+  shared/                       # Shared types and utilities
+    types/
+    utils/
+```
 
-- [Development Documentation](docs/development/)
-  - [API Documentation](docs/development/api-docs.md)
-  - [Data Model](docs/development/data-model.md)
-  - [Frontend Architecture](docs/development/frontend-architecture.md)
-  - [Backend Architecture](docs/development/backend-architecture.md)
+### Data Connectors
 
-- [Deployment Documentation](docs/deployment/)
-  - [Deployment Status](docs/deployment/deployment-status.md)
-  - [Terraform Deployment Guide](docs/deployment/terraform-deployment-guide.md)
-  - [Kubernetes Deployment](kubernetes/README.md)
-
-- [User Documentation](docs/user/)
-  - [Getting Started](docs/user/getting-started.md)
-  - [User Guide](docs/user/user-guide.md)
-  - [Admin Guide](docs/user/admin-guide.md)
+| Platform | Method | Auth Required |
+|----------|--------|--------------|
+| Reddit | Public JSON API | None |
+| Twitter/X | @the-convocation/twitter-scraper | Free Twitter account |
+| YouTube | yt-dlp CLI | None |
+| Facebook | Jina Reader | None |
+| RSS | rss-parser | None |
+| Web | cheerio + axios | None |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 16+
-- Docker and Docker Compose
-- Google Cloud SDK (for deployment)
-- Terraform 1.0+ (for deployment)
-- kubectl (for Kubernetes deployment)
+- Node.js 22+ (Node 25 works but has some dependency warnings)
+- Docker (for MongoDB)
+- yt-dlp (`pip install yt-dlp` or `brew install yt-dlp`)
 
-### Local Development
+### Setup
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/oneirocom/veritas.git
-   cd veritas
-   ```
+```bash
+# Clone and install
+git clone https://github.com/oneirocom/veritas.git
+cd veritas
+npm install
 
-2. Install dependencies:
-   ```
-   npm install
-   ```
+# Create .env from template
+cp .env.example .env
 
-3. Start the development environment:
-   ```
-   npm run dev
-   ```
+# Start MongoDB
+npm run mongodb:up
 
-4. Access the application at http://localhost:3000
+# Build and run the API
+npx nx build api
+node dist/apps/api/main.js
+```
 
-### Deployment
+The API starts at http://localhost:3000 with:
+- Swagger docs at http://localhost:3000/api
+- GraphQL playground at http://localhost:3000/graphql
 
-For production deployment, follow the [Terraform Deployment Guide](docs/deployment/terraform-deployment-guide.md).
+### Optional: Twitter/X Connector
 
-## Project Structure
+Add your Twitter session cookies to `.env`:
+
+```bash
+TWITTER_COOKIES='["auth_token=YOUR_TOKEN; Domain=.x.com", "ct0=YOUR_CT0; Domain=.x.com"]'
+```
+
+Get these from Chrome DevTools > Application > Cookies > x.com.
+
+## Development
+
+```bash
+# Run all tests (740 tests across 10 projects)
+npm test
+
+# Run tests for a specific lib
+npx nx test ingestion
+npx nx test database
+
+# Build the API
+npx nx build api
+
+# Lint
+npm run lint
+```
+
+### Project Structure
 
 ```
-veritas/
-├── app/                  # Frontend application
-├── server/               # Backend API server
-├── docs/                 # Documentation
-│   ├── development/      # Development documentation
-│   ├── deployment/       # Deployment documentation
-│   └── user/             # User documentation
-├── kubernetes/           # Kubernetes manifests
-├── terraform/            # Terraform configuration
-│   ├── environments/     # Environment-specific configurations
-│   └── modules/          # Reusable Terraform modules
-├── scripts/              # Utility scripts
-└── tests/                # Test suites
+libs/X/
+  src/lib/          # Source code
+  __tests__/        # Tests (mirrors src/ structure)
+  jest.config.ts
+  tsconfig.*.json
 ```
+
+### Key Technologies
+
+- **Runtime**: NestJS, TypeScript (strict mode), GraphQL (Apollo)
+- **Databases**: MongoDB (primary), Memgraph (graph), Redis (cache)
+- **Testing**: Jest (740 tests, 41 test suites)
+- **Tooling**: NX 20.4, Biome (formatting/linting), Webpack
+- **Ingestion**: axios, cheerio, yt-dlp, @the-convocation/twitter-scraper, rss-parser
+
+## API Endpoints
+
+### REST (Swagger at /api)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /ingestion/content | Ingest content with source |
+| PUT | /ingestion/source/:id/verify | Update source verification |
+| POST | /content | Create content |
+| GET | /content | Search content |
+| GET | /content/:id | Get content by ID |
+| PUT | /content/:id | Update content |
+| DELETE | /content/:id | Delete content |
+| GET | /content/:id/related | Find related content |
+| PUT | /content/:id/engagement | Update engagement metrics |
+| GET | /content/semantic-search | Semantic search |
+| GET | /content/:id/similar | Find similar content |
+| POST | /content/:id/embedding | Generate embedding |
+| POST | /content/embeddings/generate-all | Batch generate embeddings |
+| GET | /analysis/deviation/:narrativeId | Get reality deviation metrics |
+| GET | /analysis/patterns | Detect patterns in timeframe |
+| POST | /analysis/analyze | Analyze content |
+
+### GraphQL (Playground at /graphql)
+
+**Queries**: content, searchContent, semanticSearch, similarContent, relatedContent, getNarrativeInsights, getNarrativeTrends, detectPatterns, getRealityDeviation
+
+**Mutations**: createContent, updateContent, deleteContent, updateEngagementMetrics, generateEmbedding, generateAllEmbeddings, ingestSocialContent, verifySource, analyzeContent
+
+## Environment Variables
+
+See [.env.example](.env.example) for all configuration options. Key variables:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| MONGODB_URI | Yes | MongoDB connection string |
+| TWITTER_COOKIES | No | Twitter session cookies for Twitter connector |
+| FACEBOOK_PAGE_URLS | No | JSON array of Facebook page URLs to monitor |
+| YT_DLP_PATH | No | Custom path to yt-dlp binary |
+
+## Documentation
+
+- [Development Guide](docs/development/)
+- [API Documentation](docs/development/api-docs.md)
+- [Data Model](docs/development/data-model.md)
+- [Transform-on-Ingest Architecture](docs/development/transform-on-ingest-architecture.md)
+- [Deployment Guide](docs/deployment/)
+- [Visualization Components](docs/visualization/)
 
 ## Contributing
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- The Veritas team at Oneirocom
-- All open source projects that made this possible
+MIT License - see [LICENSE](LICENSE).
