@@ -1,4 +1,4 @@
-// API service for the Veritas visualization-showcase app.
+// API service for the Veritas veritas-client app.
 // Provides a fetch-based client for narrative search, insights, and trends.
 
 // ---------------------------------------------------------------------------

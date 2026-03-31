@@ -34,11 +34,10 @@ export function App() {
       <header className="bg-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold text-gray-900">
-            Veritas Visualization Showcase
+            Veritas
           </h1>
           <p className="mt-2 text-gray-600">
-            Explore different visualization components for data analysis and
-            narrative exploration
+            Narrative tracking and analysis across digital platforms
           </p>
         </div>
       </header>
