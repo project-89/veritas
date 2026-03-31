@@ -19,7 +19,8 @@
       "options": {
         "buildTarget": "veritas-client:build",
         "dev": true,
-        "port": 4200
+        "port": 4200,
+        "turbo": false
       },
       "configurations": {
         "development": { "buildTarget": "veritas-client:build:development", "dev": true },
