@@ -5,25 +5,20 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { searchNarratives } from '../../lib/api';
 import {
-  transformToNarrativeFlow,
   transformToNetworkGraph,
   transformToTemporalData,
   detectNarratives,
 } from '../../lib/transform';
 import type { NarrativeCluster } from '../../lib/transform';
 import type { RawPost, NarrativeInsight } from '../../lib/api';
-import type { NarrativeFlowData, NarrativeBranch, NarrativeConnection } from '@veritas-nx/visualization';
 import type { NetworkGraph as NetworkGraphData } from '@veritas-nx/visualization';
 import type { TemporalData } from '../../lib/transform';
 import { SummaryStats } from '../../components/summary-stats';
 import { RawDataTable } from '../../components/raw-data-table';
+import { NarrativeTimeline } from '../../components/narrative-timeline';
+import { PlatformBreakdown } from '../../components/platform-breakdown';
 
 // Dynamic imports for D3 visualizations
-const NarrativeFlow = dynamic(
-  () => import('@veritas-nx/visualization').then((mod) => ({ default: mod.NarrativeFlow })),
-  { ssr: false },
-);
-
 const NetworkGraphVisualization = dynamic(
   () => import('@veritas-nx/visualization').then((mod) => ({ default: mod.NetworkGraphVisualization })),
   { ssr: false },
@@ -34,27 +29,7 @@ const TemporalNarrativeVisualization = dynamic(
   { ssr: false },
 );
 
-const RealityTunnelVisualization = dynamic(
-  () => import('@veritas-nx/visualization').then((mod) => ({ default: mod.RealityTunnelVisualization })),
-  { ssr: false },
-);
-
-const NarrativeMyceliumVisualization = dynamic(
-  () => import('@veritas-nx/visualization').then((mod) => ({ default: mod.NarrativeMyceliumVisualization })),
-  { ssr: false },
-);
-
-const NarrativeLandscapeVisualization = dynamic(
-  () => import('@veritas-nx/visualization').then((mod) => ({ default: mod.NarrativeLandscapeVisualization })),
-  { ssr: false },
-);
-
-const EnhancedRealityTunnelVisualization = dynamic(
-  () => import('@veritas-nx/visualization').then((mod) => ({ default: mod.EnhancedRealityTunnelVisualization })),
-  { ssr: false },
-);
-
-type TabId = 'flow' | 'network' | 'timeline' | 'reality-tunnel' | 'mycelium' | 'landscape' | 'enhanced-tunnel' | 'raw';
+type TabId = 'timeline' | 'stream' | 'sources' | 'platforms' | 'raw';
 
 interface Summary {
   total: number;
@@ -65,13 +40,10 @@ interface Summary {
 }
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'flow', label: 'Narrative Flow' },
-  { id: 'network', label: 'Network' },
   { id: 'timeline', label: 'Timeline' },
-  { id: 'reality-tunnel', label: 'Reality Tunnel' },
-  { id: 'mycelium', label: 'Mycelium' },
-  { id: 'landscape', label: 'Landscape' },
-  { id: 'enhanced-tunnel', label: 'Enhanced Tunnel' },
+  { id: 'stream', label: 'Stream' },
+  { id: 'sources', label: 'Sources' },
+  { id: 'platforms', label: 'Platforms' },
   { id: 'raw', label: 'Raw Data' },
 ];
 
@@ -91,18 +63,9 @@ function ResultsContent() {
   const [posts, setPosts] = useState<RawPost[]>([]);
   const [insights, setInsights] = useState<NarrativeInsight[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [flowData, setFlowData] = useState<NarrativeFlowData | null>(null);
   const [networkData, setNetworkData] = useState<NetworkGraphData | null>(null);
   const [temporalData, setTemporalData] = useState<TemporalData | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>('flow');
-  const [selectedBranch, setSelectedBranch] = useState<NarrativeBranch | null>(null);
-  const [selectedConnection, setSelectedConnection] = useState<NarrativeConnection | null>(null);
-
-  // Sample data for visualizations that don't yet have proper transformers
-  const [realityTunnelData, setRealityTunnelData] = useState<unknown>(null);
-  const [myceliumData, setMyceliumData] = useState<unknown>(null);
-  const [landscapeData, setLandscapeData] = useState<unknown>(null);
-  const [enhancedTunnelData, setEnhancedTunnelData] = useState<unknown>(null);
+  const [activeTab, setActiveTab] = useState<TabId>('timeline');
   const [narrativeClusters, setNarrativeClusters] = useState<NarrativeCluster[]>([]);
 
   // New search from results page
@@ -116,15 +79,8 @@ function ResultsContent() {
       setPosts([]);
       setInsights([]);
       setSummary(null);
-      setFlowData(null);
       setNetworkData(null);
       setTemporalData(null);
-      setRealityTunnelData(null);
-      setMyceliumData(null);
-      setLandscapeData(null);
-      setEnhancedTunnelData(null);
-      setSelectedBranch(null);
-      setSelectedConnection(null);
 
       try {
         const result = await searchNarratives(q.trim(), platforms, limit);
@@ -146,17 +102,8 @@ function ResultsContent() {
         if (safePosts.length > 0) {
           const clusters = detectNarratives(safePosts, safeInsights);
           setNarrativeClusters(clusters);
-          setFlowData(transformToNarrativeFlow(safePosts, safeInsights));
           setNetworkData(transformToNetworkGraph(safePosts, safeInsights));
           setTemporalData(transformToTemporalData(safePosts, safeInsights));
-
-          // Load sample data generators for visualizations without proper transformers yet
-          import('@veritas-nx/visualization').then((mod) => {
-            setRealityTunnelData(mod.generateRealityTunnelData());
-            setMyceliumData(mod.generateMyceliumData());
-            setLandscapeData(mod.generateLandscapeData());
-            setEnhancedTunnelData(mod.generateEnhancedTunnelData());
-          });
         }
       } catch (err) {
         setError(
@@ -316,48 +263,11 @@ function ResultsContent() {
 
           {/* Visualization area */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 min-h-[500px]">
-            {activeTab === 'flow' && (
-              flowData && flowData.branches.length > 0 ? (
-                <NarrativeFlow
-                  data={flowData}
-                  width={1100}
-                  height={600}
-                  showLabels={true}
-                  showEvents={true}
-                  animate={false}
-                  highlightBranchIds={selectedBranch ? [selectedBranch.id] : []}
-                  onBranchClick={(branch: NarrativeBranch) => {
-                    setSelectedBranch(branch);
-                    setSelectedConnection(null);
-                  }}
-                  onConnectionClick={(connection: NarrativeConnection) => {
-                    setSelectedConnection(connection);
-                    setSelectedBranch(null);
-                  }}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-[400px] text-slate-500">
-                  No narrative flow data available.
-                </div>
-              )
-            )}
-
-            {activeTab === 'network' && (
-              networkData && networkData.nodes.length > 0 ? (
-                <NetworkGraphVisualization
-                  data={networkData}
-                  width={1100}
-                  height={600}
-                  onNodeClick={(node: unknown) => console.log('Node clicked:', node)}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-[400px] text-slate-500">
-                  No network data available.
-                </div>
-              )
-            )}
-
             {activeTab === 'timeline' && (
+              <NarrativeTimeline posts={posts} narratives={narrativeClusters} />
+            )}
+
+            {activeTab === 'stream' && (
               temporalData && temporalData.timePoints.length > 0 ? (
                 <TemporalNarrativeVisualization
                   data={temporalData as any}
@@ -367,159 +277,32 @@ function ResultsContent() {
                 />
               ) : (
                 <div className="flex items-center justify-center h-[400px] text-slate-500">
-                  No timeline data available.
+                  No stream data available.
                 </div>
               )
             )}
 
-            {activeTab === 'reality-tunnel' && (
-              realityTunnelData ? (
-                <RealityTunnelVisualization
-                  data={realityTunnelData as never}
+            {activeTab === 'sources' && (
+              networkData && networkData.nodes.length > 0 ? (
+                <NetworkGraphVisualization
+                  data={networkData}
                   width={1100}
                   height={600}
+                  onNodeClick={(node: unknown) => console.log('Node clicked:', node)}
                 />
               ) : (
                 <div className="flex items-center justify-center h-[400px] text-slate-500">
-                  No reality tunnel data available.
+                  No source data available.
                 </div>
               )
             )}
 
-            {activeTab === 'mycelium' && (
-              myceliumData ? (
-                <NarrativeMyceliumVisualization
-                  data={myceliumData as never}
-                  width={1100}
-                  height={600}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-[400px] text-slate-500">
-                  No mycelium data available.
-                </div>
-              )
-            )}
-
-            {activeTab === 'landscape' && (
-              landscapeData ? (
-                <NarrativeLandscapeVisualization
-                  data={landscapeData as never}
-                  width={1100}
-                  height={600}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-[400px] text-slate-500">
-                  No landscape data available.
-                </div>
-              )
-            )}
-
-            {activeTab === 'enhanced-tunnel' && (
-              enhancedTunnelData ? (
-                <EnhancedRealityTunnelVisualization
-                  data={enhancedTunnelData as never}
-                  width={1100}
-                  height={600}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-[400px] text-slate-500">
-                  No enhanced tunnel data available.
-                </div>
-              )
+            {activeTab === 'platforms' && (
+              <PlatformBreakdown narratives={narrativeClusters} />
             )}
 
             {activeTab === 'raw' && <RawDataTable posts={posts} />}
           </div>
-
-          {/* Details panel */}
-          {selectedBranch && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <div className="flex items-start justify-between mb-3">
-                <h3 className="text-lg font-semibold" style={{ color: selectedBranch.color }}>
-                  {selectedBranch.name}
-                </h3>
-                <button
-                  onClick={() => setSelectedBranch(null)}
-                  className="text-slate-500 hover:text-slate-300 text-sm"
-                >
-                  Close
-                </button>
-              </div>
-              <p className="text-slate-400 text-sm mb-4">{selectedBranch.description}</p>
-              <div className="flex flex-wrap gap-4 text-sm text-slate-300 mb-4">
-                <span>
-                  Peak Strength:{' '}
-                  <span className="font-semibold text-white">
-                    {selectedBranch.metrics.peakStrength.toFixed(2)}
-                  </span>
-                </span>
-                <span>
-                  Influence:{' '}
-                  <span className="font-semibold text-white">
-                    {selectedBranch.metrics.influence.toFixed(2)}
-                  </span>
-                </span>
-                <span>
-                  Events:{' '}
-                  <span className="font-semibold text-white">{selectedBranch.events.length}</span>
-                </span>
-                <span>
-                  Sources:{' '}
-                  <span className="font-semibold text-white">{selectedBranch.sources.length}</span>
-                </span>
-              </div>
-              {selectedBranch.events.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
-                    Key Events
-                  </h4>
-                  <ul className="space-y-1">
-                    {selectedBranch.events.slice(0, 5).map((evt) => (
-                      <li key={evt.id} className="text-sm text-slate-400">
-                        <span className="text-slate-500">
-                          {new Date(evt.timestamp).toLocaleDateString()}
-                        </span>{' '}
-                        -- {evt.description}{' '}
-                        <span className="text-slate-600">(impact: {evt.impact.toFixed(2)})</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-
-          {selectedConnection && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-              <div className="flex items-start justify-between mb-3">
-                <h3 className="text-lg font-semibold text-purple-400">
-                  {selectedConnection.type.charAt(0).toUpperCase() + selectedConnection.type.slice(1)}{' '}
-                  Connection
-                </h3>
-                <button
-                  onClick={() => setSelectedConnection(null)}
-                  className="text-slate-500 hover:text-slate-300 text-sm"
-                >
-                  Close
-                </button>
-              </div>
-              <p className="text-slate-400 text-sm mb-3">{selectedConnection.description}</p>
-              <div className="flex flex-wrap gap-4 text-sm text-slate-300">
-                <span>
-                  Strength:{' '}
-                  <span className="font-semibold text-white">
-                    {selectedConnection.strength.toFixed(2)}
-                  </span>
-                </span>
-                <span>
-                  Timestamp:{' '}
-                  <span className="font-semibold text-white">
-                    {new Date(selectedConnection.timestamp).toLocaleDateString()}
-                  </span>
-                </span>
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>

@@ -111,6 +111,7 @@
     "@nestjs/swagger": "^11.1.0",
     "@nx/next": "^22.6.1",
     "@the-convocation/twitter-scraper": "^0.22.2",
+    "afinn-165": "^2.0.2",
     "axios": "^1.6.0",
     "cheerio": "^1.0.0",
     "class-transformer": "^0.5.1",

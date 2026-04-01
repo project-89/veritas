@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NlpServiceResponse } from '../types/content.types';
 import * as francMin from 'franc-min';
+import { afinn165 } from 'afinn-165';
 
 /**
  * Result of content classification including all analysis aspects
@@ -447,81 +448,39 @@ export class ContentClassificationService {
   }
 
   /**
-   * Analyze sentiment based on lexicon approach
+   * Analyze sentiment using the AFINN-165 lexicon (3382 words scored -5 to +5)
    */
   private analyzeSentiment(text: string): ContentClassification['sentiment'] {
-    const words = text.split(/\s+/);
+    const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+    const wordCount = Math.max(words.length, 1);
 
-    // Common sentiment words (simplified implementation)
-    const positiveWords = new Set([
-      'good',
-      'great',
-      'excellent',
-      'wonderful',
-      'fantastic',
-      'amazing',
-      'love',
-      'happy',
-      'best',
-      'positive',
-      'beautiful',
-      'perfect',
-      'nice',
-      'glad',
-      'awesome',
-      'thrilled',
-      'delighted',
-    ]);
+    let totalScore = 0;
+    let matchedCount = 0;
 
-    const negativeWords = new Set([
-      'bad',
-      'terrible',
-      'awful',
-      'horrible',
-      'disappointing',
-      'hate',
-      'sad',
-      'worst',
-      'negative',
-      'ugly',
-      'poor',
-      'wrong',
-      'angry',
-      'upset',
-      'unfortunate',
-      'dislike',
-    ]);
-
-    // Count positive and negative words
-    const positiveCount = words.filter((word) =>
-      positiveWords.has(word)
-    ).length;
-    const negativeCount = words.filter((word) =>
-      negativeWords.has(word)
-    ).length;
-    const totalCount = words.length;
-
-    // Calculate sentiment score (-1 to 1)
-    let score = 0;
-    if (positiveCount + negativeCount > 0) {
-      score =
-        (positiveCount - negativeCount) /
-        Math.max(positiveCount + negativeCount, 1);
+    for (const word of words) {
+      // Strip punctuation from edges for better matching
+      const cleaned = word.replace(/^[^a-z]+|[^a-z]+$/g, '');
+      if (cleaned && cleaned in afinn165) {
+        totalScore += afinn165[cleaned];
+        matchedCount++;
+      }
     }
 
-    // Determine sentiment label
+    // Normalize score to -1..1 range
+    const rawScore = totalScore / wordCount;
+    const score = Math.max(-1, Math.min(1, rawScore));
+
+    // Determine label
     let label: 'positive' | 'negative' | 'neutral' = 'neutral';
-    if (score > 0.2) {
+    if (score > 0.1) {
       label = 'positive';
-    } else if (score < -0.2) {
+    } else if (score < -0.1) {
       label = 'negative';
     }
 
-    // Calculate confidence based on proportion of sentiment words
-    const confidence = Math.min(
-      0.9,
-      Math.abs(score) + (positiveCount + negativeCount) / totalCount
-    );
+    // Confidence: proportion of words found in lexicon * strength of signal
+    const lexiconCoverage = matchedCount / wordCount;
+    const confidence = Math.min(0.95, lexiconCoverage * Math.abs(score) + lexiconCoverage * 0.3);
 
     return {
       score,
@@ -626,46 +585,124 @@ export class ContentClassificationService {
     }
   }
 
+  /** Comprehensive stopword list for topic extraction */
+  private static readonly STOP_WORDS = new Set([
+    'a', 'about', 'above', 'after', 'again', 'against', 'ago', 'ahead', 'all', 'almost',
+    'along', 'already', 'also', 'although', 'always', 'am', 'among', 'an', 'and', 'another',
+    'any', 'anybody', 'anyone', 'anything', 'anywhere', 'are', 'area', 'areas', 'around',
+    'as', 'ask', 'asked', 'asking', 'at', 'available', 'away', 'back', 'backed', 'be',
+    'became', 'because', 'become', 'becomes', 'been', 'before', 'began', 'begin', 'behind',
+    'being', 'below', 'best', 'better', 'between', 'big', 'bit', 'both', 'but', 'by',
+    'came', 'can', 'cannot', 'case', 'cases', 'certain', 'clearly', 'come', 'could',
+    'course', 'currently', 'day', 'days', 'did', 'differ', 'different', 'do', 'does',
+    'doing', 'done', 'down', 'during', 'each', 'early', 'either', 'end', 'enough', 'even',
+    'every', 'everybody', 'everyone', 'everything', 'everywhere', 'fact', 'far', 'feel',
+    'few', 'find', 'first', 'for', 'found', 'from', 'full', 'further', 'gave', 'general',
+    'get', 'gets', 'give', 'given', 'go', 'going', 'gone', 'good', 'got', 'great',
+    'group', 'had', 'has', 'have', 'having', 'he', 'help', 'her', 'here', 'herself',
+    'high', 'him', 'himself', 'his', 'how', 'however', 'http', 'https', 'if', 'important',
+    'in', 'include', 'including', 'interest', 'into', 'is', 'it', 'its', 'itself', 'just',
+    'keep', 'kind', 'knew', 'know', 'known', 'large', 'last', 'later', 'latest', 'least',
+    'less', 'let', 'lets', 'like', 'likely', 'line', 'little', 'long', 'look', 'looking',
+    'lot', 'made', 'make', 'making', 'man', 'many', 'may', 'maybe', 'me', 'men', 'might',
+    'more', 'most', 'mostly', 'mr', 'mrs', 'much', 'must', 'my', 'myself', 'name', 'need',
+    'needed', 'never', 'new', 'next', 'no', 'non', 'nor', 'not', 'nothing', 'now',
+    'number', 'of', 'off', 'often', 'old', 'on', 'once', 'one', 'only', 'open', 'or',
+    'order', 'other', 'others', 'our', 'out', 'over', 'own', 'part', 'per', 'perhaps',
+    'place', 'point', 'possible', 'present', 'problem', 'put', 'quite', 'rather', 'read',
+    'real', 'really', 'right', 'room', 'run', 'said', 'same', 'saw', 'say', 'says',
+    'second', 'see', 'seem', 'seemed', 'set', 'several', 'shall', 'she', 'should', 'show',
+    'showed', 'side', 'since', 'small', 'so', 'some', 'somebody', 'someone', 'something',
+    'sometimes', 'somewhere', 'state', 'still', 'such', 'sure', 'take', 'taken', 'tell',
+    'than', 'that', 'the', 'their', 'them', 'then', 'there', 'therefore', 'these', 'they',
+    'thing', 'things', 'think', 'this', 'those', 'though', 'thought', 'three', 'through',
+    'time', 'to', 'today', 'together', 'too', 'took', 'top', 'toward', 'turn', 'two',
+    'under', 'until', 'up', 'upon', 'us', 'use', 'used', 'using', 'very', 'want', 'was',
+    'way', 'we', 'well', 'went', 'were', 'what', 'when', 'where', 'whether', 'which',
+    'while', 'who', 'whole', 'whom', 'whose', 'why', 'will', 'with', 'within', 'without',
+    'won', 'word', 'words', 'work', 'world', 'would', 'www', 'year', 'years', 'yes',
+    'yet', 'you', 'your', 'yours', 'yourself',
+  ]);
+
   /**
-   * Extract main topics from text using TF-IDF approach
+   * Check if a word is a valid topic candidate
+   */
+  private isValidTopicWord(word: string): boolean {
+    if (word.length < 3) return false;
+    if (ContentClassificationService.STOP_WORDS.has(word)) return false;
+    // Reject words that are just numbers or contain special characters
+    if (/^\d+$/.test(word)) return false;
+    if (/[^a-z'-]/.test(word)) return false;
+    return true;
+  }
+
+  /**
+   * Extract main topics from text using frequency analysis of words and bigrams
    */
   private extractTopics(text: string): string[] {
-    const words = text.split(/\s+/);
+    // Clean and tokenize: split on non-alpha characters, lowercase
+    const rawWords = text
+      .toLowerCase()
+      .split(/[^a-z'-]+/)
+      .filter(Boolean);
 
-    // Get candidate keywords (remove common stop words)
-    const stopWords = new Set([
-      'the',
-      'and',
-      'a',
-      'in',
-      'to',
-      'of',
-      'is',
-      'it',
-      'that',
-      'for',
-      'with',
-      'as',
-      'be',
-    ]);
-    const keywords = words.filter(
-      (word) => word.length > 3 && !stopWords.has(word.toLowerCase())
-    );
+    // Filter to valid candidate words
+    const validWords = rawWords.filter((w) => this.isValidTopicWord(w));
 
-    // Count word frequency
+    // Count single-word frequencies
     const wordCounts = new Map<string, number>();
-    for (const word of keywords) {
-      const lowerWord = word.toLowerCase();
-      wordCounts.set(lowerWord, (wordCounts.get(lowerWord) || 0) + 1);
+    for (const word of validWords) {
+      wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
     }
 
-    // Get top keywords by frequency
-    const topKeywords = Array.from(wordCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map((entry) => entry[0]);
+    // Extract bigrams (adjacent valid-word pairs) for phrase detection
+    const bigramCounts = new Map<string, number>();
+    for (let i = 0; i < validWords.length - 1; i++) {
+      const bigram = `${validWords[i]} ${validWords[i + 1]}`;
+      bigramCounts.set(bigram, (bigramCounts.get(bigram) || 0) + 1);
+    }
 
-    return topKeywords;
+    // Collect candidate topics: bigrams that appear 2+ times, then top single words
+    const topics: string[] = [];
+    const usedWords = new Set<string>();
+
+    // Add meaningful bigrams first (phrases are more informative)
+    const sortedBigrams = Array.from(bigramCounts.entries())
+      .filter(([, count]) => count >= 2)
+      .sort((a, b) => b[1] - a[1]);
+
+    for (const [bigram] of sortedBigrams) {
+      if (topics.length >= 4) break;
+      topics.push(bigram);
+      // Mark component words as used so we don't duplicate them as singles
+      for (const w of bigram.split(' ')) {
+        usedWords.add(w);
+      }
+    }
+
+    // Fill remaining slots with top single words (not already covered by bigrams)
+    const sortedWords = Array.from(wordCounts.entries())
+      .filter(([word, count]) => count >= 2 && !usedWords.has(word))
+      .sort((a, b) => b[1] - a[1]);
+
+    for (const [word] of sortedWords) {
+      if (topics.length >= 8) break;
+      topics.push(word);
+    }
+
+    // If we still have very few topics, include single-occurrence words by frequency
+    if (topics.length < 5) {
+      const remaining = Array.from(wordCounts.entries())
+        .filter(([word]) => !usedWords.has(word) && !topics.includes(word))
+        .sort((a, b) => b[1] - a[1]);
+
+      for (const [word] of remaining) {
+        if (topics.length >= 6) break;
+        topics.push(word);
+      }
+    }
+
+    return topics;
   }
 
   /**
