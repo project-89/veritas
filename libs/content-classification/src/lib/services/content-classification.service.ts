@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { NlpServiceResponse } from '../types/content.types';
 import * as francMin from 'franc-min';
 import { afinn165 } from 'afinn-165';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
  * Result of content classification including all analysis aspects
@@ -83,12 +84,25 @@ export class ContentClassificationService {
   private readonly logger = new Logger(ContentClassificationService.name);
   private readonly nlpEndpoint: string | null = null;
   private readonly apiKey: string | null = null;
+  private readonly geminiModel: ReturnType<GoogleGenerativeAI['getGenerativeModel']> | null = null;
 
   constructor(private readonly configService: ConfigService) {
     // Initialize NLP service configuration
     this.nlpEndpoint =
       this.configService.get<string>('NLP_SERVICE_ENDPOINT') || null;
     this.apiKey = this.configService.get<string>('NLP_SERVICE_API_KEY') || null;
+
+    // Initialize Gemini for sentiment analysis
+    const geminiKey = this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
+    if (geminiKey) {
+      try {
+        const genAI = new GoogleGenerativeAI(geminiKey);
+        this.geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        this.logger.log('Gemini sentiment analysis enabled (gemini-2.0-flash)');
+      } catch (err) {
+        this.logger.warn(`Failed to initialize Gemini: ${err}`);
+      }
+    }
 
     // Validate configuration
     if (!this.nlpEndpoint) {
@@ -143,8 +157,25 @@ export class ContentClassificationService {
         return await this.batchClassifyWithExternalService(texts);
       }
 
-      // Otherwise process sequentially with local implementation
-      return Promise.all(texts.map((text) => this.classifyLocally(text)));
+      // Classify locally first (topics, entities, language)
+      const localResults = texts.map((text) => this.classifyLocally(text));
+
+      // If Gemini is available, enhance sentiment with LLM
+      if (this.geminiModel) {
+        try {
+          const geminiSentiments = await this.batchSentimentWithGemini(texts);
+          for (let i = 0; i < localResults.length; i++) {
+            if (geminiSentiments[i]) {
+              localResults[i].sentiment = geminiSentiments[i];
+            }
+          }
+          this.logger.debug(`Enhanced ${geminiSentiments.filter(Boolean).length}/${texts.length} texts with Gemini sentiment`);
+        } catch (err) {
+          this.logger.warn(`Gemini sentiment failed, using AFINN fallback: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+
+      return localResults;
     } catch (error) {
       this.logger.error(
         `Batch classification error: ${
@@ -450,6 +481,76 @@ export class ContentClassificationService {
   /**
    * Analyze sentiment using the AFINN-165 lexicon (3382 words scored -5 to +5)
    */
+  /**
+   * Batch sentiment analysis using Gemini Flash.
+   * Sends all texts in a single prompt, gets back JSON array of sentiments.
+   */
+  private async batchSentimentWithGemini(
+    texts: string[],
+  ): Promise<Array<ContentClassification['sentiment'] | null>> {
+    if (!this.geminiModel || texts.length === 0) return texts.map(() => null);
+
+    // Batch in groups of 30 to stay within token limits
+    const BATCH_SIZE = 30;
+    const allResults: Array<ContentClassification['sentiment'] | null> = [];
+
+    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+      const batch = texts.slice(i, i + BATCH_SIZE);
+      const numberedTexts = batch
+        .map((t, idx) => `[${idx}] ${t.slice(0, 300)}`)
+        .join('\n\n');
+
+      const prompt = `Analyze the sentiment of each numbered social media post below. For each post, determine:
+- score: a number from -1.0 (very negative) to 1.0 (very positive), 0 = neutral
+- label: "positive", "negative", or "neutral"
+- confidence: 0.0 to 1.0
+
+Context: These posts are about a project/community. Look for frustration, criticism, disappointment, praise, support, excitement. Phrases like "went dark", "disappeared", "gave up", "dead project", "no leadership" are negative. Phrases like "believe in", "support", "building", "real ones" are positive.
+
+Respond ONLY with a JSON array of objects, one per post, in order. No other text.
+Example: [{"score": -0.7, "label": "negative", "confidence": 0.85}, {"score": 0.3, "label": "positive", "confidence": 0.7}]
+
+Posts:
+${numberedTexts}`;
+
+      try {
+        const result = await this.geminiModel.generateContent(prompt);
+        const responseText = result.response.text();
+
+        // Extract JSON from response (might have markdown code fences)
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]) as Array<{
+            score: number;
+            label: string;
+            confidence: number;
+          }>;
+
+          for (let j = 0; j < batch.length; j++) {
+            const item = parsed[j];
+            if (item && typeof item.score === 'number') {
+              allResults.push({
+                score: Math.max(-1, Math.min(1, item.score)),
+                label: item.label === 'positive' ? 'positive' : item.label === 'negative' ? 'negative' : 'neutral',
+                confidence: Math.max(0, Math.min(1, item.confidence ?? 0.5)),
+              });
+            } else {
+              allResults.push(null);
+            }
+          }
+        } else {
+          // Couldn't parse — fill with nulls
+          for (let j = 0; j < batch.length; j++) allResults.push(null);
+        }
+      } catch (err) {
+        this.logger.warn(`Gemini batch ${i / BATCH_SIZE} failed: ${err instanceof Error ? err.message : err}`);
+        for (let j = 0; j < batch.length; j++) allResults.push(null);
+      }
+    }
+
+    return allResults;
+  }
+
   private analyzeSentiment(text: string): ContentClassification['sentiment'] {
     const words = text.toLowerCase().split(/\s+/).filter(Boolean);
     const wordCount = Math.max(words.length, 1);

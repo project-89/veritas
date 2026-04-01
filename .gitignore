@@ -67,3 +67,5 @@ vitest.config.*.timestamp*
 
 # MongoDB data directory
 mongodb_data/
+
+.env
