@@ -100,6 +100,7 @@
   ],
   "dependencies": {
     "@apollo/server": "^4.11.3",
+    "@haruhunab1320/twitter-scraper": "file:../../twitter-scraper",
     "@nestjs/apollo": "^13.0.4",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.1",
@@ -110,7 +111,6 @@
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.1.0",
     "@nx/next": "^22.6.1",
-    "@the-convocation/twitter-scraper": "^0.22.2",
     "afinn-165": "^2.0.2",
     "axios": "^1.6.0",
     "cheerio": "^1.0.0",

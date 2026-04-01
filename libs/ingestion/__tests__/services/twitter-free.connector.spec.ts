@@ -11,7 +11,7 @@ const mockLogin = jest.fn();
 const mockLogout = jest.fn();
 const mockSetCookies = jest.fn();
 
-jest.mock('@the-convocation/twitter-scraper', () => ({
+jest.mock('@haruhunab1320/twitter-scraper', () => ({
   Scraper: jest.fn().mockImplementation(() => ({
     searchTweets: mockSearchTweets,
     getProfile: mockGetProfile,

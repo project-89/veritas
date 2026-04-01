@@ -1,14 +1,14 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
-import { Scraper, SearchMode, Tweet, Profile } from '@the-convocation/twitter-scraper';
+import { Scraper, SearchMode, Tweet, Profile } from '@haruhunab1320/twitter-scraper';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { BaseSocialMediaConnector } from './base-social-media.connector';
 
 /**
- * API-free Twitter/X connector using @the-convocation/twitter-scraper.
+ * API-free Twitter/X connector using @haruhunab1320/twitter-scraper.
  * Uses Twitter's internal API via a free account — no paid API key needed.
  *
  * Authentication options (configure via env vars):
