@@ -168,7 +168,7 @@ export function NarrativeTimeline({ posts, narratives }: NarrativeTimelineProps)
 
             {/* Posts for this date */}
             <div className="space-y-1.5 mb-4">
-              {group.items.map(({ post, cluster }) => {
+              {group.items.map(({ post, cluster }, postIdx) => {
                 const isExpanded = expandedId === post.id;
                 const isFaded =
                   hoveredNarrative !== null && cluster?.id !== hoveredNarrative;
@@ -177,7 +177,7 @@ export function NarrativeTimeline({ posts, narratives }: NarrativeTimelineProps)
 
                 return (
                   <div
-                    key={post.id}
+                    key={`${post.id}-${postIdx}`}
                     onClick={() => setExpandedId(isExpanded ? null : post.id)}
                     className={`flex gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 ${
                       isFaded

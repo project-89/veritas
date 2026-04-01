@@ -85,13 +85,31 @@ export class NarrativeController {
   }> {
     this.logger.log(`Searching narratives with query: "${body.query}"`);
 
-    const { posts, insights } = await this.ingestionService.searchWithRawDataAll(
+    const rawResult = await this.ingestionService.searchWithRawDataAll(
       body.query,
       {
         platforms: body.platforms,
         limit: body.limit,
       }
     );
+
+    // Deduplicate posts by URL or text content (same post from different search results)
+    const seen = new Set<string>();
+    const dedupedPosts: SocialMediaPost[] = [];
+    const dedupedInsights: NarrativeInsight[] = [];
+    for (let i = 0; i < rawResult.posts.length; i++) {
+      const post = rawResult.posts[i];
+      const key = post.url || post.text.slice(0, 100);
+      if (!seen.has(key)) {
+        seen.add(key);
+        dedupedPosts.push(post);
+        if (rawResult.insights[i]) {
+          dedupedInsights.push(rawResult.insights[i]);
+        }
+      }
+    }
+    const posts = dedupedPosts;
+    const insights = dedupedInsights;
 
     // Map SocialMediaPost[] to a simplified serializable format for the frontend
     // Pair each post with its corresponding insight (by index) to embed sentiment
