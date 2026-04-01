@@ -36,7 +36,7 @@ export function SummaryStats({ summary }: SummaryStatsProps) {
 
         <div className="w-px h-6 bg-slate-700 mx-1 hidden sm:block" />
 
-        {Object.entries(summary.byPlatform).map(([platform, count]) => (
+        {Object.entries(summary.byPlatform ?? {}).map(([platform, count]) => (
           <StatChip
             key={platform}
             label={platform.charAt(0).toUpperCase() + platform.slice(1)}

@@ -125,14 +125,25 @@ function ResultsContent() {
 
       try {
         const result = await searchNarratives(q.trim(), platforms, limit);
-        setPosts(result.posts);
-        setInsights(result.insights);
-        setSummary(result.summary);
+        const safePosts = result.posts ?? [];
+        const safeInsights = result.insights ?? [];
+        const safeSummary = result.summary
+          ? {
+              total: result.summary.total ?? 0,
+              positive: result.summary.positive ?? 0,
+              negative: result.summary.negative ?? 0,
+              neutral: result.summary.neutral ?? 0,
+              byPlatform: result.summary.byPlatform ?? {},
+            }
+          : null;
+        setPosts(safePosts);
+        setInsights(safeInsights);
+        setSummary(safeSummary);
 
-        if (result.insights.length > 0) {
-          setFlowData(transformToNarrativeFlow(result.insights));
-          setNetworkData(transformToNetworkGraph(result.insights));
-          setTemporalData(transformToTemporalData(result.insights));
+        if (safeInsights.length > 0) {
+          setFlowData(transformToNarrativeFlow(safeInsights));
+          setNetworkData(transformToNetworkGraph(safeInsights));
+          setTemporalData(transformToTemporalData(safeInsights));
 
           // Load sample data generators for visualizations without proper transformers yet
           import('@veritas-nx/visualization').then((mod) => {
@@ -235,83 +246,119 @@ function ResultsContent() {
 
           {/* Visualization area */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 min-h-[500px]">
-            {activeTab === 'flow' && flowData && (
-              <NarrativeFlow
-                data={flowData}
-                width={1100}
-                height={600}
-                showLabels={true}
-                showEvents={true}
-                animate={false}
-                highlightBranch={selectedBranch?.id}
-                onBranchClick={(branch: NarrativeBranch) => {
-                  setSelectedBranch(branch);
-                  setSelectedConnection(null);
-                }}
-                onConnectionClick={(connection: NarrativeConnection) => {
-                  setSelectedConnection(connection);
-                  setSelectedBranch(null);
-                }}
-              />
+            {activeTab === 'flow' && (
+              flowData && flowData.branches.length > 0 ? (
+                <NarrativeFlow
+                  data={flowData}
+                  width={1100}
+                  height={600}
+                  showLabels={true}
+                  showEvents={true}
+                  animate={false}
+                  highlightBranchIds={selectedBranch ? [selectedBranch.id] : []}
+                  onBranchClick={(branch: NarrativeBranch) => {
+                    setSelectedBranch(branch);
+                    setSelectedConnection(null);
+                  }}
+                  onConnectionClick={(connection: NarrativeConnection) => {
+                    setSelectedConnection(connection);
+                    setSelectedBranch(null);
+                  }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[400px] text-slate-500">
+                  No narrative flow data available.
+                </div>
+              )
             )}
 
-            {activeTab === 'network' && networkData && (
-              <NetworkGraphVisualization
-                data={networkData}
-                width={1100}
-                height={600}
-                onNodeClick={(node: unknown) => console.log('Node clicked:', node)}
-              />
+            {activeTab === 'network' && (
+              networkData && networkData.nodes.length > 0 ? (
+                <NetworkGraphVisualization
+                  data={networkData}
+                  width={1100}
+                  height={600}
+                  onNodeClick={(node: unknown) => console.log('Node clicked:', node)}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[400px] text-slate-500">
+                  No network data available.
+                </div>
+              )
             )}
 
-            {activeTab === 'timeline' && temporalData && temporalData.timePoints.length > 0 && (
-              <TemporalNarrativeVisualization
-                data={temporalData as any}
-                width={1100}
-                height={600}
-                onStreamClick={(streamId: string) => console.log('Stream clicked:', streamId)}
-              />
+            {activeTab === 'timeline' && (
+              temporalData && temporalData.timePoints.length > 0 ? (
+                <TemporalNarrativeVisualization
+                  data={temporalData as any}
+                  width={1100}
+                  height={600}
+                  onStreamClick={(streamId: string) => console.log('Stream clicked:', streamId)}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[400px] text-slate-500">
+                  No timeline data available.
+                </div>
+              )
             )}
 
-            {activeTab === 'reality-tunnel' && realityTunnelData && (
-              <RealityTunnelVisualization
-                data={realityTunnelData as never}
-                width={1100}
-                height={600}
-              />
+            {activeTab === 'reality-tunnel' && (
+              realityTunnelData ? (
+                <RealityTunnelVisualization
+                  data={realityTunnelData as never}
+                  width={1100}
+                  height={600}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[400px] text-slate-500">
+                  No reality tunnel data available.
+                </div>
+              )
             )}
 
-            {activeTab === 'mycelium' && myceliumData && (
-              <NarrativeMyceliumVisualization
-                data={myceliumData as never}
-                width={1100}
-                height={600}
-              />
+            {activeTab === 'mycelium' && (
+              myceliumData ? (
+                <NarrativeMyceliumVisualization
+                  data={myceliumData as never}
+                  width={1100}
+                  height={600}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[400px] text-slate-500">
+                  No mycelium data available.
+                </div>
+              )
             )}
 
-            {activeTab === 'landscape' && landscapeData && (
-              <NarrativeLandscapeVisualization
-                data={landscapeData as never}
-                width={1100}
-                height={600}
-              />
+            {activeTab === 'landscape' && (
+              landscapeData ? (
+                <NarrativeLandscapeVisualization
+                  data={landscapeData as never}
+                  width={1100}
+                  height={600}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[400px] text-slate-500">
+                  No landscape data available.
+                </div>
+              )
             )}
 
-            {activeTab === 'enhanced-tunnel' && enhancedTunnelData && (
-              <EnhancedRealityTunnelVisualization
-                data={enhancedTunnelData as never}
-                width={1100}
-                height={600}
-              />
+            {activeTab === 'enhanced-tunnel' && (
+              enhancedTunnelData ? (
+                <EnhancedRealityTunnelVisualization
+                  data={enhancedTunnelData as never}
+                  width={1100}
+                  height={600}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[400px] text-slate-500">
+                  No enhanced tunnel data available.
+                </div>
+              )
             )}
 
             {activeTab === 'raw' && <RawDataTable posts={posts} insights={insights} />}
-
-            {insights.length === 0 && (
-              <div className="flex items-center justify-center h-[400px] text-slate-500">
-                No data to visualize. Try a different search term.
-              </div>
-            )}
           </div>
 
           {/* Details panel */}

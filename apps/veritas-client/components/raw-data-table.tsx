@@ -4,8 +4,8 @@ import { useState, useMemo } from 'react';
 import type { RawPost, NarrativeInsight } from '../lib/api';
 
 interface RawDataTableProps {
-  posts: RawPost[];
-  insights: NarrativeInsight[];
+  posts?: RawPost[];
+  insights?: NarrativeInsight[];
 }
 
 type SortField = 'timestamp' | 'sentiment' | 'engagement' | 'platform';
@@ -35,7 +35,9 @@ interface PairedRow {
   index: number;
 }
 
-export function RawDataTable({ posts, insights }: RawDataTableProps) {
+export function RawDataTable({ posts: rawPosts, insights: rawInsights }: RawDataTableProps) {
+  const posts = rawPosts ?? [];
+  const insights = rawInsights ?? [];
   const [sortField, setSortField] = useState<SortField>('timestamp');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function RawDataTable({ posts, insights }: RawDataTableProps) {
 
   // Pair posts with insights by index
   const paired: PairedRow[] = useMemo(
-    () => posts.map((post, index) => ({ post, insight: insights[index], index })),
+    () => posts.map((post, index) => ({ post, insight: insights[index] as NarrativeInsight | undefined, index })),
     [posts, insights],
   );
 
@@ -52,6 +54,14 @@ export function RawDataTable({ posts, insights }: RawDataTableProps) {
     () => Array.from(new Set(posts.map((p) => p.platform))).sort(),
     [posts],
   );
+
+  if (posts.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[200px] text-slate-500 text-sm">
+        No data available.
+      </div>
+    );
+  }
 
   const filtered = useMemo(() => {
     let list = [...paired];
@@ -69,8 +79,8 @@ export function RawDataTable({ posts, insights }: RawDataTableProps) {
       if (sortField === 'sentiment')
         return dir * ((a.insight?.sentiment.score ?? 0) - (b.insight?.sentiment.score ?? 0));
       if (sortField === 'engagement') {
-        const engA = a.post.engagement.likes + a.post.engagement.comments + a.post.engagement.shares;
-        const engB = b.post.engagement.likes + b.post.engagement.comments + b.post.engagement.shares;
+        const engA = (a.post.engagement?.likes ?? 0) + (a.post.engagement?.comments ?? 0) + (a.post.engagement?.shares ?? 0);
+        const engB = (b.post.engagement?.likes ?? 0) + (b.post.engagement?.comments ?? 0) + (b.post.engagement?.shares ?? 0);
         return dir * (engA - engB);
       }
       if (sortField === 'platform') return dir * a.post.platform.localeCompare(b.post.platform);
@@ -201,19 +211,19 @@ export function RawDataTable({ posts, insights }: RawDataTableProps) {
                           {theme}
                         </span>
                       ))}
-                      {!isExpanded && (insight?.themes.length ?? 0) > 2 && (
+                      {!isExpanded && (insight?.themes?.length ?? 0) > 2 && (
                         <span className="text-xs text-slate-500">
-                          +{(insight?.themes.length ?? 0) - 2}
+                          +{(insight?.themes?.length ?? 0) - 2}
                         </span>
                       )}
                     </div>
                   </td>
                   <td className="px-3 py-2 text-slate-400 text-xs">
-                    <span title="Likes">{post.engagement.likes}</span>
+                    <span title="Likes">{post.engagement?.likes ?? 0}</span>
                     {' / '}
-                    <span title="Comments">{post.engagement.comments}</span>
+                    <span title="Comments">{post.engagement?.comments ?? 0}</span>
                     {' / '}
-                    <span title="Shares">{post.engagement.shares}</span>
+                    <span title="Shares">{post.engagement?.shares ?? 0}</span>
                   </td>
                   <td className="px-3 py-2 text-slate-500 text-xs whitespace-nowrap">
                     {new Date(post.timestamp).toLocaleDateString()}

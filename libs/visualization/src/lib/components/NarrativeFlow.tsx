@@ -35,6 +35,19 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove(); // Clear previous rendering
 
+    // Helper: check if a Date is valid
+    const isValidDate = (d: unknown): d is Date =>
+      d instanceof Date && !isNaN(d.getTime());
+
+    // Helper: check if a number is finite
+    const safeNum = (v: unknown, fallback = 0): number => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+
+    // Validate timeframe
+    if (!isValidDate(effectiveTimeWindow.start) || !isValidDate(effectiveTimeWindow.end)) return;
+
     // Create main container with margins
     const margin = { top: 40, right: 40, bottom: 60, left: 60 };
     const innerWidth = width - margin.left - margin.right;
@@ -115,10 +128,13 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
       .y1((d) => yScale(0) + strengthScale(d[1]) / 2)
       .curve(d3.curveBasis);
 
-    // Prepare consensus data points
-    const consensusPoints: [Date, number][] = data.consensus.timePoints.map(
-      (time, i) => [time, data.consensus.strengthValues[i]]
-    );
+    // Prepare consensus data points (filter out invalid entries)
+    const consensusPoints: [Date, number][] = (data.consensus.timePoints ?? [])
+      .map((time, i) => [time, safeNum(data.consensus.strengthValues?.[i], 0.5)] as [Date, number])
+      .filter(([time]) => isValidDate(time));
+
+    // Need at least 2 points for area/line generators
+    if (consensusPoints.length < 2) return;
 
     // Draw consensus band
     container
@@ -143,13 +159,13 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
 
     // Function to generate path for a narrative branch
     const generateBranchPath = (branch: NarrativeBranch) => {
-      const branchPoints: [Date, number, number][] = branch.timePoints.map(
-        (time, i) => [
+      const branchPoints: [Date, number, number][] = (branch.timePoints ?? [])
+        .map((time, i) => [
           time,
-          branch.strengthValues[i],
-          branch.divergenceValues[i],
-        ]
-      );
+          safeNum(branch.strengthValues?.[i], 0),
+          safeNum(branch.divergenceValues?.[i], 0),
+        ] as [Date, number, number])
+        .filter(([time]) => isValidDate(time));
 
       // Create a line generator for this branch
       const branchLine = d3
@@ -172,8 +188,13 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
       };
     };
 
-    // Draw narrative branches
-    data.branches.forEach((branch) => {
+    // Draw narrative branches (filter to those with valid data)
+    const validBranches = (data.branches ?? []).filter((branch) => {
+      const validPoints = (branch.timePoints ?? []).filter((t) => isValidDate(t));
+      return validPoints.length >= 2;
+    });
+
+    validBranches.forEach((branch) => {
       const paths = generateBranchPath(branch);
 
       const isHighlighted = highlightBranchIds.includes(branch.id);
@@ -203,69 +224,88 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
         });
 
       // Add labels if enabled
-      if (showLabels) {
+      if (showLabels && (branch.strengthValues ?? []).length > 0 && (branch.timePoints ?? []).length > 0) {
         // Find the point with maximum strength for label placement
         let maxStrengthIndex = 0;
         let maxStrength = 0;
 
-        branch.strengthValues.forEach((strength, i) => {
-          if (strength > maxStrength) {
-            maxStrength = strength;
+        (branch.strengthValues ?? []).forEach((strength, i) => {
+          const s = safeNum(strength, 0);
+          if (s > maxStrength) {
+            maxStrength = s;
             maxStrengthIndex = i;
           }
         });
 
-        const labelX = xScale(branch.timePoints[maxStrengthIndex]);
-        const labelY = yScale(branch.divergenceValues[maxStrengthIndex]);
+        const labelTime = branch.timePoints[maxStrengthIndex];
+        const labelDiv = branch.divergenceValues?.[maxStrengthIndex] ?? 0;
+        if (isValidDate(labelTime)) {
+          const labelX = safeNum(xScale(labelTime));
+          const labelY = safeNum(yScale(labelDiv));
 
-        container
-          .append('text')
-          .attr('class', `branch-label branch-label-${branch.id}`)
-          .attr('x', labelX)
-          .attr('y', labelY)
-          .attr('dy', '-0.5em')
-          .attr('text-anchor', 'middle')
-          .attr('font-size', '12px')
-          .attr('fill', '#333')
-          .text(branch.name)
-          .attr('opacity', isHighlighted ? 1 : 0.8);
+          if (Number.isFinite(labelX) && Number.isFinite(labelY)) {
+            container
+              .append('text')
+              .attr('class', `branch-label branch-label-${branch.id}`)
+              .attr('x', labelX)
+              .attr('y', labelY)
+              .attr('dy', '-0.5em')
+              .attr('text-anchor', 'middle')
+              .attr('font-size', '12px')
+              .attr('fill', '#333')
+              .text(branch.name)
+              .attr('opacity', isHighlighted ? 1 : 0.8);
+          }
+        }
       }
 
       // Add event markers if enabled
       if (showEvents && branch.events && branch.events.length > 0) {
-        branch.events.forEach((event) => {
-          // Find the closest time point to this event
-          const closestTimeIndex = branch.timePoints.reduce(
-            (closest, time, index) => {
-              const currentDiff = Math.abs(
-                time.getTime() - event.timestamp.getTime()
-              );
-              const closestDiff = Math.abs(
-                branch.timePoints[closest].getTime() - event.timestamp.getTime()
-              );
-              return currentDiff < closestDiff ? index : closest;
-            },
-            0
-          );
+        // Filter to events with valid timestamps and finite impact
+        const validEvents = branch.events.filter(
+          (evt) => isValidDate(evt.timestamp) && Number.isFinite(safeNum(evt.impact))
+        );
+        const validTimePoints = (branch.timePoints ?? []).filter((t) => isValidDate(t));
 
-          const eventX = xScale(event.timestamp);
-          const eventY = yScale(branch.divergenceValues[closestTimeIndex]);
+        validEvents.forEach((evt) => {
+          // Find the closest time point to this event
+          const closestTimeIndex = validTimePoints.length > 0
+            ? validTimePoints.reduce(
+                (closest, time, index) => {
+                  const currentDiff = Math.abs(
+                    time.getTime() - evt.timestamp.getTime()
+                  );
+                  const closestDiff = Math.abs(
+                    validTimePoints[closest].getTime() - evt.timestamp.getTime()
+                  );
+                  return currentDiff < closestDiff ? index : closest;
+                },
+                0
+              )
+            : 0;
+
+          const eventX = safeNum(xScale(evt.timestamp));
+          const eventY = safeNum(yScale(branch.divergenceValues?.[closestTimeIndex] ?? 0));
+          const impactVal = safeNum(evt.impact, 0.5);
+
+          // Skip if coordinates are not finite
+          if (!Number.isFinite(eventX) || !Number.isFinite(eventY)) return;
 
           container
             .append('circle')
-            .attr('class', `event-marker event-${event.id}`)
+            .attr('class', `event-marker event-${evt.id}`)
             .attr('cx', eventX)
             .attr('cy', eventY)
-            .attr('r', 5 + event.impact * 3) // Size based on impact
+            .attr('r', 5 + impactVal * 3) // Size based on impact
             .attr('fill', '#f56565')
             .attr('stroke', '#fff')
             .attr('stroke-width', 1)
             .attr('opacity', 0.8)
-            .on('mouseover', function (event) {
+            .on('mouseover', function () {
               if (interactive) {
                 d3.select(this)
                   .attr('opacity', 1)
-                  .attr('r', 7 + event.impact * 3);
+                  .attr('r', 7 + impactVal * 3);
 
                 // Show tooltip
                 const tooltip = container
@@ -289,23 +329,23 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
                   .attr('x', 10)
                   .attr('y', 20)
                   .attr('font-weight', 'bold')
-                  .text(new Date(event.timestamp).toLocaleDateString());
+                  .text(isValidDate(evt.timestamp) ? evt.timestamp.toLocaleDateString() : 'Unknown date');
 
                 tooltip
                   .append('text')
                   .attr('x', 10)
                   .attr('y', 40)
                   .text(
-                    (event.description ?? '').substring(0, 30) +
-                      ((event.description ?? '').length > 30 ? '...' : '')
+                    (evt.description ?? '').substring(0, 30) +
+                      ((evt.description ?? '').length > 30 ? '...' : '')
                   );
               }
             })
-            .on('mouseout', function (event) {
+            .on('mouseout', function () {
               if (interactive) {
                 d3.select(this)
                   .attr('opacity', 0.8)
-                  .attr('r', 5 + event.impact * 3);
+                  .attr('r', 5 + impactVal * 3);
 
                 container.select('.tooltip').remove();
               }
@@ -315,7 +355,9 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
     });
 
     // Draw connections between narratives
-    data.connections.forEach((connection) => {
+    (data.connections ?? []).forEach((connection) => {
+      // Skip connections with invalid timestamps
+      if (!isValidDate(connection.timestamp)) return;
       // Find the source and target branches
       const sourceBranch = data.branches.find(
         (b) => b.id === connection.sourceId

@@ -68,7 +68,14 @@ function computeBuckets(insights: NarrativeInsight[]): {
   timePoints: Date[];
   bucketMs: number;
 } {
-  const timestamps = insights.map((i) => new Date(i.timestamp).getTime());
+  const timestamps = insights
+    .map((i) => new Date(i.timestamp).getTime())
+    .filter((t) => Number.isFinite(t));
+
+  if (timestamps.length === 0) {
+    return { buckets: new Map(), timePoints: [], bucketMs: 24 * 60 * 60 * 1000 };
+  }
+
   const min = Math.min(...timestamps);
   const max = Math.max(...timestamps);
   const spanMs = max - min;
@@ -127,16 +134,32 @@ function clamp(v: number, lo: number, hi: number): number {
 // transformToNarrativeFlow
 // ---------------------------------------------------------------------------
 
+/** Check whether a Date is valid (not NaN). */
+function isValidDate(d: Date): boolean {
+  return d instanceof Date && !isNaN(d.getTime());
+}
+
+/** Ensure a number is finite; return fallback otherwise. */
+function safeFinite(v: number, fallback = 0): number {
+  return Number.isFinite(v) ? v : fallback;
+}
+
 export function transformToNarrativeFlow(
   insights: NarrativeInsight[],
 ): NarrativeFlowData {
-  if (insights.length === 0) {
+  // Filter out insights with invalid timestamps up front
+  const validInsights = (insights ?? []).filter((i) => {
+    const d = new Date(i.timestamp);
+    return isValidDate(d);
+  });
+
+  if (validInsights.length === 0) {
     const now = new Date();
     return emptyFlowData(now, now);
   }
 
-  const { buckets, timePoints } = computeBuckets(insights);
-  const themes = uniqueThemes(insights);
+  const { buckets, timePoints } = computeBuckets(validInsights);
+  const themes = uniqueThemes(validInsights);
   const bucketKeys = timePoints.map((d) => String(d.getTime()));
 
   // ---- Consensus band ----
@@ -146,8 +169,8 @@ export function transformToNarrativeFlow(
   for (const key of bucketKeys) {
     const items = buckets.get(key) ?? [];
     const sentiments = items.map((i) => i.sentiment.score);
-    consensusSentiments.push(mean(sentiments));
-    consensusStability.push(1 - clamp(variance(sentiments), 0, 1));
+    consensusSentiments.push(safeFinite(mean(sentiments)));
+    consensusStability.push(safeFinite(1 - clamp(variance(sentiments), 0, 1)));
   }
 
   const consensus = {
@@ -160,11 +183,11 @@ export function transformToNarrativeFlow(
       clamp((s + 1) / 2, 0, 1),
     ),
     metrics: {
-      stability: mean(consensusStability),
-      confidence: clamp(insights.length / 100, 0, 1),
+      stability: safeFinite(mean(consensusStability)),
+      confidence: safeFinite(clamp(validInsights.length / 100, 0, 1)),
       diversity:
         themes.length > 0
-          ? clamp(themes.length / 20, 0, 1)
+          ? safeFinite(clamp(themes.length / 20, 0, 1))
           : 0,
     },
   };
@@ -184,23 +207,26 @@ export function transformToNarrativeFlow(
       const total = items.length || 1;
 
       // Branch strength = fraction of insights containing this theme
-      const strength = themeItems.length / total;
+      const strength = safeFinite(themeItems.length / total);
       strengthValues.push(clamp(strength, 0, 1));
 
       // Divergence = |theme avg sentiment - consensus sentiment|
-      const themeSentiment = mean(themeItems.map((i) => i.sentiment.score));
-      const div = Math.abs(themeSentiment - consensusSentiments[bi]);
+      const themeSentiment = safeFinite(mean(themeItems.map((i) => i.sentiment.score)));
+      const div = safeFinite(Math.abs(themeSentiment - (consensusSentiments[bi] ?? 0)));
       divergenceValues.push(clamp(div, 0, 1));
 
-      // Collect events (high narrative-score insights)
+      // Collect events (high narrative-score insights with valid timestamps)
       for (const item of themeItems) {
         if (item.narrativeScore > 0.7) {
-          events.push({
-            id: item.id,
-            timestamp: new Date(item.timestamp),
-            description: item.themes.join(', ') || `Insight ${item.id}`,
-            impact: item.narrativeScore,
-          });
+          const eventTs = new Date(item.timestamp);
+          if (isValidDate(eventTs) && Number.isFinite(item.narrativeScore)) {
+            events.push({
+              id: item.id,
+              timestamp: eventTs,
+              description: item.themes.join(', ') || `Insight ${item.id}`,
+              impact: safeFinite(item.narrativeScore, 0.5),
+            });
+          }
         }
         // Track source platforms
         sourceMap.set(
@@ -210,14 +236,15 @@ export function transformToNarrativeFlow(
       }
     }
 
-    const themeInsights = insights.filter((i) => i.themes.includes(theme));
-    const themeTimes = themeInsights.map(
-      (i) => new Date(i.timestamp).getTime(),
+    const themeInsights = validInsights.filter((i) => i.themes.includes(theme));
+    const themeTimes = themeInsights
+      .map((i) => new Date(i.timestamp).getTime())
+      .filter((t) => Number.isFinite(t));
+    const emergence = themeTimes.length > 0 ? new Date(Math.min(...themeTimes)) : timePoints[0];
+    const termination = themeTimes.length > 0 ? new Date(Math.max(...themeTimes)) : timePoints[timePoints.length - 1];
+    const longevityDays = safeFinite(
+      (termination.getTime() - emergence.getTime()) / (1000 * 60 * 60 * 24),
     );
-    const emergence = new Date(Math.min(...themeTimes));
-    const termination = new Date(Math.max(...themeTimes));
-    const longevityDays =
-      (termination.getTime() - emergence.getTime()) / (1000 * 60 * 60 * 24);
 
     const sources = Array.from(sourceMap.entries()).map(([name, count]) => ({
       id: name,
@@ -237,10 +264,10 @@ export function transformToNarrativeFlow(
       strengthValues,
       divergenceValues,
       metrics: {
-        peakStrength: Math.max(...strengthValues, 0),
+        peakStrength: safeFinite(Math.max(...strengthValues, 0)),
         longevity: longevityDays,
-        volatility: Math.sqrt(variance(strengthValues)),
-        influence: mean(strengthValues),
+        volatility: safeFinite(Math.sqrt(variance(strengthValues))),
+        influence: safeFinite(mean(strengthValues)),
       },
       sources,
       events,
@@ -292,19 +319,22 @@ export function transformToNarrativeFlow(
     }
   }
 
+  // Only keep branches with at least 2 time points (D3 area generators need >= 2)
+  const validBranches = branches.filter((b) => b.timePoints.length >= 2);
+
   return {
     timeframe: {
       start: timePoints[0],
       end: timePoints[timePoints.length - 1],
     },
     consensus,
-    branches,
+    branches: validBranches,
     connections,
     metadata: {
       title: 'Narrative Flow Analysis',
-      description: `Analysis of ${insights.length} insights across ${themes.length} themes`,
+      description: `Analysis of ${validInsights.length} insights across ${themes.length} themes`,
       topics: themes.slice(0, 10),
-      sources: new Set(insights.map((i) => i.platform)).size,
+      sources: new Set(validInsights.map((i) => i.platform)).size,
       timestamp: new Date(),
     },
   };
@@ -341,6 +371,13 @@ function emptyFlowData(start: Date, end: Date): NarrativeFlowData {
 export function transformToNetworkGraph(
   insights: NarrativeInsight[],
 ): NetworkGraph {
+  if (!insights || insights.length === 0) {
+    return {
+      nodes: [],
+      edges: [],
+      metadata: { timestamp: new Date(), nodeCount: 0, edgeCount: 0, density: 0 },
+    };
+  }
   // Count frequencies and accumulate sentiment for themes and entities
   const themeFreq = new Map<string, number>();
   const themeSentiment = new Map<string, number[]>();
@@ -467,9 +504,20 @@ export function transformToTemporalData(
   insights: NarrativeInsight[],
   topN = 8,
 ): TemporalData {
-  if (insights.length === 0) {
+  if (!insights || insights.length === 0) {
     return { timePoints: [], streams: [] };
   }
+
+  // Filter out insights with invalid timestamps
+  const validInsights = insights.filter((i) => {
+    const d = new Date(i.timestamp);
+    return d instanceof Date && !isNaN(d.getTime());
+  });
+  if (validInsights.length === 0) {
+    return { timePoints: [], streams: [] };
+  }
+  // Use validInsights from here
+  insights = validInsights;
 
   const { buckets, timePoints } = computeBuckets(insights);
   const bucketKeys = timePoints.map((d) => String(d.getTime()));
