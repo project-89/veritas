@@ -99,18 +99,60 @@ export class TwitterFreeConnector
     },
   ): Promise<SocialMediaPost[]> {
     const limit = options?.limit || 50;
+    const perQueryLimit = Math.ceil(limit / 3);
 
     try {
-      const tweets: Tweet[] = [];
-      const generator = this.scraper.searchTweets(query, limit, SearchMode.Latest);
+      const seenIds = new Set<string>();
+      const allTweets: Tweet[] = [];
 
-      for await (const tweet of generator) {
-        tweets.push(tweet);
-        if (tweets.length >= limit) break;
+      // Search multiple query variations to cast a wider net
+      const queries = [
+        query,                          // exact term
+        `@${query.replace(/^@/, '')}`,  // as mention
+        `#${query.replace(/^#/, '')}`,  // as hashtag
+      ];
+
+      for (const q of queries) {
+        try {
+          const generator = this.scraper.searchTweets(q, perQueryLimit, SearchMode.Latest);
+          for await (const tweet of generator) {
+            if (tweet.id && !seenIds.has(tweet.id)) {
+              seenIds.add(tweet.id);
+              allTweets.push(tweet);
+            }
+            if (allTweets.length >= limit) break;
+          }
+        } catch (err: unknown) {
+          this.logger.warn(
+            `Twitter search query "${q}" failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        if (allTweets.length >= limit) break;
       }
 
+      // Also try to fetch the account timeline if the query looks like a username
+      const usernameMatch = query.match(/^@?(\w+)$/);
+      if (usernameMatch && allTweets.length < limit) {
+        try {
+          const username = usernameMatch[1];
+          this.logger.log(`Also fetching timeline for @${username}`);
+          let timelineCount = 0;
+          for await (const tweet of this.scraper.getTweets(username, Math.min(30, limit - allTweets.length))) {
+            if (tweet.id && !seenIds.has(tweet.id)) {
+              seenIds.add(tweet.id);
+              allTweets.push(tweet);
+            }
+            if (++timelineCount >= 30 || allTweets.length >= limit) break;
+          }
+        } catch {
+          // Timeline fetch is best-effort
+        }
+      }
+
+      this.logger.log(`Found ${allTweets.length} unique tweets across ${queries.length} queries`);
+
       // Filter by date client-side
-      let filtered = tweets;
+      let filtered = allTweets;
       if (options?.startDate) {
         const start = options.startDate.getTime();
         filtered = filtered.filter(
