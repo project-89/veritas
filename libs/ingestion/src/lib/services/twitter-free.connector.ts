@@ -106,13 +106,23 @@ export class TwitterFreeConnector
       const allTweets: Tweet[] = [];
 
       // Search multiple query variations to cast a wider net
-      const queries = [
-        query,                          // exact term
-        `@${query.replace(/^@/, '')}`,  // as mention
-        `#${query.replace(/^#/, '')}`,  // as hashtag
-      ];
+      const baseQuery = query.replace(/^[@#]/, '');
+      const withUnderscore = baseQuery.includes('_') ? baseQuery : baseQuery.replace(/(\d+)/, '_$1');
+      const withoutUnderscore = baseQuery.replace(/_/g, '');
+      const uniqueQueries = [...new Set([
+        query,                           // exact as typed
+        baseQuery,                       // stripped prefix
+        `@${baseQuery}`,                 // as mention
+        `#${baseQuery}`,                 // as hashtag
+        withUnderscore !== baseQuery ? `@${withUnderscore}` : null,  // @project_89
+        withUnderscore !== baseQuery ? withUnderscore : null,        // project_89
+        withoutUnderscore !== baseQuery ? withoutUnderscore : null,  // project89
+        `"${baseQuery}"`,               // exact phrase match
+      ].filter(Boolean))] as string[];
 
-      for (const q of queries) {
+      this.logger.log(`Searching Twitter with ${uniqueQueries.length} query variations: ${uniqueQueries.join(', ')}`);
+
+      for (const q of uniqueQueries) {
         try {
           const generator = this.scraper.searchTweets(q, perQueryLimit, SearchMode.Latest);
           for await (const tweet of generator) {
@@ -149,7 +159,7 @@ export class TwitterFreeConnector
         }
       }
 
-      this.logger.log(`Found ${allTweets.length} unique tweets across ${queries.length} queries`);
+      this.logger.log(`Found ${allTweets.length} unique tweets across ${uniqueQueries.length} queries`);
 
       // Filter by date client-side
       let filtered = allTweets;
