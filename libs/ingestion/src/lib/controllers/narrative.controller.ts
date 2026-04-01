@@ -93,15 +93,22 @@ export class NarrativeController {
       }
     );
 
-    // Deduplicate posts by URL or text content (same post from different search results)
+    // Deduplicate posts by ID, then URL, then text (multiple dedup keys)
     const seen = new Set<string>();
     const dedupedPosts: SocialMediaPost[] = [];
     const dedupedInsights: NarrativeInsight[] = [];
     for (let i = 0; i < rawResult.posts.length; i++) {
       const post = rawResult.posts[i];
-      const key = post.url || post.text.slice(0, 100);
-      if (!seen.has(key)) {
-        seen.add(key);
+      // Try multiple keys for deduplication
+      const keys = [
+        post.id,
+        post.url,
+        `${post.platform}:${post.text.slice(0, 80)}`,
+      ].filter(Boolean);
+
+      const isDuplicate = keys.some((k) => seen.has(k));
+      if (!isDuplicate) {
+        for (const k of keys) seen.add(k);
         dedupedPosts.push(post);
         if (rawResult.insights[i]) {
           dedupedInsights.push(rawResult.insights[i]);
@@ -110,6 +117,7 @@ export class NarrativeController {
     }
     const posts = dedupedPosts;
     const insights = dedupedInsights;
+    this.logger.log(`Deduplicated: ${rawResult.posts.length} → ${posts.length} posts`);
 
     // Map SocialMediaPost[] to a simplified serializable format for the frontend
     // Pair each post with its corresponding insight (by index) to embed sentiment

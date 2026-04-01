@@ -177,24 +177,22 @@ export class IngestionModule {
     };
 
     // All connectors are API-free — no paid API keys needed
+    // Only register via injection token — do NOT also push the bare class,
+    // otherwise NestJS creates two instances and duplicates all searches.
     if (connectorConfig.reddit) {
       providers.push({ provide: REDDIT_CONNECTOR, useClass: RedditFreeConnector });
-      providers.push(RedditFreeConnector);
     }
 
     if (connectorConfig.twitter) {
       providers.push({ provide: TWITTER_CONNECTOR, useClass: TwitterFreeConnector });
-      providers.push(TwitterFreeConnector);
     }
 
     if (connectorConfig.facebook) {
       providers.push({ provide: FACEBOOK_CONNECTOR, useClass: FacebookJinaConnector });
-      providers.push(FacebookJinaConnector);
     }
 
     if (connectorConfig.youtube) {
       providers.push({ provide: YOUTUBE_CONNECTOR, useClass: YouTubeFreeConnector });
-      providers.push(YouTubeFreeConnector);
     }
 
     // RSS and WebScraper are already API-free
