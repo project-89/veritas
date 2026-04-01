@@ -8,7 +8,9 @@ import {
   transformToNarrativeFlow,
   transformToNetworkGraph,
   transformToTemporalData,
+  detectNarratives,
 } from '../../lib/transform';
+import type { NarrativeCluster } from '../../lib/transform';
 import type { RawPost, NarrativeInsight } from '../../lib/api';
 import type { NarrativeFlowData, NarrativeBranch, NarrativeConnection } from '@veritas-nx/visualization';
 import type { NetworkGraph as NetworkGraphData } from '@veritas-nx/visualization';
@@ -101,6 +103,7 @@ function ResultsContent() {
   const [myceliumData, setMyceliumData] = useState<unknown>(null);
   const [landscapeData, setLandscapeData] = useState<unknown>(null);
   const [enhancedTunnelData, setEnhancedTunnelData] = useState<unknown>(null);
+  const [narrativeClusters, setNarrativeClusters] = useState<NarrativeCluster[]>([]);
 
   // New search from results page
   const [searchInput, setSearchInput] = useState(query);
@@ -140,10 +143,12 @@ function ResultsContent() {
         setInsights(safeInsights);
         setSummary(safeSummary);
 
-        if (safeInsights.length > 0) {
-          setFlowData(transformToNarrativeFlow(safeInsights));
-          setNetworkData(transformToNetworkGraph(safeInsights));
-          setTemporalData(transformToTemporalData(safeInsights));
+        if (safePosts.length > 0) {
+          const clusters = detectNarratives(safePosts, safeInsights);
+          setNarrativeClusters(clusters);
+          setFlowData(transformToNarrativeFlow(safePosts, safeInsights));
+          setNetworkData(transformToNetworkGraph(safePosts, safeInsights));
+          setTemporalData(transformToTemporalData(safePosts, safeInsights));
 
           // Load sample data generators for visualizations without proper transformers yet
           import('@veritas-nx/visualization').then((mod) => {
@@ -226,6 +231,71 @@ function ResultsContent() {
         <>
           {/* Summary stats */}
           <SummaryStats summary={summary} />
+
+          {/* Detected Narratives */}
+          {narrativeClusters.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider mb-4">
+                {narrativeClusters.length} Narratives Detected
+              </h3>
+              <div className="space-y-3">
+                {narrativeClusters.map((cluster) => (
+                  <div
+                    key={cluster.id}
+                    className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full mt-1.5 flex-shrink-0"
+                      style={{ backgroundColor: cluster.color }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-slate-200 text-sm">
+                          {cluster.label}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {cluster.posts.length} posts
+                        </span>
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded ${
+                            cluster.avgSentiment > 0.2
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : cluster.avgSentiment < -0.2
+                                ? 'bg-red-500/20 text-red-400'
+                                : 'bg-slate-600/30 text-slate-400'
+                          }`}
+                        >
+                          {cluster.avgSentiment > 0.2 ? 'Positive' : cluster.avgSentiment < -0.2 ? 'Negative' : 'Neutral'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {Object.entries(cluster.platforms).map(([platform, count]) => (
+                          <span
+                            key={platform}
+                            className="text-xs px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-400"
+                          >
+                            {platform}: {count}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Sources: {cluster.authors.slice(0, 3).map((a) => a.handle ? `@${a.handle}` : a.name).join(', ')}
+                        {cluster.authors.length > 3 && ` +${cluster.authors.length - 3} more`}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-xs text-slate-500">
+                        {new Date(cluster.firstSeen).toLocaleDateString()}
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        {cluster.totalEngagement.toLocaleString()} engagements
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="flex gap-1 border-b border-slate-800 pb-px overflow-x-auto">

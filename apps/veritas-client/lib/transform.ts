@@ -1,8 +1,18 @@
-// Data transformation layer.
-// Converts API response types (NarrativeInsight) into the shapes expected by
-// the visualization library components.
+/**
+ * Narrative Detection & Transformation Layer
+ *
+ * This is NOT a theme frequency counter. It detects actual narratives:
+ * 1. Sort posts chronologically
+ * 2. Cluster posts by content similarity (shared key phrases)
+ * 3. Identify the dominant narrative at each time point
+ * 4. Detect when posts diverge from the dominant → create branches
+ * 5. Each branch carries its actual posts, authors, and URLs
+ *
+ * A "narrative" = a cluster of posts making a similar point
+ * A "branch" = when new posts introduce a different angle
+ */
 
-import type { NarrativeInsight } from './api';
+import type { RawPost, NarrativeInsight } from './api';
 import type {
   NarrativeFlowData,
   NarrativeBranch,
@@ -15,7 +25,7 @@ import type {
 } from '@veritas-nx/visualization';
 
 // ---------------------------------------------------------------------------
-// Temporal data types (stream-graph style)
+// Types
 // ---------------------------------------------------------------------------
 
 export interface TemporalEvent {
@@ -29,7 +39,7 @@ export interface TemporalStream {
   id: string;
   name: string;
   color: string;
-  strength: number[]; // strength at each time point (0-1)
+  strength: number[];
   events: TemporalEvent[];
 }
 
@@ -38,92 +48,239 @@ export interface TemporalData {
   streams: TemporalStream[];
 }
 
+/** A detected narrative cluster — a group of posts making a similar point */
+export interface NarrativeCluster {
+  id: string;
+  /** Representative summary of what this cluster is about */
+  label: string;
+  /** The actual posts in this cluster */
+  posts: RawPost[];
+  /** Key phrases that define this narrative */
+  keyPhrases: string[];
+  /** Average sentiment of posts in this cluster */
+  avgSentiment: number;
+  /** Platforms contributing to this narrative */
+  platforms: Record<string, number>;
+  /** Authors driving this narrative */
+  authors: Array<{ name: string; handle: string; postCount: number }>;
+  /** When this narrative first appeared */
+  firstSeen: Date;
+  /** When this narrative was last active */
+  lastSeen: Date;
+  /** Total engagement across all posts */
+  totalEngagement: number;
+  /** Color for visualization */
+  color: string;
+}
+
 // ---------------------------------------------------------------------------
-// Color palette - sourced from the visualization lib color-utils
+// Colors
 // ---------------------------------------------------------------------------
 
-const BRANCH_COLORS = [
-  '#4299E1', // Blue
-  '#48BB78', // Green
-  '#805AD5', // Purple
-  '#ECC94B', // Yellow
-  '#F56565', // Red
-  '#2B6CB0', // Dark Blue
-  '#38A169', // Dark Green
-  '#6B46C1', // Dark Purple
-  '#D69E2E', // Dark Yellow
-  '#E53E3E', // Dark Red
-  '#90CDF4', // Light Blue
-  '#B794F4', // Light Purple
-  '#FC8181', // Light Red
+const COLORS = [
+  '#4299E1', '#48BB78', '#805AD5', '#ECC94B', '#F56565',
+  '#2B6CB0', '#38A169', '#6B46C1', '#D69E2E', '#E53E3E',
+  '#90CDF4', '#B794F4', '#FC8181', '#68D391', '#FBD38D',
 ];
 
 // ---------------------------------------------------------------------------
-// Internal helpers
+// Text similarity — extract key phrases and compare
 // ---------------------------------------------------------------------------
 
-/** Choose bucket size: hours if the data spans < 3 days, otherwise days. */
-function computeBuckets(insights: NarrativeInsight[]): {
-  buckets: Map<string, NarrativeInsight[]>;
-  timePoints: Date[];
-  bucketMs: number;
-} {
-  const timestamps = insights
-    .map((i) => new Date(i.timestamp).getTime())
-    .filter((t) => Number.isFinite(t));
+/** Extract meaningful phrases (2-3 word ngrams) from text */
+function extractKeyPhrases(text: string): string[] {
+  const clean = text
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, '') // remove URLs
+    .replace(/[@#]\w+/g, '')        // remove mentions/hashtags
+    .replace(/[^a-z0-9\s]/g, ' ')   // remove punctuation
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  if (timestamps.length === 0) {
-    return { buckets: new Map(), timePoints: [], bucketMs: 24 * 60 * 60 * 1000 };
+  const words = clean.split(' ').filter((w) => w.length > 2);
+  const stopwords = new Set([
+    'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had',
+    'her', 'was', 'one', 'our', 'out', 'has', 'have', 'been', 'will', 'more',
+    'when', 'who', 'what', 'how', 'this', 'that', 'with', 'from', 'they',
+    'just', 'like', 'about', 'would', 'make', 'than', 'them', 'its', 'into',
+    'also', 'could', 'very', 'some', 'other', 'which', 'these', 'then', 'there',
+    'their', 'were', 'being', 'does', 'doing', 'did', 'here',
+  ]);
+
+  const meaningful = words.filter((w) => !stopwords.has(w));
+
+  // Extract bigrams (2-word phrases) as the primary unit
+  const phrases: string[] = [];
+  for (let i = 0; i < meaningful.length - 1; i++) {
+    phrases.push(`${meaningful[i]} ${meaningful[i + 1]}`);
   }
-
-  const min = Math.min(...timestamps);
-  const max = Math.max(...timestamps);
-  const spanMs = max - min;
-
-  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
-  const useHours = spanMs < THREE_DAYS_MS;
-  const bucketMs = useHours ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-
-  const buckets = new Map<string, NarrativeInsight[]>();
-
-  for (const insight of insights) {
-    const ts = new Date(insight.timestamp).getTime();
-    const bucketStart = Math.floor(ts / bucketMs) * bucketMs;
-    const key = String(bucketStart);
-    if (!buckets.has(key)) buckets.set(key, []);
-    buckets.get(key)!.push(insight);
+  // Also include important single words (longer = more specific)
+  for (const w of meaningful) {
+    if (w.length >= 5) phrases.push(w);
   }
-
-  // Sorted time points
-  const timePoints = Array.from(buckets.keys())
-    .map(Number)
-    .sort((a, b) => a - b)
-    .map((t) => new Date(t));
-
-  return { buckets, timePoints, bucketMs };
+  return [...new Set(phrases)];
 }
 
-function mean(values: number[]): number {
-  if (values.length === 0) return 0;
-  return values.reduce((s, v) => s + v, 0) / values.length;
+/** Calculate similarity between two posts (0-1) based on shared phrases */
+function postSimilarity(a: string[], b: string[]): number {
+  if (a.length === 0 || b.length === 0) return 0;
+  const setB = new Set(b);
+  let shared = 0;
+  for (const phrase of a) {
+    if (setB.has(phrase)) shared++;
+  }
+  return shared / Math.max(a.length, b.length);
 }
 
-function variance(values: number[]): number {
-  if (values.length < 2) return 0;
-  const m = mean(values);
-  return values.reduce((s, v) => s + (v - m) ** 2, 0) / values.length;
-}
+// ---------------------------------------------------------------------------
+// Narrative clustering — group posts making similar points
+// ---------------------------------------------------------------------------
 
-function uniqueThemes(insights: NarrativeInsight[]): string[] {
-  const counts = new Map<string, number>();
-  for (const i of insights) {
-    for (const t of i.themes) {
-      counts.set(t, (counts.get(t) ?? 0) + 1);
+const SIMILARITY_THRESHOLD = 0.15; // Posts sharing 15%+ of phrases = same narrative
+
+export function detectNarratives(
+  posts: RawPost[],
+  insights: NarrativeInsight[],
+): NarrativeCluster[] {
+  if (!posts || posts.length === 0) return [];
+
+  // Sort chronologically
+  const sorted = [...posts].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
+
+  // Extract key phrases for each post
+  const postPhrases = sorted.map((p) => extractKeyPhrases(p.text));
+
+  // Build sentiment lookup from insights (match by index since they're parallel)
+  const sentimentByIndex = insights.map((ins) => ins?.sentiment?.score ?? 0);
+
+  // Cluster posts using single-linkage clustering
+  const clusters: Array<{
+    postIndices: number[];
+    phrases: Set<string>;
+  }> = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    const phrases = postPhrases[i];
+    if (phrases.length === 0) {
+      // Post with no meaningful content — skip or put in "misc"
+      continue;
+    }
+
+    // Find the best matching existing cluster
+    let bestCluster = -1;
+    let bestSim = 0;
+
+    for (let c = 0; c < clusters.length; c++) {
+      const clusterPhraseArr = [...clusters[c].phrases];
+      const sim = postSimilarity(phrases, clusterPhraseArr);
+      if (sim > bestSim) {
+        bestSim = sim;
+        bestCluster = c;
+      }
+    }
+
+    if (bestSim >= SIMILARITY_THRESHOLD && bestCluster >= 0) {
+      // Add to existing cluster
+      clusters[bestCluster].postIndices.push(i);
+      for (const p of phrases) clusters[bestCluster].phrases.add(p);
+    } else {
+      // Start a new cluster
+      clusters.push({
+        postIndices: [i],
+        phrases: new Set(phrases),
+      });
     }
   }
-  return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([theme]) => theme);
+
+  // Convert clusters to NarrativeCluster objects
+  // Sort by size (largest first = dominant narrative)
+  clusters.sort((a, b) => b.postIndices.length - a.postIndices.length);
+
+  return clusters
+    .filter((c) => c.postIndices.length >= 1) // Keep even single-post narratives
+    .slice(0, 12) // Cap at 12 narratives for readability
+    .map((cluster, idx) => {
+      const clusterPosts = cluster.postIndices.map((i) => sorted[i]);
+      const timestamps = clusterPosts.map((p) => new Date(p.timestamp).getTime()).filter(Number.isFinite);
+
+      // Find the most representative phrases (appear in most posts)
+      const phraseCount = new Map<string, number>();
+      for (const i of cluster.postIndices) {
+        for (const p of postPhrases[i]) {
+          phraseCount.set(p, (phraseCount.get(p) ?? 0) + 1);
+        }
+      }
+      const topPhrases = [...phraseCount.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([phrase]) => phrase);
+
+      // Generate a readable label from top phrases
+      const label = topPhrases.slice(0, 3).join(', ') || `Narrative ${idx + 1}`;
+
+      // Platform breakdown
+      const platforms: Record<string, number> = {};
+      for (const p of clusterPosts) {
+        platforms[p.platform] = (platforms[p.platform] ?? 0) + 1;
+      }
+
+      // Author breakdown
+      const authorMap = new Map<string, { name: string; handle: string; count: number }>();
+      for (const p of clusterPosts) {
+        const key = p.authorHandle || p.authorName || 'unknown';
+        const existing = authorMap.get(key);
+        if (existing) {
+          existing.count++;
+        } else {
+          authorMap.set(key, { name: p.authorName, handle: p.authorHandle, count: 1 });
+        }
+      }
+      const authors = [...authorMap.values()]
+        .sort((a, b) => b.count - a.count)
+        .map((a) => ({ name: a.name, handle: a.handle, postCount: a.count }));
+
+      // Average sentiment
+      const sentiments = cluster.postIndices
+        .map((i) => sentimentByIndex[i] ?? 0)
+        .filter(Number.isFinite);
+      const avgSentiment = sentiments.length > 0
+        ? sentiments.reduce((a, b) => a + b, 0) / sentiments.length
+        : 0;
+
+      // Total engagement
+      const totalEngagement = clusterPosts.reduce(
+        (sum, p) => sum + (p.engagement?.likes ?? 0) + (p.engagement?.comments ?? 0) + (p.engagement?.shares ?? 0),
+        0,
+      );
+
+      return {
+        id: `narrative-${idx}`,
+        label,
+        posts: clusterPosts,
+        keyPhrases: topPhrases,
+        avgSentiment,
+        platforms,
+        authors,
+        firstSeen: new Date(Math.min(...timestamps)),
+        lastSeen: new Date(Math.max(...timestamps)),
+        totalEngagement,
+        color: COLORS[idx % COLORS.length],
+      };
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Safe helpers
+// ---------------------------------------------------------------------------
+
+function isValidDate(d: Date): boolean {
+  return d instanceof Date && !isNaN(d.getTime());
+}
+
+function safeFinite(v: number, fallback = 0): number {
+  return Number.isFinite(v) ? v : fallback;
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -131,346 +288,315 @@ function clamp(v: number, lo: number, hi: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// Time bucketing
+// ---------------------------------------------------------------------------
+
+function computeTimeBuckets(posts: RawPost[]): { timePoints: Date[]; bucketMs: number } {
+  const timestamps = posts
+    .map((p) => new Date(p.timestamp).getTime())
+    .filter(Number.isFinite);
+
+  if (timestamps.length === 0) return { timePoints: [], bucketMs: 86400000 };
+
+  const min = Math.min(...timestamps);
+  const max = Math.max(...timestamps);
+  const span = max - min;
+
+  const THREE_DAYS = 3 * 86400000;
+  const bucketMs = span < THREE_DAYS ? 3600000 : 86400000; // hourly or daily
+
+  const timePoints: Date[] = [];
+  for (let t = min; t <= max + bucketMs; t += bucketMs) {
+    timePoints.push(new Date(t));
+  }
+  return { timePoints, bucketMs };
+}
+
+// ---------------------------------------------------------------------------
 // transformToNarrativeFlow
 // ---------------------------------------------------------------------------
 
-/** Check whether a Date is valid (not NaN). */
-function isValidDate(d: Date): boolean {
-  return d instanceof Date && !isNaN(d.getTime());
-}
-
-/** Ensure a number is finite; return fallback otherwise. */
-function safeFinite(v: number, fallback = 0): number {
-  return Number.isFinite(v) ? v : fallback;
-}
-
 export function transformToNarrativeFlow(
+  posts: RawPost[],
   insights: NarrativeInsight[],
 ): NarrativeFlowData {
-  // Filter out insights with invalid timestamps up front
-  const validInsights = (insights ?? []).filter((i) => {
-    const d = new Date(i.timestamp);
-    return isValidDate(d);
-  });
+  const narratives = detectNarratives(posts, insights);
 
-  if (validInsights.length === 0) {
+  if (narratives.length === 0 || !posts || posts.length === 0) {
     const now = new Date();
     return emptyFlowData(now, now);
   }
 
-  const { buckets, timePoints } = computeBuckets(validInsights);
-  const themes = uniqueThemes(validInsights);
-  const bucketKeys = timePoints.map((d) => String(d.getTime()));
+  const { timePoints, bucketMs } = computeTimeBuckets(posts);
+  if (timePoints.length < 2) return emptyFlowData(new Date(), new Date());
 
-  // ---- Consensus band ----
-  const consensusSentiments: number[] = [];
-  const consensusStability: number[] = [];
+  // The dominant narrative (largest cluster) forms the consensus band
+  const dominant = narratives[0];
+  const branches: NarrativeBranch[] = [];
 
-  for (const key of bucketKeys) {
-    const items = buckets.get(key) ?? [];
-    const sentiments = items.map((i) => i.sentiment.score);
-    consensusSentiments.push(safeFinite(mean(sentiments)));
-    consensusStability.push(safeFinite(1 - clamp(variance(sentiments), 0, 1)));
-  }
+  // Build consensus band from the dominant narrative
+  const consensusStrength: number[] = timePoints.map((tp) => {
+    const bucketStart = tp.getTime();
+    const bucketEnd = bucketStart + bucketMs;
+    const postsInBucket = dominant.posts.filter((p) => {
+      const t = new Date(p.timestamp).getTime();
+      return t >= bucketStart && t < bucketEnd;
+    });
+    const allInBucket = posts.filter((p) => {
+      const t = new Date(p.timestamp).getTime();
+      return t >= bucketStart && t < bucketEnd;
+    });
+    return allInBucket.length > 0 ? postsInBucket.length / allInBucket.length : 0;
+  });
 
   const consensus = {
     id: 'consensus',
-    name: 'Overall Consensus',
-    description: 'Aggregate sentiment across all narratives',
-    color: '#4299E1',
+    name: dominant.label,
+    description: `Dominant narrative (${dominant.posts.length} posts): ${dominant.keyPhrases.join(', ')}`,
+    color: dominant.color,
     timePoints: [...timePoints],
-    strengthValues: consensusSentiments.map((s) =>
-      clamp((s + 1) / 2, 0, 1),
-    ),
+    strengthValues: consensusStrength.map((s) => clamp(s, 0, 1)),
     metrics: {
-      stability: safeFinite(mean(consensusStability)),
-      confidence: safeFinite(clamp(validInsights.length / 100, 0, 1)),
-      diversity:
-        themes.length > 0
-          ? safeFinite(clamp(themes.length / 20, 0, 1))
-          : 0,
+      stability: safeFinite(1 - variance(consensusStrength)),
+      confidence: clamp(dominant.posts.length / posts.length, 0, 1),
+      diversity: clamp(Object.keys(dominant.platforms).length / 5, 0, 1),
     },
   };
 
-  // ---- Branches (one per theme) ----
-  const branches: NarrativeBranch[] = themes.map((theme, idx) => {
-    const color = BRANCH_COLORS[idx % BRANCH_COLORS.length];
-    const strengthValues: number[] = [];
-    const divergenceValues: number[] = [];
-    const events: NarrativeBranch['events'] = [];
-    const sourceMap = new Map<string, number>();
+  // Each non-dominant narrative becomes a branch
+  for (let i = 0; i < narratives.length; i++) {
+    const narrative = narratives[i];
 
-    for (let bi = 0; bi < bucketKeys.length; bi++) {
-      const key = bucketKeys[bi];
-      const items = buckets.get(key) ?? [];
-      const themeItems = items.filter((i) => i.themes.includes(theme));
-      const total = items.length || 1;
+    const strengthValues: number[] = timePoints.map((tp) => {
+      const bucketStart = tp.getTime();
+      const bucketEnd = bucketStart + bucketMs;
+      const postsInBucket = narrative.posts.filter((p) => {
+        const t = new Date(p.timestamp).getTime();
+        return t >= bucketStart && t < bucketEnd;
+      });
+      const allInBucket = posts.filter((p) => {
+        const t = new Date(p.timestamp).getTime();
+        return t >= bucketStart && t < bucketEnd;
+      });
+      return allInBucket.length > 0 ? postsInBucket.length / allInBucket.length : 0;
+    });
 
-      // Branch strength = fraction of insights containing this theme
-      const strength = safeFinite(themeItems.length / total);
-      strengthValues.push(clamp(strength, 0, 1));
+    // Divergence = how different this narrative's sentiment is from the dominant
+    const divergenceValues: number[] = timePoints.map((tp) => {
+      const bucketStart = tp.getTime();
+      const bucketEnd = bucketStart + bucketMs;
+      const narPosts = narrative.posts.filter((p) => {
+        const t = new Date(p.timestamp).getTime();
+        return t >= bucketStart && t < bucketEnd;
+      });
+      if (narPosts.length === 0) return 0;
+      // Use position offset based on narrative index for visual separation
+      return (i + 1) * 0.15 * (narrative.avgSentiment >= 0 ? 1 : -1);
+    });
 
-      // Divergence = |theme avg sentiment - consensus sentiment|
-      const themeSentiment = safeFinite(mean(themeItems.map((i) => i.sentiment.score)));
-      const div = safeFinite(Math.abs(themeSentiment - (consensusSentiments[bi] ?? 0)));
-      divergenceValues.push(clamp(div, 0, 1));
-
-      // Collect events (high narrative-score insights with valid timestamps)
-      for (const item of themeItems) {
-        if (item.narrativeScore > 0.7) {
-          const eventTs = new Date(item.timestamp);
-          if (isValidDate(eventTs) && Number.isFinite(item.narrativeScore)) {
-            events.push({
-              id: item.id,
-              timestamp: eventTs,
-              description: item.themes.join(', ') || `Insight ${item.id}`,
-              impact: safeFinite(item.narrativeScore, 0.5),
-            });
-          }
-        }
-        // Track source platforms
-        sourceMap.set(
-          item.platform,
-          (sourceMap.get(item.platform) ?? 0) + 1,
-        );
-      }
-    }
-
-    const themeInsights = validInsights.filter((i) => i.themes.includes(theme));
-    const themeTimes = themeInsights
-      .map((i) => new Date(i.timestamp).getTime())
-      .filter((t) => Number.isFinite(t));
-    const emergence = themeTimes.length > 0 ? new Date(Math.min(...themeTimes)) : timePoints[0];
-    const termination = themeTimes.length > 0 ? new Date(Math.max(...themeTimes)) : timePoints[timePoints.length - 1];
-    const longevityDays = safeFinite(
-      (termination.getTime() - emergence.getTime()) / (1000 * 60 * 60 * 24),
+    // Key events = posts with highest engagement in this narrative
+    const sortedByEngagement = [...narrative.posts].sort(
+      (a, b) =>
+        (b.engagement?.likes ?? 0) + (b.engagement?.comments ?? 0) -
+        (a.engagement?.likes ?? 0) - (a.engagement?.comments ?? 0),
     );
+    const events = sortedByEngagement.slice(0, 5).map((p) => ({
+      id: p.id,
+      timestamp: new Date(p.timestamp),
+      description: p.text.slice(0, 100) + (p.text.length > 100 ? '...' : ''),
+      impact: clamp(
+        ((p.engagement?.likes ?? 0) + (p.engagement?.comments ?? 0)) /
+          Math.max(narrative.totalEngagement, 1),
+        0.1,
+        1,
+      ),
+    })).filter((e) => isValidDate(e.timestamp));
 
-    const sources = Array.from(sourceMap.entries()).map(([name, count]) => ({
-      id: name,
-      name,
-      weight: count / (themeInsights.length || 1),
+    const sources = narrative.authors.slice(0, 10).map((a) => ({
+      id: a.handle || a.name,
+      name: a.handle ? `@${a.handle}` : a.name,
+      weight: a.postCount / narrative.posts.length,
     }));
 
-    return {
-      id: `branch-${idx}`,
-      name: theme,
-      description: `Narrative branch for "${theme}"`,
-      color,
-      parentId: null,
-      emergencePoint: emergence,
-      terminationPoint: termination,
+    branches.push({
+      id: narrative.id,
+      name: narrative.label,
+      description: `${narrative.posts.length} posts | ${Object.keys(narrative.platforms).join(', ')} | sentiment: ${narrative.avgSentiment.toFixed(2)}`,
+      color: narrative.color,
+      parentId: i === 0 ? null : 'consensus',
+      emergencePoint: narrative.firstSeen,
+      terminationPoint: narrative.lastSeen,
       timePoints: [...timePoints],
       strengthValues,
       divergenceValues,
       metrics: {
         peakStrength: safeFinite(Math.max(...strengthValues, 0)),
-        longevity: longevityDays,
+        longevity: safeFinite(
+          (narrative.lastSeen.getTime() - narrative.firstSeen.getTime()) / 86400000,
+        ),
         volatility: safeFinite(Math.sqrt(variance(strengthValues))),
-        influence: safeFinite(mean(strengthValues)),
+        influence: safeFinite(narrative.totalEngagement / Math.max(posts.reduce((s, p) => s + (p.engagement?.likes ?? 0) + (p.engagement?.comments ?? 0), 0), 1)),
       },
       sources,
       events,
-    };
-  });
+    });
+  }
 
-  // ---- Connections: themes sharing entities within the same bucket ----
+  // Connections: narratives that share authors (cross-pollination)
   const connections: NarrativeConnection[] = [];
-  let connId = 0;
-
-  for (let bi = 0; bi < bucketKeys.length; bi++) {
-    const key = bucketKeys[bi];
-    const items = buckets.get(key) ?? [];
-
-    // Build theme -> entities map for this bucket
-    const themeEntities = new Map<string, Set<string>>();
-    for (const item of items) {
-      for (const theme of item.themes) {
-        if (!themeEntities.has(theme)) themeEntities.set(theme, new Set());
-        for (const entity of item.entities) {
-          themeEntities.get(theme)!.add(entity.name);
-        }
-      }
-    }
-
-    // Find pairs that share entities
-    const themeList = Array.from(themeEntities.keys());
-    for (let a = 0; a < themeList.length; a++) {
-      for (let b = a + 1; b < themeList.length; b++) {
-        const entA = themeEntities.get(themeList[a])!;
-        const entB = themeEntities.get(themeList[b])!;
-        const shared = [...entA].filter((e) => entB.has(e));
-        if (shared.length > 0) {
-          const branchA = branches.find((br) => br.name === themeList[a]);
-          const branchB = branches.find((br) => br.name === themeList[b]);
-          if (branchA && branchB) {
-            connections.push({
-              id: `conn-${connId++}`,
-              sourceId: branchA.id,
-              targetId: branchB.id,
-              timestamp: timePoints[bi],
-              strength: clamp(shared.length / 5, 0, 1),
-              type: 'influence',
-              description: `Shared entities: ${shared.slice(0, 3).join(', ')}`,
-            });
-          }
+  for (let i = 0; i < narratives.length; i++) {
+    for (let j = i + 1; j < narratives.length; j++) {
+      const authorsI = new Set(narratives[i].authors.map((a) => a.handle || a.name));
+      const authorsJ = new Set(narratives[j].authors.map((a) => a.handle || a.name));
+      const shared = [...authorsI].filter((a) => authorsJ.has(a));
+      if (shared.length > 0) {
+        // Find the midpoint timestamp
+        const midTime = new Date(
+          (narratives[i].firstSeen.getTime() + narratives[j].firstSeen.getTime()) / 2,
+        );
+        if (isValidDate(midTime)) {
+          connections.push({
+            id: `conn-${i}-${j}`,
+            sourceId: narratives[i].id,
+            targetId: narratives[j].id,
+            timestamp: midTime,
+            strength: shared.length / Math.max(authorsI.size, authorsJ.size),
+            type: 'influence',
+            description: `Shared authors: ${shared.slice(0, 3).join(', ')}`,
+          });
         }
       }
     }
   }
 
-  // Only keep branches with at least 2 time points (D3 area generators need >= 2)
-  const validBranches = branches.filter((b) => b.timePoints.length >= 2);
-
   return {
-    timeframe: {
-      start: timePoints[0],
-      end: timePoints[timePoints.length - 1],
-    },
+    timeframe: { start: timePoints[0], end: timePoints[timePoints.length - 1] },
     consensus,
-    branches: validBranches,
+    branches: branches.filter((b) => b.timePoints.length >= 2),
     connections,
     metadata: {
       title: 'Narrative Flow Analysis',
-      description: `Analysis of ${validInsights.length} insights across ${themes.length} themes`,
-      topics: themes.slice(0, 10),
-      sources: new Set(validInsights.map((i) => i.platform)).size,
-      timestamp: new Date(),
-    },
-  };
-}
-
-function emptyFlowData(start: Date, end: Date): NarrativeFlowData {
-  return {
-    timeframe: { start, end },
-    consensus: {
-      id: 'consensus',
-      name: 'Overall Consensus',
-      description: 'No data available',
-      color: '#4299E1',
-      timePoints: [],
-      strengthValues: [],
-      metrics: { stability: 0, confidence: 0, diversity: 0 },
-    },
-    branches: [],
-    connections: [],
-    metadata: {
-      title: 'Narrative Flow Analysis',
-      description: 'No insights available',
-      topics: [],
-      sources: 0,
+      description: `${narratives.length} narratives detected across ${posts.length} posts`,
+      topics: narratives.map((n) => n.label),
+      sources: new Set(posts.map((p) => p.platform)).size,
       timestamp: new Date(),
     },
   };
 }
 
 // ---------------------------------------------------------------------------
-// transformToNetworkGraph
+// transformToNetworkGraph — shows relationships between sources & narratives
 // ---------------------------------------------------------------------------
 
 export function transformToNetworkGraph(
+  posts: RawPost[],
   insights: NarrativeInsight[],
 ): NetworkGraph {
-  if (!insights || insights.length === 0) {
-    return {
-      nodes: [],
-      edges: [],
-      metadata: { timestamp: new Date(), nodeCount: 0, edgeCount: 0, density: 0 },
-    };
+  const narratives = detectNarratives(posts, insights);
+
+  if (narratives.length === 0) {
+    return { nodes: [], edges: [], metadata: { timestamp: new Date(), nodeCount: 0, edgeCount: 0, density: 0 } };
   }
-  // Count frequencies and accumulate sentiment for themes and entities
-  const themeFreq = new Map<string, number>();
-  const themeSentiment = new Map<string, number[]>();
-  const entityFreq = new Map<string, number>();
-  const entitySentiment = new Map<string, number[]>();
-  // Co-occurrence tracking: pairs that appear in the same insight
-  const edgeCounts = new Map<string, number>();
 
-  for (const insight of insights) {
-    const allItems = [
-      ...insight.themes.map((t) => ({ id: `theme:${t}`, kind: 'theme' as const, label: t })),
-      ...insight.entities.map((e) => ({ id: `entity:${e.name}`, kind: 'entity' as const, label: e.name })),
-    ];
+  const nodes: NetworkNode[] = [];
+  const edges: NetworkEdge[] = [];
+  const nodeIds = new Set<string>();
 
-    for (const item of allItems) {
-      if (item.kind === 'theme') {
-        themeFreq.set(item.label, (themeFreq.get(item.label) ?? 0) + 1);
-        if (!themeSentiment.has(item.label)) themeSentiment.set(item.label, []);
-        themeSentiment.get(item.label)!.push(insight.sentiment.score);
-      } else {
-        entityFreq.set(item.label, (entityFreq.get(item.label) ?? 0) + 1);
-        if (!entitySentiment.has(item.label)) entitySentiment.set(item.label, []);
-        entitySentiment.get(item.label)!.push(insight.sentiment.score);
+  // Create nodes for each narrative
+  for (const narrative of narratives) {
+    const nodeId = narrative.id;
+    nodes.push({
+      id: nodeId,
+      type: 'content',
+      label: narrative.label,
+      properties: {
+        postCount: narrative.posts.length,
+        platforms: Object.keys(narrative.platforms).join(', '),
+        sentiment: narrative.avgSentiment,
+      },
+      metrics: {
+        size: Math.max(0.2, narrative.posts.length / posts.length),
+        color: narrative.color,
+        weight: narrative.posts.length / posts.length,
+      },
+    });
+    nodeIds.add(nodeId);
+  }
+
+  // Create nodes for top authors and connect them to narratives
+  for (const narrative of narratives) {
+    for (const author of narrative.authors.slice(0, 5)) {
+      const authorId = `author-${author.handle || author.name}`;
+      if (!nodeIds.has(authorId)) {
+        nodes.push({
+          id: authorId,
+          type: 'source',
+          label: author.handle ? `@${author.handle}` : author.name,
+          properties: { postCount: author.postCount },
+          metrics: {
+            size: Math.max(0.1, author.postCount / 10),
+            color: '#94a3b8',
+            weight: author.postCount / posts.length,
+          },
+        });
+        nodeIds.add(authorId);
       }
 
-      // Build co-occurrence edges (pairs within same insight)
-      for (const other of allItems) {
-        if (item.id >= other.id) continue; // avoid duplicates
-        const edgeKey = `${item.id}||${other.id}`;
-        edgeCounts.set(edgeKey, (edgeCounts.get(edgeKey) ?? 0) + 1);
-      }
+      edges.push({
+        id: `edge-${authorId}-${narrative.id}`,
+        source: authorId,
+        target: narrative.id,
+        type: 'PUBLISHED',
+        properties: { count: author.postCount },
+        metrics: {
+          width: Math.max(1, author.postCount),
+          color: narrative.color,
+          weight: author.postCount / narrative.posts.length,
+        },
+      });
     }
   }
 
-  // Determine max frequency for normalization
-  const allFreqs = [
-    ...Array.from(themeFreq.values()),
-    ...Array.from(entityFreq.values()),
-  ];
-  const maxFreq = Math.max(...allFreqs, 1);
-
-  // Build nodes
-  const nodes: NetworkNode[] = [];
-
-  for (const [label, freq] of themeFreq) {
-    const avgSent = mean(themeSentiment.get(label) ?? []);
-    nodes.push({
-      id: `theme:${label}`,
-      type: 'content',
-      label,
-      properties: { kind: 'theme' },
-      metrics: {
-        size: clamp(freq / maxFreq, 0.1, 1),
-        color: sentimentToColor(avgSent),
-        weight: freq,
-      },
-    });
+  // Create nodes for platforms
+  const platformCounts = new Map<string, number>();
+  for (const p of posts) {
+    platformCounts.set(p.platform, (platformCounts.get(p.platform) ?? 0) + 1);
   }
+  for (const [platform, count] of platformCounts) {
+    const platformId = `platform-${platform}`;
+    if (!nodeIds.has(platformId)) {
+      nodes.push({
+        id: platformId,
+        type: 'account',
+        label: platform.charAt(0).toUpperCase() + platform.slice(1),
+        properties: { postCount: count },
+        metrics: {
+          size: Math.max(0.3, count / posts.length),
+          color: platform === 'reddit' ? '#FF4500' : platform === 'twitter' ? '#1DA1F2' : platform === 'youtube' ? '#FF0000' : '#888',
+          weight: count / posts.length,
+        },
+      });
+      nodeIds.add(platformId);
+    }
 
-  for (const [label, freq] of entityFreq) {
-    const avgSent = mean(entitySentiment.get(label) ?? []);
-    nodes.push({
-      id: `entity:${label}`,
-      type: 'source',
-      label,
-      properties: { kind: 'entity' },
-      metrics: {
-        size: clamp(freq / maxFreq, 0.1, 1),
-        color: sentimentToColor(avgSent),
-        weight: freq,
-      },
-    });
-  }
-
-  // Build edges
-  const maxEdge = Math.max(...Array.from(edgeCounts.values()), 1);
-  const edges: NetworkEdge[] = [];
-  let edgeId = 0;
-
-  for (const [key, count] of edgeCounts) {
-    const [sourceId, targetId] = key.split('||');
-    edges.push({
-      id: `edge-${edgeId++}`,
-      source: sourceId,
-      target: targetId,
-      type: 'co-occurrence',
-      properties: { count },
-      metrics: {
-        width: clamp(count / maxEdge, 0.1, 1),
-        color: '#805AD5',
-        weight: count,
-      },
-    });
+    // Connect platforms to narratives they contribute to
+    for (const narrative of narratives) {
+      const narPlatCount = narrative.platforms[platform];
+      if (narPlatCount > 0) {
+        edges.push({
+          id: `edge-${platformId}-${narrative.id}`,
+          source: platformId,
+          target: narrative.id,
+          type: 'SHARED',
+          properties: { count: narPlatCount },
+          metrics: {
+            width: Math.max(1, narPlatCount / 5),
+            color: narrative.color,
+            weight: narPlatCount / narrative.posts.length,
+          },
+        });
+      }
+    }
   }
 
   return {
@@ -480,92 +606,95 @@ export function transformToNetworkGraph(
       timestamp: new Date(),
       nodeCount: nodes.length,
       edgeCount: edges.length,
-      density:
-        nodes.length > 1
-          ? (2 * edges.length) / (nodes.length * (nodes.length - 1))
-          : 0,
+      density: edges.length / Math.max(nodes.length * (nodes.length - 1) / 2, 1),
     },
   };
 }
 
-/** Map sentiment (-1...1) to a color from red (negative) through yellow to green (positive). */
-function sentimentToColor(sentiment: number): string {
-  if (sentiment > 0.3) return '#48BB78'; // Green
-  if (sentiment > 0) return '#ECC94B'; // Yellow
-  if (sentiment > -0.3) return '#ED8936'; // Orange
-  return '#F56565'; // Red
-}
-
 // ---------------------------------------------------------------------------
-// transformToTemporalData
+// transformToTemporalData — shows narrative strength over time
 // ---------------------------------------------------------------------------
 
 export function transformToTemporalData(
+  posts: RawPost[],
   insights: NarrativeInsight[],
-  topN = 8,
 ): TemporalData {
-  if (!insights || insights.length === 0) {
+  const narratives = detectNarratives(posts, insights);
+  if (narratives.length === 0 || !posts || posts.length === 0) {
     return { timePoints: [], streams: [] };
   }
 
-  // Filter out insights with invalid timestamps
-  const validInsights = insights.filter((i) => {
-    const d = new Date(i.timestamp);
-    return d instanceof Date && !isNaN(d.getTime());
-  });
-  if (validInsights.length === 0) {
-    return { timePoints: [], streams: [] };
-  }
-  // Use validInsights from here
-  insights = validInsights;
+  const { timePoints, bucketMs } = computeTimeBuckets(posts);
+  if (timePoints.length < 2) return { timePoints: [], streams: [] };
 
-  const { buckets, timePoints } = computeBuckets(insights);
-  const bucketKeys = timePoints.map((d) => String(d.getTime()));
-
-  // Pick top N themes by overall frequency
-  const themes = uniqueThemes(insights).slice(0, topN);
-
-  // Find the maximum count in any bucket for normalization
-  let maxCount = 1;
-  for (const key of bucketKeys) {
-    const items = buckets.get(key) ?? [];
-    for (const theme of themes) {
-      const count = items.filter((i) => i.themes.includes(theme)).length;
-      if (count > maxCount) maxCount = count;
-    }
-  }
-
-  const streams: TemporalStream[] = themes.map((theme, idx) => {
-    const values: number[] = bucketKeys.map((key) => {
-      const items = buckets.get(key) ?? [];
-      const count = items.filter((i) => i.themes.includes(theme)).length;
-      return count / maxCount; // normalized 0-1
+  const streams: TemporalStream[] = narratives.map((narrative) => {
+    const strength: number[] = timePoints.map((tp) => {
+      const bucketStart = tp.getTime();
+      const bucketEnd = bucketStart + bucketMs;
+      const count = narrative.posts.filter((p) => {
+        const t = new Date(p.timestamp).getTime();
+        return t >= bucketStart && t < bucketEnd;
+      }).length;
+      const total = posts.filter((p) => {
+        const t = new Date(p.timestamp).getTime();
+        return t >= bucketStart && t < bucketEnd;
+      }).length;
+      return total > 0 ? count / total : 0;
     });
 
-    // Collect events: high-score insights with this theme
-    const events: TemporalEvent[] = [];
-    for (const key of bucketKeys) {
-      const items = buckets.get(key) ?? [];
-      for (const item of items) {
-        if (item.themes.includes(theme) && item.narrativeScore > 0.6) {
-          events.push({
-            id: item.id,
-            timestamp: new Date(item.timestamp),
-            content: item.themes.join(', '),
-            impact: item.narrativeScore,
-          });
-        }
-      }
-    }
+    const events: TemporalEvent[] = narrative.posts
+      .sort((a, b) => (b.engagement?.likes ?? 0) - (a.engagement?.likes ?? 0))
+      .slice(0, 3)
+      .map((p) => ({
+        id: p.id,
+        timestamp: new Date(p.timestamp),
+        content: p.text.slice(0, 80),
+        impact: clamp((p.engagement?.likes ?? 0) / Math.max(narrative.totalEngagement, 1), 0.1, 1),
+      }))
+      .filter((e) => isValidDate(e.timestamp));
 
     return {
-      id: `stream-${idx}`,
-      name: theme,
-      color: BRANCH_COLORS[idx % BRANCH_COLORS.length],
-      strength: values,
-      events: events.slice(0, 5),
+      id: narrative.id,
+      name: narrative.label,
+      color: narrative.color,
+      strength,
+      events,
     };
   });
 
   return { timePoints, streams };
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function variance(values: number[]): number {
+  if (values.length === 0) return 0;
+  const avg = values.reduce((a, b) => a + b, 0) / values.length;
+  return values.reduce((sum, v) => sum + (v - avg) ** 2, 0) / values.length;
+}
+
+function emptyFlowData(start: Date, end: Date): NarrativeFlowData {
+  return {
+    timeframe: { start, end },
+    consensus: {
+      id: 'consensus',
+      name: 'No Data',
+      description: 'No data available',
+      color: '#888',
+      timePoints: [start, end],
+      strengthValues: [0.5, 0.5],
+      metrics: { stability: 0, confidence: 0, diversity: 0 },
+    },
+    branches: [],
+    connections: [],
+    metadata: {
+      title: 'No Data',
+      description: 'No insights available',
+      topics: [],
+      sources: 0,
+      timestamp: new Date(),
+    },
+  };
 }
