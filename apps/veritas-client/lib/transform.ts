@@ -18,11 +18,19 @@ import type {
 // Temporal data types (stream-graph style)
 // ---------------------------------------------------------------------------
 
+export interface TemporalEvent {
+  id: string;
+  timestamp: Date;
+  content: string;
+  impact: number;
+}
+
 export interface TemporalStream {
   id: string;
-  label: string;
+  name: string;
   color: string;
-  values: number[]; // strength at each time point (0-1)
+  strength: number[]; // strength at each time point (0-1)
+  events: TemporalEvent[];
 }
 
 export interface TemporalData {
@@ -486,11 +494,28 @@ export function transformToTemporalData(
       return count / maxCount; // normalized 0-1
     });
 
+    // Collect events: high-score insights with this theme
+    const events: TemporalEvent[] = [];
+    for (const key of bucketKeys) {
+      const items = buckets.get(key) ?? [];
+      for (const item of items) {
+        if (item.themes.includes(theme) && item.narrativeScore > 0.6) {
+          events.push({
+            id: item.id,
+            timestamp: new Date(item.timestamp),
+            content: item.themes.join(', '),
+            impact: item.narrativeScore,
+          });
+        }
+      }
+    }
+
     return {
       id: `stream-${idx}`,
-      label: theme,
+      name: theme,
       color: BRANCH_COLORS[idx % BRANCH_COLORS.length],
-      values,
+      strength: values,
+      events: events.slice(0, 5),
     };
   });
 

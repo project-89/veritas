@@ -296,8 +296,8 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
                   .attr('x', 10)
                   .attr('y', 40)
                   .text(
-                    event.description.substring(0, 30) +
-                      (event.description.length > 30 ? '...' : '')
+                    (event.description ?? '').substring(0, 30) +
+                      ((event.description ?? '').length > 30 ? '...' : '')
                   );
               }
             })

@@ -266,7 +266,7 @@ function ResultsContent() {
 
             {activeTab === 'timeline' && temporalData && temporalData.timePoints.length > 0 && (
               <TemporalNarrativeVisualization
-                data={temporalData as never}
+                data={temporalData as any}
                 width={1100}
                 height={600}
                 onStreamClick={(streamId: string) => console.log('Stream clicked:', streamId)}
