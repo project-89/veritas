@@ -94,22 +94,28 @@ export class NarrativeController {
     );
 
     // Map SocialMediaPost[] to a simplified serializable format for the frontend
-    const serializedPosts = posts.map((post: SocialMediaPost) => ({
-      id: post.id,
-      text: post.text,
-      platform: post.platform,
-      authorName: post.authorName ?? 'Unknown',
-      authorHandle: post.authorHandle ?? 'unknown',
-      url: post.url ?? '',
-      timestamp: post.timestamp instanceof Date ? post.timestamp.toISOString() : String(post.timestamp),
-      engagement: {
-        likes: post.engagementMetrics.likes,
-        shares: post.engagementMetrics.shares,
-        comments: post.engagementMetrics.comments,
-        reach: post.engagementMetrics.reach,
-        viralityScore: post.engagementMetrics.viralityScore,
-      },
-    }));
+    // Pair each post with its corresponding insight (by index) to embed sentiment
+    const serializedPosts = posts.map((post: SocialMediaPost, idx: number) => {
+      const insight = insights[idx];
+      return {
+        id: post.id,
+        text: post.text,
+        platform: post.platform,
+        authorName: post.authorName ?? 'Unknown',
+        authorHandle: post.authorHandle ?? 'unknown',
+        url: post.url ?? '',
+        timestamp: post.timestamp instanceof Date ? post.timestamp.toISOString() : String(post.timestamp),
+        sentiment: insight?.sentiment ?? { score: 0, label: 'neutral', confidence: 0 },
+        themes: insight?.themes ?? [],
+        engagement: {
+          likes: post.engagementMetrics.likes,
+          shares: post.engagementMetrics.shares,
+          comments: post.engagementMetrics.comments,
+          reach: post.engagementMetrics.reach,
+          viralityScore: post.engagementMetrics.viralityScore,
+        },
+      };
+    });
 
     const summary = {
       total: insights.length,

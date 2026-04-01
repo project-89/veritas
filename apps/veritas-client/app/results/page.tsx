@@ -428,7 +428,7 @@ function ResultsContent() {
               )
             )}
 
-            {activeTab === 'raw' && <RawDataTable posts={posts} insights={insights} />}
+            {activeTab === 'raw' && <RawDataTable posts={posts} />}
           </div>
 
           {/* Details panel */}

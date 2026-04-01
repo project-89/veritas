@@ -13,6 +13,8 @@ export interface RawPost {
   authorHandle: string;
   url: string;
   timestamp: string; // ISO-8601
+  sentiment: { score: number; label: string; confidence: number };
+  themes: string[];
   engagement: {
     likes: number;
     shares: number;
