@@ -87,13 +87,12 @@ const COLORS = [
 // Text similarity — extract key phrases and compare
 // ---------------------------------------------------------------------------
 
-/** Extract meaningful phrases (2-3 word ngrams) from text */
-function extractKeyPhrases(text: string): string[] {
+/** Extract meaningful keywords from text (single words, not bigrams) */
+function extractKeywords(text: string): string[] {
   const clean = text
     .toLowerCase()
-    .replace(/https?:\/\/\S+/g, '') // remove URLs
-    .replace(/[@#]\w+/g, '')        // remove mentions/hashtags
-    .replace(/[^a-z0-9\s]/g, ' ')   // remove punctuation
+    .replace(/https?:\/\/\S+/g, '')   // remove URLs
+    .replace(/[^a-z0-9\s@#]/g, ' ')   // keep @mentions and #hashtags
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -104,39 +103,37 @@ function extractKeyPhrases(text: string): string[] {
     'when', 'who', 'what', 'how', 'this', 'that', 'with', 'from', 'they',
     'just', 'like', 'about', 'would', 'make', 'than', 'them', 'its', 'into',
     'also', 'could', 'very', 'some', 'other', 'which', 'these', 'then', 'there',
-    'their', 'were', 'being', 'does', 'doing', 'did', 'here',
+    'their', 'were', 'being', 'does', 'doing', 'did', 'here', 'should',
+    'get', 'got', 'going', 'went', 'come', 'came', 'know', 'think',
+    'really', 'still', 'much', 'well', 'even', 'back', 'only', 'right',
+    'now', 'way', 'may', 'say', 'said', 'see', 'look', 'want', 'give',
+    'most', 'let', 'thing', 'things', 'made', 'after', 'year', 'take',
+    'because', 'good', 'each', 'those', 'people', 'over', 'such', 'great',
+    'its', 'yes', 'own', 'tell', 'day', 'keep', 'same', 'able',
   ]);
 
-  const meaningful = words.filter((w) => !stopwords.has(w));
-
-  // Extract bigrams (2-word phrases) as the primary unit
-  const phrases: string[] = [];
-  for (let i = 0; i < meaningful.length - 1; i++) {
-    phrases.push(`${meaningful[i]} ${meaningful[i + 1]}`);
-  }
-  // Also include important single words (longer = more specific)
-  for (const w of meaningful) {
-    if (w.length >= 5) phrases.push(w);
-  }
-  return [...new Set(phrases)];
+  return [...new Set(words.filter((w) => !stopwords.has(w)))];
 }
 
-/** Calculate similarity between two posts (0-1) based on shared phrases */
+/** Calculate similarity between two posts based on shared keywords (Jaccard) */
 function postSimilarity(a: string[], b: string[]): number {
   if (a.length === 0 || b.length === 0) return 0;
+  const setA = new Set(a);
   const setB = new Set(b);
-  let shared = 0;
-  for (const phrase of a) {
-    if (setB.has(phrase)) shared++;
+  let intersection = 0;
+  for (const word of setA) {
+    if (setB.has(word)) intersection++;
   }
-  return shared / Math.max(a.length, b.length);
+  const union = new Set([...a, ...b]).size;
+  return union > 0 ? intersection / union : 0;
 }
 
 // ---------------------------------------------------------------------------
 // Narrative clustering — group posts making similar points
 // ---------------------------------------------------------------------------
 
-const SIMILARITY_THRESHOLD = 0.15; // Posts sharing 15%+ of phrases = same narrative
+// Jaccard similarity: 0.1 = sharing 10% of vocabulary = loosely related
+const SIMILARITY_THRESHOLD = 0.1;
 
 export function detectNarratives(
   posts: RawPost[],
@@ -149,8 +146,8 @@ export function detectNarratives(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
 
-  // Extract key phrases for each post
-  const postPhrases = sorted.map((p) => extractKeyPhrases(p.text));
+  // Extract keywords for each post
+  const postPhrases = sorted.map((p) => extractKeywords(p.text));
 
   // Build sentiment lookup from insights (match by index since they're parallel)
   const sentimentByIndex = insights.map((ins) => ins?.sentiment?.score ?? 0);
@@ -217,8 +214,15 @@ export function detectNarratives(
         .slice(0, 5)
         .map(([phrase]) => phrase);
 
-      // Generate a readable label from top phrases
-      const label = topPhrases.slice(0, 3).join(', ') || `Narrative ${idx + 1}`;
+      // Generate a readable label: use the most engaged post's text as summary
+      const bestPost = [...clusterPosts].sort(
+        (a, b) =>
+          (b.engagement?.likes ?? 0) + (b.engagement?.comments ?? 0) -
+          (a.engagement?.likes ?? 0) - (a.engagement?.comments ?? 0),
+      )[0];
+      const label = bestPost
+        ? bestPost.text.replace(/https?:\/\/\S+/g, '').trim().slice(0, 80) + (bestPost.text.length > 80 ? '...' : '')
+        : topPhrases.slice(0, 3).join(', ') || `Narrative ${idx + 1}`;
 
       // Platform breakdown
       const platforms: Record<string, number> = {};

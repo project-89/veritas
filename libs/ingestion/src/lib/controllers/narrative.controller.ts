@@ -93,22 +93,17 @@ export class NarrativeController {
       }
     );
 
-    // Deduplicate posts by ID, then URL, then text (multiple dedup keys)
-    const seen = new Set<string>();
+    // Deduplicate posts — use normalized text as primary key since tweet IDs
+    // can vary across search queries
+    const seenTexts = new Set<string>();
     const dedupedPosts: SocialMediaPost[] = [];
     const dedupedInsights: NarrativeInsight[] = [];
     for (let i = 0; i < rawResult.posts.length; i++) {
       const post = rawResult.posts[i];
-      // Try multiple keys for deduplication
-      const keys = [
-        post.id,
-        post.url,
-        `${post.platform}:${post.text.slice(0, 80)}`,
-      ].filter(Boolean);
-
-      const isDuplicate = keys.some((k) => seen.has(k));
-      if (!isDuplicate) {
-        for (const k of keys) seen.add(k);
+      // Normalize text for comparison: lowercase, strip whitespace, first 100 chars
+      const textKey = post.text.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 100);
+      if (!seenTexts.has(textKey)) {
+        seenTexts.add(textKey);
         dedupedPosts.push(post);
         if (rawResult.insights[i]) {
           dedupedInsights.push(rawResult.insights[i]);
