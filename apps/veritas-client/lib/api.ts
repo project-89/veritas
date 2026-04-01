@@ -5,18 +5,36 @@
 // Response types -- these mirror the shapes returned by the backend API.
 // ---------------------------------------------------------------------------
 
+export interface RawPost {
+  id: string;
+  text: string;
+  platform: string;
+  authorName: string;
+  authorHandle: string;
+  url: string;
+  timestamp: string; // ISO-8601
+  engagement: {
+    likes: number;
+    shares: number;
+    comments: number;
+    reach: number;
+    viralityScore: number;
+  };
+}
+
 export interface NarrativeInsight {
   id: string;
-  title: string;
-  content: string;
+  contentHash: string;
+  sourceHash: string;
   platform: string;
   timestamp: string; // ISO-8601
-  sentiment: number; // -1 ... 1
-  narrativeScore: number; // 0 ... 1
   themes: string[];
-  entities: string[];
-  sourceUrl?: string;
-  metadata?: Record<string, unknown>;
+  entities: Array<{ name: string; type: string; relevance: number }>;
+  sentiment: { score: number; label: string; confidence: number };
+  engagement: { total: number; breakdown: Record<string, number> };
+  narrativeScore: number; // 0 ... 1
+  processedAt: string;
+  expiresAt: string;
 }
 
 export interface NarrativeTrend {
@@ -30,10 +48,8 @@ export interface NarrativeTrend {
 }
 
 export interface SearchResult {
+  posts: RawPost[];
   insights: NarrativeInsight[];
-  total: number;
-  page: number;
-  pageSize: number;
   summary: {
     total: number;
     positive: number;

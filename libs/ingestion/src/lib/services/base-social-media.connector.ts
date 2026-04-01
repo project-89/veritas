@@ -138,6 +138,40 @@ export abstract class BaseSocialMediaConnector
   }
 
   /**
+   * Search for content and return both raw posts and transformed insights.
+   * Unlike searchAndTransform, this preserves the original post data for
+   * dashboard display purposes.
+   */
+  async searchWithRawData(
+    query: string,
+    options?: ConnectorSearchOptions
+  ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> {
+    try {
+      this.logger.log(`Searching ${this.platform} (with raw data) for: "${query}"`);
+
+      const posts = await this.searchContent(query, options);
+
+      if (posts.length === 0) {
+        this.logger.debug(`No results found for query: "${query}"`);
+        return { posts: [], insights: [] };
+      }
+
+      this.logger.debug(`Found ${posts.length} results for query: "${query}"`);
+
+      const insights = await this.transformService.transformBatch(posts);
+
+      return { posts, insights };
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(
+        `Error in searchWithRawData for ${this.platform}: ${err.message}`,
+        err.stack
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Stream content and transform it using the transform-on-ingest pattern
    */
   streamAndTransform(keywords: string[]): EventEmitter {

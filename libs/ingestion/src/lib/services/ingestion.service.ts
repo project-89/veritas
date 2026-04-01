@@ -200,4 +200,47 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
     const results = await Promise.all(searchPromises);
     return results.flat();
   }
+
+  /**
+   * Search all registered connectors and return both raw posts and insights.
+   * The raw posts preserve the original text, author info, and URLs needed
+   * by the dashboard frontend.
+   */
+  async searchWithRawDataAll(
+    query: string,
+    options?: ConnectorSearchOptions & {
+      platforms?: string[];
+    }
+  ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> {
+    const targetConnectors = options?.platforms
+      ? Array.from(this.connectors.values()).filter((connector) =>
+          options.platforms!.includes(connector.platform)
+        )
+      : Array.from(this.connectors.values());
+
+    const searchPromises = targetConnectors.map(async (connector) => {
+      try {
+        // Use searchWithRawData if the connector supports it (BaseSocialMediaConnector),
+        // otherwise fall back to searchAndTransform with empty posts
+        if ('searchWithRawData' in connector && typeof (connector as Record<string, unknown>).searchWithRawData === 'function') {
+          return await (connector as { searchWithRawData: (q: string, o?: ConnectorSearchOptions) => Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> }).searchWithRawData(query, options);
+        }
+        const insights = await connector.searchAndTransform(query, options);
+        return { posts: [] as SocialMediaPost[], insights };
+      } catch (error) {
+        const err = error as Error;
+        this.logger.error(
+          `Error searching ${connector.platform}: ${err.message}`,
+          err.stack
+        );
+        return { posts: [] as SocialMediaPost[], insights: [] as NarrativeInsight[] };
+      }
+    });
+
+    const results = await Promise.all(searchPromises);
+    return {
+      posts: results.flatMap((r) => r.posts),
+      insights: results.flatMap((r) => r.insights),
+    };
+  }
 }

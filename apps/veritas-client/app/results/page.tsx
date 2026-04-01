@@ -9,7 +9,7 @@ import {
   transformToNetworkGraph,
   transformToTemporalData,
 } from '../../lib/transform';
-import type { NarrativeInsight } from '../../lib/api';
+import type { RawPost, NarrativeInsight } from '../../lib/api';
 import type { NarrativeFlowData, NarrativeBranch, NarrativeConnection } from '@veritas-nx/visualization';
 import type { NetworkGraph as NetworkGraphData } from '@veritas-nx/visualization';
 import type { TemporalData } from '../../lib/transform';
@@ -32,7 +32,27 @@ const TemporalNarrativeVisualization = dynamic(
   { ssr: false },
 );
 
-type TabId = 'flow' | 'network' | 'timeline' | 'raw';
+const RealityTunnelVisualization = dynamic(
+  () => import('@veritas-nx/visualization').then((mod) => ({ default: mod.RealityTunnelVisualization })),
+  { ssr: false },
+);
+
+const NarrativeMyceliumVisualization = dynamic(
+  () => import('@veritas-nx/visualization').then((mod) => ({ default: mod.NarrativeMyceliumVisualization })),
+  { ssr: false },
+);
+
+const NarrativeLandscapeVisualization = dynamic(
+  () => import('@veritas-nx/visualization').then((mod) => ({ default: mod.NarrativeLandscapeVisualization })),
+  { ssr: false },
+);
+
+const EnhancedRealityTunnelVisualization = dynamic(
+  () => import('@veritas-nx/visualization').then((mod) => ({ default: mod.EnhancedRealityTunnelVisualization })),
+  { ssr: false },
+);
+
+type TabId = 'flow' | 'network' | 'timeline' | 'reality-tunnel' | 'mycelium' | 'landscape' | 'enhanced-tunnel' | 'raw';
 
 interface Summary {
   total: number;
@@ -46,6 +66,10 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'flow', label: 'Narrative Flow' },
   { id: 'network', label: 'Network' },
   { id: 'timeline', label: 'Timeline' },
+  { id: 'reality-tunnel', label: 'Reality Tunnel' },
+  { id: 'mycelium', label: 'Mycelium' },
+  { id: 'landscape', label: 'Landscape' },
+  { id: 'enhanced-tunnel', label: 'Enhanced Tunnel' },
   { id: 'raw', label: 'Raw Data' },
 ];
 
@@ -62,6 +86,7 @@ function ResultsContent() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [posts, setPosts] = useState<RawPost[]>([]);
   const [insights, setInsights] = useState<NarrativeInsight[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [flowData, setFlowData] = useState<NarrativeFlowData | null>(null);
@@ -71,6 +96,12 @@ function ResultsContent() {
   const [selectedBranch, setSelectedBranch] = useState<NarrativeBranch | null>(null);
   const [selectedConnection, setSelectedConnection] = useState<NarrativeConnection | null>(null);
 
+  // Sample data for visualizations that don't yet have proper transformers
+  const [realityTunnelData, setRealityTunnelData] = useState<unknown>(null);
+  const [myceliumData, setMyceliumData] = useState<unknown>(null);
+  const [landscapeData, setLandscapeData] = useState<unknown>(null);
+  const [enhancedTunnelData, setEnhancedTunnelData] = useState<unknown>(null);
+
   // New search from results page
   const [searchInput, setSearchInput] = useState(query);
 
@@ -79,16 +110,22 @@ function ResultsContent() {
       if (!q.trim()) return;
       setLoading(true);
       setError(null);
+      setPosts([]);
       setInsights([]);
       setSummary(null);
       setFlowData(null);
       setNetworkData(null);
       setTemporalData(null);
+      setRealityTunnelData(null);
+      setMyceliumData(null);
+      setLandscapeData(null);
+      setEnhancedTunnelData(null);
       setSelectedBranch(null);
       setSelectedConnection(null);
 
       try {
         const result = await searchNarratives(q.trim(), platforms, limit);
+        setPosts(result.posts);
         setInsights(result.insights);
         setSummary(result.summary);
 
@@ -96,6 +133,14 @@ function ResultsContent() {
           setFlowData(transformToNarrativeFlow(result.insights));
           setNetworkData(transformToNetworkGraph(result.insights));
           setTemporalData(transformToTemporalData(result.insights));
+
+          // Load sample data generators for visualizations without proper transformers yet
+          import('@veritas-nx/visualization').then((mod) => {
+            setRealityTunnelData(mod.generateRealityTunnelData());
+            setMyceliumData(mod.generateMyceliumData());
+            setLandscapeData(mod.generateLandscapeData());
+            setEnhancedTunnelData(mod.generateEnhancedTunnelData());
+          });
         }
       } catch (err) {
         setError(
@@ -172,12 +217,12 @@ function ResultsContent() {
           <SummaryStats summary={summary} />
 
           {/* Tabs */}
-          <div className="flex gap-1 border-b border-slate-800 pb-px">
+          <div className="flex gap-1 border-b border-slate-800 pb-px overflow-x-auto">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-slate-900 text-indigo-400 border border-slate-800 border-b-slate-950 -mb-px'
                     : 'text-slate-500 hover:text-slate-300'
@@ -228,7 +273,39 @@ function ResultsContent() {
               />
             )}
 
-            {activeTab === 'raw' && <RawDataTable insights={insights} />}
+            {activeTab === 'reality-tunnel' && realityTunnelData && (
+              <RealityTunnelVisualization
+                data={realityTunnelData as never}
+                width={1100}
+                height={600}
+              />
+            )}
+
+            {activeTab === 'mycelium' && myceliumData && (
+              <NarrativeMyceliumVisualization
+                data={myceliumData as never}
+                width={1100}
+                height={600}
+              />
+            )}
+
+            {activeTab === 'landscape' && landscapeData && (
+              <NarrativeLandscapeVisualization
+                data={landscapeData as never}
+                width={1100}
+                height={600}
+              />
+            )}
+
+            {activeTab === 'enhanced-tunnel' && enhancedTunnelData && (
+              <EnhancedRealityTunnelVisualization
+                data={enhancedTunnelData as never}
+                width={1100}
+                height={600}
+              />
+            )}
+
+            {activeTab === 'raw' && <RawDataTable posts={posts} insights={insights} />}
 
             {insights.length === 0 && (
               <div className="flex items-center justify-center h-[400px] text-slate-500">

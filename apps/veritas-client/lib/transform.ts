@@ -137,7 +137,7 @@ export function transformToNarrativeFlow(
 
   for (const key of bucketKeys) {
     const items = buckets.get(key) ?? [];
-    const sentiments = items.map((i) => i.sentiment);
+    const sentiments = items.map((i) => i.sentiment.score);
     consensusSentiments.push(mean(sentiments));
     consensusStability.push(1 - clamp(variance(sentiments), 0, 1));
   }
@@ -180,7 +180,7 @@ export function transformToNarrativeFlow(
       strengthValues.push(clamp(strength, 0, 1));
 
       // Divergence = |theme avg sentiment - consensus sentiment|
-      const themeSentiment = mean(themeItems.map((i) => i.sentiment));
+      const themeSentiment = mean(themeItems.map((i) => i.sentiment.score));
       const div = Math.abs(themeSentiment - consensusSentiments[bi]);
       divergenceValues.push(clamp(div, 0, 1));
 
@@ -190,7 +190,7 @@ export function transformToNarrativeFlow(
           events.push({
             id: item.id,
             timestamp: new Date(item.timestamp),
-            description: item.title || item.content.slice(0, 120),
+            description: item.themes.join(', ') || `Insight ${item.id}`,
             impact: item.narrativeScore,
           });
         }
@@ -253,7 +253,7 @@ export function transformToNarrativeFlow(
       for (const theme of item.themes) {
         if (!themeEntities.has(theme)) themeEntities.set(theme, new Set());
         for (const entity of item.entities) {
-          themeEntities.get(theme)!.add(entity);
+          themeEntities.get(theme)!.add(entity.name);
         }
       }
     }
@@ -344,18 +344,18 @@ export function transformToNetworkGraph(
   for (const insight of insights) {
     const allItems = [
       ...insight.themes.map((t) => ({ id: `theme:${t}`, kind: 'theme' as const, label: t })),
-      ...insight.entities.map((e) => ({ id: `entity:${e}`, kind: 'entity' as const, label: e })),
+      ...insight.entities.map((e) => ({ id: `entity:${e.name}`, kind: 'entity' as const, label: e.name })),
     ];
 
     for (const item of allItems) {
       if (item.kind === 'theme') {
         themeFreq.set(item.label, (themeFreq.get(item.label) ?? 0) + 1);
         if (!themeSentiment.has(item.label)) themeSentiment.set(item.label, []);
-        themeSentiment.get(item.label)!.push(insight.sentiment);
+        themeSentiment.get(item.label)!.push(insight.sentiment.score);
       } else {
         entityFreq.set(item.label, (entityFreq.get(item.label) ?? 0) + 1);
         if (!entitySentiment.has(item.label)) entitySentiment.set(item.label, []);
-        entitySentiment.get(item.label)!.push(insight.sentiment);
+        entitySentiment.get(item.label)!.push(insight.sentiment.score);
       }
 
       // Build co-occurrence edges (pairs within same insight)

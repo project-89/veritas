@@ -51,12 +51,29 @@ export class NarrativeController {
   }
 
   /**
-   * Search across all registered connectors and return classified narrative insights
+   * Search across all registered connectors and return raw posts,
+   * classified narrative insights, and a summary.
    */
   @Post('search')
   async searchNarratives(
     @Body() body: { query: string; platforms?: string[]; limit?: number }
   ): Promise<{
+    posts: Array<{
+      id: string;
+      text: string;
+      platform: string;
+      authorName: string;
+      authorHandle: string;
+      url: string;
+      timestamp: string;
+      engagement: {
+        likes: number;
+        shares: number;
+        comments: number;
+        reach: number;
+        viralityScore: number;
+      };
+    }>;
     insights: NarrativeInsight[];
     summary: {
       total: number;
@@ -68,13 +85,31 @@ export class NarrativeController {
   }> {
     this.logger.log(`Searching narratives with query: "${body.query}"`);
 
-    const insights = await this.ingestionService.searchAndTransformAll(
+    const { posts, insights } = await this.ingestionService.searchWithRawDataAll(
       body.query,
       {
         platforms: body.platforms,
         limit: body.limit,
       }
     );
+
+    // Map SocialMediaPost[] to a simplified serializable format for the frontend
+    const serializedPosts = posts.map((post: SocialMediaPost) => ({
+      id: post.id,
+      text: post.text,
+      platform: post.platform,
+      authorName: post.authorName ?? 'Unknown',
+      authorHandle: post.authorHandle ?? 'unknown',
+      url: post.url ?? '',
+      timestamp: post.timestamp instanceof Date ? post.timestamp.toISOString() : String(post.timestamp),
+      engagement: {
+        likes: post.engagementMetrics.likes,
+        shares: post.engagementMetrics.shares,
+        comments: post.engagementMetrics.comments,
+        reach: post.engagementMetrics.reach,
+        viralityScore: post.engagementMetrics.viralityScore,
+      },
+    }));
 
     const summary = {
       total: insights.length,
@@ -87,7 +122,7 @@ export class NarrativeController {
       }, {}),
     };
 
-    return { insights, summary };
+    return { posts: serializedPosts, insights, summary };
   }
 
   /**
