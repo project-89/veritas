@@ -22,6 +22,7 @@ import { TwitterFreeConnector } from './services/twitter-free.connector';
 import { RSSConnector } from './services/rss.connector';
 import { WebScraperConnector } from './services/web-scraper.connector';
 import { YouTubeFreeConnector } from './services/youtube-free.connector';
+import { TruthSocialFreeConnector } from './services/truthsocial-free.connector';
 import { IngestionService } from './services/ingestion.service';
 import { SubprocessUtil } from './services/utils/subprocess.util';
 import { JinaReaderService } from './services/utils/jina-reader.service';
@@ -41,6 +42,7 @@ import {
   TWITTER_CONNECTOR,
   YOUTUBE_CONNECTOR,
   FACEBOOK_CONNECTOR,
+  TRUTHSOCIAL_CONNECTOR,
 } from './interfaces/connector-tokens';
 
 /**
@@ -104,6 +106,7 @@ export interface IngestionModuleOptions {
     rss?: boolean;
     webScraper?: boolean;
     youtube?: boolean;
+    truthsocial?: boolean;
   };
 
   /**
@@ -220,6 +223,10 @@ export class IngestionModule {
 
     if (connectorConfig.youtube) {
       providers.push({ provide: YOUTUBE_CONNECTOR, useClass: YouTubeFreeConnector });
+    }
+
+    if (connectorConfig.truthsocial !== false) {
+      providers.push({ provide: TRUTHSOCIAL_CONNECTOR, useClass: TruthSocialFreeConnector });
     }
 
     // RSS and WebScraper are already API-free

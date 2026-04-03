@@ -44,7 +44,7 @@ class AnalysisJobInputEmbed {
 })
 export class AnalysisJobSchema extends Document {
   /** Links back to the scan job that produced the posts (null for identity-scoped jobs like psychological-profile) */
-  @Prop({ index: true, default: null })
+  @Prop({ type: String, index: true, default: null })
   scanId!: string | null;
 
   /** Analysis type */
