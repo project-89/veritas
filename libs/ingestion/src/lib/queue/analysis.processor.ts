@@ -346,8 +346,8 @@ export class AnalysisProcessor extends WorkerHost {
       // Gather posts from all investigations for this user
       const allPosts: UserPost[] = [];
 
-      // Try to get posts from the most recent scan job
-      if (analysisJob.scanId) {
+      // Try to get posts from the most recent scan job (skip if scanId isn't a real ObjectId)
+      if (analysisJob.scanId && /^[0-9a-f]{24}$/i.test(analysisJob.scanId)) {
         const scanPosts = await this.scanJobRepo.getJobPosts(analysisJob.scanId);
         const userPosts = scanPosts.filter((p: any) =>
           (p.authorHandle ?? '').toLowerCase() === identity.primaryHandle.toLowerCase(),
