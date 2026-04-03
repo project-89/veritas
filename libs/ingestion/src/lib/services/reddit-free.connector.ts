@@ -490,10 +490,11 @@ export class RedditFreeConnector
     const diffHours =
       (now.getTime() - startDate.getTime()) / (60 * 60 * 1000);
 
-    if (diffHours <= 24) return 'hour';
-    if (diffHours <= 24 * 7) return 'day';
-    if (diffHours <= 24 * 30) return 'week';
-    if (diffHours <= 24 * 90) return 'month';
+    // Reddit time filters: hour=1h, day=24h, week=7d, month=30d, year=365d
+    if (diffHours <= 1) return 'hour';
+    if (diffHours <= 24) return 'day';
+    if (diffHours <= 24 * 7) return 'week';
+    if (diffHours <= 24 * 30) return 'month';
     if (diffHours <= 24 * 365) return 'year';
     return 'all';
   }

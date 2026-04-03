@@ -332,9 +332,13 @@ export class DownstreamEffectsService {
     }
 
     // Extend +-7 days to capture lagging real-world effects
+    // Truncate to the hour for consistent cache key matching
     const msPerDay = 24 * 60 * 60 * 1000;
-    const startDate = new Date(minTs - 7 * msPerDay).toISOString();
-    const endDate = new Date(maxTs + 7 * msPerDay).toISOString();
+    const msPerHour = 60 * 60 * 1000;
+    const startMs = Math.floor((minTs - 7 * msPerDay) / msPerHour) * msPerHour;
+    const endMs = Math.ceil((maxTs + 7 * msPerDay) / msPerHour) * msPerHour;
+    const startDate = new Date(startMs).toISOString();
+    const endDate = new Date(endMs).toISOString();
 
     return { startDate, endDate };
   }
