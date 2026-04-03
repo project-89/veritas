@@ -103,8 +103,11 @@ export class GitHubEvidenceAdapter implements EvidenceAdapter {
       }
     }
 
-    // Search for non-repo entities
-    for (const entity of nonRepoEntities.slice(0, 2)) {
+    // Search for non-repo entities (skip social handles like @username)
+    const searchableEntities = nonRepoEntities
+      .map((e) => e.replace(/^@/, ''))
+      .filter((e) => e.length > 2 && !/^[0-9a-f]{40}$/i.test(e) && !/^0x/i.test(e));
+    for (const entity of searchableEntities.slice(0, 2)) {
       const searchData = await this.apiCall(`/search/repositories?q=${encodeURIComponent(entity)}&sort=stars&per_page=3`);
       if (!searchData) continue;
 
