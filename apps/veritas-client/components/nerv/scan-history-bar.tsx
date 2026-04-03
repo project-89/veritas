@@ -67,7 +67,7 @@ export function ScanHistoryBar({ scans, currentScanId, onSelectScan }: ScanHisto
   return (
     <div className="px-4 py-1.5 border-b border-nerv-border/50 bg-nerv-bg">
       {/* Header + hover info */}
-      <div className="flex items-center justify-between mb-1.5">
+      <div className="flex items-center justify-between mb-1">
         <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
           Scan Coverage &middot; {segments.length} scans
         </span>
@@ -82,58 +82,76 @@ export function ScanHistoryBar({ scans, currentScanId, onSelectScan }: ScanHisto
         )}
       </div>
 
-      {/* Timeline track */}
-      <div className="relative h-4">
-        {/* Background track line */}
-        <div className="absolute top-[7px] left-0 right-0 h-[2px] bg-nerv-border/50 rounded-full" />
+      {/* Timeline: SVG-based for precise rendering */}
+      <svg width="100%" height="20" className="overflow-visible">
+        {/* Background track */}
+        <line x1="0" y1="10" x2="100%" y2="10" stroke="#2a2a45" strokeWidth="1" />
 
-        {/* Segments as colored spans with node dots at start/end */}
+        {/* Segments */}
         {segments.map((seg) => {
-          const leftPct = ((seg.start - totalStart) / totalRange) * 100;
-          const widthPct = ((seg.end - seg.start) / totalRange) * 100;
+          const x1Pct = ((seg.start - totalStart) / totalRange) * 100;
+          const x2Pct = ((seg.end - totalStart) / totalRange) * 100;
           const isHovered = hoveredId === seg.scanId;
 
+          const barColor = seg.isCurrent ? '#FF6B2B' : isHovered ? '#00FF41' : '#555570';
+          const barOpacity = seg.isCurrent ? 1 : isHovered ? 0.8 : 0.35;
+          const dotRadius = isHovered ? 5 : 3.5;
+          const dotColor = seg.isCurrent ? '#FF6B2B' : isHovered ? '#00FF41' : '#555570';
+
           return (
-            <button
+            <g
               key={seg.scanId}
               onClick={() => onSelectScan?.(seg.scanId)}
               onMouseEnter={() => setHoveredId(seg.scanId)}
               onMouseLeave={() => setHoveredId(null)}
-              className="absolute top-0 h-full group"
-              style={{ left: `${leftPct}%`, width: `${Math.max(widthPct, 1.5)}%` }}
+              style={{ cursor: 'pointer' }}
             >
+              {/* Invisible wider hit area */}
+              <rect
+                x={`${x1Pct}%`}
+                y="0"
+                width={`${Math.max(x2Pct - x1Pct, 1)}%`}
+                height="20"
+                fill="transparent"
+              />
+
               {/* Span bar */}
-              <div
-                className="absolute top-[5px] left-0 right-0 h-[6px] rounded-full transition-all"
-                style={{
-                  backgroundColor: seg.isCurrent ? '#FF6B2B' : isHovered ? '#00FF41' : '#555570',
-                  opacity: seg.isCurrent ? 1 : isHovered ? 0.9 : 0.4,
-                }}
+              <line
+                x1={`${x1Pct}%`}
+                y1="10"
+                x2={`${x2Pct}%`}
+                y2="10"
+                stroke={barColor}
+                strokeWidth={isHovered ? 4 : 3}
+                opacity={barOpacity}
+                strokeLinecap="round"
               />
 
-              {/* Start node dot */}
-              <div
-                className="absolute top-[3px] left-0 w-[10px] h-[10px] rounded-full border-2 transition-all -translate-x-1/2"
-                style={{
-                  backgroundColor: seg.isCurrent ? '#FF6B2B' : isHovered ? '#00FF41' : '#3a3a5f',
-                  borderColor: seg.isCurrent ? '#FF8B4B' : isHovered ? '#00FF41' : '#555570',
-                  transform: `translateX(-50%) scale(${isHovered ? 1.3 : 1})`,
-                }}
+              {/* Start dot */}
+              <circle
+                cx={`${x1Pct}%`}
+                cy="10"
+                r={dotRadius}
+                fill={dotColor}
+                stroke={seg.isCurrent ? '#FF8B4B' : isHovered ? '#00FF41' : '#3a3a5f'}
+                strokeWidth="1.5"
+                style={{ transition: 'r 0.15s, fill 0.15s' }}
               />
 
-              {/* End node dot */}
-              <div
-                className="absolute top-[3px] right-0 w-[10px] h-[10px] rounded-full border-2 transition-all translate-x-1/2"
-                style={{
-                  backgroundColor: seg.isCurrent ? '#FF6B2B' : isHovered ? '#00FF41' : '#3a3a5f',
-                  borderColor: seg.isCurrent ? '#FF8B4B' : isHovered ? '#00FF41' : '#555570',
-                  transform: `translateX(50%) scale(${isHovered ? 1.3 : 1})`,
-                }}
+              {/* End dot */}
+              <circle
+                cx={`${x2Pct}%`}
+                cy="10"
+                r={dotRadius}
+                fill={dotColor}
+                stroke={seg.isCurrent ? '#FF8B4B' : isHovered ? '#00FF41' : '#3a3a5f'}
+                strokeWidth="1.5"
+                style={{ transition: 'r 0.15s, fill 0.15s' }}
               />
-            </button>
+            </g>
           );
         })}
-      </div>
+      </svg>
     </div>
   );
 }
