@@ -97,6 +97,10 @@ export class EntityAnalysisService {
     insights: InsightInput[],
     narratives: AnalyzedNarrative[],
   ): EntityDossier[] {
+    // If no insights provided, extract entities from raw post text
+    if (insights.length === 0 && posts.length > 0) {
+      insights = this.extractInsightsFromPosts(posts);
+    }
     if (insights.length === 0) return [];
 
     // Normalise entity name for dedup (lower-case, trimmed)
@@ -384,5 +388,66 @@ export class EntityAnalysisService {
     );
 
     return { nodes, edges: trimmedEdges };
+  }
+
+  // -------------------------------------------------------------------------
+  // Fallback entity extraction from raw posts
+  // -------------------------------------------------------------------------
+
+  /**
+   * Extract synthetic InsightInput objects from raw posts when the transform-on-ingest
+   * pipeline wasn't used (e.g., scan queue architecture stores raw posts only).
+   * Uses simple pattern matching: @handles, #hashtags, $tickers, capitalized phrases.
+   */
+  private extractInsightsFromPosts(posts: RawPost[]): InsightInput[] {
+    return posts.map((post) => {
+      const entities: Array<{ name: string; type: string; relevance: number }> = [];
+      const seen = new Set<string>();
+
+      // @handles → person entities
+      const handles = post.text.match(/@[\w]+/g) ?? [];
+      for (const h of handles) {
+        const name = h.slice(1); // remove @
+        if (name.length < 2 || seen.has(name.toLowerCase())) continue;
+        seen.add(name.toLowerCase());
+        entities.push({ name, type: 'person', relevance: 0.8 });
+      }
+
+      // #hashtags → topic entities
+      const hashtags = post.text.match(/#[\w]+/g) ?? [];
+      for (const h of hashtags) {
+        const name = h.slice(1);
+        if (name.length < 2 || seen.has(name.toLowerCase())) continue;
+        seen.add(name.toLowerCase());
+        entities.push({ name, type: 'topic', relevance: 0.6 });
+      }
+
+      // $TICKER → organization/asset entities
+      const tickers = post.text.match(/\$[A-Z]{2,6}/g) ?? [];
+      for (const t of tickers) {
+        const name = t.slice(1);
+        if (seen.has(name.toLowerCase())) continue;
+        seen.add(name.toLowerCase());
+        entities.push({ name, type: 'organization', relevance: 0.7 });
+      }
+
+      // Capitalized multi-word phrases (2-3 words) → potential entity names
+      const capitalizedPhrases = post.text.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2}\b/g) ?? [];
+      for (const phrase of capitalizedPhrases) {
+        if (phrase.length < 4 || seen.has(phrase.toLowerCase())) continue;
+        // Skip common sentence starters
+        if (['The', 'This', 'That', 'What', 'When', 'Where', 'How', 'Why'].some((w) => phrase.startsWith(w + ' '))) continue;
+        seen.add(phrase.toLowerCase());
+        entities.push({ name: phrase, type: 'entity', relevance: 0.5 });
+      }
+
+      return {
+        id: post.id ?? `post-${Math.random().toString(36).slice(2)}`,
+        platform: post.platform,
+        timestamp: post.timestamp,
+        entities,
+        sentiment: { score: 0, label: 'neutral' as const, confidence: 0 },
+      };
+    });
   }
 }

@@ -13,6 +13,7 @@ import neo4j, { Driver, Session } from 'neo4j-driver';
 export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
   private driver: Driver | null = null;
   private readonly logger = new Logger(GraphDatabaseService.name);
+  private mageWarningLogged = false;
 
   // --------------------------------------------------------------------------
   // Lifecycle
@@ -100,9 +101,15 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
     } catch (err) {
       const error = err as Error;
       const msg = error.message ?? '';
-      // Expected errors when MAGE algorithms aren't installed — log at debug, not error
+      // Expected when MAGE algorithms aren't installed — log once, then suppress
       if (msg.includes('no procedure named') || msg.includes('There is no procedure')) {
-        this.logger.debug(`Memgraph procedure not available (install MAGE for graph algorithms): ${msg.split('.')[0]}`);
+        if (!this.mageWarningLogged) {
+          this.mageWarningLogged = true;
+          this.logger.warn(
+            'Memgraph MAGE not installed — graph algorithms (pagerank, betweenness, community detection) unavailable. ' +
+            'Use memgraph/memgraph-mage Docker image to enable. System continues with heuristic scoring.',
+          );
+        }
       } else {
         this.logger.error(`Cypher query failed: ${msg}`);
       }

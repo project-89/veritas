@@ -121,6 +121,7 @@ export class ScanProcessor extends WorkerHost {
               : String(post.timestamp),
           sentiment: insight?.sentiment ?? { score: 0, label: 'neutral', confidence: 0 },
           themes: insight?.themes ?? [],
+          entities: insight?.entities ?? [],
           engagement: {
             likes: post.engagementMetrics?.likes ?? 0,
             shares: post.engagementMetrics?.shares ?? 0,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
-import type { AnalyzedNarrative } from '../../lib/api';
+import type { AnalyzedNarrative, AnalysisJob } from '../../lib/api';
 import { NervBadge } from './nerv-badge';
 import { NervBar } from './nerv-bar';
 
@@ -55,6 +55,10 @@ interface NarrativeListProps {
   unclusteredCount: number;
   /** Multi-select state for batch analysis */
   selectedNarrativeIds?: string[];
+  /** Analysis jobs for showing queue status per narrative */
+  analysisJobs?: AnalysisJob[];
+  /** Narratives that have been investigated */
+  investigatedNarrativeIds?: string[];
   onToggleSelection?: (narrativeId: string) => void;
   onAnalyzeSelected?: () => void;
   onInvestigateSelected?: () => void;
@@ -67,6 +71,8 @@ export function NarrativeList({
   onSelect,
   unclusteredCount,
   selectedNarrativeIds = [],
+  analysisJobs = [],
+  investigatedNarrativeIds = [],
   onToggleSelection,
   onAnalyzeSelected,
   onInvestigateSelected,
@@ -140,17 +146,41 @@ export function NarrativeList({
           const isChecked = selectedNarrativeIds.includes(narrative.id);
           const trend = narrative.velocity?.trend ?? 'steady';
           const postCount = narrative.postIndices.length;
+          const isInvestigated = investigatedNarrativeIds.includes(narrative.id);
+
+          // Check analysis queue status for this narrative
+          const narrativeJobs = analysisJobs.filter((j) => j.narrativeIds.includes(narrative.id));
+          const hasRunningJob = narrativeJobs.some((j) => j.status === 'running');
+          const hasPendingJob = narrativeJobs.some((j) => j.status === 'pending');
+          const hasCompletedJob = narrativeJobs.some((j) => j.status === 'completed');
+          const hasFailedJob = narrativeJobs.some((j) => j.status === 'failed');
 
           return (
             <div key={narrative.id} className="flex items-stretch border-b border-nerv-border/50">
               {onToggleSelection && (
-                <label className="flex items-center px-1.5 cursor-pointer hover:bg-nerv-bg-elevated/40">
+                <label className="flex items-center gap-1 px-1.5 cursor-pointer hover:bg-nerv-bg-elevated/40">
                   <input
                     type="checkbox"
                     checked={isChecked}
                     onChange={() => onToggleSelection(narrative.id)}
                     className="w-3 h-3 accent-nerv-orange cursor-pointer"
                   />
+                  {/* Status indicator dot */}
+                  {hasRunningJob && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-nerv-orange animate-pulse shrink-0" title="Running" />
+                  )}
+                  {hasPendingJob && !hasRunningJob && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-nerv-text-muted shrink-0" title="Queued" />
+                  )}
+                  {hasCompletedJob && !hasRunningJob && !hasPendingJob && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-nerv-green shrink-0" title="Analyzed" />
+                  )}
+                  {hasFailedJob && !hasRunningJob && !hasPendingJob && !hasCompletedJob && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-nerv-red shrink-0" title="Failed" />
+                  )}
+                  {isInvestigated && !hasRunningJob && !hasPendingJob && (
+                    <span className="text-[8px] text-nerv-green shrink-0" title="Investigated">{'\u2713'}</span>
+                  )}
                 </label>
               )}
               <button

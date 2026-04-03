@@ -104,12 +104,7 @@ export class ContentClassificationService {
       }
     }
 
-    // Validate configuration
-    if (!this.nlpEndpoint) {
-      this.logger.warn(
-        'NLP_SERVICE_ENDPOINT not configured, falling back to local processing'
-      );
-    }
+    // NLP endpoint is optional — local processing (afinn + franc) works fine without it
 
     this.logger.log('Content classification service initialized');
   }

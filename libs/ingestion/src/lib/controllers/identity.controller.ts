@@ -111,47 +111,53 @@ export class IdentityController {
    * POST /identity/:id/generate-profile — Trigger MAGI psychological profile generation.
    */
   @Post(':id/generate-profile')
-  async generateProfile(@Param('id') id: string): Promise<{ status: string; jobId: string }> {
+  async generateProfile(@Param('id') id: string): Promise<{ status: string; jobId?: string; error?: string }> {
     const record = await this.identityRepo.findById(id);
     if (!record) {
       throw new HttpException(`Identity not found: ${id}`, HttpStatus.NOT_FOUND);
     }
 
-    // Mark as queued
-    await this.identityRepo.updateProfileStatus(id, 'queued');
+    try {
+      // Mark as queued
+      await this.identityRepo.updateProfileStatus(id, 'queued');
 
-    // Create analysis job for the profiler
-    const analysisJob = await this.analysisJobRepo.createJob({
-      scanId: 'profile-generation', // Not tied to a specific scan
-      type: 'psychological-profile',
-      narrativeIds: [id], // Store identity record ID here
-      input: {
-        query: record.primaryHandle,
-        narrativeSummaries: [],
-        narratives: [],
-        userHandles: [record.primaryHandle],
-        postCount: record.totalPostsAnalyzed,
-      },
-    });
+      // Create analysis job for the profiler
+      const analysisJob = await this.analysisJobRepo.createJob({
+        scanId: 'profile-generation',
+        type: 'psychological-profile' as any,
+        narrativeIds: [id],
+        input: {
+          query: record.primaryHandle,
+          narrativeSummaries: [],
+          narratives: [],
+          userHandles: [record.primaryHandle],
+          postCount: record.totalPostsAnalyzed,
+        },
+      });
 
-    const jobId = analysisJob._id?.toString() ?? analysisJob.id;
+      const jobId = analysisJob._id?.toString() ?? analysisJob.id;
 
-    // Enqueue BullMQ job
-    const jobData: AnalysisJobData = {
-      analysisJobId: jobId,
-      scanId: 'profile-generation',
-      type: 'psychological-profile',
-    };
+      // Enqueue BullMQ job
+      const jobData: AnalysisJobData = {
+        analysisJobId: jobId,
+        scanId: 'profile-generation',
+        type: 'psychological-profile',
+      };
 
-    await this.analysisQueue.add('analysis-psychological-profile', jobData, {
-      attempts: 1,
-      backoff: { type: 'exponential', delay: 10000 },
-      removeOnComplete: 100,
-      removeOnFail: 50,
-    });
+      await this.analysisQueue.add('analysis-psychological-profile', jobData, {
+        attempts: 1,
+        backoff: { type: 'exponential', delay: 10000 },
+        removeOnComplete: 100,
+        removeOnFail: 50,
+      });
 
-    this.logger.log(`MAGI profile generation queued for @${record.primaryHandle} (job: ${jobId})`);
-
-    return { status: 'queued', jobId };
+      this.logger.log(`MAGI profile generation queued for @${record.primaryHandle} (job: ${jobId})`);
+      return { status: 'queued', jobId };
+    } catch (err) {
+      const error = err as Error;
+      this.logger.error(`Failed to queue MAGI profile for @${record.primaryHandle}: ${error.message}`, error.stack);
+      await this.identityRepo.updateProfileStatus(id, 'failed').catch(() => {});
+      return { status: 'failed', error: error.message };
+    }
   }
 }

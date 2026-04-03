@@ -289,7 +289,17 @@ function InvestigationWorkspace() {
       // Stage 5: Entities
       try {
         dispatch({ type: 'SET_PIPELINE', stage: 'entities', status: 'running' });
-        const entityResult = await analyzeEntities(posts, [], narratives);
+        // Build insights from posts that have entity/sentiment data from the scan processor
+        const insights = posts
+          .filter((p: any) => p.entities?.length > 0 || p.themes?.length > 0)
+          .map((p: any) => ({
+            id: p.id,
+            platform: p.platform,
+            timestamp: p.timestamp,
+            entities: p.entities ?? [],
+            sentiment: p.sentiment ?? { score: 0, label: 'neutral', confidence: 0 },
+          }));
+        const entityResult = await analyzeEntities(posts, insights, narratives);
         dispatch({ type: 'SET_ENTITIES', data: entityResult });
         dispatch({ type: 'SET_PIPELINE', stage: 'entities', status: 'done' });
         cacheData.entities = entityResult;
@@ -493,7 +503,7 @@ function InvestigationWorkspace() {
       // ---- FRESH SEARCH: Use scan queue ----
       if (freshSearch) {
         try {
-          const { scanId } = await startScan(query);
+          const { scanId } = await startScan(query, undefined, undefined, '7d');
           const initialStatus = await getScanStatus(scanId);
           setScanJob(initialStatus);
           scanPostsFetchedRef.current = false;
@@ -649,7 +659,7 @@ function InvestigationWorkspace() {
 
     try {
       await startAnalysisJobs(scanId, jobs);
-      dispatch({ type: 'CLEAR_NARRATIVE_SELECTION' });
+      // Don't clear selection — keep checked so user can see what's queued
       startAnalysisPolling(scanId);
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: `Failed to start analysis jobs: ${err}` });
@@ -682,7 +692,6 @@ function InvestigationWorkspace() {
 
     try {
       await startAnalysisJobs(scanId, jobs);
-      dispatch({ type: 'CLEAR_NARRATIVE_SELECTION' });
       startAnalysisPolling(scanId);
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: `Failed to start analysis jobs: ${err}` });
@@ -823,7 +832,7 @@ function InvestigationWorkspace() {
 
     // Start a new scan directly — don't navigate, don't rely on useEffect
     try {
-      const { scanId } = await startScan(query);
+      const { scanId } = await startScan(query, undefined, undefined, '7d');
       const initialStatus = await getScanStatus(scanId);
       setScanJob(initialStatus);
     } catch (err) {
@@ -1144,6 +1153,8 @@ function InvestigationWorkspace() {
               onSelect={handleNarrativeSelect}
               unclusteredCount={state.unclusteredCount}
               selectedNarrativeIds={state.selectedNarrativeIds}
+              analysisJobs={state.analysisJobs}
+              investigatedNarrativeIds={state.investigatedNarrativeIds}
               onToggleSelection={(id) => dispatch({ type: 'TOGGLE_NARRATIVE_SELECTION', narrativeId: id })}
               onInvestigateSelected={handleInvestigateSelected}
               onAnalyzeSelected={handleAnalyzeSelected}

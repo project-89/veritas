@@ -84,7 +84,11 @@ export function EffectsChain({
     isPanning.current = false;
   }, []);
 
-  if (!downstream) {
+  const hasData = downstream
+    && Array.isArray(downstream.narrativeCorrelations)
+    && downstream.narrativeCorrelations.length > 0;
+
+  if (!hasData) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <div className="text-center">
