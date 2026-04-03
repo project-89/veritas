@@ -106,9 +106,7 @@ export function ScanHistoryBar({ scans, currentScanId, onSelectScan, onFillGap }
   }, [completedScans, currentScanId]);
 
   if (segments.length === 0) return null;
-  // Only show if there's meaningful history (multiple data segments or a gap)
   const dataSegments = segments.filter((s) => s.type === 'data');
-  if (dataSegments.length < 2) return null;
 
   const totalRange = totalEnd - totalStart || 1;
   const hovered = hoveredIdx !== null ? segments[hoveredIdx] : null;
