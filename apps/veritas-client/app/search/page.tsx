@@ -10,12 +10,27 @@ import { fetchInvestigations } from '../../lib/api';
 // Constants
 // ---------------------------------------------------------------------------
 
-const ALL_PLATFORMS = [
-  { id: 'twitter', label: 'Twitter / X' },
-  { id: 'reddit', label: 'Reddit' },
-  { id: 'youtube', label: 'YouTube' },
-  { id: 'facebook', label: 'Facebook' },
-] as const;
+const PLATFORM_GROUPS = [
+  {
+    label: 'Social',
+    platforms: [
+      { id: 'twitter', label: 'Twitter / X', icon: '\u{1D54F}' },
+      { id: 'reddit', label: 'Reddit', icon: 'R' },
+      { id: 'farcaster', label: 'Farcaster', icon: 'FC' },
+      { id: 'truthsocial', label: 'Truth Social', icon: 'TS' },
+    ],
+  },
+  {
+    label: 'Media',
+    platforms: [
+      { id: 'youtube', label: 'YouTube', icon: '\u25B6' },
+      { id: 'rss', label: 'News Feeds (177)', icon: '\u{1F4F0}' },
+      { id: 'telegram', label: 'Telegram OSINT', icon: '\u2708' },
+    ],
+  },
+];
+
+const ALL_PLATFORMS = PLATFORM_GROUPS.flatMap((g) => g.platforms);
 
 const TIME_RANGES = [
   { value: '24h', label: '24h' },
@@ -50,7 +65,7 @@ export default function SearchPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [query, setQuery] = useState('');
-  const [platforms, setPlatforms] = useState<string[]>(['twitter', 'reddit', 'youtube']);
+  const [platforms, setPlatforms] = useState<string[]>(['twitter', 'reddit', 'youtube', 'rss', 'farcaster']);
   const [timeRange, setTimeRange] = useState('7d');
   const [limit, setLimit] = useState(100);
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
@@ -131,42 +146,64 @@ export default function SearchPage() {
 
             {/* Options row */}
             <div className="grid grid-cols-3 gap-4">
-              {/* Platforms */}
+              {/* Data Sources */}
               <div>
                 <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
-                  Platforms
+                  Data Sources
                 </label>
-                <div className="space-y-1.5">
-                  {ALL_PLATFORMS.map((p) => {
-                    const checked = platforms.includes(p.id);
-                    return (
-                      <label
-                        key={p.id}
-                        className="flex items-center gap-2 cursor-pointer group"
-                      >
-                        <span
-                          className={[
-                            'w-3.5 h-3.5 border flex items-center justify-center text-[9px] font-mono transition-all',
-                            checked
-                              ? 'border-nerv-green bg-nerv-green/15 text-nerv-green'
-                              : 'border-nerv-border text-transparent hover:border-nerv-text-muted',
-                          ].join(' ')}
-                          onClick={() => togglePlatform(p.id)}
-                        >
-                          {checked ? 'x' : ''}
-                        </span>
-                        <span
-                          className={[
-                            'text-xs font-mono transition-colors',
-                            checked ? 'text-nerv-text' : 'text-nerv-text-muted',
-                          ].join(' ')}
-                          onClick={() => togglePlatform(p.id)}
-                        >
-                          {p.label}
-                        </span>
-                      </label>
-                    );
-                  })}
+                <div className="space-y-3">
+                  {PLATFORM_GROUPS.map((group) => (
+                    <div key={group.label}>
+                      <div className="text-[8px] uppercase tracking-widest text-nerv-text-muted mb-1">
+                        {group.label}
+                      </div>
+                      <div className="space-y-1">
+                        {group.platforms.map((p) => {
+                          const checked = platforms.includes(p.id);
+                          return (
+                            <label
+                              key={p.id}
+                              className="flex items-center gap-2 cursor-pointer group"
+                              onClick={() => togglePlatform(p.id)}
+                            >
+                              <span
+                                className={[
+                                  'w-3.5 h-3.5 border flex items-center justify-center text-[8px] font-mono transition-all',
+                                  checked
+                                    ? 'border-nerv-green bg-nerv-green/15 text-nerv-green'
+                                    : 'border-nerv-border text-transparent hover:border-nerv-text-muted',
+                                ].join(' ')}
+                              >
+                                {checked ? '\u2713' : ''}
+                              </span>
+                              <span
+                                className={[
+                                  'text-[11px] font-mono transition-colors',
+                                  checked ? 'text-nerv-text' : 'text-nerv-text-muted',
+                                ].join(' ')}
+                              >
+                                {p.label}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => setPlatforms(ALL_PLATFORMS.map((p) => p.id))}
+                      className="text-[8px] font-mono uppercase text-nerv-green hover:underline"
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setPlatforms([])}
+                      className="text-[8px] font-mono uppercase text-nerv-text-muted hover:underline"
+                    >
+                      None
+                    </button>
+                  </div>
                 </div>
               </div>
 

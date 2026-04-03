@@ -171,7 +171,9 @@ function InvestigationWorkspace() {
   const router = useRouter();
   const query = searchParams.get('q') ?? '';
   const invId = searchParams.get('inv');
-  const freshSearch = searchParams.get('fresh') === '1'; // Only auto-run full pipeline on fresh search
+  const freshSearch = searchParams.get('fresh') === '1';
+  const urlPlatforms = searchParams.get('platforms')?.split(',').filter(Boolean) ?? undefined;
+  const urlTimeRange = searchParams.get('timeRange') ?? '7d';
   const { state, dispatch, selectNarrative, selectActor, selectClaim, setCenterMode } =
     useInvestigation();
   const pipelineRan = useRef(false);
@@ -509,7 +511,7 @@ function InvestigationWorkspace() {
       // ---- FRESH SEARCH: Use scan queue ----
       if (freshSearch) {
         try {
-          const { scanId } = await startScan(query, undefined, undefined, '7d');
+          const { scanId } = await startScan(query, urlPlatforms, undefined, urlTimeRange);
           const initialStatus = await getScanStatus(scanId);
           setScanJob(initialStatus);
           scanPostsFetchedRef.current = false;
@@ -895,7 +897,7 @@ function InvestigationWorkspace() {
 
     // Start a new scan directly — don't navigate, don't rely on useEffect
     try {
-      const { scanId } = await startScan(query, undefined, undefined, '7d');
+      const { scanId } = await startScan(query, urlPlatforms, undefined, urlTimeRange);
       const initialStatus = await getScanStatus(scanId);
       setScanJob(initialStatus);
     } catch (err) {
