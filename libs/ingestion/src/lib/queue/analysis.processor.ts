@@ -374,7 +374,7 @@ export class AnalysisProcessor extends WorkerHost {
 
       if (allPosts.length === 0) {
         await this.identityRepo.updateProfileStatus(identityId, 'failed');
-        return { error: 'No posts available for profiling' };
+        throw new Error(`No posts available for profiling @${identity.primaryHandle} — need timeline data from at least one connector`);
       }
 
       const profile = await this.profilerService.generateProfile({
@@ -404,27 +404,36 @@ export class AnalysisProcessor extends WorkerHost {
 
   private async fetchTimeline(handle: string): Promise<UserPost[]> {
     const allConnectors = this.ingestionService.getAllConnectors() as any[];
+    const allPosts: UserPost[] = [];
+
     for (const connector of allConnectors) {
       if (typeof connector?.getUserTimeline !== 'function') continue;
 
       try {
         const timelinePosts = await connector.getUserTimeline(handle, { limit: 50 });
-        return (timelinePosts as any[]).map((post) => ({
-          text: post.text ?? '',
-          timestamp: post.timestamp instanceof Date ? post.timestamp.toISOString() : String(post.timestamp),
-          platform: post.platform ?? 'unknown',
-          url: post.url,
-          engagement: {
-            likes: post.engagementMetrics?.likes ?? 0,
-            comments: post.engagementMetrics?.comments ?? 0,
-            shares: post.engagementMetrics?.shares ?? 0,
-          },
-          sentiment: { score: 0, label: 'neutral' },
-        }));
+        if (timelinePosts?.length > 0) {
+          this.logger.debug(`Fetched ${timelinePosts.length} timeline posts for @${handle} from ${connector.platform ?? 'unknown'}`);
+          for (const post of timelinePosts as any[]) {
+            allPosts.push({
+              text: post.text ?? '',
+              timestamp: post.timestamp instanceof Date ? post.timestamp.toISOString() : String(post.timestamp),
+              platform: post.platform ?? 'unknown',
+              url: post.url,
+              engagement: {
+                likes: post.engagementMetrics?.likes ?? 0,
+                comments: post.engagementMetrics?.comments ?? 0,
+                shares: post.engagementMetrics?.shares ?? 0,
+              },
+              sentiment: { score: 0, label: 'neutral' },
+            });
+          }
+        }
       } catch {
         continue;
       }
     }
-    return [];
+
+    this.logger.debug(`Timeline fetch for @${handle}: ${allPosts.length} total posts from ${allConnectors.length} connectors`);
+    return allPosts;
   }
 }

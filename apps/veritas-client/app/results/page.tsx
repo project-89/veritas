@@ -1191,6 +1191,25 @@ function InvestigationWorkspace() {
         <ScanHistoryBar
           scans={scanHistory}
           currentScanId={scanJob?._id ?? scanJob?.id}
+          onSelectScan={async (scanId) => {
+            // Load cached analysis data from a previous scan
+            try {
+              const cached = await getAnalysisCache(scanId);
+              if (cached) {
+                if (cached.narratives) {
+                  dispatch({ type: 'SET_NARRATIVES', narratives: cached.narratives as AnalyzedNarrative[], unclusteredCount: (cached.unclusteredCount as number) ?? 0 });
+                }
+                if (cached.propaganda) dispatch({ type: 'SET_PROPAGANDA', data: cached.propaganda as PropagandaAnalysisResult });
+                if (cached.downstream) dispatch({ type: 'SET_DOWNSTREAM', data: cached.downstream as DownstreamEffectsResult });
+                if (cached.investigation) dispatch({ type: 'SET_INVESTIGATION', data: cached.investigation as any, narrativeId: (cached.investigationNarrativeId as string) ?? '' });
+                // Update the scan history to show which one is selected
+                const scanStatus = await getScanStatus(scanId);
+                setScanJob(scanStatus);
+              }
+            } catch {
+              dispatch({ type: 'SET_ERROR', error: 'Failed to load historical scan data' });
+            }
+          }}
         />
 
         {/* Analysis queue progress — only shown while jobs are active */}

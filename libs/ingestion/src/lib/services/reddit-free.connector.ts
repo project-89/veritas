@@ -356,7 +356,8 @@ export class RedditFreeConnector
       this.logger.debug(`Fetched ${posts.length} posts from u/${username}`);
       return posts;
     } catch (error) {
-      this.logger.error(`Error fetching timeline for u/${username}:`, error);
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Timeline unavailable for u/${username}: ${msg}`);
       return [];
     }
   }

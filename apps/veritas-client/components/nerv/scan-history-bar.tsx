@@ -66,22 +66,29 @@ export function ScanHistoryBar({ scans, currentScanId, onSelectScan }: ScanHisto
             const left = ((seg.start - totalStart) / totalRange) * 100;
             const width = ((seg.end - seg.start) / totalRange) * 100;
 
+            const date = new Date(seg.end).toLocaleDateString([], { month: 'short', day: 'numeric' });
+
             return (
               <button
                 key={seg.scanId}
                 onClick={() => onSelectScan?.(seg.scanId)}
-                title={`${seg.timeRange} scan — ${seg.posts} posts (${seg.platforms.join(', ')})`}
-                className={`absolute top-0 h-full transition-all hover:brightness-125 ${
-                  seg.isCurrent ? 'z-10' : 'z-0'
+                title={`${date} — ${seg.timeRange} scan — ${seg.posts} posts (${seg.platforms.join(', ')})\nClick to load this scan's data`}
+                className={`absolute top-0 h-full transition-all group ${
+                  seg.isCurrent ? 'z-10' : 'z-0 hover:z-20'
                 }`}
                 style={{
                   left: `${left}%`,
-                  width: `${Math.max(width, 1)}%`,
+                  width: `${Math.max(width, 2)}%`,
                   backgroundColor: seg.isCurrent ? '#FF6B2B' : '#555570',
-                  opacity: seg.isCurrent ? 1 : 0.5,
+                  opacity: seg.isCurrent ? 1 : 0.4,
                   borderRight: '1px solid rgba(15,15,26,0.5)',
                 }}
-              />
+              >
+                <span
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ backgroundColor: seg.isCurrent ? '#FF8B4B' : '#00FF41' }}
+                />
+              </button>
             );
           })}
         </div>
