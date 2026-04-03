@@ -30,8 +30,8 @@ export { JinaReaderService } from './lib/services/utils/jina-reader.service';
 export {
   ContentClassificationModule,
   ContentClassificationService,
-  ContentClassification,
 } from '@veritas/content-classification';
+export type { ContentClassification } from '@veritas/content-classification';
 
 // Repositories
 export * from './lib/repositories/narrative-insight.repository';

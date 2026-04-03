@@ -34,10 +34,10 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
   private sourceRepository!: Repository<SourceNode>;
 
   constructor(
-    @Optional() @Inject(REDDIT_CONNECTOR) private readonly redditConnector: DataConnector,
-    @Optional() @Inject(TWITTER_CONNECTOR) private readonly twitterConnector: DataConnector,
-    @Optional() @Inject(FACEBOOK_CONNECTOR) private readonly facebookConnector: DataConnector,
-    @Optional() @Inject(YOUTUBE_CONNECTOR) private readonly youtubeConnector: DataConnector,
+    @Optional() @Inject(REDDIT_CONNECTOR) private readonly redditConnector: any,
+    @Optional() @Inject(TWITTER_CONNECTOR) private readonly twitterConnector: any,
+    @Optional() @Inject(FACEBOOK_CONNECTOR) private readonly facebookConnector: any,
+    @Optional() @Inject(YOUTUBE_CONNECTOR) private readonly youtubeConnector: any,
     @Optional() private readonly rssFeedConnector: RSSConnector,
     @Optional() private readonly webScraperConnector: WebScraperConnector,
     private readonly databaseService: DatabaseService,

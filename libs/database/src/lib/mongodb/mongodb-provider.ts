@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Connection, createConnection, Model } from 'mongoose';
-import {
-  DatabaseProvider,
-  DatabaseProviderOptions,
-} from '../interfaces/database-provider.interface';
+import type { DatabaseProvider, DatabaseProviderOptions } from '../interfaces/database-provider.interface';
 import { MongoDBRepository } from './mongodb-repository';
-import { Repository } from '../interfaces/repository.interface';
+import type { Repository } from '../interfaces/repository.interface';
 
 /**
  * MongoDB implementation of the DatabaseProvider interface

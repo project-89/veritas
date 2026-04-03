@@ -1,49 +1,22 @@
 import { Controller, Post, Body, Logger } from '@nestjs/common';
-import {
-  NarrativeAnalysisService,
-  AnalyzeResult,
-  AnalyzedNarrative,
-} from '../services/narrative-analysis.service';
-import {
-  DeviationService,
-  DeviationResponse,
-  RawPost,
-} from '../services/deviation.service';
-import {
-  ReportService,
-  ReportParams,
-  ReportResult,
-} from '../services/report.service';
-import {
-  PropagandaAnalysisService,
-  PropagandaAnalysisResult,
-} from '../services/propaganda.service';
-import {
-  ComparisonService,
-  NarrativeComparison,
-  TimePeriodComparison,
-  PlatformComparison,
-} from '../services/comparison.service';
-import {
-  EntityAnalysisService,
-  EntityAnalysisResponse,
-  InsightInput,
-} from '../services/entity-analysis.service';
-import {
-  NarrativeGenealogyService,
-  GenealogyResponse,
-  NarrativeSnapshot,
-} from '../services/genealogy.service';
-import {
-  DownstreamEffectsService,
-  DownstreamEffectsResult,
-  MyceliumData,
-} from '../services/downstream-effects.service';
-import {
-  ClaimVerificationService,
-  ClaimVerificationBatchResult,
-} from '../services/claim-verification.service';
-import type { ExtractedClaim } from '../services/propaganda.service';
+import { NarrativeAnalysisService } from '../services/narrative-analysis.service';
+import type { AnalyzeResult, AnalyzedNarrative } from '../services/narrative-analysis.service';
+import { DeviationService } from '../services/deviation.service';
+import type { DeviationResponse, RawPost } from '../services/deviation.service';
+import { ReportService } from '../services/report.service';
+import type { ReportParams, ReportResult } from '../services/report.service';
+import { PropagandaAnalysisService } from '../services/propaganda.service';
+import type { PropagandaAnalysisResult, ExtractedClaim } from '../services/propaganda.service';
+import { ComparisonService } from '../services/comparison.service';
+import type { NarrativeComparison, TimePeriodComparison, PlatformComparison } from '../services/comparison.service';
+import { EntityAnalysisService } from '../services/entity-analysis.service';
+import type { EntityAnalysisResponse, InsightInput } from '../services/entity-analysis.service';
+import { NarrativeGenealogyService } from '../services/genealogy.service';
+import type { GenealogyResponse, NarrativeSnapshot } from '../services/genealogy.service';
+import { DownstreamEffectsService } from '../services/downstream-effects.service';
+import type { DownstreamEffectsResult, MyceliumData } from '../services/downstream-effects.service';
+import { ClaimVerificationService } from '../services/claim-verification.service';
+import type { ClaimVerificationBatchResult } from '../services/claim-verification.service';
 
 interface AnalyzeRequestPost {
   text: string;

@@ -9,12 +9,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { NarrativeRepository } from '../repositories/narrative-insight.repository';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
-import { NarrativeTrend } from '../../types/narrative-trend.interface';
+import type { NarrativeInsight } from '../../types/narrative-insight.interface';
+import type { NarrativeTrend } from '../../types/narrative-trend.interface';
 import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
 import { IngestionService } from '../services/ingestion.service';
 import { InvestigationRepository } from '../repositories/investigation.repository';
-import { SocialMediaPost } from '../../types/social-media.types';
+import type { SocialMediaPost } from '../../types/social-media.types';
 
 /**
  * Controller for narrative insights and trends

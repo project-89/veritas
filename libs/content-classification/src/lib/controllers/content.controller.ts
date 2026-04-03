@@ -12,15 +12,9 @@ import {
   HttpException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import {
-  ContentService,
-  ContentSearchParams,
-  ExtendedContentNode,
-} from '../services/content.service';
-import {
-  ContentCreateInput,
-  ContentUpdateInput,
-} from '../services/content-validation.service';
+import { ContentService } from '../services/content.service';
+import type { ContentSearchParams, ExtendedContentNode } from '../services/content.service';
+import type { ContentCreateInput, ContentUpdateInput } from '../services/content-validation.service';
 
 @ApiTags('content')
 @Controller('content')

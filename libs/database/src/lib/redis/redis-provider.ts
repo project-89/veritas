@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createClient, RedisClientType } from 'redis';
-import {
-  DatabaseProvider,
-  DatabaseProviderOptions,
-} from '../interfaces/database-provider.interface';
+import type { DatabaseProvider, DatabaseProviderOptions } from '../interfaces/database-provider.interface';
 import { RedisRepository } from './redis-repository';
-import { Repository } from '../interfaces/repository.interface';
+import type { Repository } from '../interfaces/repository.interface';
 
 /**
  * Redis implementation of the DatabaseProvider interface

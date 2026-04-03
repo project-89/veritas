@@ -36,7 +36,7 @@ export const NetworkGraphVisualization: React.FC<NetworkGraphProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
-    if (!svgRef.current || !data) return;
+    if (!svgRef.current || !data) return undefined;
 
     // Clear previous visualization
     d3.select(svgRef.current).selectAll('*').remove();

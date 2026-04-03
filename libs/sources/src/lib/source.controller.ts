@@ -9,13 +9,13 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import {
-  SourceService,
+import { SourceService } from './services/source.service';
+import type {
   SourceCreateInput,
   SourceUpdateInput,
   SourceSearchParams,
 } from './services/source.service';
-import { SourceNode, ContentNode } from '@veritas/shared';
+import type { SourceNode, ContentNode } from '@veritas/shared';
 
 @ApiTags('sources')
 @Controller('sources')

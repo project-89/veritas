@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { DatabaseModule } from "@/database";
+import { DatabaseModule } from "@veritas/database";
 import { SourceService } from "./services/source.service";
 import { SourceController } from "./source.controller";
 import { SourceResolver } from "./resolvers/source.resolver";

@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import neo4j, { Driver, Session, Result } from 'neo4j-driver';
-import {
-  DatabaseProvider,
-  DatabaseProviderOptions,
-} from '../interfaces/database-provider.interface';
+import type { DatabaseProvider, DatabaseProviderOptions } from '../interfaces/database-provider.interface';
 import { MemgraphRepository } from './memgraph-repository';
-import { Repository } from '../interfaces/repository.interface';
+import type { Repository } from '../interfaces/repository.interface';
 
 /**
  * Memgraph implementation of the DatabaseProvider interface

@@ -86,4 +86,4 @@ export interface SocialMediaConnector {
   streamAndTransform(keywords: string[]): EventEmitter;
 }
 
-export { SocialMediaPost };
+export type { SocialMediaPost };

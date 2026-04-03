@@ -6,8 +6,8 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { DATABASE_PROVIDER } from './database.constants';
-import { DatabaseProvider } from './interfaces/database-provider.interface';
-import { Repository } from './interfaces/repository.interface';
+import type { DatabaseProvider } from './interfaces/database-provider.interface';
+import type { Repository } from './interfaces/repository.interface';
 
 /**
  * Service for interacting with the database

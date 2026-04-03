@@ -18,7 +18,7 @@ export * from './resolvers';
 export * from './types';
 
 // Schema exports
-export { EngagementMetrics } from './types';
+export type { EngagementMetrics } from './types';
 export * from './schemas';
 
 // Controller exports

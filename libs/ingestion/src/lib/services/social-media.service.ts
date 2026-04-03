@@ -29,9 +29,9 @@ export class SocialMediaService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     // Connectors injected via NestJS DI
-    private readonly twitterConnector: SocialMediaConnector,
-    private readonly facebookConnector: SocialMediaConnector,
-    private readonly redditConnector: SocialMediaConnector
+    private readonly twitterConnector: any,
+    private readonly facebookConnector: any,
+    private readonly redditConnector: any
   ) {
     // Initialize the connector array
     this.connectors = [

@@ -193,7 +193,7 @@ export const NarrativeMyceliumVisualization: React.FC<
     useState<NarrativeCluster | null>(null);
 
   useEffect(() => {
-    if (!svgRef.current || !data) return;
+    if (!svgRef.current || !data) return undefined;
 
     // Clear previous visualization
     d3.select(svgRef.current).selectAll('*').remove();
@@ -215,6 +215,8 @@ export const NarrativeMyceliumVisualization: React.FC<
       y?: number;
       vx?: number;
       vy?: number;
+      fx?: number | null;
+      fy?: number | null;
       index?: number;
     }
 

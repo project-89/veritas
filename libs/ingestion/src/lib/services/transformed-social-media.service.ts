@@ -28,9 +28,9 @@ export class TransformedSocialMediaService
 
   constructor(
     // Connectors injected via NestJS DI - they should extend BaseSocialMediaConnector
-    private readonly twitterConnector: SocialMediaConnector,
-    private readonly facebookConnector: SocialMediaConnector,
-    private readonly redditConnector: SocialMediaConnector
+    private readonly twitterConnector: any,
+    private readonly facebookConnector: any,
+    private readonly redditConnector: any
   ) {
     // Initialize the connector array
     this.connectors = [twitterConnector, facebookConnector, redditConnector];
@@ -159,13 +159,14 @@ export class TransformedSocialMediaService
         });
       } catch (error: unknown) {
         hasError = true;
+        const err = error as Error;
         this.logger.error(
-          `Failed to start ${connector.platform} stream: ${error.message}`,
-          error.stack
+          `Failed to start ${connector.platform} stream: ${err.message}`,
+          err.stack
         );
         emitter.emit('error', {
           platform: connector.platform,
-          message: error.message,
+          message: err.message,
           timestamp: new Date(),
         });
       }
@@ -190,9 +191,10 @@ export class TransformedSocialMediaService
     try {
       return await connector.getAuthorDetails(authorId);
     } catch (error: unknown) {
+      const err = error as Error;
       this.logger.error(
-        `Error getting author details from ${platform}: ${error.message}`,
-        error.stack
+        `Error getting author details from ${platform}: ${err.message}`,
+        err.stack
       );
       throw error;
     }

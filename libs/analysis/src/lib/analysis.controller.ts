@@ -11,15 +11,14 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { z } from 'zod';
 import {
   ANALYSIS_SERVICE,
-  AnalysisServiceInterface,
 } from './interfaces/analysis-service.interface';
+import type { AnalysisServiceInterface } from './interfaces/analysis-service.interface';
+import { TimeFrame } from './analysis.types';
 
 const TimeFrameSchema = z.object({
   start: z.coerce.date(),
   end: z.coerce.date(),
 });
-
-type TimeFrame = z.infer<typeof TimeFrameSchema>;
 
 interface AnalyzeContentBody {
   contentId: string;
@@ -52,7 +51,7 @@ export class AnalysisController {
     description: 'Patterns retrieved successfully',
   })
   async getPatterns(@Query() timeframe: TimeFrame) {
-    const validTimeframe = TimeFrameSchema.parse(timeframe);
+    const validTimeframe = TimeFrameSchema.parse(timeframe) as TimeFrame;
     return this.analysisService.detectPatterns(validTimeframe);
   }
 

@@ -2,8 +2,8 @@ import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
 import { Inject } from '@nestjs/common';
 import {
   ANALYSIS_SERVICE,
-  AnalysisServiceInterface,
 } from './interfaces/analysis-service.interface';
+import type { AnalysisServiceInterface } from './interfaces/analysis-service.interface';
 import { DeviationMetrics, Pattern, TimeFrame, TimeFrameInput, ExtendedContentNode } from './analysis.types';
 import { ContentAnalysisInput } from './dto/content-analysis.input';
 import { ContentAnalysisResult, RelatedContent } from './dto/content-analysis.result';

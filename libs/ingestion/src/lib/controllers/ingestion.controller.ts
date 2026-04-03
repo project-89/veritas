@@ -11,9 +11,9 @@ import {
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { NarrativeRepository } from '../repositories/narrative-insight.repository';
 import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
-import { ContentNode, SourceNode } from '@veritas/shared/types';
-import { SocialMediaPost } from '../../types/social-media.types';
-import { SocialMediaContentNode } from '../../types/social-media.types';
+import type { ContentNode, SourceNode } from '@veritas/shared/types';
+import type { SocialMediaPost } from '../../types/social-media.types';
+import type { SocialMediaContentNode } from '../../types/social-media.types';
 import * as crypto from 'crypto';
 
 /** Interface for the graph database service */

@@ -7,32 +7,20 @@
 export { ContentClassificationModule } from './lib/content-classification.module';
 
 // Export the service and interfaces for direct use
-export {
-  ContentClassificationService,
-  ContentClassification,
-} from './lib/services/content-classification.service';
+export { ContentClassificationService } from './lib/services/content-classification.service';
+export type { ContentClassification } from './lib/services/content-classification.service';
 
 // Export ContentValidationService
-export {
-  ContentValidationService,
-  ContentCreateInput,
-  ContentUpdateInput,
-} from './lib/services/content-validation.service';
+export { ContentValidationService } from './lib/services/content-validation.service';
+export type { ContentCreateInput, ContentUpdateInput } from './lib/services/content-validation.service';
 
 // Export ContentService
-export {
-  ContentService,
-  ContentSearchParams,
-  ExtendedContentNode,
-} from './lib/services/content.service';
+export { ContentService } from './lib/services/content.service';
+export type { ContentSearchParams, ExtendedContentNode } from './lib/services/content.service';
 
 // Export EmbeddingsService
-export {
-  EmbeddingsService,
-  EmbeddingVector,
-  VectorSearchResult,
-  VectorSearchOptions,
-} from './lib/services/embeddings.service';
+export { EmbeddingsService } from './lib/services/embeddings.service';
+export type { EmbeddingVector, VectorSearchResult, VectorSearchOptions } from './lib/services/embeddings.service';
 
 // Export the controller
 export { ContentController } from './lib/controllers/content.controller';
