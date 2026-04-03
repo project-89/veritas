@@ -470,7 +470,9 @@ function InvestigationWorkspace() {
               (s) => s.query === query && s.status === 'completed' && s.totalPosts > 0,
             );
             if (matchingScan) {
-              const { posts: scanPosts } = await getScanPosts(matchingScan._id ?? matchingScan.id);
+              activeScanIdRef.current = matchingScan._id ?? matchingScan.id;
+              setScanJob(matchingScan);
+              const { posts: scanPosts } = await getScanPosts(activeScanIdRef.current);
               if (scanPosts.length > 0) {
                 posts = scanPosts;
                 const summary = {
@@ -505,6 +507,7 @@ function InvestigationWorkspace() {
           );
           if (scanForQuery) {
             activeScanIdRef.current = scanForQuery._id ?? scanForQuery.id;
+            setScanJob(scanForQuery);
             restored = await restoreFromCache(activeScanIdRef.current);
           }
 
