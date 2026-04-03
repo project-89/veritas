@@ -9,8 +9,12 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { IdentityRecordRepository } from '../repositories/identity-record.repository';
+import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
 import type { IdentityRecord } from '../schemas/identity-record.schema';
+import type { AnalysisJobData } from '../queue/analysis.processor';
 
 @Controller('identity')
 export class IdentityController {
@@ -18,6 +22,8 @@ export class IdentityController {
 
   constructor(
     private readonly identityRepo: IdentityRecordRepository,
+    private readonly analysisJobRepo: AnalysisJobRepository,
+    @InjectQueue('analysis') private readonly analysisQueue: Queue,
   ) {}
 
   /**
@@ -49,14 +55,16 @@ export class IdentityController {
   async getByHandle(
     @Param('handle') handle: string,
     @Query('platform') platform?: string,
-  ): Promise<IdentityRecord> {
+  ): Promise<IdentityRecord | null> {
     // Try all platforms if not specified
     const platformsToTry = platform ? [platform] : ['twitter', 'reddit', 'youtube'];
     for (const p of platformsToTry) {
       const record = await this.identityRepo.findByHandle(handle.toLowerCase(), p);
       if (record) return record;
     }
-    throw new HttpException(`Identity not found: ${handle}`, HttpStatus.NOT_FOUND);
+    // Return null instead of 404 — identity records are created on investigation,
+    // so not finding one is normal for users that haven't been investigated yet
+    return null;
   }
 
   /**
@@ -103,7 +111,7 @@ export class IdentityController {
    * POST /identity/:id/generate-profile — Trigger MAGI psychological profile generation.
    */
   @Post(':id/generate-profile')
-  async generateProfile(@Param('id') id: string): Promise<{ status: string }> {
+  async generateProfile(@Param('id') id: string): Promise<{ status: string; jobId: string }> {
     const record = await this.identityRepo.findById(id);
     if (!record) {
       throw new HttpException(`Identity not found: ${id}`, HttpStatus.NOT_FOUND);
@@ -112,10 +120,38 @@ export class IdentityController {
     // Mark as queued
     await this.identityRepo.updateProfileStatus(id, 'queued');
 
-    // TODO: Enqueue via analysis job queue once the psychological-profile job type is wired
-    // For now, return the status so the frontend can poll
-    this.logger.log(`MAGI profile generation queued for @${record.primaryHandle}`);
+    // Create analysis job for the profiler
+    const analysisJob = await this.analysisJobRepo.createJob({
+      scanId: 'profile-generation', // Not tied to a specific scan
+      type: 'psychological-profile',
+      narrativeIds: [id], // Store identity record ID here
+      input: {
+        query: record.primaryHandle,
+        narrativeSummaries: [],
+        narratives: [],
+        userHandles: [record.primaryHandle],
+        postCount: record.totalPostsAnalyzed,
+      },
+    });
 
-    return { status: 'queued' };
+    const jobId = analysisJob._id?.toString() ?? analysisJob.id;
+
+    // Enqueue BullMQ job
+    const jobData: AnalysisJobData = {
+      analysisJobId: jobId,
+      scanId: 'profile-generation',
+      type: 'psychological-profile',
+    };
+
+    await this.analysisQueue.add('analysis-psychological-profile', jobData, {
+      attempts: 1,
+      backoff: { type: 'exponential', delay: 10000 },
+      removeOnComplete: 100,
+      removeOnFail: 50,
+    });
+
+    this.logger.log(`MAGI profile generation queued for @${record.primaryHandle} (job: ${jobId})`);
+
+    return { status: 'queued', jobId };
   }
 }

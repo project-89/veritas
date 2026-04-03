@@ -25,35 +25,44 @@ export class GdeltAdapter implements SignalAdapter {
     startDate: string;
     endDate: string;
   }): Promise<ExternalSignal[]> {
-    try {
-      const query = this.buildQuery(params.keywords);
-      const startDt = this.toGdeltDate(params.startDate);
-      const endDt = this.toGdeltDate(params.endDate);
+    const query = this.buildQuery(params.keywords);
+    const startDt = this.toGdeltDate(params.startDate);
+    const endDt = this.toGdeltDate(params.endDate);
 
-      const url = new URL(this.baseUrl);
-      url.searchParams.set('query', query);
-      url.searchParams.set('mode', 'artlist');
-      url.searchParams.set('maxrecords', '50');
-      url.searchParams.set('format', 'json');
-      url.searchParams.set('startdatetime', startDt);
-      url.searchParams.set('enddatetime', endDt);
+    const url = new URL(this.baseUrl);
+    url.searchParams.set('query', query);
+    url.searchParams.set('mode', 'artlist');
+    url.searchParams.set('maxrecords', '50');
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('startdatetime', startDt);
+    url.searchParams.set('enddatetime', endDt);
 
-      const response = await fetch(url.toString(), {
-        headers: { 'User-Agent': USER_AGENT },
-        signal: AbortSignal.timeout(8_000),
-      });
+    // Retry once on timeout (GDELT can be slow)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch(url.toString(), {
+          headers: { 'User-Agent': USER_AGENT },
+          signal: AbortSignal.timeout(15_000),
+        });
 
-      if (!response.ok) {
-        this.logger.warn(`GDELT returned HTTP ${response.status}`);
+        if (!response.ok) {
+          this.logger.warn(`GDELT returned HTTP ${response.status}`);
+          return [];
+        }
+
+        const data = (await response.json()) as GdeltResponse;
+        return this.mapArticles(data);
+      } catch (err) {
+        if (attempt === 0) {
+          this.logger.debug(`GDELT attempt 1 failed, retrying: ${err}`);
+          continue;
+        }
+        this.logger.warn(`GDELT fetch failed after 2 attempts: ${err}`);
         return [];
       }
-
-      const data = (await response.json()) as GdeltResponse;
-      return this.mapArticles(data);
-    } catch (err) {
-      this.logger.warn(`GDELT fetch failed: ${err}`);
-      return [];
     }
+
+    return [];
   }
 
   // ---------------------------------------------------------------------------

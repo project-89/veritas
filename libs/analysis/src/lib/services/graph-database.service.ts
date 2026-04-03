@@ -99,7 +99,13 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
       return result.records.map((r) => r.toObject());
     } catch (err) {
       const error = err as Error;
-      this.logger.error(`Cypher query failed: ${error.message}`, error.stack);
+      const msg = error.message ?? '';
+      // Expected errors when MAGE algorithms aren't installed — log at debug, not error
+      if (msg.includes('no procedure named') || msg.includes('There is no procedure')) {
+        this.logger.debug(`Memgraph procedure not available (install MAGE for graph algorithms): ${msg.split('.')[0]}`);
+      } else {
+        this.logger.error(`Cypher query failed: ${msg}`);
+      }
       return [];
     } finally {
       if (session) {

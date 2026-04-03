@@ -60,6 +60,7 @@ export {
   CROSS_PLATFORM_SERVICE,
   SOURCE_CREDIBILITY_SERVICE,
   GRAPH_BOT_DETECTION_SERVICE,
+  PSYCHOLOGICAL_PROFILER_SERVICE,
 } from './lib/queue/analysis.processor';
 
 // Queue

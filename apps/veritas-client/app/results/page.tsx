@@ -745,13 +745,33 @@ function InvestigationWorkspace() {
       .catch(() => dispatch({ type: 'SET_IDENTITY', identity: null }));
   }, [state.selectedActorHandle, dispatch]);
 
+  const profilePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const handleGenerateProfile = useCallback(async (identityId: string) => {
     try {
       await generateMagiProfile(identityId);
+      // Immediately refresh to show "queued" status
       if (state.selectedActorHandle) {
         const updated = await getIdentityByHandle(state.selectedActorHandle);
         dispatch({ type: 'SET_IDENTITY', identity: updated });
       }
+      // Poll until profile is complete
+      if (profilePollRef.current) clearInterval(profilePollRef.current);
+      profilePollRef.current = setInterval(async () => {
+        if (!state.selectedActorHandle) {
+          if (profilePollRef.current) clearInterval(profilePollRef.current);
+          profilePollRef.current = null;
+          return;
+        }
+        const refreshed = await getIdentityByHandle(state.selectedActorHandle);
+        if (refreshed) {
+          dispatch({ type: 'SET_IDENTITY', identity: refreshed });
+          if (refreshed.profileGenerationStatus === 'complete' || refreshed.profileGenerationStatus === 'failed') {
+            if (profilePollRef.current) clearInterval(profilePollRef.current);
+            profilePollRef.current = null;
+          }
+        }
+      }, 3000);
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: `Profile generation failed: ${err}` });
     }

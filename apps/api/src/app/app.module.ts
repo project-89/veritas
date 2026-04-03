@@ -15,6 +15,7 @@ import {
   CrossPlatformIdentityService,
   SourceCredibilityService,
   GraphBotDetectionService,
+  PsychologicalProfilerService,
 } from '@veritas/analysis';
 import { SignalCacheRepository } from '@veritas/ingestion';
 import {
@@ -25,6 +26,7 @@ import {
   CROSS_PLATFORM_SERVICE,
   SOURCE_CREDIBILITY_SERVICE,
   GRAPH_BOT_DETECTION_SERVICE,
+  PSYCHOLOGICAL_PROFILER_SERVICE,
 } from '@veritas/ingestion';
 import { AnalysisProcessor } from '@veritas/ingestion';
 import { ContentClassificationModule } from '@veritas/content-classification';
@@ -112,6 +114,7 @@ import { DatabaseService } from '@veritas/database';
     { provide: CROSS_PLATFORM_SERVICE, useExisting: CrossPlatformIdentityService },
     { provide: SOURCE_CREDIBILITY_SERVICE, useExisting: SourceCredibilityService },
     { provide: GRAPH_BOT_DETECTION_SERVICE, useExisting: GraphBotDetectionService },
+    { provide: PSYCHOLOGICAL_PROFILER_SERVICE, useExisting: PsychologicalProfilerService },
     // Memgraph is now handled by GraphDatabaseService in AnalysisModule (auto-connects with graceful fallback).
     // Uncomment when Redis is available:
     // { provide: 'REDIS_SERVICE', useFactory: (db: DatabaseService) => db, inject: [DatabaseService] },

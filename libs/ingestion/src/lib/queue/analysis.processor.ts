@@ -3,6 +3,7 @@ import { Logger, Inject, Optional } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
 import { ScanJobRepository } from '../repositories/scan-job.repository';
+import { IdentityRecordRepository } from '../repositories/identity-record.repository';
 import { IngestionService } from '../services/ingestion.service';
 import type { AnalysisJobType } from '../schemas/analysis-job.schema';
 
@@ -14,6 +15,7 @@ export const DEEP_INVESTIGATION_SERVICE = Symbol('DEEP_INVESTIGATION_SERVICE');
 export const CROSS_PLATFORM_SERVICE = Symbol('CROSS_PLATFORM_SERVICE');
 export const SOURCE_CREDIBILITY_SERVICE = Symbol('SOURCE_CREDIBILITY_SERVICE');
 export const GRAPH_BOT_DETECTION_SERVICE = Symbol('GRAPH_BOT_DETECTION_SERVICE');
+export const PSYCHOLOGICAL_PROFILER_SERVICE = Symbol('PSYCHOLOGICAL_PROFILER_SERVICE');
 
 export interface AnalysisJobData {
   analysisJobId: string;
@@ -37,6 +39,7 @@ export class AnalysisProcessor extends WorkerHost {
   constructor(
     private readonly analysisJobRepo: AnalysisJobRepository,
     private readonly scanJobRepo: ScanJobRepository,
+    private readonly identityRepo: IdentityRecordRepository,
     private readonly ingestionService: IngestionService,
     @Optional() @Inject(PROPAGANDA_SERVICE) private readonly propagandaService?: any,
     @Optional() @Inject(CLAIM_VERIFICATION_SERVICE) private readonly claimService?: any,
@@ -45,6 +48,7 @@ export class AnalysisProcessor extends WorkerHost {
     @Optional() @Inject(CROSS_PLATFORM_SERVICE) private readonly crossPlatformService?: any,
     @Optional() @Inject(SOURCE_CREDIBILITY_SERVICE) private readonly credibilityService?: any,
     @Optional() @Inject(GRAPH_BOT_DETECTION_SERVICE) private readonly botDetectionService?: any,
+    @Optional() @Inject(PSYCHOLOGICAL_PROFILER_SERVICE) private readonly profilerService?: any,
   ) {
     super();
   }
@@ -76,6 +80,9 @@ export class AnalysisProcessor extends WorkerHost {
           break;
         case 'downstream':
           result = await this.runDownstream(analysisJobId, scanId);
+          break;
+        case 'psychological-profile':
+          result = await this.runPsychologicalProfile(analysisJobId);
           break;
         default:
           throw new Error(`Unknown analysis type: ${type}`);
@@ -205,6 +212,35 @@ export class AnalysisProcessor extends WorkerHost {
       }
     }
 
+    // Upsert identity records for each investigated user
+    try {
+      for (const userResult of investigationResult.users as any[]) {
+        const cred: any = userResult.credibility;
+        const bot: any = userResult.botScore;
+        await this.identityRepo.upsertFromInvestigation({
+          handle: userResult.user.handle,
+          platform: userResult.user.platform,
+          displayName: userResult.user.name,
+          snapshot: {
+            query,
+            timestamp: new Date(),
+            postCount: (userResult.user.topicPosts?.length ?? 0) + (userResult.user.historicalPosts?.length ?? 0),
+            platforms: userResult.user.profile?.patterns?.platformPresence ?? [],
+            credibilityScore: cred?.overallScore ?? null,
+            botProbability: bot?.botProbability ?? null,
+            flags: userResult.flags ?? [],
+            influenceScore: userResult.influenceScore ?? 0,
+          },
+          credibilityScore: cred?.overallScore ?? null,
+          botProbability: bot?.botProbability ?? null,
+          flags: userResult.flags ?? [],
+        });
+      }
+      this.logger.log(`Upserted ${investigationResult.users.length} identity records from queue`);
+    } catch (err) {
+      this.logger.warn(`Identity record upsert failed: ${err}`);
+    }
+
     return investigationResult as unknown as Record<string, unknown>;
   }
 
@@ -266,6 +302,84 @@ export class AnalysisProcessor extends WorkerHost {
     const myceliumData = this.downstreamService.toMyceliumData(narratives, dsResult.narrativeCorrelations);
 
     return { ...dsResult, myceliumData };
+  }
+
+  // -------------------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------------------
+
+  // -------------------------------------------------------------------------
+  // Psychological profile — per-identity deep analysis
+  // -------------------------------------------------------------------------
+
+  private async runPsychologicalProfile(jobId: string): Promise<Record<string, unknown>> {
+    if (!this.profilerService) {
+      return { error: 'Psychological profiler service not available' };
+    }
+
+    const analysisJob = await this.analysisJobRepo.getJob(jobId);
+    if (!analysisJob) throw new Error(`Job not found: ${jobId}`);
+
+    // The identity record ID is stored in narrativeIds[0] for this job type
+    const identityId = analysisJob.narrativeIds[0];
+    if (!identityId) throw new Error('No identity ID in job');
+
+    const identity = await this.identityRepo.findById(identityId);
+    if (!identity) throw new Error(`Identity record not found: ${identityId}`);
+
+    // Mark as generating
+    await this.identityRepo.updateProfileStatus(identityId, 'generating');
+
+    try {
+      // Gather posts from all investigations for this user
+      const allPosts: UserPost[] = [];
+
+      // Try to get posts from the most recent scan job
+      if (analysisJob.scanId) {
+        const scanPosts = await this.scanJobRepo.getJobPosts(analysisJob.scanId);
+        const userPosts = scanPosts.filter((p: any) =>
+          (p.authorHandle ?? '').toLowerCase() === identity.primaryHandle.toLowerCase(),
+        );
+        for (const p of userPosts as any[]) {
+          allPosts.push({
+            text: p.text ?? '',
+            timestamp: p.timestamp ?? new Date().toISOString(),
+            platform: p.platform ?? 'unknown',
+            url: p.url,
+            engagement: p.engagement ?? { likes: 0, comments: 0, shares: 0 },
+            sentiment: p.sentiment ?? { score: 0, label: 'neutral' },
+          });
+        }
+      }
+
+      // Also fetch fresh timeline
+      const timelinePosts = await this.fetchTimeline(identity.primaryHandle);
+      allPosts.push(...timelinePosts);
+
+      if (allPosts.length === 0) {
+        await this.identityRepo.updateProfileStatus(identityId, 'failed');
+        return { error: 'No posts available for profiling' };
+      }
+
+      const profile = await this.profilerService.generateProfile({
+        handle: identity.primaryHandle,
+        platform: identity.primaryPlatform,
+        posts: allPosts,
+        authorProfile: identity.authorProfile,
+        existingProfile: identity.psychologicalProfile,
+      });
+
+      await this.identityRepo.updatePsychologicalProfile(identityId, profile);
+      this.logger.log(
+        `MAGI profile generated for @${identity.primaryHandle} — ` +
+        `${profile.coreBeliefs?.length ?? 0} beliefs, role: ${profile.socialRole?.primary ?? 'unknown'}`,
+      );
+
+      return profile as unknown as Record<string, unknown>;
+    } catch (err) {
+      await this.identityRepo.updateProfileStatus(identityId, 'failed');
+      throw err;
+    }
   }
 
   // -------------------------------------------------------------------------

@@ -51,7 +51,7 @@ export class AnalysisJobSchema extends Document {
   @Prop({
     type: String,
     required: true,
-    enum: ['investigation', 'propaganda', 'claims', 'downstream'],
+    enum: ['investigation', 'propaganda', 'claims', 'downstream', 'psychological-profile'],
   })
   type!: 'investigation' | 'propaganda' | 'claims' | 'downstream';
 
@@ -108,7 +108,7 @@ export interface AnalysisJobInput {
   postCount: number;
 }
 
-export type AnalysisJobType = 'investigation' | 'propaganda' | 'claims' | 'downstream';
+export type AnalysisJobType = 'investigation' | 'propaganda' | 'claims' | 'downstream' | 'psychological-profile';
 export type AnalysisJobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 export interface AnalysisJob {
