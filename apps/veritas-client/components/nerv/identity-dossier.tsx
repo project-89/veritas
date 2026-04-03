@@ -176,7 +176,6 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
         <div className="flex items-center gap-2">
           <NervBar
             value={identity.currentCredibility ?? 0}
-            max={1}
             color={
               (identity.currentCredibility ?? 0) > 0.6
                 ? '#00FF41'
@@ -195,7 +194,6 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
             data={credHistory}
             color="#00FF41"
             height={20}
-            className="mt-1"
           />
         )}
       </div>
@@ -206,7 +204,6 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
         <div className="flex items-center gap-2">
           <NervBar
             value={identity.currentBotProbability ?? 0}
-            max={1}
             color={
               (identity.currentBotProbability ?? 0) > 0.7
                 ? '#e94560'
@@ -225,7 +222,6 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
             data={botHistory}
             color="#e94560"
             height={20}
-            className="mt-1"
           />
         )}
       </div>
@@ -299,10 +295,8 @@ function MagiProfile({ profile }: { profile: PsychologicalProfile }) {
             <div key={i} className="flex items-start gap-2">
               <NervBar
                 value={belief.confidence}
-                max={1}
                 color="#FF6B2B"
                 height={4}
-                className="w-12 mt-1.5 shrink-0"
               />
               <span className="text-[9px] font-mono text-nerv-text-secondary">
                 {belief.belief}
@@ -638,9 +632,7 @@ export function IdentityDossier({
         <div className="p-3 border border-nerv-orange/30 bg-nerv-orange/5 rounded-sm">
           <button
             onClick={() => onGenerateProfile?.(id)}
-            disabled={
-              profileStatus === 'queued' || profileStatus === 'generating'
-            }
+            disabled={profileStatus === 'generating'}
             className={`w-full px-4 py-2.5 font-mono uppercase tracking-wider text-xs border rounded-sm transition-colors font-bold ${
               profileStatus === 'queued' || profileStatus === 'generating'
                 ? 'bg-nerv-amber/20 text-nerv-amber border-nerv-amber/50 cursor-wait animate-pulse'

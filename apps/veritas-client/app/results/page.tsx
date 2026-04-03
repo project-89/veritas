@@ -41,6 +41,10 @@ import {
   type StartAnalysisJobRequest,
   getIdentityByHandle,
   generateMagiProfile,
+  type DeviationResponse,
+  type PropagandaAnalysisResult,
+  type EntityAnalysisResponse,
+  type DownstreamEffectsResult,
 } from '../../lib/api';
 
 import {
@@ -211,19 +215,19 @@ function InvestigationWorkspace() {
           dispatch({ type: 'SET_PIPELINE', stage: 'analyze', status: 'done' });
         }
         if (cache.deviations) {
-          dispatch({ type: 'SET_DEVIATIONS', data: cache.deviations });
+          dispatch({ type: 'SET_DEVIATIONS', data: cache.deviations as DeviationResponse });
           dispatch({ type: 'SET_PIPELINE', stage: 'deviations', status: 'done' });
         }
         if (cache.propaganda) {
-          dispatch({ type: 'SET_PROPAGANDA', data: cache.propaganda });
+          dispatch({ type: 'SET_PROPAGANDA', data: cache.propaganda as PropagandaAnalysisResult });
           dispatch({ type: 'SET_PIPELINE', stage: 'propaganda', status: 'done' });
         }
         if (cache.entities) {
-          dispatch({ type: 'SET_ENTITIES', data: cache.entities });
+          dispatch({ type: 'SET_ENTITIES', data: cache.entities as EntityAnalysisResponse });
           dispatch({ type: 'SET_PIPELINE', stage: 'entities', status: 'done' });
         }
         if (cache.downstream) {
-          dispatch({ type: 'SET_DOWNSTREAM', data: cache.downstream });
+          dispatch({ type: 'SET_DOWNSTREAM', data: cache.downstream as DownstreamEffectsResult });
           dispatch({ type: 'SET_PIPELINE', stage: 'downstream', status: 'done' });
         }
 
@@ -299,7 +303,7 @@ function InvestigationWorkspace() {
             entities: p.entities ?? [],
             sentiment: p.sentiment ?? { score: 0, label: 'neutral', confidence: 0 },
           }));
-        const entityResult = await analyzeEntities(posts, insights, narratives);
+        const entityResult = await analyzeEntities(posts, insights as any[], narratives);
         dispatch({ type: 'SET_ENTITIES', data: entityResult });
         dispatch({ type: 'SET_PIPELINE', stage: 'entities', status: 'done' });
         cacheData.entities = entityResult;

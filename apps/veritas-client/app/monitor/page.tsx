@@ -374,6 +374,14 @@ export default function MonitorPage() {
     loadData();
   }, [loadData]);
 
+  // Build investigation lookup maps
+  const invNameMap: Record<string, string> = {};
+  const invQueryMap: Record<string, string> = {};
+  for (const inv of investigations) {
+    invNameMap[inv._id] = inv.name;
+    invQueryMap[inv._id] = inv.query;
+  }
+
   const handleRefresh = useCallback(
     (investigationId: string) => {
       // Navigate to the investigation's results page with fresh=1 to trigger scan queue
@@ -428,14 +436,6 @@ export default function MonitorPage() {
     },
     [],
   );
-
-  // Build investigation lookup maps
-  const invNameMap: Record<string, string> = {};
-  const invQueryMap: Record<string, string> = {};
-  for (const inv of investigations) {
-    invNameMap[inv._id] = inv.name;
-    invQueryMap[inv._id] = inv.query;
-  }
 
   const handleNavigateToInvestigation = useCallback(
     (investigationId: string) => {

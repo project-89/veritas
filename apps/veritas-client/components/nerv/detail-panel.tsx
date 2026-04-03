@@ -847,7 +847,7 @@ export function DetailPanel({
     );
   } else if (selectedActorHandle) {
     title = selectedIdentity ? 'IDENTITY DOSSIER' : 'ACTOR DOSSIER';
-    status = selectedIdentity?.psychologicalProfile ? 'online' : 'standby';
+    status = selectedIdentity?.psychologicalProfile ? 'online' : 'offline';
     content = selectedIdentity ? (
       <IdentityDossier
         identity={selectedIdentity}
