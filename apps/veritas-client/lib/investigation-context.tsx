@@ -46,7 +46,9 @@ export type CenterMode =
   | 'entities'
   | 'genealogy'
   | 'flow'
-  | 'radar';
+  | 'radar'
+  | 'evidence'
+  | 'graph';
 
 export interface SearchSummary {
   total: number;

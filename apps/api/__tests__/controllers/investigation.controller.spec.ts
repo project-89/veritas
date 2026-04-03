@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException } from '@nestjs/common';
 import { InvestigationController } from '../../src/app/controllers/investigation.controller';
 import { IngestionService, IdentityRecordRepository } from '@veritas/ingestion';
-import { DeepInvestigationService, CrossPlatformIdentityService, SourceCredibilityService, GraphBotDetectionService } from '@veritas/analysis';
+import { DeepInvestigationService, CrossPlatformIdentityService, SourceCredibilityService, GraphBotDetectionService, SocialGraphIntelligenceService } from '@veritas/analysis';
 
 describe('InvestigationController', () => {
   let controller: InvestigationController;
@@ -94,6 +94,12 @@ describe('InvestigationController', () => {
               summary: 'No bots detected',
               graphEnhanced: false,
             }),
+          },
+        },
+        {
+          provide: SocialGraphIntelligenceService,
+          useValue: {
+            enrichRelationships: jest.fn().mockResolvedValue({ edgesCreated: 0, communitiesDetected: 0 }),
           },
         },
         {

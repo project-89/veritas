@@ -14,6 +14,7 @@ import {
   CrossPlatformIdentityService,
   SourceCredibilityService,
   GraphBotDetectionService,
+  SocialGraphIntelligenceService,
 } from '@veritas/analysis';
 import type { SourceCredibilityScore, BotDetectionResult } from '@veritas/analysis';
 
@@ -100,6 +101,7 @@ export class InvestigationController {
     private readonly crossPlatformIdentity: CrossPlatformIdentityService,
     private readonly sourceCredibility: SourceCredibilityService,
     private readonly graphBotDetection: GraphBotDetectionService,
+    private readonly socialGraph: SocialGraphIntelligenceService,
     private readonly identityRecordRepo: IdentityRecordRepository,
   ) {}
 
@@ -306,6 +308,20 @@ export class InvestigationController {
           graphEnhanced: botDetection.graphEnhanced,
         }
       : null;
+
+    // --- Social Graph Enrichment ---
+    try {
+      const graphUsers = investigationResult.users.map((u: any) => ({
+        handle: u.user.handle,
+        platform: u.user.platform,
+        posts: [...(u.user.topicPosts ?? []), ...(u.user.historicalPosts ?? [])],
+      }));
+      const graphResult = await this.socialGraph.enrichRelationships(graphUsers, query);
+      this.logger.log(`Social graph: ${graphResult.edgesCreated} edges, ${graphResult.communitiesDetected} communities`);
+      (investigationResult as any)['socialGraph'] = graphResult;
+    } catch (err) {
+      this.logger.warn(`Social graph enrichment failed: ${err}`);
+    }
 
     // --- Upsert Identity Records ---
     try {

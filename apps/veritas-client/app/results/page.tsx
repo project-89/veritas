@@ -56,6 +56,8 @@ import {
   type NervTickerItem,
 } from '../../components/nerv';
 import { ScanProgress } from '../../components/nerv/scan-progress';
+import { EvidenceChainPanel } from '../../components/nerv/evidence-chain-panel';
+import { SocialGraphPanel } from '../../components/nerv/social-graph-panel';
 import { AnalysisQueuePanel } from '../../components/nerv/analysis-queue-panel';
 import { ScanHistoryBar } from '../../components/nerv/scan-history-bar';
 
@@ -90,7 +92,9 @@ const CENTER_MODES: { key: CenterMode; label: string; shortcut: string }[] = [
   { key: 'entities', label: 'ENTITIES', shortcut: '6' },
   { key: 'genealogy', label: 'GENEALOGY', shortcut: '7' },
   { key: 'flow', label: 'FLOW', shortcut: '8' },
-  { key: 'radar', label: 'RADAR', shortcut: '9' },
+  { key: 'evidence', label: 'EVIDENCE', shortcut: '9' },
+  { key: 'graph', label: 'GRAPH', shortcut: '0' },
+  { key: 'radar', label: 'RADAR', shortcut: '' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -1119,6 +1123,20 @@ function InvestigationWorkspace() {
         return (
           <PropagationFlow
             investigation={state.investigation}
+          />
+        );
+      case 'evidence':
+        return (
+          <EvidenceChainPanel
+            claims={state.claims}
+            propaganda={state.propaganda}
+          />
+        );
+      case 'graph':
+        return (
+          <SocialGraphPanel
+            investigation={state.investigation}
+            onSelectActor={selectActor}
           />
         );
       case 'radar':
