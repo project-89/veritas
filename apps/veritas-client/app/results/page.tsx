@@ -229,6 +229,9 @@ function InvestigationWorkspace() {
           dispatch({ type: 'SET_DOWNSTREAM', data: cache.downstream as DownstreamEffectsResult });
           dispatch({ type: 'SET_PIPELINE', stage: 'downstream', status: 'done' });
         }
+        if (cache.investigation) {
+          dispatch({ type: 'SET_INVESTIGATION', data: cache.investigation as any, narrativeId: (cache.investigationNarrativeId as string) ?? '' });
+        }
 
         dispatch({ type: 'SET_LOADING', loading: false });
         return true;
@@ -591,6 +594,27 @@ function InvestigationWorkspace() {
         if (active.length === 0 && analysisJobPollRef.current) {
           clearInterval(analysisJobPollRef.current);
           analysisJobPollRef.current = null;
+
+          // Save completed results to analysis cache for page refresh persistence
+          const sid = activeScanIdRef.current;
+          if (sid) {
+            const cacheUpdate: Record<string, unknown> = {};
+            for (const j of allJobs) {
+              if (j.status !== 'completed' || !j.result) continue;
+              if (j.type === 'investigation') {
+                cacheUpdate.investigation = j.result;
+                cacheUpdate.investigationNarrativeId = j.narrativeIds[0] ?? '';
+              }
+              if (j.type === 'propaganda') cacheUpdate.propaganda = j.result;
+              if (j.type === 'downstream') cacheUpdate.downstream = j.result;
+            }
+            if (Object.keys(cacheUpdate).length > 0) {
+              // Merge with existing cache rather than overwriting
+              getAnalysisCache(sid).then((existing) => {
+                saveAnalysisCache(sid, { ...(existing ?? {}), ...cacheUpdate }).catch(() => {});
+              }).catch(() => {});
+            }
+          }
         }
       } catch { /* polling error */ }
     }, 2000);
