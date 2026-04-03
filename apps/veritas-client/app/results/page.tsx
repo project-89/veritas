@@ -735,14 +735,19 @@ function InvestigationWorkspace() {
     }
   }, [state.narratives, state.posts, dispatch]);
 
+  const [verifyingClaims, setVerifyingClaims] = useState(false);
+
   const handleVerifyClaims = useCallback(async () => {
     const claims: ExtractedClaim[] = state.propaganda?.claims ?? [];
     if (claims.length === 0) return;
+    setVerifyingClaims(true);
     try {
       const result = await verifyClaims(claims);
       dispatch({ type: 'SET_CLAIMS', data: result });
-    } catch {
-      // silent
+    } catch (err) {
+      dispatch({ type: 'SET_ERROR', error: `Claim verification failed: ${err instanceof Error ? err.message : 'unknown'}` });
+    } finally {
+      setVerifyingClaims(false);
     }
   }, [state.propaganda, dispatch]);
 
@@ -978,6 +983,8 @@ function InvestigationWorkspace() {
             onSelectClaim={selectClaim}
             onRunPropaganda={handleRunPropaganda}
             propagandaLoading={state.pipeline.propaganda === 'running'}
+            onVerifyClaims={handleVerifyClaims}
+            verifyingClaims={verifyingClaims}
           />
         );
       case 'effects':

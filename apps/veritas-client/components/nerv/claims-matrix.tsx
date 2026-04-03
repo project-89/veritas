@@ -44,6 +44,8 @@ interface ClaimsMatrixProps {
   onSelectClaim: (index: number | null) => void;
   onRunPropaganda?: () => void;
   propagandaLoading?: boolean;
+  onVerifyClaims?: () => void;
+  verifyingClaims?: boolean;
 }
 
 export function ClaimsMatrix({
@@ -53,6 +55,8 @@ export function ClaimsMatrix({
   onSelectClaim,
   onRunPropaganda,
   propagandaLoading,
+  onVerifyClaims,
+  verifyingClaims,
 }: ClaimsMatrixProps) {
   const rows: ClaimRow[] = useMemo(() => {
     if (!propaganda?.claims) return [];
@@ -210,6 +214,41 @@ export function ClaimsMatrix({
         }
         compact
       />
+
+      {/* Verify claims button + results summary */}
+      <div className="mt-2 pt-2 border-t border-nerv-border/50">
+        {claims ? (
+          <div className="flex items-center gap-3 text-[9px] font-mono">
+            <span className="text-nerv-green">{claims.verifiedCount ?? 0} verified</span>
+            <span className="text-nerv-red">{claims.disputedCount ?? 0} disputed</span>
+            <span className="text-nerv-text-muted">{claims.unverifiedCount ?? 0} unverified</span>
+            {onVerifyClaims && (
+              <button
+                onClick={onVerifyClaims}
+                disabled={verifyingClaims}
+                className="ml-auto px-2 py-1 text-[8px] font-mono uppercase border border-nerv-blue/50 text-nerv-blue hover:bg-nerv-blue/10 rounded-sm transition-colors"
+              >
+                {verifyingClaims ? 'VERIFYING...' : 'RE-VERIFY'}
+              </button>
+            )}
+          </div>
+        ) : onVerifyClaims ? (
+          <button
+            onClick={onVerifyClaims}
+            disabled={verifyingClaims || (propaganda?.claims?.length ?? 0) === 0}
+            className={[
+              'w-full px-4 py-2 text-[10px] font-mono uppercase tracking-wider border rounded-sm transition-colors',
+              verifyingClaims
+                ? 'border-nerv-border text-nerv-text-muted cursor-wait animate-pulse'
+                : 'border-nerv-blue text-nerv-blue hover:bg-nerv-blue/10',
+            ].join(' ')}
+          >
+            {verifyingClaims
+              ? 'VERIFYING CLAIMS...'
+              : `VERIFY ${propaganda?.claims?.length ?? 0} CLAIMS`}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

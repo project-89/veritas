@@ -108,6 +108,18 @@ export class AnalysisProcessor extends WorkerHost {
         error: error.message,
       });
       this.logger.error(`Analysis job ${analysisJobId} [${type}] failed: ${error.message}`);
+
+      // For psychological-profile jobs, also update the identity record status
+      if (type === 'psychological-profile') {
+        try {
+          const job = await this.analysisJobRepo.getJob(analysisJobId);
+          const identityId = job?.narrativeIds?.[0];
+          if (identityId) {
+            await this.identityRepo.updateProfileStatus(identityId, 'failed');
+          }
+        } catch { /* best effort */ }
+      }
+
       throw err;
     }
   }

@@ -105,7 +105,7 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
       if (msg.includes('no procedure named') || msg.includes('There is no procedure')) {
         if (!this.mageWarningLogged) {
           this.mageWarningLogged = true;
-          this.logger.warn(
+          this.logger.log(
             'Memgraph MAGE not installed — graph algorithms (pagerank, betweenness, community detection) unavailable. ' +
             'Use memgraph/memgraph-mage Docker image to enable. System continues with heuristic scoring.',
           );
