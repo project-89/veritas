@@ -59,15 +59,20 @@ export function TemporalHeatmap({
       return { buckets: [], bucketLabels: [], grid: [], postsByNarrativeBucket: new Map() };
     }
 
-    const allTimestamps = posts.map((p) => new Date(p.timestamp).getTime());
-    const rawMin = Math.min(...allTimestamps);
-    const rawMax = Math.max(...allTimestamps);
+    const allTimestamps = posts.map((p) => new Date(p.timestamp).getTime()).sort((a, b) => a - b);
 
-    // Clamp to a reasonable window — don't let stale posts stretch the grid
-    // Use 7 days ago as the floor (matches default scan window)
-    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const minTime = Math.max(rawMin, sevenDaysAgo);
-    const maxTime = Math.min(rawMax, Date.now());
+    // Use the interquartile range of timestamps to determine the natural window,
+    // filtering out outlier posts that are way outside the scan period.
+    // This auto-adapts to any scan window (7d, 30d, 90d, etc.)
+    const q1Idx = Math.floor(allTimestamps.length * 0.05);
+    const q3Idx = Math.floor(allTimestamps.length * 0.95);
+    const q1 = allTimestamps[q1Idx]!;
+    const q3 = allTimestamps[q3Idx]!;
+    const iqr = q3 - q1;
+
+    // Extend slightly beyond the IQR to capture edge posts, but not wild outliers
+    const minTime = Math.max(allTimestamps[0]!, q1 - iqr * 1.5);
+    const maxTime = Math.min(allTimestamps[allTimestamps.length - 1]!, q3 + iqr * 1.5);
     const range = Math.max(maxTime - minTime, 3600000); // at least 1 hour
 
     // Choose bucket count based on range
