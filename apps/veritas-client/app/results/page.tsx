@@ -57,6 +57,7 @@ import {
 } from '../../components/nerv';
 import { ScanProgress } from '../../components/nerv/scan-progress';
 import { AnalysisQueuePanel } from '../../components/nerv/analysis-queue-panel';
+import { ScanHistoryBar } from '../../components/nerv/scan-history-bar';
 
 import { NarrativeList } from '../../components/nerv/narrative-list';
 import { TemporalHeatmap } from '../../components/nerv/temporal-heatmap';
@@ -181,6 +182,7 @@ function InvestigationWorkspace() {
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(380);
   const [scanJob, setScanJob] = useState<ScanJob | null>(null);
+  const [scanHistory, setScanHistory] = useState<ScanJob[]>([]);
   const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scanPostsFetchedRef = useRef(false);
 
@@ -200,6 +202,14 @@ function InvestigationWorkspace() {
     },
     [selectNarrative, state.centerMode],
   );
+
+  // Load scan history for the current query
+  useEffect(() => {
+    if (!query) return;
+    getRecentScans(20)
+      .then((scans) => setScanHistory(scans.filter((s) => s.query === query)))
+      .catch(() => {});
+  }, [query]);
 
   // Track the active scan ID for caching
   const activeScanIdRef = useRef<string | null>(null);
@@ -1166,8 +1176,8 @@ function InvestigationWorkspace() {
           <NervProgress stages={getPipelineStages(state.pipeline)} />
         </div>
 
-        {/* Scan progress (per-connector) — shown when using queue-based scanning */}
-        {scanJob && (
+        {/* Scan progress — only shown while active */}
+        {scanJob && (scanJob.status === 'pending' || scanJob.status === 'running') && (
           <div className="px-4 pb-2">
             <ScanProgress
               scanJob={scanJob}
@@ -1177,8 +1187,14 @@ function InvestigationWorkspace() {
           </div>
         )}
 
-        {/* Analysis queue progress */}
-        {state.analysisJobs.length > 0 && (
+        {/* Scan history timeline — shows coverage of previous scans */}
+        <ScanHistoryBar
+          scans={scanHistory}
+          currentScanId={scanJob?._id ?? scanJob?.id}
+        />
+
+        {/* Analysis queue progress — only shown while jobs are active */}
+        {state.analysisJobs.length > 0 && state.analysisJobs.some((j) => j.status === 'pending' || j.status === 'running') && (
           <div className="px-4 pb-2">
             <AnalysisQueuePanel
               jobs={state.analysisJobs}

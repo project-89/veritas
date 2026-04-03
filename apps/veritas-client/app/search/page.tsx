@@ -96,15 +96,13 @@ export default function SearchPage() {
     const q = query.trim();
     if (!q) return;
     const params = new URLSearchParams({ q });
-    if (platforms.length > 0 && platforms.length < ALL_PLATFORMS.length) {
+    if (platforms.length > 0) {
       params.set('platforms', platforms.join(','));
     }
     if (limit !== 100) {
       params.set('limit', String(limit));
     }
-    if (timeRange !== '7d') {
-      params.set('timeRange', timeRange);
-    }
+    params.set('timeRange', timeRange);
     params.set('fresh', '1'); // Signal to results page to run full pipeline
     router.push(`/results?${params.toString()}`);
   }, [query, platforms, limit, timeRange, router]);

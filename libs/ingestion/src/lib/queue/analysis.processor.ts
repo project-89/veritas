@@ -404,14 +404,11 @@ export class AnalysisProcessor extends WorkerHost {
 
   private async fetchTimeline(handle: string): Promise<UserPost[]> {
     const allConnectors = this.ingestionService.getAllConnectors() as any[];
-    for (const { connector } of allConnectors) {
-      const connectorAny = connector as unknown as Record<string, unknown>;
-      if (typeof connectorAny['getUserTimeline'] !== 'function') continue;
+    for (const connector of allConnectors) {
+      if (typeof connector?.getUserTimeline !== 'function') continue;
 
       try {
-        const timelinePosts = await (connectorAny['getUserTimeline'] as Function).call(
-          connector, handle, { limit: 50 },
-        );
+        const timelinePosts = await connector.getUserTimeline(handle, { limit: 50 });
         return (timelinePosts as any[]).map((post) => ({
           text: post.text ?? '',
           timestamp: post.timestamp instanceof Date ? post.timestamp.toISOString() : String(post.timestamp),
