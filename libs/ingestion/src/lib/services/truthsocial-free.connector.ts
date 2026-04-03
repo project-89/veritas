@@ -234,10 +234,6 @@ export class TruthSocialFreeConnector
       );
 
       if (result.exitCode === 0) {
-        this.available = true;
-        this.logger.log('Truth Social connector validated (truthbrush available)');
-
-        // Check if credentials are configured
         const hasUsername = !!(
           this.configService.get<string>('TRUTHSOCIAL_USERNAME') ||
           process.env['TRUTHSOCIAL_USERNAME']
@@ -248,11 +244,15 @@ export class TruthSocialFreeConnector
         );
 
         if (!hasUsername && !hasToken) {
-          this.logger.warn(
-            'Truth Social credentials not configured. Set TRUTHSOCIAL_USERNAME + TRUTHSOCIAL_PASSWORD or TRUTHSOCIAL_TOKEN',
+          this.available = false;
+          this.logger.log(
+            'Truth Social: truthbrush installed but no credentials. Set TRUTHSOCIAL_USERNAME + TRUTHSOCIAL_PASSWORD or TRUTHSOCIAL_TOKEN to enable.',
           );
+          return false;
         }
 
+        this.available = true;
+        this.logger.log('Truth Social connector validated (truthbrush + credentials available)');
         return true;
       }
 
