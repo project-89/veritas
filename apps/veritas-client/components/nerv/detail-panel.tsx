@@ -285,7 +285,7 @@ function NarrativeDetail({
         </div>
       </div>
 
-      {/* Primary action: INVESTIGATE */}
+      {/* Primary action: ANALYZE NARRATIVE */}
       {onInvestigate && (() => {
         const isInvestigating = investigatingNarrativeId === narrative.id;
         const isInvestigated = investigatedNarrativeIds?.includes(narrative.id);
@@ -313,17 +313,17 @@ function NarrativeDetail({
               }`}
             >
               {isInvestigating
-                ? '\u23F3 INVESTIGATING...'
+                ? '\u23F3 ANALYZING...'
                 : isInvestigated
-                  ? '\u2713 RE-INVESTIGATE NARRATIVE'
-                  : '\u25B6 INVESTIGATE THIS NARRATIVE'}
+                  ? '\u2713 RE-ANALYZE NARRATIVE'
+                  : '\u25B6 DEEP DIVE \u2014 ANALYZE NARRATIVE'}
             </button>
             <p className="text-[10px] font-mono text-nerv-text-muted mt-2 leading-relaxed">
               {isInvestigating
-                ? 'Fetching timelines, running cross-platform discovery, scoring credibility...'
+                ? 'Investigating authors, analyzing propaganda techniques, correlating downstream effects...'
                 : isOtherInvestigating
-                  ? 'Another investigation is in progress. Wait for it to complete.'
-                  : `Deep-dive into the ${narrative.authors?.length ?? 0} authors behind this narrative.`}
+                  ? 'Another analysis is in progress. Wait for it to complete.'
+                  : `Investigate ${narrative.authors?.length ?? 0} authors, detect propaganda techniques, and trace downstream effects.`}
             </p>
           </div>
         );

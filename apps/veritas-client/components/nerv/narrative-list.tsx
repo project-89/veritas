@@ -60,8 +60,8 @@ interface NarrativeListProps {
   /** Narratives that have been investigated */
   investigatedNarrativeIds?: string[];
   onToggleSelection?: (narrativeId: string) => void;
+  /** Unified analyze: queues investigation + propaganda + downstream for selected */
   onAnalyzeSelected?: () => void;
-  onInvestigateSelected?: () => void;
   onClearSelection?: () => void;
 }
 
@@ -75,7 +75,6 @@ export function NarrativeList({
   investigatedNarrativeIds = [],
   onToggleSelection,
   onAnalyzeSelected,
-  onInvestigateSelected,
   onClearSelection,
 }: NarrativeListProps) {
   const [sortKey, setSortKey] = useState<SortKey>('velocity');
@@ -265,20 +264,12 @@ export function NarrativeList({
               {selectedNarrativeIds.length} selected
             </span>
             <div className="flex gap-1">
-              {onInvestigateSelected && (
-                <button
-                  onClick={onInvestigateSelected}
-                  className="px-2 py-1 text-[9px] font-mono uppercase bg-nerv-orange/20 text-nerv-orange border border-nerv-orange/40 rounded-sm hover:bg-nerv-orange/30 transition-colors"
-                >
-                  Investigate
-                </button>
-              )}
               {onAnalyzeSelected && (
                 <button
                   onClick={onAnalyzeSelected}
-                  className="px-2 py-1 text-[9px] font-mono uppercase bg-nerv-blue/20 text-nerv-blue border border-nerv-blue/40 rounded-sm hover:bg-nerv-blue/30 transition-colors"
+                  className="px-2 py-1 text-[9px] font-mono uppercase bg-nerv-orange/20 text-nerv-orange border border-nerv-orange/40 rounded-sm hover:bg-nerv-orange/30 transition-colors font-bold"
                 >
-                  Full Analysis
+                  {'\u25B6'} Analyze
                 </button>
               )}
               {onClearSelection && (

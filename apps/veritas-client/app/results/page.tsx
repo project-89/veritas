@@ -19,7 +19,6 @@ import {
   fetchInvestigation,
   fetchInvestigations,
   verifyClaims,
-  investigateNarrative,
   saveAnalysisCache,
   getAnalysisCache,
   generateReport,
@@ -559,58 +558,19 @@ function InvestigationWorkspace() {
     return () => window.removeEventListener('keydown', handler);
   }, [setCenterMode]);
 
-  // ---- Action handlers ----
-  const handleInvestigate = useCallback(
-    async (narrativeId: string) => {
-      const narrative = state.narratives.find((n) => n.id === narrativeId);
-      if (!narrative) return;
-
-      // Don't re-investigate if already in progress
-      if (state.investigatingNarrativeId) return;
-
-      const handles = Array.from(
-        new Set(
-          narrative.authors
-            .map((a) => a.handle)
-            .filter((h): h is string => Boolean(h) && h !== 'unknown'),
-        ),
-      ).slice(0, 20);
-
-      if (handles.length === 0) return;
-
-      const topicPosts = narrative.postIndices.map((i) => state.posts[i]).filter((p): p is RawPost => Boolean(p));
-
-      dispatch({ type: 'SET_INVESTIGATING', narrativeId });
-
-      try {
-        const result = await investigateNarrative(
-          state.query,
-          handles,
-          topicPosts,
-        );
-        dispatch({ type: 'SET_INVESTIGATION', data: result, narrativeId });
-      } catch (err) {
-        dispatch({ type: 'SET_INVESTIGATING', narrativeId: null });
-        dispatch({ type: 'SET_ERROR', error: `Investigation failed: ${err instanceof Error ? err.message : 'unknown'}` });
-      }
-    },
-    [state.narratives, state.posts, state.query, state.investigatingNarrativeId, dispatch],
-  );
-
-  // ---- Analysis queue handlers ----
+  // ---- Analysis queue setup (must be before action handlers that reference startAnalysisPolling) ----
   const analysisJobPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mergedJobIdsRef = useRef<Set<string>>(new Set());
 
   /** Start polling for analysis job results. Merges completed jobs into state as they finish. */
   const startAnalysisPolling = useCallback((scanId: string) => {
-    if (analysisJobPollRef.current) return; // already polling
+    if (analysisJobPollRef.current) return;
 
     analysisJobPollRef.current = setInterval(async () => {
       try {
         const allJobs = await getAnalysisJobsByScan(scanId);
         dispatch({ type: 'SET_ANALYSIS_JOBS', jobs: allJobs });
 
-        // Merge any newly completed jobs into state
         for (const j of allJobs) {
           const jId = j._id ?? j.id;
           if (j.status !== 'completed' || !j.result || mergedJobIdsRef.current.has(jId)) continue;
@@ -627,7 +587,6 @@ function InvestigationWorkspace() {
           }
         }
 
-        // Stop polling when all jobs are terminal
         const active = allJobs.filter((j) => j.status === 'pending' || j.status === 'running');
         if (active.length === 0 && analysisJobPollRef.current) {
           clearInterval(analysisJobPollRef.current);
@@ -637,39 +596,87 @@ function InvestigationWorkspace() {
     }, 2000);
   }, [dispatch]);
 
-  const handleInvestigateSelected = useCallback(async () => {
-    const scanId = activeScanIdRef.current;
-    if (!scanId || state.selectedNarrativeIds.length === 0) return;
+  // ---- Action handlers ----
+  /**
+   * "Analyze this narrative" from the detail panel — auto-selects and queues
+   * the full analysis (investigation + propaganda + downstream) via the queue.
+   */
+  const handleInvestigate = useCallback(
+    async (narrativeId: string) => {
+      // Auto-select this narrative and trigger unified analysis
+      if (!state.selectedNarrativeIds.includes(narrativeId)) {
+        dispatch({ type: 'TOGGLE_NARRATIVE_SELECTION', narrativeId });
+      }
+      dispatch({ type: 'SET_INVESTIGATING', narrativeId });
 
-    const jobs: StartAnalysisJobRequest[] = state.selectedNarrativeIds.map((nId) => {
-      const narrative = state.narratives.find((n) => n.id === nId);
-      const handles = narrative
-        ? Array.from(new Set(
-            narrative.authors.map((a) => a.handle).filter((h): h is string => Boolean(h) && h !== 'unknown'),
-          )).slice(0, 20)
-        : [];
-      return {
-        type: 'investigation' as const,
-        narrativeIds: [nId],
-        input: {
-          query: state.query,
-          narrativeSummaries: [narrative?.summary ?? ''],
-          narratives: narrative ? [narrative as unknown as Record<string, unknown>] : [],
-          userHandles: handles,
-          postCount: state.posts.length,
+      const scanId = activeScanIdRef.current;
+      if (!scanId) return;
+
+      const narrative = state.narratives.find((n) => n.id === narrativeId);
+      if (!narrative) return;
+
+      const handles = Array.from(
+        new Set(
+          narrative.authors
+            .map((a) => a.handle)
+            .filter((h): h is string => Boolean(h) && h !== 'unknown'),
+        ),
+      ).slice(0, 20);
+
+      const jobs: StartAnalysisJobRequest[] = [
+        // Investigation
+        {
+          type: 'investigation',
+          narrativeIds: [narrativeId],
+          input: {
+            query: state.query,
+            narrativeSummaries: [narrative.summary],
+            narratives: [narrative as unknown as Record<string, unknown>],
+            userHandles: handles,
+            postCount: state.posts.length,
+          },
         },
-      };
-    });
+        // Propaganda
+        {
+          type: 'propaganda',
+          narrativeIds: [narrativeId],
+          input: {
+            query: state.query,
+            narrativeSummaries: [narrative.summary],
+            narratives: [narrative as unknown as Record<string, unknown>],
+            postCount: state.posts.length,
+          },
+        },
+        // Downstream effects
+        {
+          type: 'downstream',
+          narrativeIds: [narrativeId],
+          input: {
+            query: state.query,
+            narrativeSummaries: [narrative.summary],
+            narratives: [narrative as unknown as Record<string, unknown>],
+            postCount: state.posts.length,
+          },
+        },
+      ];
 
-    try {
-      await startAnalysisJobs(scanId, jobs);
-      // Don't clear selection — keep checked so user can see what's queued
-      startAnalysisPolling(scanId);
-    } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: `Failed to start analysis jobs: ${err}` });
-    }
-  }, [state.selectedNarrativeIds, state.narratives, state.query, state.posts.length, dispatch, startAnalysisPolling]);
+      try {
+        await startAnalysisJobs(scanId, jobs);
+        startAnalysisPolling(scanId);
+      } catch (err) {
+        dispatch({ type: 'SET_INVESTIGATING', narrativeId: null });
+        dispatch({ type: 'SET_ERROR', error: `Analysis failed: ${err instanceof Error ? err.message : 'unknown'}` });
+      }
+    },
+    [state.narratives, state.posts, state.query, state.selectedNarrativeIds, dispatch, startAnalysisPolling],
+  );
 
+  // ---- Analysis queue handlers (startAnalysisPolling defined above) ----
+
+  /**
+   * Unified "Analyze" — queues investigation + propaganda + downstream for selected narratives.
+   * Investigation runs per-narrative (one job each), propaganda + downstream run as batch.
+   */
   const handleAnalyzeSelected = useCallback(async () => {
     const scanId = activeScanIdRef.current;
     if (!scanId || state.selectedNarrativeIds.length === 0) return;
@@ -681,14 +688,37 @@ function InvestigationWorkspace() {
       narratives: selectedNarratives as unknown as Record<string, unknown>[],
       postCount: state.posts.length,
     };
+
     const jobs: StartAnalysisJobRequest[] = [
+      // Per-narrative investigation jobs
+      ...state.selectedNarrativeIds.map((nId) => {
+        const narrative = state.narratives.find((n) => n.id === nId);
+        const handles = narrative
+          ? Array.from(new Set(
+              narrative.authors.map((a) => a.handle).filter((h): h is string => Boolean(h) && h !== 'unknown'),
+            )).slice(0, 20)
+          : [];
+        return {
+          type: 'investigation' as const,
+          narrativeIds: [nId],
+          input: {
+            query: state.query,
+            narrativeSummaries: [narrative?.summary ?? ''],
+            narratives: narrative ? [narrative as unknown as Record<string, unknown>] : [],
+            userHandles: handles,
+            postCount: state.posts.length,
+          },
+        };
+      }),
+      // Batch propaganda
       {
-        type: 'propaganda',
+        type: 'propaganda' as const,
         narrativeIds: state.selectedNarrativeIds,
         input: sharedInput,
       },
+      // Batch downstream effects
       {
-        type: 'downstream',
+        type: 'downstream' as const,
         narrativeIds: state.selectedNarrativeIds,
         input: sharedInput,
       },
@@ -1167,7 +1197,6 @@ function InvestigationWorkspace() {
               analysisJobs={state.analysisJobs}
               investigatedNarrativeIds={state.investigatedNarrativeIds}
               onToggleSelection={(id) => dispatch({ type: 'TOGGLE_NARRATIVE_SELECTION', narrativeId: id })}
-              onInvestigateSelected={handleInvestigateSelected}
               onAnalyzeSelected={handleAnalyzeSelected}
               onClearSelection={() => dispatch({ type: 'CLEAR_NARRATIVE_SELECTION' })}
             />
