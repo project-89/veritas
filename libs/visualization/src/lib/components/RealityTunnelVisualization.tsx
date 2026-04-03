@@ -323,7 +323,7 @@ export const generateSampleData = (): RealityTunnel[] => {
   tunnels.slice(1).forEach((tunnel) => {
     // Start from a random consensus node
     const startIndex = 5 + Math.floor(Math.random() * 5);
-    const parentNode = consensusTunnel.nodes[startIndex];
+    const parentNode = consensusTunnel.nodes[startIndex]!;
 
     // Generate nodes with increasing deviation
     for (let i = 0; i < 15; i++) {

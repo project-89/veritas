@@ -24,8 +24,8 @@ export function NervProgress({ stages }: NervProgressProps) {
             <div
               className={[
                 'flex-1 h-6 flex items-center justify-center px-1',
-                style.bg,
-                style.extra ?? '',
+                style!.bg,
+                style!.extra ?? '',
                 i === 0 ? 'rounded-l-sm' : '',
                 i === stages.length - 1 ? 'rounded-r-sm' : '',
               ].join(' ')}
@@ -33,7 +33,7 @@ export function NervProgress({ stages }: NervProgressProps) {
               <span
                 className={[
                   'text-[9px] font-mono uppercase tracking-wider truncate',
-                  style.text,
+                  style!.text,
                 ].join(' ')}
               >
                 {stage.label}

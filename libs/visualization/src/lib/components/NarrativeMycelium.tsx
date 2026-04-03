@@ -23,7 +23,7 @@ export const generateSampleData = (): MyceliumData => {
       description: `A cluster of related narrative elements about topic ${
         i + 1
       }`,
-      color: clusterColors[i],
+      color: clusterColors[i]!,
       nodes: [],
       centralNodeId: `node-${i}-0`,
       metrics: {
@@ -62,7 +62,7 @@ export const generateSampleData = (): MyceliumData => {
     const branchCount = Math.floor(Math.random() * 10) + 5;
     for (let i = 0; i < branchCount; i++) {
       const parentIndex = i === 0 ? 0 : Math.floor(Math.random() * i);
-      const parentId = cluster.nodes[parentIndex];
+      const parentId = cluster.nodes[parentIndex]!;
 
       const branchNode: MyceliumNode = {
         id: `node-${clusterIndex}-${nodeId}`,
@@ -124,14 +124,14 @@ export const generateSampleData = (): MyceliumData => {
     } while (targetClusterIndex === sourceClusterIndex);
 
     const sourceNodeIndex = Math.floor(
-      Math.random() * clusters[sourceClusterIndex].nodes.length
+      Math.random() * clusters[sourceClusterIndex]!.nodes.length
     );
     const targetNodeIndex = Math.floor(
-      Math.random() * clusters[targetClusterIndex].nodes.length
+      Math.random() * clusters[targetClusterIndex]!.nodes.length
     );
 
-    const sourceId = clusters[sourceClusterIndex].nodes[sourceNodeIndex];
-    const targetId = clusters[targetClusterIndex].nodes[targetNodeIndex];
+    const sourceId = clusters[sourceClusterIndex]!.nodes[sourceNodeIndex]!;
+    const targetId = clusters[targetClusterIndex]!.nodes[targetNodeIndex]!;
 
     branches.push({
       id: `cross-branch-${i}`,
@@ -164,7 +164,7 @@ export const generateSampleData = (): MyceliumData => {
       totalStrength: nodes.reduce((sum, node) => sum + node.strength, 0),
       dominantClusterId: clusters.sort(
         (a, b) => b.metrics.influence - a.metrics.influence
-      )[0].id,
+      )[0]!.id,
       timeframe: {
         start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
         end: new Date(),
@@ -245,8 +245,8 @@ export const NarrativeMyceliumVisualization: React.FC<
           console.error(`Could not find nodes for branch: ${branch.id}`);
           // Return a placeholder to avoid breaking the visualization
           return {
-            source: nodes[0],
-            target: nodes[0],
+            source: nodes[0]!,
+            target: nodes[0]!,
             index: 0,
             metrics: branch.metrics,
             strength: branch.strength,

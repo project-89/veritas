@@ -210,9 +210,9 @@ export function GenealogyPanel({ lineages, onRefresh, refreshing }: GenealogyPan
                 const isSameNarrative = node.similarity > 0.7;
                 return (
                   <line
-                    key={`${prev.snapshotId}-${node.snapshotId}`}
-                    x1={prev.cx}
-                    y1={prev.cy}
+                    key={`${prev!.snapshotId}-${node.snapshotId}`}
+                    x1={prev!.cx}
+                    y1={prev!.cy}
                     x2={node.cx}
                     y2={node.cy}
                     stroke={statusColor}
@@ -278,7 +278,7 @@ export function GenealogyPanel({ lineages, onRefresh, refreshing }: GenealogyPan
             let bestDist = Infinity;
             const evtTime = new Date(evt.timestamp).getTime();
             for (const [, idx] of snapIndexMap) {
-              const snapTime = new Date(allSnapshots[idx].timestamp).getTime();
+              const snapTime = new Date(allSnapshots[idx]!.timestamp).getTime();
               const dist = Math.abs(snapTime - evtTime);
               if (dist < bestDist) {
                 bestDist = dist;

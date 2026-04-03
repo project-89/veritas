@@ -269,7 +269,7 @@ export function EffectsChain({
   const ROW_HEIGHT = 64;
 
   const colCounts = [0, 0, 0];
-  for (const n of nodes) colCounts[n.col]++;
+  for (const n of nodes) colCounts[n.col] = (colCounts[n.col] ?? 0) + 1;
   const maxRows = Math.max(...colCounts, 1);
   const svgHeight = Math.max(250, maxRows * ROW_HEIGHT + 60);
 

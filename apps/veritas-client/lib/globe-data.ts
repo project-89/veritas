@@ -247,7 +247,7 @@ export function buildGlobeData(params: {
 
   // 1. Extract countries from post text + GDELT signal metadata
   for (let pi = 0; pi < posts.length; pi++) {
-    const post = posts[pi];
+    const post = posts[pi]!;
     const codes = extractCountriesFromText(post.text);
 
     // Check for GDELT metadata country (platform === 'gdelt' or 'news')
@@ -409,8 +409,8 @@ export function buildGlobeData(params: {
 
   for (let i = 0; i < buckets.length; i++) {
     for (let j = i + 1; j < buckets.length; j++) {
-      const a = buckets[i];
-      const b = buckets[j];
+      const a = buckets[i]!;
+      const b = buckets[j]!;
       const coordsA = COUNTRY_COORDS[a.code];
       const coordsB = COUNTRY_COORDS[b.code];
       if (!coordsA || !coordsB) continue;
@@ -428,7 +428,7 @@ export function buildGlobeData(params: {
       const [source, target] = aFirst ? [a, b] : [b, a];
       const [sourceCoords, targetCoords] = aFirst ? [coordsA, coordsB] : [coordsB, coordsA];
 
-      const arcKey = `${source.code}-${target.code}`;
+      const arcKey = `${source!.code}-${target!.code}`;
       if (arcSet.has(arcKey)) continue;
       arcSet.add(arcKey);
 

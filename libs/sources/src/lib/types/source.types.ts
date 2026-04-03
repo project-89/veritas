@@ -34,37 +34,37 @@ registerEnumType(VerificationStatus, {
 @ObjectType("Source")
 export class SourceType {
   @Field(() => ID)
-  id: string;
+  id!: string;
 
   @Field()
-  name: string;
+  name!: string;
 
   @Field(() => SourcePlatform)
-  platform: SourcePlatform;
+  platform!: SourcePlatform;
 
   @Field(() => Float)
-  credibilityScore: number;
+  credibilityScore!: number;
 
   @Field(() => VerificationStatus)
-  verificationStatus: VerificationStatus;
+  verificationStatus!: VerificationStatus;
 
   @Field(() => GraphQLJSON, { nullable: true })
   metadata?: Record<string, any>;
 
   @Field(() => Date)
-  createdAt: Date;
+  createdAt!: Date;
 
   @Field(() => Date)
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 @InputType("SourceCreateInput")
 export class SourceCreateInputType {
   @Field()
-  name: string;
+  name!: string;
 
   @Field(() => SourcePlatform)
-  platform: SourcePlatform;
+  platform!: SourcePlatform;
 
   @Field(() => Float, { nullable: true })
   credibilityScore?: number;

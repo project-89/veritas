@@ -50,7 +50,7 @@ export const generateSampleNarrativeFlowData = (
     // Determine when this branch emerges
     const emergenceIndex =
       Math.floor(Math.random() * (timePoints.length / 3)) + 3;
-    const emergencePoint = timePoints[emergenceIndex];
+    const emergencePoint = timePoints[emergenceIndex]!;
 
     // Determine if and when this branch terminates
     const hasTermination = Math.random() > 0.6;
@@ -60,7 +60,7 @@ export const generateSampleNarrativeFlowData = (
         5
       : null;
     const terminationPoint = terminationIndex
-      ? timePoints[terminationIndex]
+      ? timePoints[terminationIndex]!
       : undefined;
 
     // Generate strength values for this branch
@@ -137,9 +137,9 @@ export const generateSampleNarrativeFlowData = (
 
       events.push({
         id: `event-${i}-${j}`,
-        timestamp: timePoints[eventIndex],
+        timestamp: timePoints[eventIndex]!,
         description: `Significant event in narrative "${
-          narrativeNames[i % narrativeNames.length]
+          narrativeNames[i % narrativeNames.length]!
         }"`,
         impact: 0.3 + Math.random() * 0.7, // Between 0.3 and 1.0
       });
@@ -160,9 +160,9 @@ export const generateSampleNarrativeFlowData = (
 
     branches.push({
       id: `branch-${i}`,
-      name: narrativeNames[i % narrativeNames.length],
-      description: narrativeDescriptions[i % narrativeDescriptions.length],
-      color: branchColors[i % branchColors.length],
+      name: narrativeNames[i % narrativeNames.length]!,
+      description: narrativeDescriptions[i % narrativeDescriptions.length]!,
+      color: branchColors[i % branchColors.length]!,
       parentId: null, // All branches emerge from consensus in this sample
       emergencePoint,
       terminationPoint,
@@ -184,7 +184,7 @@ export const generateSampleNarrativeFlowData = (
       const targetBranchIndex = Math.floor(Math.random() * i);
       const connectionType = ['merge', 'split', 'influence', 'conflict'][
         Math.floor(Math.random() * 4)
-      ];
+      ]!;
       const connectionIndex =
         emergenceIndex +
         Math.floor(
@@ -199,13 +199,13 @@ export const generateSampleNarrativeFlowData = (
         id: `connection-${i}-${targetBranchIndex}`,
         sourceId: `branch-${i}`,
         targetId: `branch-${targetBranchIndex}`,
-        timestamp: timePoints[connectionIndex],
+        timestamp: timePoints[connectionIndex]!,
         strength: 0.3 + Math.random() * 0.7,
         type: connectionType as 'merge' | 'split' | 'influence' | 'conflict',
         description: `${
           connectionType.charAt(0).toUpperCase() + connectionType.slice(1)
-        } between "${narrativeNames[i % narrativeNames.length]}" and "${
-          narrativeNames[targetBranchIndex % narrativeNames.length]
+        } between "${narrativeNames[i % narrativeNames.length]!}" and "${
+          narrativeNames[targetBranchIndex % narrativeNames.length]!
         }"`,
       });
     }
@@ -248,7 +248,7 @@ const generateRandomSources = (count: number) => {
   for (let i = 0; i < count; i++) {
     sources.push({
       id: `source-${i}`,
-      name: sourceNames[Math.floor(Math.random() * sourceNames.length)],
+      name: sourceNames[Math.floor(Math.random() * sourceNames.length)]!,
       weight: 0.2 + Math.random() * 0.8, // Between 0.2 and 1.0
     });
   }

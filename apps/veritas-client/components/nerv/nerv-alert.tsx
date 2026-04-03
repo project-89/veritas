@@ -46,13 +46,13 @@ export function NervAlert({
       onClick={onClick}
       className={[
         'flex items-start gap-2 px-3 py-2 border-l-2 border border-nerv-border',
-        config.border,
-        config.bg,
+        config!.border,
+        config!.bg,
         onClick ? 'cursor-pointer hover:bg-nerv-bg-elevated/40 transition-colors' : '',
       ].join(' ')}
     >
-      <span className={['text-sm mt-0.5 shrink-0', config.iconColor].join(' ')}>
-        {config.icon}
+      <span className={['text-sm mt-0.5 shrink-0', config!.iconColor].join(' ')}>
+        {config!.icon}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

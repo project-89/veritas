@@ -206,13 +206,13 @@ export function EntityPanel({ entities, narratives }: EntityPanelProps) {
                 />
                 <div className="flex justify-between mt-1">
                   <span className="text-[8px] font-mono text-nerv-text-muted">
-                    {new Date(effectiveSelected.sentimentTimeline[0].timestamp).toLocaleDateString()}
+                    {new Date(effectiveSelected.sentimentTimeline[0]!.timestamp).toLocaleDateString()}
                   </span>
                   <span className="text-[8px] font-mono text-nerv-text-muted">
                     {new Date(
                       effectiveSelected.sentimentTimeline[
                         effectiveSelected.sentimentTimeline.length - 1
-                      ].timestamp,
+                      ]!.timestamp,
                     ).toLocaleDateString()}
                   </span>
                 </div>

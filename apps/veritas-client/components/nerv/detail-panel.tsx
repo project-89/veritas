@@ -244,9 +244,11 @@ function NarrativeDetail({
         </div>
         <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
           {narrativePosts
-            .sort((a, b) => (b.engagement?.viralityScore ?? 0) - (a.engagement?.viralityScore ?? 0))
+            .sort((a, b) => (b?.engagement?.viralityScore ?? 0) - (a?.engagement?.viralityScore ?? 0))
             .slice(0, 10)
-            .map((post, idx) => (
+            .map((post, idx) => {
+              if (!post) return null;
+              return (
               <div
                 key={`${post.id}-${idx}`}
                 className="px-2 py-1.5 bg-nerv-bg-elevated/40 border border-nerv-border/30 rounded-sm"
@@ -278,7 +280,8 @@ function NarrativeDetail({
                   </a>
                 )}
               </div>
-            ))}
+              );
+            })}
         </div>
       </div>
 

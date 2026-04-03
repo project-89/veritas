@@ -552,7 +552,7 @@ function InvestigationWorkspace() {
       }
       const idx = parseInt(e.key, 10);
       if (idx >= 1 && idx <= 9) {
-        setCenterMode(CENTER_MODES[idx - 1].key);
+        setCenterMode(CENTER_MODES[idx - 1]!.key);
       }
     };
     window.addEventListener('keydown', handler);
@@ -578,7 +578,7 @@ function InvestigationWorkspace() {
 
       if (handles.length === 0) return;
 
-      const topicPosts = narrative.postIndices.map((i) => state.posts[i]).filter(Boolean);
+      const topicPosts = narrative.postIndices.map((i) => state.posts[i]).filter((p): p is RawPost => Boolean(p));
 
       dispatch({ type: 'SET_INVESTIGATING', narrativeId });
 

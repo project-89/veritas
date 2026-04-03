@@ -83,7 +83,7 @@ export const generateSampleData = (): EnhancedTunnelData => {
     if (i > 0) {
       const branch: EnhancedTunnelBranch = {
         id: `main-branch-${i}`,
-        sourceId: mainPathNodes[i - 1].id,
+        sourceId: mainPathNodes[i - 1]!.id,
         targetId: node.id,
         narrativeId: 'narrative-1',
         strength: 0.8 + Math.random() * 0.2,
@@ -93,7 +93,7 @@ export const generateSampleData = (): EnhancedTunnelData => {
         },
       };
       branches.push(branch);
-      mainPathNodes[i - 1].connections.push(node.id);
+      mainPathNodes[i - 1]!.connections.push(node.id);
     }
 
     // Create branches at certain points
@@ -102,7 +102,7 @@ export const generateSampleData = (): EnhancedTunnelData => {
       const altNarrativeId = i % 6 === 0 ? 'narrative-2' : 'narrative-3';
       const branchLength = 2 + Math.floor(Math.random() * 3); // 2-4 nodes in branch
 
-      let lastBranchNode = mainPathNodes[i];
+      let lastBranchNode = mainPathNodes[i]!;
 
       for (let j = 0; j < branchLength; j++) {
         const branchDate = new Date(date);

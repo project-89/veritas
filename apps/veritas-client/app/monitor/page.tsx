@@ -359,7 +359,7 @@ export default function MonitorPage() {
       for (let i = 0; i < activeInvs.length; i++) {
         const result = configResults[i];
         if (result && result.status === 'fulfilled') {
-          configMap[activeInvs[i]._id] = result.value;
+          configMap[activeInvs[i]!._id] = result.value;
         }
       }
       setConfigs(configMap);

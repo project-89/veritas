@@ -99,7 +99,7 @@ export const VisualizationDemo: React.FC = () => {
   const getButtonStyle = (vizType: VisualizationType): CSSProperties => {
     return activeViz === vizType
       ? { ...styles.button, ...styles.buttonActive }
-      : styles.button;
+      : styles.button!;
   };
 
   return (

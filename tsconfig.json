@@ -10,8 +10,19 @@
       "@/*": ["libs/*"],
       "@veritas/ingestion": ["libs/ingestion/src/index.ts"],
       "@veritas/ingestion/*": ["libs/ingestion/src/*"],
+      "@veritas/analysis": ["libs/analysis/src/index.ts"],
+      "@veritas/analysis/*": ["libs/analysis/src/*"],
+      "@veritas/database": ["libs/database/src/index.ts"],
+      "@veritas/database/*": ["libs/database/src/*"],
+      "@veritas/content-classification": ["libs/content-classification/src/index.ts"],
+      "@veritas/content-classification/*": ["libs/content-classification/src/*"],
       "@veritas/shared": ["libs/shared/src/index.ts"],
-      "@veritas/shared/*": ["libs/shared/src/*"]
+      "@veritas/shared/*": ["libs/shared/src/*"],
+      "@veritas/shared/types": ["libs/shared/types/src/index.ts"],
+      "@veritas/visualization": ["libs/visualization/src/index.ts"],
+      "@veritas/visualization/*": ["libs/visualization/src/*"],
+      "@veritas/sources": ["libs/sources/src/index.ts"],
+      "@veritas/sources/*": ["libs/sources/src/*"]
     },
     "typeRoots": [
       "./node_modules/@types"
@@ -23,23 +34,10 @@
   ],
   "exclude": [
     "node_modules",
+    "dist",
     "**/*.spec.ts",
     "**/*.test.ts",
     "**/*.d.ts",
     "**/*.js"
-  ],
-  "references": [
-    {
-      "path": "./libs/shared/utils/tsconfig.lib.json"
-    },
-    {
-      "path": "./libs/shared/types/tsconfig.lib.json"
-    },
-    {
-      "path": "./libs/ingestion/tsconfig.lib.json"
-    },
-    {
-      "path": "./libs/analysis/tsconfig.lib.json"
-    }
   ]
 } 

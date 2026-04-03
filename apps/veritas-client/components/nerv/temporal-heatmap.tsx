@@ -92,10 +92,10 @@ export function TemporalHeatmap({
 
     for (const narrative of narratives) {
       const row: Array<{ count: number; avgSentiment: number; topAuthor: string }> = [];
-      const narrativePosts = narrative.postIndices.map((idx) => posts[idx]).filter(Boolean);
+      const narrativePosts = narrative.postIndices.map((idx) => posts[idx]).filter((p): p is RawPost => Boolean(p));
 
       for (let bi = 0; bi < numBuckets; bi++) {
-        const bucket = bkts[bi];
+        const bucket = bkts[bi]!;
         const cellPosts = narrativePosts.filter((p) => {
           const t = new Date(p.timestamp).getTime();
           return t >= bucket.start && t < bucket.end;
@@ -204,7 +204,7 @@ export function TemporalHeatmap({
 
     for (let ni = 0; ni < narratives.length; ni++) {
       const y = TOP_MARGIN + ni * ROW_HEIGHT + ROW_HEIGHT / 2;
-      const isSelected = narratives[ni].id === selectedNarrativeId;
+      const isSelected = narratives[ni]!.id === selectedNarrativeId;
 
       // Selected row highlight
       if (isSelected) {
@@ -218,7 +218,7 @@ export function TemporalHeatmap({
       ctx.fillStyle = isSelected ? '#FF6B2B' : '#8888a0';
       // Short label: "N1 (52)" — narrative number + post count
       // Full summary is in the left panel
-      const postCount = narratives[ni].postIndices?.length ?? 0;
+      const postCount = narratives[ni]!.postIndices?.length ?? 0;
       const shortLabel = `N${ni + 1} (${postCount})`;
       ctx.fillText(shortLabel, LABEL_WIDTH - 8, y);
     }
@@ -282,7 +282,7 @@ export function TemporalHeatmap({
       // Only render every other label if too dense
       if (bucketLabels.length > 12 && bi % 2 !== 0) continue;
       const x = LABEL_WIDTH + bi * cellWidth + cellWidth / 2;
-      ctx.fillText(bucketLabels[bi], x, labelY);
+      ctx.fillText(bucketLabels[bi]!, x, labelY);
     }
 
     // Title
@@ -341,8 +341,8 @@ export function TemporalHeatmap({
       setTooltip({
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
-        narrativeSummary: narratives[ni].summary,
-        timeLabel: bucketLabels[bi],
+        narrativeSummary: narratives[ni]!.summary,
+        timeLabel: bucketLabels[bi]!,
         postCount: cell.count,
         avgSentiment: cell.avgSentiment,
         topAuthor: cell.topAuthor,
@@ -362,7 +362,7 @@ export function TemporalHeatmap({
 
       if (ni >= 0 && ni < narratives.length) {
         onSelectNarrative(
-          narratives[ni].id === selectedNarrativeId ? null : narratives[ni].id,
+          narratives[ni]!.id === selectedNarrativeId ? null : narratives[ni]!.id,
         );
       }
     },

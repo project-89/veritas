@@ -131,7 +131,7 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
     // Build edges from likelySource
     const edgeList: Array<{ from: number; to: number }> = [];
     for (let i = 0; i < nodeList.length; i++) {
-      const src = nodeList[i].likelySource;
+      const src = nodeList[i]!.likelySource;
       if (src && handleIndex.has(src)) {
         edgeList.push({ from: handleIndex.get(src)!, to: i });
       }
@@ -196,21 +196,21 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       ctx.stroke();
       // Label
       ctx.fillStyle = '#555570';
-      ctx.fillText(platforms[i].toUpperCase(), marginLeft - 8, y + 3);
+      ctx.fillText(platforms[i]!.toUpperCase(), marginLeft - 8, y + 3);
     }
 
     // Coordination cluster boundaries
     for (const cluster of coordClusters) {
       if (cluster.userIndices.length < 2) continue;
-      const clusterNodes = cluster.userIndices.map((i) => nodes[i]);
+      const clusterNodes = cluster.userIndices.map((i) => nodes[i]!);
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       for (const n of clusterNodes) {
-        const nx = marginLeft + n.x * plotW;
-        const ny = marginTop + n.y * laneH + laneH / 2;
-        minX = Math.min(minX, nx - n.r - 10);
-        maxX = Math.max(maxX, nx + n.r + 10);
-        minY = Math.min(minY, ny - n.r - 10);
-        maxY = Math.max(maxY, ny + n.r + 10);
+        const nx = marginLeft + n!.x * plotW;
+        const ny = marginTop + n!.y * laneH + laneH / 2;
+        minX = Math.min(minX, nx - n!.r - 10);
+        maxX = Math.max(maxX, nx + n!.r + 10);
+        minY = Math.min(minY, ny - n!.r - 10);
+        maxY = Math.max(maxY, ny + n!.r + 10);
       }
       ctx.strokeStyle = `rgba(233, 69, 96, ${0.3 + 0.1 * Math.sin(t * 2)})`;
       ctx.lineWidth = 1;
@@ -226,8 +226,8 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
 
     // Edges
     for (const edge of edges) {
-      const from = nodes[edge.from];
-      const to = nodes[edge.to];
+      const from = nodes[edge.from]!;
+      const to = nodes[edge.to]!;
       const fx = marginLeft + from.x * plotW;
       const fy = marginTop + from.y * laneH + laneH / 2;
       const tx = marginLeft + to.x * plotW;

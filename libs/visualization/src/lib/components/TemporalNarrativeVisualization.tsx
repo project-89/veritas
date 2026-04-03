@@ -63,7 +63,7 @@ export const TemporalNarrativeVisualization: React.FC<
     // Setup scales
     const timeScale = d3
       .scaleTime()
-      .domain([data.timePoints[0], data.timePoints[data.timePoints.length - 1]])
+      .domain([data.timePoints[0]!, data.timePoints[data.timePoints.length - 1]!])
       .range([0, innerWidth]);
 
     const strengthScale = d3
@@ -102,7 +102,7 @@ export const TemporalNarrativeVisualization: React.FC<
     // Create area generator
     const areaGenerator = d3
       .area<number>()
-      .x((d, i) => timeScale(data.timePoints[i]))
+      .x((d, i) => timeScale(data.timePoints[i]!))
       .y0(innerHeight)
       .y1((d) => strengthScale(d))
       .curve(d3.curveBasis);
@@ -140,7 +140,7 @@ export const TemporalNarrativeVisualization: React.FC<
           const timeIndex = data.timePoints.findIndex(
             (t) => t.getTime() >= d.timestamp.getTime()
           );
-          const strength = stream.strength[timeIndex >= 0 ? timeIndex : 0];
+          const strength = stream.strength[timeIndex >= 0 ? timeIndex : 0]!;
           return strengthScale(strength);
         })
         .attr("r", (d) => 3 + d.impact * 5) // Size based on impact
@@ -344,52 +344,52 @@ export const generateSampleData = (): TemporalData => {
   });
 
   // Add some key events to each narrative
-  streams[0].events = [
+  streams[0]!.events = [
     {
       id: "event-1-1",
-      timestamp: timePoints[5],
+      timestamp: timePoints[5]!,
       content: "Initial coverage in mainstream media",
       impact: 0.6,
     },
     {
       id: "event-1-2",
-      timestamp: timePoints[15],
+      timestamp: timePoints[15]!,
       content: "Official statement released",
       impact: 0.8,
     },
     {
       id: "event-1-3",
-      timestamp: timePoints[25],
+      timestamp: timePoints[25]!,
       content: "Follow-up investigation published",
       impact: 0.7,
     },
   ];
 
-  streams[1].events = [
+  streams[1]!.events = [
     {
       id: "event-2-1",
-      timestamp: timePoints[12],
+      timestamp: timePoints[12]!,
       content: "Alternative theory gains traction",
       impact: 0.5,
     },
     {
       id: "event-2-2",
-      timestamp: timePoints[18],
+      timestamp: timePoints[18]!,
       content: "Viral social media post challenges mainstream view",
       impact: 0.9,
     },
   ];
 
-  streams[2].events = [
+  streams[2]!.events = [
     {
       id: "event-3-1",
-      timestamp: timePoints[16],
+      timestamp: timePoints[16]!,
       content: "New evidence emerges",
       impact: 0.4,
     },
     {
       id: "event-3-2",
-      timestamp: timePoints[23],
+      timestamp: timePoints[23]!,
       content: "Academic paper published supporting this view",
       impact: 0.7,
     },
@@ -399,13 +399,13 @@ export const generateSampleData = (): TemporalData => {
   const externalEvents: NarrativeEvent[] = [
     {
       id: "external-1",
-      timestamp: timePoints[10],
+      timestamp: timePoints[10]!,
       content: "Major related news event",
       impact: 0.9,
     },
     {
       id: "external-2",
-      timestamp: timePoints[20],
+      timestamp: timePoints[20]!,
       content: "Government policy announcement",
       impact: 0.7,
     },

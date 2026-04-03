@@ -276,7 +276,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
                     time.getTime() - evt.timestamp.getTime()
                   );
                   const closestDiff = Math.abs(
-                    validTimePoints[closest].getTime() - evt.timestamp.getTime()
+                    validTimePoints[closest]!.getTime() - evt.timestamp.getTime()
                   );
                   return currentDiff < closestDiff ? index : closest;
                 },
@@ -375,7 +375,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
             time.getTime() - connection.timestamp.getTime()
           );
           const closestDiff = Math.abs(
-            sourceBranch.timePoints[closest].getTime() -
+            sourceBranch.timePoints[closest]!.getTime() -
               connection.timestamp.getTime()
           );
           return currentDiff < closestDiff ? index : closest;
@@ -389,7 +389,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
             time.getTime() - connection.timestamp.getTime()
           );
           const closestDiff = Math.abs(
-            targetBranch.timePoints[closest].getTime() -
+            targetBranch.timePoints[closest]!.getTime() -
               connection.timestamp.getTime()
           );
           return currentDiff < closestDiff ? index : closest;
@@ -398,9 +398,9 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
       );
 
       const sourceX = xScale(connection.timestamp);
-      const sourceY = yScale(sourceBranch.divergenceValues[sourceTimeIndex]);
+      const sourceY = yScale(sourceBranch.divergenceValues[sourceTimeIndex]!);
       const targetX = xScale(connection.timestamp);
-      const targetY = yScale(targetBranch.divergenceValues[targetTimeIndex]);
+      const targetY = yScale(targetBranch.divergenceValues[targetTimeIndex]!);
 
       // Draw connection line
       container
@@ -528,7 +528,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
         .duration(1000)
         .attr('opacity', function () {
           const branchClass = d3.select(this).attr('class');
-          const branchId = branchClass.split('branch-')[1];
+          const branchId = branchClass.split('branch-')[1]!;
           return highlightBranchIds.includes(branchId) ? 0.9 : 0.6;
         });
 

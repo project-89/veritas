@@ -49,8 +49,8 @@ export function NervMetric({
           </span>
         )}
         {trend && (
-          <span className={['text-[10px]', trendIcons[trend].color].join(' ')}>
-            {trendIcons[trend].symbol}
+          <span className={['text-[10px]', trendIcons[trend]!.color].join(' ')}>
+            {trendIcons[trend]!.symbol}
           </span>
         )}
       </div>

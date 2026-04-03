@@ -166,19 +166,19 @@ export const generateSampleData = (): LandscapeData => {
           if (feature.type === 'peak') {
             influence =
               (1 - distance / feature.radius) * feature.metrics.prominence;
-            elevationData[y][x] += influence;
+            elevationData[y]![x] = (elevationData[y]![x] ?? 0) + influence;
           } else if (feature.type === 'valley') {
             influence =
               (1 - distance / feature.radius) *
               feature.metrics.prominence *
               0.5;
-            elevationData[y][x] -= influence;
+            elevationData[y]![x] = (elevationData[y]![x] ?? 0) - influence;
           } else if (feature.type === 'ridge') {
             influence =
               (1 - distance / feature.radius) *
               feature.metrics.prominence *
               0.7;
-            elevationData[y][x] += influence;
+            elevationData[y]![x] = (elevationData[y]![x] ?? 0) + influence;
           }
 
           // Determine dominant narrative for color
@@ -197,16 +197,16 @@ export const generateSampleData = (): LandscapeData => {
           if (color) {
             // Adjust color based on elevation
             const adjustedColor =
-              elevationData[y][x] > 0
-                ? color.brighter(elevationData[y][x])
-                : color.darker(Math.abs(elevationData[y][x]));
-            colorData[y][x] = adjustedColor.toString();
+              elevationData[y]![x]! > 0
+                ? color.brighter(elevationData[y]![x]!)
+                : color.darker(Math.abs(elevationData[y]![x]!));
+            colorData[y]![x] = adjustedColor.toString();
           }
         }
       }
 
       // Ensure elevation is within bounds
-      elevationData[y][x] = Math.max(-1, Math.min(1, elevationData[y][x]));
+      elevationData[y]![x] = Math.max(-1, Math.min(1, elevationData[y]![x]!));
     }
   }
 
@@ -234,9 +234,9 @@ export const generateSampleData = (): LandscapeData => {
 
       // Add elevation at this point
       const elevation =
-        elevationData[Math.floor(feature.center.y)][
+        elevationData[Math.floor(feature.center.y)]![
           Math.floor(feature.center.x)
-        ];
+        ]!;
       elevationProfile.push(elevation);
     });
 
@@ -244,7 +244,7 @@ export const generateSampleData = (): LandscapeData => {
     const gradient =
       elevationProfile.length > 1
         ? Math.abs(
-            elevationProfile[elevationProfile.length - 1] - elevationProfile[0]
+            elevationProfile[elevationProfile.length - 1]! - elevationProfile[0]!
           ) / elevationProfile.length
         : 0;
 
@@ -328,18 +328,18 @@ export const NarrativeLandscapeVisualization: React.FC<
     // Draw the landscape
     for (let y = 0; y < data.height; y++) {
       for (let x = 0; x < data.width; x++) {
-        const elevation = data.elevationData[y][x];
-        const color = data.colorData[y][x];
+        const elevation = data.elevationData[y]![x]!;
+        const color = data.colorData[y]![x]!;
 
         // Calculate shading based on elevation and neighbors
         let shading = 1.0;
         if (x > 0 && y > 0 && x < data.width - 1 && y < data.height - 1) {
-          const nx = data.elevationData[y][x + 1];
-          const ny = data.elevationData[y + 1][x];
+          const nx = data.elevationData[y]![x + 1]!;
+          const ny = data.elevationData[y + 1]![x]!;
 
           // Calculate normal vector
-          const normalX = (data.elevationData[y][x - 1] - nx) * exaggeration;
-          const normalY = (data.elevationData[y - 1][x] - ny) * exaggeration;
+          const normalX = (data.elevationData[y]![x - 1]! - nx) * exaggeration;
+          const normalY = (data.elevationData[y - 1]![x]! - ny) * exaggeration;
           const normalZ = 2.0;
 
           // Normalize
