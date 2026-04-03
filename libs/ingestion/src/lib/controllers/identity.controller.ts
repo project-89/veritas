@@ -123,7 +123,7 @@ export class IdentityController {
 
       // Create analysis job for the profiler
       const analysisJob = await this.analysisJobRepo.createJob({
-        scanId: 'profile-generation',
+        scanId: null,
         type: 'psychological-profile' as any,
         narrativeIds: [id],
         input: {
@@ -140,7 +140,7 @@ export class IdentityController {
       // Enqueue BullMQ job
       const jobData: AnalysisJobData = {
         analysisJobId: jobId,
-        scanId: 'profile-generation',
+        scanId: null,
         type: 'psychological-profile',
       };
 

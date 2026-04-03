@@ -45,7 +45,7 @@ export class AnalysisJobRepository implements OnModuleInit {
   }
 
   async createJob(params: {
-    scanId: string;
+    scanId: string | null;
     type: AnalysisJobType;
     narrativeIds: string[];
     input: AnalysisJobInput;

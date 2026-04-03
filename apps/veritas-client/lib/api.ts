@@ -1119,7 +1119,7 @@ export type AnalysisJobStatus = 'pending' | 'running' | 'completed' | 'failed' |
 export interface AnalysisJob {
   _id: string;
   id: string;
-  scanId: string;
+  scanId: string | null;
   type: AnalysisJobType;
   status: AnalysisJobStatus;
   narrativeIds: string[];

@@ -19,7 +19,7 @@ export const PSYCHOLOGICAL_PROFILER_SERVICE = Symbol('PSYCHOLOGICAL_PROFILER_SER
 
 export interface AnalysisJobData {
   analysisJobId: string;
-  scanId: string;
+  scanId: string | null;
   type: AnalysisJobType;
 }
 
@@ -70,15 +70,19 @@ export class AnalysisProcessor extends WorkerHost {
 
       switch (type) {
         case 'investigation':
+          if (!scanId) throw new Error('Investigation jobs require a scanId');
           result = await this.runInvestigation(analysisJobId, scanId);
           break;
         case 'propaganda':
+          if (!scanId) throw new Error('Propaganda jobs require a scanId');
           result = await this.runPropaganda(analysisJobId, scanId);
           break;
         case 'claims':
+          if (!scanId) throw new Error('Claims jobs require a scanId');
           result = await this.runClaims(analysisJobId, scanId);
           break;
         case 'downstream':
+          if (!scanId) throw new Error('Downstream jobs require a scanId');
           result = await this.runDownstream(analysisJobId, scanId);
           break;
         case 'psychological-profile':
@@ -346,8 +350,8 @@ export class AnalysisProcessor extends WorkerHost {
       // Gather posts from all investigations for this user
       const allPosts: UserPost[] = [];
 
-      // Try to get posts from the most recent scan job (skip if scanId isn't a real ObjectId)
-      if (analysisJob.scanId && /^[0-9a-f]{24}$/i.test(analysisJob.scanId)) {
+      // Try to get posts from the scan job (null for identity-scoped jobs)
+      if (analysisJob.scanId) {
         const scanPosts = await this.scanJobRepo.getJobPosts(analysisJob.scanId);
         const userPosts = scanPosts.filter((p: any) =>
           (p.authorHandle ?? '').toLowerCase() === identity.primaryHandle.toLowerCase(),

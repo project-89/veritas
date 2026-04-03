@@ -43,9 +43,9 @@ class AnalysisJobInputEmbed {
   },
 })
 export class AnalysisJobSchema extends Document {
-  /** Links back to the scan job that produced the posts */
-  @Prop({ required: true, index: true })
-  scanId!: string;
+  /** Links back to the scan job that produced the posts (null for identity-scoped jobs like psychological-profile) */
+  @Prop({ index: true, default: null })
+  scanId!: string | null;
 
   /** Analysis type */
   @Prop({
@@ -114,7 +114,7 @@ export type AnalysisJobStatus = 'pending' | 'running' | 'completed' | 'failed' |
 export interface AnalysisJob {
   _id: string;
   id: string;
-  scanId: string;
+  scanId: string | null;
   type: AnalysisJobType;
   status: AnalysisJobStatus;
   narrativeIds: string[];
