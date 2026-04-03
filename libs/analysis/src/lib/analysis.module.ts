@@ -21,6 +21,8 @@ import { SourceCredibilityService } from './services/source-credibility.service'
 import { GraphBotDetectionService } from './services/graph-bot-detection.service';
 import { ClaimVerificationService } from './services/claim-verification.service';
 import { PsychologicalProfilerService } from './services/psychological-profiler.service';
+import { PlatformCredibilityService } from './services/platform-credibility.service';
+import { SocialGraphIntelligenceService } from './services/social-graph-intelligence.service';
 import { ANALYSIS_SERVICE } from './interfaces/analysis-service.interface';
 
 @Module({
@@ -48,6 +50,8 @@ import { ANALYSIS_SERVICE } from './interfaces/analysis-service.interface';
     GraphBotDetectionService,
     ClaimVerificationService,
     PsychologicalProfilerService,
+    PlatformCredibilityService,
+    SocialGraphIntelligenceService,
     {
       provide: ANALYSIS_SERVICE,
       useExisting: AnalysisService,
@@ -55,6 +59,6 @@ import { ANALYSIS_SERVICE } from './interfaces/analysis-service.interface';
     AnalysisResolver,
   ],
   controllers: [AnalysisController, NarrativeAnalysisController],
-  exports: [ANALYSIS_SERVICE, AnalysisService, NarrativeAnalysisService, MonitorService, DeviationService, DeepInvestigationService, CrossPlatformIdentityService, ReportService, PropagandaAnalysisService, ComparisonService, EntityAnalysisService, NarrativeGenealogyService, DownstreamEffectsService, CausalReasoningService, GraphDatabaseService, SourceCredibilityService, GraphBotDetectionService, ClaimVerificationService, PsychologicalProfilerService],
+  exports: [ANALYSIS_SERVICE, AnalysisService, NarrativeAnalysisService, MonitorService, DeviationService, DeepInvestigationService, CrossPlatformIdentityService, ReportService, PropagandaAnalysisService, ComparisonService, EntityAnalysisService, NarrativeGenealogyService, DownstreamEffectsService, CausalReasoningService, GraphDatabaseService, SourceCredibilityService, GraphBotDetectionService, ClaimVerificationService, PsychologicalProfilerService, PlatformCredibilityService, SocialGraphIntelligenceService],
 })
 export class AnalysisModule {}

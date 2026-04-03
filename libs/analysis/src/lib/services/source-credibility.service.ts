@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { GraphDatabaseService } from './graph-database.service';
+import { PlatformCredibilityService } from './platform-credibility.service';
 import type { UserPost } from './deep-investigation.service';
 
 // ---------------------------------------------------------------------------
@@ -39,7 +40,10 @@ export interface BridgeNodeResult {
 export class SourceCredibilityService {
   private readonly logger = new Logger(SourceCredibilityService.name);
 
-  constructor(private readonly graph: GraphDatabaseService) {}
+  constructor(
+    private readonly graph: GraphDatabaseService,
+    @Optional() private readonly platformCredibility?: PlatformCredibilityService,
+  ) {}
 
   /**
    * Score a source's credibility based on multiple signals.
@@ -141,6 +145,13 @@ export class SourceCredibilityService {
     // Penalize for flags
     const flagPenalty = Math.min(0.3, flags.length * 0.1);
     overallScore = Math.max(0, overallScore - flagPenalty);
+
+    // Apply platform credibility multiplier if available
+    if (this.platformCredibility) {
+      const platformMultiplier =
+        this.platformCredibility.getCredibilityMultiplier(platform);
+      overallScore = overallScore * platformMultiplier;
+    }
 
     return {
       handle,

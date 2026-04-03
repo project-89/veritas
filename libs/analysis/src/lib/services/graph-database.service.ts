@@ -333,6 +333,117 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   // --------------------------------------------------------------------------
+  // Social graph intelligence operations
+  // --------------------------------------------------------------------------
+
+  /**
+   * Upsert an INTERACTS_WITH edge that accumulates across investigations.
+   * Increments interactionCount, appends new interaction types, updates
+   * lastSeen, appends investigationId, and recalculates weight.
+   */
+  async upsertInteraction(
+    fromHandle: string,
+    fromPlatform: string,
+    toHandle: string,
+    toPlatform: string,
+    interactionType: string,
+    metadata?: { investigationId?: string; sentiment?: number },
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const investigationId = metadata?.investigationId ?? '';
+    const sentiment = metadata?.sentiment ?? 0;
+
+    await this.runQuery(
+      `MERGE (a:User {handle: $fromHandle, platform: $fromPlatform})
+       MERGE (b:User {handle: $toHandle, platform: $toPlatform})
+       MERGE (a)-[r:INTERACTS_WITH]->(b)
+       ON CREATE SET
+         r.interactionCount = 1,
+         r.interactionTypes = [$interactionType],
+         r.investigationIds = CASE WHEN $investigationId = '' THEN [] ELSE [$investigationId] END,
+         r.sentimentSum = $sentiment,
+         r.firstSeen = $now,
+         r.lastSeen = $now
+       ON MATCH SET
+         r.interactionCount = r.interactionCount + 1,
+         r.interactionTypes = CASE
+           WHEN $interactionType IN r.interactionTypes THEN r.interactionTypes
+           ELSE r.interactionTypes + $interactionType
+         END,
+         r.investigationIds = CASE
+           WHEN $investigationId = '' OR $investigationId IN r.investigationIds THEN r.investigationIds
+           ELSE r.investigationIds + $investigationId
+         END,
+         r.sentimentSum = r.sentimentSum + $sentiment,
+         r.lastSeen = $now`,
+      {
+        fromHandle,
+        fromPlatform,
+        toHandle,
+        toPlatform,
+        interactionType,
+        investigationId,
+        sentiment,
+        now,
+      },
+    );
+  }
+
+  /**
+   * Find the shortest path between two users via INTERACTS_WITH edges.
+   */
+  async findShortestPath(
+    handleA: string,
+    platformA: string,
+    handleB: string,
+    platformB: string,
+  ): Promise<{ path: string[]; hops: number } | null> {
+    const records = await this.runQuery(
+      `MATCH (a:User {handle: $handleA, platform: $platformA}),
+            (b:User {handle: $handleB, platform: $platformB})
+       MATCH p = allShortestPaths((a)-[:INTERACTS_WITH*..10]-(b))
+       RETURN [n IN nodes(p) | n.handle] AS path, length(p) AS hops
+       LIMIT 1`,
+      { handleA, platformA, handleB, platformB },
+    );
+
+    const rec = records[0];
+    if (!rec) return null;
+
+    return {
+      path: rec['path'] as string[],
+      hops: Number(rec['hops']),
+    };
+  }
+
+  /**
+   * Get neighbors of a user by tier, ordered by weight descending.
+   */
+  async getNeighborsByTier(
+    handle: string,
+    platform: string,
+    maxTier: number,
+    limit: number,
+  ): Promise<Array<{ handle: string; platform: string; weight: number; tier: number }>> {
+    const records = await this.runQuery(
+      `MATCH (u:User {handle: $handle, platform: $platform})-[r:INTERACTS_WITH]-(neighbor:User)
+       WHERE r.tier IS NOT NULL AND r.tier <= $maxTier
+       RETURN neighbor.handle AS handle, neighbor.platform AS platform,
+              COALESCE(r.weight, 0) AS weight, r.tier AS tier
+       ORDER BY weight DESC
+       LIMIT $limit`,
+      { handle, platform, maxTier, limit },
+    );
+
+    return records.map((r) => ({
+      handle: String(r['handle']),
+      platform: String(r['platform']),
+      weight: Number(r['weight']),
+      tier: Number(r['tier']),
+    }));
+  }
+
+  // --------------------------------------------------------------------------
   // Private helpers
   // --------------------------------------------------------------------------
 

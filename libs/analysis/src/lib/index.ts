@@ -21,6 +21,8 @@ export * from './services/source-credibility.service';
 export * from './services/graph-bot-detection.service';
 export * from './services/claim-verification.service';
 export * from './services/psychological-profiler.service';
+export * from './services/platform-credibility.service';
+export * from './services/social-graph-intelligence.service';
 export * from './services/signal-adapters/signal-adapter.interface';
 export * from './services/signal-adapters/llm-hypothesis.adapter';
 export * from './interfaces/analysis-service.interface';
