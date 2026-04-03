@@ -13,6 +13,7 @@ import {
   SocialMediaPost,
 } from '../interfaces/social-media-connector.interface';
 import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
+import { getFeedsForQuery, getAllFeeds } from '../config/rss-feed-catalog';
 import { SourceNode } from '@veritas/shared/types';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
@@ -74,10 +75,10 @@ export class RSSConnector
   }
 
   /**
-   * Load feed URLs from configuration
-   * This could be enhanced to load from database
+   * Load feed URLs from env config or curated catalog.
    */
   private async loadFeedUrls() {
+    // 1. Try env-configured feeds first
     const feedsConfig = this.configService.get<string>('RSS_FEEDS');
     if (feedsConfig) {
       try {
@@ -85,11 +86,31 @@ export class RSSConnector
         for (const [name, url] of Object.entries(feeds)) {
           this.feedUrls.set(name, url as string);
         }
-        this.logger.log(`Loaded ${this.feedUrls.size} RSS feed URLs`);
+        this.logger.log(`Loaded ${this.feedUrls.size} RSS feeds from config`);
+        return;
       } catch (error) {
         this.logger.error('Error parsing RSS_FEEDS config:', error);
       }
     }
+
+    // 2. Fall back to curated catalog (177 feeds across 15 categories)
+    const catalogFeeds = getAllFeeds();
+    for (const feed of catalogFeeds) {
+      this.feedUrls.set(feed.name, feed.url);
+    }
+    this.logger.log(`Loaded ${this.feedUrls.size} RSS feeds from curated catalog`);
+  }
+
+  /**
+   * Load only feeds relevant to a specific query (for targeted scans).
+   */
+  loadFeedsForQuery(query: string): void {
+    const relevant = getFeedsForQuery(query);
+    this.feedUrls.clear();
+    for (const feed of relevant) {
+      this.feedUrls.set(feed.name, feed.url);
+    }
+    this.logger.log(`Loaded ${this.feedUrls.size} RSS feeds relevant to "${query}"`);
   }
 
   async connect(): Promise<void> {
@@ -118,18 +139,42 @@ export class RSSConnector
     options?: SearchOptions
   ): Promise<SocialMediaPost[]> {
     try {
-      // Fetch recent items from all feeds
+      // Use query-relevant feeds (smart matching) instead of all 177
+      const relevantFeeds = getFeedsForQuery(query);
+      const feedsToUse = new Map<string, string>();
+      for (const feed of relevantFeeds) {
+        feedsToUse.set(feed.name, feed.url);
+      }
+      // Also include any manually configured feeds
+      for (const [name, url] of this.feedUrls.entries()) {
+        feedsToUse.set(name, url);
+      }
+
+      this.logger.log(`Fetching from ${feedsToUse.size} RSS feeds relevant to "${query}"`);
+
+      // Fetch in parallel batches of 10 (don't overwhelm network)
       const allItems: RSSItem[] = [];
-      for (const [feedName, feedUrl] of this.feedUrls.entries()) {
-        const items = await this.fetchFeedItems(feedUrl, options);
+      const entries = Array.from(feedsToUse.entries());
+      const BATCH_SIZE = 10;
 
-        // Add source name to each item
-        items.forEach((item) => {
-          item.sourceName = feedName;
-          item.sourceUrl = feedUrl;
-        });
+      for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+        const batch = entries.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async ([feedName, feedUrl]) => {
+            const items = await this.fetchFeedItems(feedUrl, options);
+            items.forEach((item) => {
+              item.sourceName = feedName;
+              item.sourceUrl = feedUrl;
+            });
+            return items;
+          }),
+        );
 
-        allItems.push(...items);
+        for (const result of results) {
+          if (result.status === 'fulfilled') {
+            allItems.push(...result.value);
+          }
+        }
       }
 
       // Filter items by query if provided
@@ -444,10 +489,13 @@ export class RSSConnector
 
   async validateCredentials(): Promise<boolean> {
     try {
-      // For RSS, we validate by checking if we can access at least one feed
+      // RSS always available — curated catalog has 177 feeds
       if (this.feedUrls.size === 0) {
-        this.logger.warn('No RSS feeds configured');
-        return false;
+        // Load from catalog if not yet loaded
+        const catalogFeeds = getAllFeeds();
+        for (const feed of catalogFeeds) {
+          this.feedUrls.set(feed.name, feed.url);
+        }
       }
 
       // Try to fetch the first feed

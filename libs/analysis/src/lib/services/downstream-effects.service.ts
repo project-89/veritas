@@ -12,6 +12,9 @@ import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
 import { YahooFinanceAdapter } from './signal-adapters/yahoo-finance.adapter';
 import { WorldBankAdapter } from './signal-adapters/worldbank.adapter';
 import { FredAdapter } from './signal-adapters/fred.adapter';
+import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
+import { AcledAdapter } from './signal-adapters/acled.adapter';
+import { UsgsAdapter } from './signal-adapters/usgs.adapter';
 import type { CausalReasoningService } from './causal-reasoning.service';
 
 /** Injection token for the causal reasoning service (avoids circular dependency). */
@@ -182,6 +185,9 @@ export class DownstreamEffectsService {
     this.adapters.push(new YahooFinanceAdapter());
     this.adapters.push(new WorldBankAdapter());
     this.adapters.push(new FredAdapter());
+    this.adapters.push(new CoinGeckoAdapter());
+    this.adapters.push(new AcledAdapter());
+    this.adapters.push(new UsgsAdapter());
     this.adapters.push(new LlmHypothesisAdapter(this.genAI));
   }
 
