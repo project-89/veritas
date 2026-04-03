@@ -17,6 +17,10 @@ function parseTimeRange(tr: string): number {
   return val * (unit === 'd' ? 86400000 : unit === 'h' ? 3600000 : 60000);
 }
 
+function shortDate(ts: number): string {
+  return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 export function ScanHistoryBar({ scans, currentScanId, onSelectScan }: ScanHistoryBarProps) {
   const completedScans = useMemo(
     () => scans
@@ -25,7 +29,6 @@ export function ScanHistoryBar({ scans, currentScanId, onSelectScan }: ScanHisto
     [scans],
   );
 
-  // Compute the full time range across all scans
   const { segments, totalStart, totalEnd } = useMemo(() => {
     if (completedScans.length === 0) return { segments: [], totalStart: 0, totalEnd: 0 };
 
@@ -49,64 +52,72 @@ export function ScanHistoryBar({ scans, currentScanId, onSelectScan }: ScanHisto
     return { segments: segs, totalStart: allStart, totalEnd: allEnd };
   }, [completedScans, currentScanId]);
 
-  if (segments.length < 2) return null; // Only show when there's history
+  if (segments.length < 2) return null;
 
   const totalRange = totalEnd - totalStart || 1;
 
   return (
     <div className="px-4 py-1.5 border-b border-nerv-border/50 bg-nerv-bg">
-      <div className="flex items-center gap-2">
-        <span className="text-[8px] font-mono uppercase tracking-widest text-nerv-text-muted shrink-0">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[8px] font-mono uppercase tracking-widest text-nerv-text-muted">
           Scan Coverage
         </span>
+        <span className="text-[8px] font-mono text-nerv-text-muted">
+          {segments.length} scans &middot; {shortDate(totalStart)} {'\u2192'} {shortDate(totalEnd)}
+        </span>
+      </div>
 
-        {/* Timeline bar */}
-        <div className="flex-1 relative h-3 bg-nerv-bg-elevated/30 rounded-sm overflow-hidden">
-          {segments.map((seg) => {
-            const left = ((seg.start - totalStart) / totalRange) * 100;
-            const width = ((seg.end - seg.start) / totalRange) * 100;
+      {/* Timeline bar with date labels */}
+      <div className="relative" style={{ height: 28 }}>
+        {/* Track background */}
+        <div className="absolute top-0 left-0 right-0 h-3 bg-nerv-bg-elevated/30 rounded-sm" />
 
-            const date = new Date(seg.end).toLocaleDateString([], { month: 'short', day: 'numeric' });
+        {/* Segments */}
+        {segments.map((seg) => {
+          const left = ((seg.start - totalStart) / totalRange) * 100;
+          const width = ((seg.end - seg.start) / totalRange) * 100;
+          const startLabel = shortDate(seg.start);
+          const endLabel = shortDate(seg.end);
 
-            return (
+          return (
+            <div key={seg.scanId} className="absolute top-0" style={{ left: `${left}%`, width: `${Math.max(width, 3)}%` }}>
+              {/* Bar segment */}
               <button
-                key={seg.scanId}
                 onClick={() => onSelectScan?.(seg.scanId)}
-                title={`${date} — ${seg.timeRange} scan — ${seg.posts} posts (${seg.platforms.join(', ')})\nClick to load this scan's data`}
-                className={`absolute top-0 h-full transition-all group ${
+                title={`${startLabel} \u2192 ${endLabel} (${seg.timeRange})\n${seg.posts} posts \u00B7 ${seg.platforms.join(', ')}\nClick to load`}
+                className={`w-full h-3 rounded-sm transition-all group relative overflow-hidden ${
                   seg.isCurrent ? 'z-10' : 'z-0 hover:z-20'
                 }`}
                 style={{
-                  left: `${left}%`,
-                  width: `${Math.max(width, 2)}%`,
                   backgroundColor: seg.isCurrent ? '#FF6B2B' : '#555570',
-                  opacity: seg.isCurrent ? 1 : 0.4,
-                  borderRight: '1px solid rgba(15,15,26,0.5)',
+                  opacity: seg.isCurrent ? 1 : 0.5,
                 }}
               >
                 <span
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity rounded-sm"
                   style={{ backgroundColor: seg.isCurrent ? '#FF8B4B' : '#00FF41' }}
                 />
               </button>
-            );
-          })}
-        </div>
 
-        {/* Date labels */}
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[8px] font-mono text-nerv-text-muted tabular-nums">
-            {new Date(totalStart).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-          </span>
-          <span className="text-[7px] text-nerv-text-muted">{'\u2192'}</span>
-          <span className="text-[8px] font-mono text-nerv-text-muted tabular-nums">
-            {new Date(totalEnd).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-          </span>
-        </div>
-
-        <span className="text-[8px] font-mono text-nerv-text-muted shrink-0">
-          {segments.length} scans
-        </span>
+              {/* Date range label below the segment */}
+              <div className="flex justify-between mt-0.5 px-px" style={{ minWidth: 0 }}>
+                <span className={`text-[7px] font-mono tabular-nums truncate ${
+                  seg.isCurrent ? 'text-nerv-orange' : 'text-nerv-text-muted'
+                }`}>
+                  {startLabel}
+                </span>
+                {width > 8 && (
+                  <span className={`text-[7px] font-mono tabular-nums truncate ${
+                    seg.isCurrent ? 'text-nerv-orange' : 'text-nerv-text-muted'
+                  }`}>
+                    {endLabel}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
