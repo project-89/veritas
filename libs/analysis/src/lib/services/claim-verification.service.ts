@@ -1,6 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { IdentityRecordRepository } from '@veritas/ingestion';
+import { DexScreenerEvidenceAdapter } from './evidence-adapters/dexscreener.evidence-adapter';
+import { EtherscanEvidenceAdapter } from './evidence-adapters/etherscan.evidence-adapter';
+import type {
+  EvidenceAdapter,
+  EvidenceSource,
+  InvestigativeLead,
+} from './evidence-adapters/evidence-adapter.interface';
+import { GitHubEvidenceAdapter } from './evidence-adapters/github.evidence-adapter';
+import { SecEdgarEvidenceAdapter } from './evidence-adapters/sec-edgar.evidence-adapter';
+import { SocialGraphEvidenceAdapter } from './evidence-adapters/social-graph.evidence-adapter';
+import { PlatformCredibilityService } from './platform-credibility.service';
 import type { ExtractedClaim } from './propaganda.service';
 
 // ---------------------------------------------------------------------------
@@ -28,6 +40,8 @@ export interface VerificationResult {
   reasoning: string;
   caveats: string[];
   sourcesChecked: string[];
+  evidenceSources?: EvidenceSource[];
+  investigativeLeads?: InvestigativeLead[];
 }
 
 export interface ClaimVerificationBatchResult {
@@ -36,6 +50,7 @@ export interface ClaimVerificationBatchResult {
   verifiedCount: number;
   disputedCount: number;
   unverifiedCount: number;
+  investigativeLeads?: InvestigativeLead[];
 }
 
 // ---------------------------------------------------------------------------
@@ -71,8 +86,7 @@ interface GdeltResponse {
 // Constants
 // ---------------------------------------------------------------------------
 
-const USER_AGENT =
-  'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
+const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
 
 const WIKIPEDIA_API = 'https://en.wikipedia.org/w/api.php';
 const GDELT_API = 'https://api.gdeltproject.org/api/v2/doc/doc';
@@ -86,20 +100,47 @@ export class ClaimVerificationService {
   private readonly logger = new Logger(ClaimVerificationService.name);
   private readonly genAI: GoogleGenerativeAI | null = null;
   private readonly chatModel: string = 'gemini-2.0-flash';
+  private readonly evidenceAdapters: EvidenceAdapter[] = [];
+  private readonly platformCredibility: PlatformCredibilityService | null = null;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Optional()
+    @Inject(PlatformCredibilityService)
+    platformCredibility?: PlatformCredibilityService,
+    @Optional()
+    @Inject('IDENTITY_RECORD_REPOSITORY')
+    identityRepo?: IdentityRecordRepository,
+  ) {
     const geminiKey =
-      this.configService.get<string>('GEMINI_API_KEY') ||
-      process.env['GEMINI_API_KEY'];
+      this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
 
     if (geminiKey) {
       this.genAI = new GoogleGenerativeAI(geminiKey);
       this.logger.log('ClaimVerificationService initialized with Gemini');
     } else {
-      this.logger.warn(
-        'GEMINI_API_KEY not set -- claim verification will use heuristic fallback',
-      );
+      this.logger.warn('GEMINI_API_KEY not set -- claim verification will use heuristic fallback');
     }
+
+    if (platformCredibility) {
+      this.platformCredibility = platformCredibility;
+    }
+
+    // Instantiate evidence adapters
+    this.evidenceAdapters = [
+      new EtherscanEvidenceAdapter(),
+      new DexScreenerEvidenceAdapter(),
+      new GitHubEvidenceAdapter(),
+      new SecEdgarEvidenceAdapter(),
+    ];
+
+    if (identityRepo) {
+      this.evidenceAdapters.push(new SocialGraphEvidenceAdapter(identityRepo));
+    }
+
+    this.logger.log(
+      `Evidence adapters initialized: ${this.evidenceAdapters.map((a) => a.name).join(', ')}`,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -111,16 +152,13 @@ export class ClaimVerificationService {
    * searches for evidence from free sources, and uses LLM reasoning (or
    * heuristic fallback) to assess veracity.
    */
-  async verifyBatch(
-    claims: ExtractedClaim[],
-  ): Promise<ClaimVerificationBatchResult> {
+  async verifyBatch(claims: ExtractedClaim[]): Promise<ClaimVerificationBatchResult> {
     const verifiable = claims.filter((c) => c.verifiability === 'verifiable');
 
     if (verifiable.length === 0) {
       return {
         results: [],
-        summary:
-          'No verifiable claims found. All claims were either subjective or unfalsifiable.',
+        summary: 'No verifiable claims found. All claims were either subjective or unfalsifiable.',
         verifiedCount: 0,
         disputedCount: 0,
         unverifiedCount: 0,
@@ -137,21 +175,15 @@ export class ClaimVerificationService {
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
       const batch = verifiable.slice(i, i + batchSize);
-      const batchResults = await Promise.all(
-        batch.map((claim) => this.verifySingleClaim(claim)),
-      );
+      const batchResults = await Promise.all(batch.map((claim) => this.verifySingleClaim(claim)));
       results.push(...batchResults);
     }
 
-    const verifiedCount = results.filter(
-      (r) => r.status === 'verified',
-    ).length;
+    const verifiedCount = results.filter((r) => r.status === 'verified').length;
     const disputedCount = results.filter(
       (r) => r.status === 'disputed' || r.status === 'false',
     ).length;
-    const unverifiedCount = results.filter(
-      (r) => r.status === 'unverified',
-    ).length;
+    const unverifiedCount = results.filter((r) => r.status === 'unverified').length;
 
     const summary = this.buildBatchSummary(
       results,
@@ -159,7 +191,17 @@ export class ClaimVerificationService {
       claims.length - verifiable.length,
     );
 
-    return { results, summary, verifiedCount, disputedCount, unverifiedCount };
+    // Aggregate all investigative leads from individual results
+    const allLeads = results.flatMap((r) => r.investigativeLeads ?? []);
+
+    return {
+      results,
+      summary,
+      verifiedCount,
+      disputedCount,
+      unverifiedCount,
+      investigativeLeads: allLeads.length > 0 ? allLeads : undefined,
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -180,12 +222,98 @@ export class ClaimVerificationService {
 
     const allEvidence = [...wikiEvidence, ...gdeltEvidence];
 
-    // Use LLM reasoning if available, otherwise fall back to heuristic
-    if (this.genAI) {
-      return this.llmVerification(claim, allEvidence, sourcesChecked);
+    // Gather targeted evidence from adapters
+    const entities = this.extractEntities(claim.claim);
+    const entityValues = entities.map((e) => e.value);
+    const matchingAdapters = this.evidenceAdapters.filter((adapter) =>
+      adapter.canVerify(claim.claim, entityValues),
+    );
+
+    const adapterEvidenceSources: EvidenceSource[] = [];
+
+    if (matchingAdapters.length > 0) {
+      const evidenceResults = await Promise.allSettled(
+        matchingAdapters.map((adapter) =>
+          adapter.fetchEvidence({ claim: claim.claim, entities: entityValues }),
+        ),
+      );
+
+      for (let i = 0; i < evidenceResults.length; i++) {
+        const result = evidenceResults[i];
+        const adapter = matchingAdapters[i];
+        if (!result || !adapter) continue;
+
+        if (result.status === 'fulfilled' && result.value.length > 0) {
+          sourcesChecked.push(adapter.name);
+          adapterEvidenceSources.push(...result.value);
+        } else if (result.status === 'rejected') {
+          this.logger.warn(
+            `Evidence adapter ${adapter.name} failed: ${result.reason}`,
+          );
+        }
+      }
     }
 
-    return this.heuristicVerification(claim, allEvidence, sourcesChecked);
+    // Convert adapter evidence sources to EvidenceItems for the existing pipeline
+    const adapterSupporting: EvidenceItem[] = [];
+    const adapterContradicting: EvidenceItem[] = [];
+
+    for (const es of adapterEvidenceSources) {
+      const credibility = this.mapCredibilityScore(es.credibilityScore);
+      const item: EvidenceItem = {
+        source: es.source,
+        url: es.url,
+        excerpt: es.excerpt,
+        credibility,
+        timestamp: es.retrievedAt,
+      };
+
+      if (es.stance === 'supports') {
+        adapterSupporting.push(item);
+      } else if (es.stance === 'contradicts') {
+        adapterContradicting.push(item);
+      } else {
+        // Neutral evidence goes to supporting as context
+        adapterSupporting.push(item);
+      }
+    }
+
+    // Generate investigative leads
+    const investigativeLeads = this.generateInvestigativeLeads(
+      claim.claim,
+      entities,
+      adapterEvidenceSources,
+    );
+
+    // Use LLM reasoning if available, otherwise fall back to heuristic
+    let result: VerificationResult;
+
+    if (this.genAI) {
+      result = await this.llmVerification(
+        claim,
+        allEvidence,
+        sourcesChecked,
+        adapterEvidenceSources,
+      );
+    } else {
+      result = this.heuristicVerification(claim, allEvidence, sourcesChecked);
+    }
+
+    // Merge adapter evidence into the result
+    result.evidence.supporting.push(...adapterSupporting);
+    result.evidence.contradicting.push(...adapterContradicting);
+    result.evidenceSources = adapterEvidenceSources.length > 0 ? adapterEvidenceSources : undefined;
+    result.investigativeLeads = investigativeLeads.length > 0 ? investigativeLeads : undefined;
+
+    // Apply platform credibility weighting if available
+    if (this.platformCredibility && claim.sources.length > 0) {
+      result.confidence = this.applyPlatformCredibilityWeighting(
+        result.confidence,
+        adapterEvidenceSources,
+      );
+    }
+
+    return result;
   }
 
   // ---------------------------------------------------------------------------
@@ -231,9 +359,7 @@ export class ClaimVerificationService {
   // Evidence search: GDELT
   // ---------------------------------------------------------------------------
 
-  async searchGdelt(
-    claimText: string,
-  ): Promise<{ source: 'GDELT'; items: GdeltArticle[] }[]> {
+  async searchGdelt(claimText: string): Promise<{ source: 'GDELT'; items: GdeltArticle[] }[]> {
     try {
       const query = this.extractSearchTerms(claimText);
 
@@ -276,10 +402,12 @@ export class ClaimVerificationService {
       | { source: 'GDELT'; items: GdeltArticle[] }
     >,
     sourcesChecked: string[],
+    adapterEvidence: EvidenceSource[] = [],
   ): Promise<VerificationResult> {
     const model = this.genAI!.getGenerativeModel({ model: this.chatModel });
 
     const evidenceText = this.formatEvidenceForPrompt(evidence);
+    const adapterEvidenceText = this.formatAdapterEvidenceForPrompt(adapterEvidence);
 
     const prompt = `You are an evidence-based fact-checking assistant. Given a claim and evidence found from public sources, assess the veracity of the claim.
 
@@ -287,7 +415,7 @@ CRITICAL PRINCIPLES:
 - Evidence-first: base your assessment ONLY on the evidence provided.
 - Use bounded language: "evidence suggests", "sources indicate", not "this is true/false".
 - Absence of evidence is not evidence of absence.
-- Consider source credibility: Wikipedia is generally reliable for well-sourced articles; news articles vary.
+- Consider source credibility: Wikipedia is generally reliable for well-sourced articles; news articles vary. On-chain data (Etherscan) and regulatory filings (SEC EDGAR) are highly reliable. Market data (DexScreener) reflects current state but not intent.
 - If evidence is insufficient, say so clearly.
 
 CLAIM: "${claim.claim}"
@@ -296,6 +424,7 @@ SOURCES WHO MADE THIS CLAIM: ${claim.sources.join(', ') || 'Unknown'}
 
 EVIDENCE FOUND:
 ${evidenceText || 'No relevant evidence found from searched sources.'}
+${adapterEvidenceText ? `\nTARGETED EVIDENCE FROM SPECIALIZED SOURCES:\n${adapterEvidenceText}` : ''}
 
 Respond ONLY with a single JSON object (no markdown fences, no other text):
 
@@ -329,7 +458,8 @@ Rules:
 - confidence 0-1: how confident you are in the status assessment
 - Only include evidence items that are actually relevant to the claim
 - Always include at least one caveat
-- Use bounded language throughout`;
+- Use bounded language throughout
+- Weight on-chain and governmental evidence higher than social media claims`;
 
     try {
       const result = await model.generateContent(prompt);
@@ -367,13 +497,7 @@ Rules:
     raw: Record<string, unknown>,
     sourcesChecked: string[],
   ): VerificationResult {
-    const validStatuses = new Set([
-      'verified',
-      'disputed',
-      'unverified',
-      'mixed',
-      'false',
-    ]);
+    const validStatuses = new Set(['verified', 'disputed', 'unverified', 'mixed', 'false']);
 
     const status = validStatuses.has(raw['status'] as string)
       ? (raw['status'] as VerificationResult['status'])
@@ -413,23 +537,15 @@ Rules:
     const validCredibility = new Set(['high', 'medium', 'low']);
 
     return raw
-      .filter(
-        (item): item is Record<string, unknown> =>
-          typeof item === 'object' && item !== null,
-      )
+      .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
       .map((item) => ({
-        source:
-          typeof item['source'] === 'string' ? item['source'] : 'Unknown',
+        source: typeof item['source'] === 'string' ? item['source'] : 'Unknown',
         url: typeof item['url'] === 'string' ? item['url'] : undefined,
-        excerpt:
-          typeof item['excerpt'] === 'string' ? item['excerpt'] : '',
+        excerpt: typeof item['excerpt'] === 'string' ? item['excerpt'] : '',
         credibility: validCredibility.has(item['credibility'] as string)
           ? (item['credibility'] as EvidenceItem['credibility'])
           : 'medium',
-        timestamp:
-          typeof item['timestamp'] === 'string'
-            ? item['timestamp']
-            : undefined,
+        timestamp: typeof item['timestamp'] === 'string' ? item['timestamp'] : undefined,
       }))
       .filter((item) => item.excerpt.length > 0);
   }
@@ -467,10 +583,7 @@ Rules:
       } else if (evidenceGroup.source === 'GDELT') {
         for (const article of evidenceGroup.items) {
           if (article.title) {
-            const relevance = this.computeRelevance(
-              claim.claim,
-              article.title,
-            );
+            const relevance = this.computeRelevance(claim.claim, article.title);
             if (relevance > 0.2) {
               supporting.push({
                 source: `GDELT: ${article.domain ?? 'news'}`,
@@ -524,6 +637,239 @@ Rules:
       ],
       sourcesChecked,
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Entity extraction
+  // ---------------------------------------------------------------------------
+
+  private extractEntities(claim: string): Array<{ type: string; value: string }> {
+    const entities: Array<{ type: string; value: string }> = [];
+
+    // Wallet addresses (Ethereum-style)
+    const walletMatches = claim.match(/0x[a-fA-F0-9]{40}/g);
+    if (walletMatches) {
+      for (const addr of walletMatches) {
+        entities.push({ type: 'wallet', value: addr });
+      }
+    }
+
+    // Ticker symbols ($BTC, $ETH, etc.)
+    const tickerMatches = claim.match(/\$[A-Z]{2,10}/g);
+    if (tickerMatches) {
+      for (const ticker of tickerMatches) {
+        entities.push({ type: 'ticker', value: ticker.slice(1) }); // remove $
+      }
+    }
+
+    // Social handles (@username)
+    const handleMatches = claim.match(/@[\w]+/g);
+    if (handleMatches) {
+      for (const handle of handleMatches) {
+        entities.push({ type: 'handle', value: handle });
+      }
+    }
+
+    // GitHub-style repo references (org/repo)
+    const repoMatches = claim.match(/\b[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\b/g);
+    if (repoMatches) {
+      for (const repo of repoMatches) {
+        // Filter out common false positives like dates (e.g. "2024/01")
+        if (!/^\d+\/\d+$/.test(repo)) {
+          entities.push({ type: 'repo', value: repo });
+        }
+      }
+    }
+
+    return entities;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Investigative leads generation
+  // ---------------------------------------------------------------------------
+
+  private generateInvestigativeLeads(
+    claim: string,
+    entities: Array<{ type: string; value: string }>,
+    existingEvidence: EvidenceSource[],
+  ): InvestigativeLead[] {
+    const leads: InvestigativeLead[] = [];
+    const claimLower = claim.toLowerCase();
+
+    // For wallet addresses without owner identification
+    for (const e of entities.filter((e) => e.type === 'wallet')) {
+      const hasOwnerInfo = existingEvidence.some(
+        (ev) => ev.source.includes(e.value.slice(0, 10)) && ev.data['ownerIdentified'],
+      );
+      if (!hasOwnerInfo) {
+        leads.push({
+          question: `Who controls wallet ${e.value}? Check if it's labeled on Etherscan or linked to any ENS name.`,
+          dataSources: ['Etherscan', 'ENS'],
+          priority: 'high',
+          automatable: false,
+        });
+      }
+    }
+
+    // For token claims without on-chain verification
+    if (claimLower.includes('sold') || claimLower.includes('dump') || claimLower.includes('rug')) {
+      leads.push({
+        question:
+          'Were team tokens actually sold? Check deployer wallet and known team wallets for outgoing transfers.',
+        dataSources: ['Etherscan', 'DexScreener'],
+        priority: 'high',
+        automatable: true,
+      });
+    }
+
+    // For project activity claims
+    if (
+      claimLower.includes('abandon') ||
+      claimLower.includes('dead') ||
+      claimLower.includes('inactive')
+    ) {
+      leads.push({
+        question:
+          'Is development actually inactive? Check GitHub commit history and recent activity.',
+        dataSources: ['GitHub'],
+        priority: 'high',
+        automatable: true,
+      });
+    }
+
+    // For partnership/collaboration claims
+    if (
+      claimLower.includes('partner') ||
+      claimLower.includes('collaborat') ||
+      claimLower.includes('deal')
+    ) {
+      leads.push({
+        question:
+          'Has this partnership been officially announced? Check SEC filings and official press releases.',
+        dataSources: ['SEC EDGAR', 'GDELT'],
+        priority: 'medium',
+        automatable: true,
+      });
+    }
+
+    // For claims about specific people/accounts
+    for (const e of entities.filter((e) => e.type === 'handle')) {
+      leads.push({
+        question: `What is the credibility history of ${e.value}? Check past claims, bot probability, and cross-platform presence.`,
+        dataSources: ['Social Graph', 'Twitter'],
+        priority: 'medium',
+        automatable: true,
+      });
+    }
+
+    // For market manipulation claims
+    if (
+      claimLower.includes('pump') ||
+      claimLower.includes('manipulat') ||
+      claimLower.includes('wash trad')
+    ) {
+      leads.push({
+        question:
+          'Is there evidence of coordinated trading? Check on-chain transaction patterns and DEX volume anomalies.',
+        dataSources: ['Etherscan', 'DexScreener'],
+        priority: 'high',
+        automatable: true,
+      });
+    }
+
+    // For regulatory claims
+    if (
+      claimLower.includes('sec') ||
+      claimLower.includes('regulat') ||
+      claimLower.includes('lawsuit') ||
+      claimLower.includes('fine')
+    ) {
+      leads.push({
+        question:
+          'Are there actual regulatory filings or enforcement actions? Check SEC EDGAR for official records.',
+        dataSources: ['SEC EDGAR'],
+        priority: 'high',
+        automatable: true,
+      });
+    }
+
+    return leads;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Platform credibility weighting
+  // ---------------------------------------------------------------------------
+
+  private applyPlatformCredibilityWeighting(
+    confidence: number,
+    adapterEvidence: EvidenceSource[],
+  ): number {
+    if (!this.platformCredibility || adapterEvidence.length === 0) {
+      return confidence;
+    }
+
+    // Weight evidence by source type credibility
+    const sourceTypeWeights: Record<string, number> = {
+      'on-chain': 0.95,
+      governmental: 0.95,
+      financial: 0.85,
+      journalistic: 0.7,
+      social: 0.5,
+    };
+
+    let totalWeight = 0;
+    let weightedConfidence = 0;
+
+    for (const es of adapterEvidence) {
+      const typeWeight = sourceTypeWeights[es.sourceType] ?? 0.5;
+      const evidenceWeight = typeWeight * es.credibilityScore * es.relevance;
+      totalWeight += evidenceWeight;
+      weightedConfidence +=
+        evidenceWeight *
+        (es.stance === 'supports' ? 1.0 : es.stance === 'contradicts' ? -0.5 : 0.3);
+    }
+
+    if (totalWeight === 0) return confidence;
+
+    // Blend the adapter-weighted signal with the existing confidence
+    const adapterSignal = this.clamp(weightedConfidence / totalWeight, 0, 1);
+    const blended = confidence * 0.6 + adapterSignal * 0.4;
+    return this.clamp(blended, 0, 1);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Adapter evidence formatting
+  // ---------------------------------------------------------------------------
+
+  private formatAdapterEvidenceForPrompt(adapterEvidence: EvidenceSource[]): string {
+    if (adapterEvidence.length === 0) return '';
+
+    const grouped = new Map<string, EvidenceSource[]>();
+    for (const es of adapterEvidence) {
+      const key = es.sourceType;
+      const list = grouped.get(key) ?? [];
+      list.push(es);
+      grouped.set(key, list);
+    }
+
+    const sections: string[] = [];
+
+    for (const [sourceType, items] of grouped) {
+      const label = sourceType.toUpperCase().replace('-', ' ');
+      const lines = items.map(
+        (es) =>
+          `  - [${es.source}] (credibility: ${es.credibilityScore.toFixed(2)}, stance: ${es.stance}): ${es.excerpt}${es.url ? ` (${es.url})` : ''}`,
+      );
+      sections.push(`${label} EVIDENCE:\n${lines.join('\n')}`);
+    }
+
+    return sections.join('\n\n');
+  }
+
+  private mapCredibilityScore(score: number): 'high' | 'medium' | 'low' {
+    if (score >= 0.8) return 'high';
+    if (score >= 0.5) return 'medium';
+    return 'low';
   }
 
   // ---------------------------------------------------------------------------
@@ -642,7 +988,10 @@ Rules:
 
   /** Strip HTML tags from Wikipedia snippet. */
   stripHtml(html: string): string {
-    return html.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, ' ').trim();
+    return html
+      .replace(/<[^>]*>/g, '')
+      .replace(/&[^;]+;/g, ' ')
+      .trim();
   }
 
   /** Format evidence groups into a text block for the LLM prompt. */
@@ -666,10 +1015,7 @@ Rules:
       } else if (group.source === 'GDELT') {
         const gdeltItems = group.items
           .filter((a) => a.title)
-          .map(
-            (a) =>
-              `  - "${a.title}" [${a.domain ?? 'unknown source'}] ${a.url ?? ''}`,
-          )
+          .map((a) => `  - "${a.title}" [${a.domain ?? 'unknown source'}] ${a.url ?? ''}`)
           .join('\n');
         sections.push(`NEWS ARTICLES (via GDELT):\n${gdeltItems}`);
       }
@@ -684,9 +1030,7 @@ Rules:
     skippedCount: number,
   ): string {
     const verified = results.filter((r) => r.status === 'verified').length;
-    const disputed = results.filter(
-      (r) => r.status === 'disputed' || r.status === 'false',
-    ).length;
+    const disputed = results.filter((r) => r.status === 'disputed' || r.status === 'false').length;
     const mixed = results.filter((r) => r.status === 'mixed').length;
     const unverified = results.filter((r) => r.status === 'unverified').length;
 
@@ -701,15 +1045,10 @@ Rules:
     }
 
     const statusParts: string[] = [];
-    if (verified > 0)
-      statusParts.push(
-        `${verified} found supporting evidence`,
-      );
-    if (disputed > 0)
-      statusParts.push(`${disputed} found contradicting evidence`);
+    if (verified > 0) statusParts.push(`${verified} found supporting evidence`);
+    if (disputed > 0) statusParts.push(`${disputed} found contradicting evidence`);
     if (mixed > 0) statusParts.push(`${mixed} found mixed evidence`);
-    if (unverified > 0)
-      statusParts.push(`${unverified} could not be verified`);
+    if (unverified > 0) statusParts.push(`${unverified} could not be verified`);
 
     if (statusParts.length > 0) {
       parts.push(statusParts.join(', ') + '.');
@@ -722,17 +1061,13 @@ Rules:
     return parts.join(' ');
   }
 
-  private unverifiedResult(
-    claimText: string,
-    sourcesChecked: string[],
-  ): VerificationResult {
+  private unverifiedResult(claimText: string, sourcesChecked: string[]): VerificationResult {
     return {
       claim: claimText,
       status: 'unverified',
       confidence: 0,
       evidence: { supporting: [], contradicting: [] },
-      reasoning:
-        'Verification could not be completed due to an error in processing.',
+      reasoning: 'Verification could not be completed due to an error in processing.',
       caveats: [
         'This claim could not be assessed. This does not indicate truthfulness or falsehood.',
       ],

@@ -32,3 +32,12 @@ export { NervNav } from './nerv-nav';
 
 export { NarrativeGlobe } from './narrative-globe';
 export type { NarrativeGlobeProps } from './narrative-globe';
+
+export { PlatformCredibilityBadge } from './platform-credibility-badge';
+export type { PlatformCredibilityBadgeProps } from './platform-credibility-badge';
+
+export { EvidenceChainPanel } from './evidence-chain-panel';
+export type { EvidenceChainPanelProps } from './evidence-chain-panel';
+
+export { SocialGraphPanel } from './social-graph-panel';
+export type { SocialGraphPanelProps } from './social-graph-panel';

@@ -944,6 +944,26 @@ export interface EvidenceItem {
   timestamp?: string;
 }
 
+export interface EvidenceSource {
+  source: string;
+  sourceType: 'on-chain' | 'financial' | 'social' | 'journalistic' | 'governmental';
+  credibilityScore: number;
+  url?: string;
+  data: Record<string, unknown>;
+  excerpt: string;
+  relevance: number;
+  freshness: number;
+  stance: 'supports' | 'contradicts' | 'neutral';
+  retrievedAt: string;
+}
+
+export interface InvestigativeLead {
+  question: string;
+  dataSources: string[];
+  priority: 'high' | 'medium' | 'low';
+  automatable: boolean;
+}
+
 export interface VerificationResult {
   claim: string;
   status: 'verified' | 'disputed' | 'unverified' | 'mixed' | 'false';
@@ -957,6 +977,8 @@ export interface VerificationResult {
   reasoning: string;
   caveats: string[];
   sourcesChecked: string[];
+  evidenceSources?: EvidenceSource[];
+  investigativeLeads?: InvestigativeLead[];
 }
 
 export interface ClaimVerificationBatchResult {
@@ -965,6 +987,7 @@ export interface ClaimVerificationBatchResult {
   verifiedCount: number;
   disputedCount: number;
   unverifiedCount: number;
+  investigativeLeads?: InvestigativeLead[];
 }
 
 // ---------------------------------------------------------------------------

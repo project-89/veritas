@@ -25,4 +25,5 @@ export * from './services/platform-credibility.service';
 export * from './services/social-graph-intelligence.service';
 export * from './services/signal-adapters/signal-adapter.interface';
 export * from './services/signal-adapters/llm-hypothesis.adapter';
+export * from './services/evidence-adapters/evidence-adapter.interface';
 export * from './interfaces/analysis-service.interface';
