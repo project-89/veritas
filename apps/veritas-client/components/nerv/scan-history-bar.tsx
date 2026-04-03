@@ -69,7 +69,7 @@ export function ScanHistoryBar({ scans, currentScanId, onSelectScan }: ScanHisto
       </div>
 
       {/* Timeline bar with date labels */}
-      <div className="relative" style={{ height: 28 }}>
+      <div className="relative" style={{ height: 32 }}>
         {/* Track background */}
         <div className="absolute top-0 left-0 right-0 h-3 bg-nerv-bg-elevated/30 rounded-sm" />
 
@@ -102,14 +102,14 @@ export function ScanHistoryBar({ scans, currentScanId, onSelectScan }: ScanHisto
 
               {/* Date range label below the segment */}
               <div className="flex justify-between mt-0.5 px-px" style={{ minWidth: 0 }}>
-                <span className={`text-[7px] font-mono tabular-nums truncate ${
-                  seg.isCurrent ? 'text-nerv-orange' : 'text-nerv-text-muted'
+                <span className={`text-[9px] font-mono tabular-nums truncate ${
+                  seg.isCurrent ? 'text-nerv-orange' : 'text-nerv-text-secondary'
                 }`}>
                   {startLabel}
                 </span>
                 {width > 8 && (
-                  <span className={`text-[7px] font-mono tabular-nums truncate ${
-                    seg.isCurrent ? 'text-nerv-orange' : 'text-nerv-text-muted'
+                  <span className={`text-[9px] font-mono tabular-nums truncate ${
+                    seg.isCurrent ? 'text-nerv-orange' : 'text-nerv-text-secondary'
                   }`}>
                     {endLabel}
                   </span>

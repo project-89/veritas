@@ -162,7 +162,7 @@ export class TruthSocialFreeConnector
     try {
       const result = await this.subprocessUtil.exec(
         this.truthbrushPath,
-        ['user', authorId, '--json'],
+        ['user', authorId],
         { timeout: 30000 },
       );
 
@@ -208,7 +208,7 @@ export class TruthSocialFreeConnector
     try {
       const result = await this.subprocessUtil.exec(
         this.truthbrushPath,
-        ['statuses', username, '--json'],
+        ['statuses', username],
         { timeout: 60000 },
       );
 
@@ -280,7 +280,7 @@ export class TruthSocialFreeConnector
       // truthbrush search <query> --searchtype statuses --json
       const result = await this.subprocessUtil.exec(
         this.truthbrushPath,
-        ['search', query, '--searchtype', 'statuses', '--json'],
+        ['search', query, '--searchtype', 'statuses'],
         { timeout: 60000 },
       );
 

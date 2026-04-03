@@ -19,13 +19,27 @@ export class AcledAdapter implements SignalAdapter {
 
   private readonly logger = new Logger(AcledAdapter.name);
   private readonly baseUrl = 'https://api.acleddata.com/acled/read';
+  private warnedMissingKey = false;
 
   async fetchSignals(params: {
     keywords: string[];
     startDate: string;
     endDate: string;
   }): Promise<ExternalSignal[]> {
+    // ACLED requires API key + email for access
+    const apiKey = process.env['ACLED_API_KEY'];
+    const email = process.env['ACLED_EMAIL'];
+    if (!apiKey || !email) {
+      if (!this.warnedMissingKey) {
+        this.warnedMissingKey = true;
+        this.logger.log('ACLED_API_KEY and ACLED_EMAIL not set — conflict event data unavailable. Register free at acleddata.com');
+      }
+      return [];
+    }
+
     const url = new URL(this.baseUrl);
+    url.searchParams.set('key', apiKey);
+    url.searchParams.set('email', email);
     url.searchParams.set('terms', 'accept');
     url.searchParams.set('limit', '100');
 

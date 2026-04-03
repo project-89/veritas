@@ -238,6 +238,24 @@ export class ScanJobRepository implements OnModuleInit {
   async updateAnalysisCache(scanId: string, cache: Record<string, unknown>): Promise<void> {
     this.ensureInitialized();
     try {
+      // Estimate size — MongoDB has a 16MB BSON document limit.
+      // Strip large fields if needed.
+      const json = JSON.stringify(cache);
+      if (json.length > 14_000_000) {
+        this.logger.warn(`Analysis cache too large (${(json.length / 1_000_000).toFixed(1)}MB) — trimming`);
+        const inv = cache['investigation'] as Record<string, unknown> | undefined;
+        if (inv && Array.isArray(inv['users'])) {
+          for (const user of inv['users'] as any[]) {
+            if (user?.user?.topicPosts) user.user.topicPosts = [];
+            if (user?.user?.historicalPosts) user.user.historicalPosts = [];
+          }
+        }
+        const ds = cache['downstream'] as Record<string, unknown> | undefined;
+        if (ds && Array.isArray(ds['externalSignals']) && (ds['externalSignals'] as any[]).length > 50) {
+          ds['externalSignals'] = (ds['externalSignals'] as any[]).slice(0, 50);
+        }
+      }
+
       await this.scanJobRepo.updateById(scanId, { analysisCache: cache } as Partial<ScanJob>);
     } catch (error) {
       const err = error as Error;
