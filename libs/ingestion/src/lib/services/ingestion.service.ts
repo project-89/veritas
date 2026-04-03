@@ -21,6 +21,8 @@ import {
   YOUTUBE_CONNECTOR,
   FACEBOOK_CONNECTOR,
   TRUTHSOCIAL_CONNECTOR,
+  FARCASTER_CONNECTOR,
+  TELEGRAM_CONNECTOR,
 } from '../interfaces/connector-tokens';
 
 /**
@@ -40,6 +42,8 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
     @Optional() @Inject(FACEBOOK_CONNECTOR) private readonly facebookConnector: any,
     @Optional() @Inject(YOUTUBE_CONNECTOR) private readonly youtubeConnector: any,
     @Optional() @Inject(TRUTHSOCIAL_CONNECTOR) private readonly truthSocialConnector: any,
+    @Optional() @Inject(FARCASTER_CONNECTOR) private readonly farcasterConnector: any,
+    @Optional() @Inject(TELEGRAM_CONNECTOR) private readonly telegramConnector: any,
     @Optional() private readonly rssFeedConnector: RSSConnector,
     @Optional() private readonly webScraperConnector: WebScraperConnector,
     private readonly databaseService: DatabaseService,
@@ -95,6 +99,8 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
       this.facebookConnector,
       this.youtubeConnector,
       this.truthSocialConnector,
+      this.farcasterConnector,
+      this.telegramConnector,
       this.rssFeedConnector,
       this.webScraperConnector,
     ].filter((connector) => connector !== undefined);

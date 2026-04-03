@@ -44,6 +44,7 @@ const RELEVANT_PLATFORMS = new Set([
   'telegram',
   'discord',
   'truthsocial',
+  'farcaster',
 ]);
 
 /**

@@ -23,6 +23,8 @@ import { RSSConnector } from './services/rss.connector';
 import { WebScraperConnector } from './services/web-scraper.connector';
 import { YouTubeFreeConnector } from './services/youtube-free.connector';
 import { TruthSocialFreeConnector } from './services/truthsocial-free.connector';
+import { FarcasterFreeConnector } from './services/farcaster-free.connector';
+import { TelegramFreeConnector } from './services/telegram-free.connector';
 import { IngestionService } from './services/ingestion.service';
 import { SubprocessUtil } from './services/utils/subprocess.util';
 import { JinaReaderService } from './services/utils/jina-reader.service';
@@ -43,6 +45,8 @@ import {
   YOUTUBE_CONNECTOR,
   FACEBOOK_CONNECTOR,
   TRUTHSOCIAL_CONNECTOR,
+  FARCASTER_CONNECTOR,
+  TELEGRAM_CONNECTOR,
 } from './interfaces/connector-tokens';
 
 /**
@@ -107,6 +111,8 @@ export interface IngestionModuleOptions {
     webScraper?: boolean;
     youtube?: boolean;
     truthsocial?: boolean;
+    farcaster?: boolean;
+    telegram?: boolean;
   };
 
   /**
@@ -227,6 +233,14 @@ export class IngestionModule {
 
     if (connectorConfig.truthsocial !== false) {
       providers.push({ provide: TRUTHSOCIAL_CONNECTOR, useClass: TruthSocialFreeConnector });
+    }
+
+    if (connectorConfig.farcaster !== false) {
+      providers.push({ provide: FARCASTER_CONNECTOR, useClass: FarcasterFreeConnector });
+    }
+
+    if (connectorConfig.telegram !== false) {
+      providers.push({ provide: TELEGRAM_CONNECTOR, useClass: TelegramFreeConnector });
     }
 
     // RSS and WebScraper are already API-free

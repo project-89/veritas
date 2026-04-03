@@ -21,6 +21,7 @@ export { RedditFreeConnector } from './lib/services/reddit-free.connector';
 export { TwitterFreeConnector } from './lib/services/twitter-free.connector';
 export { YouTubeFreeConnector } from './lib/services/youtube-free.connector';
 export { FacebookJinaConnector } from './lib/services/facebook-jina.connector';
+export { TelegramFreeConnector } from './lib/services/telegram-free.connector';
 
 // Utilities
 export { SubprocessUtil } from './lib/services/utils/subprocess.util';
