@@ -60,9 +60,15 @@ export function TemporalHeatmap({
     }
 
     const allTimestamps = posts.map((p) => new Date(p.timestamp).getTime());
-    const minTime = Math.min(...allTimestamps);
-    const maxTime = Math.max(...allTimestamps);
-    const range = maxTime - minTime;
+    const rawMin = Math.min(...allTimestamps);
+    const rawMax = Math.max(...allTimestamps);
+
+    // Clamp to a reasonable window — don't let stale posts stretch the grid
+    // Use 7 days ago as the floor (matches default scan window)
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const minTime = Math.max(rawMin, sevenDaysAgo);
+    const maxTime = Math.min(rawMax, Date.now());
+    const range = Math.max(maxTime - minTime, 3600000); // at least 1 hour
 
     // Choose bucket count based on range
     let numBuckets: number;
