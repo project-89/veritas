@@ -87,9 +87,9 @@ export const NetworkGraphVisualization: React.FC<NetworkGraphProps> = ({
       .data(links)
       .enter()
       .append('line')
-      .attr('stroke-width', (d) => d.metrics.width)
+      .attr('stroke-width', (d) => Math.max(1, Math.min(d.metrics.width, 5)))
       .attr('stroke', (d) => d.metrics.color)
-      .attr('opacity', 0.6)
+      .attr('opacity', 0.4)
       .on('click', (event, d) => onEdgeClick?.(d as unknown as NetworkEdge));
 
     // Draw nodes
@@ -102,22 +102,24 @@ export const NetworkGraphVisualization: React.FC<NetworkGraphProps> = ({
       .attr('cursor', 'pointer')
       .on('click', (event, d) => onNodeClick?.(d));
 
-    // Node circles
+    // Node circles — size is a 0-1 fraction, scale to reasonable pixel radius
     nodeGroups
       .append('circle')
-      .attr('r', (d) => d.metrics.size)
+      .attr('r', (d) => Math.max(8, d.metrics.size * 40))
       .attr('fill', (d) => d.metrics.color)
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 2);
+      .attr('stroke', '#334155')
+      .attr('stroke-width', 1.5)
+      .attr('opacity', 0.9);
 
     // Node labels
     nodeGroups
       .append('text')
-      .text((d) => d.label)
-      .attr('dy', 4)
+      .text((d) => d.label.length > 20 ? d.label.substring(0, 20) + '...' : d.label)
+      .attr('dy', (d) => d.metrics.size + 14)
       .attr('text-anchor', 'middle')
-      .attr('font-size', '12px')
-      .attr('fill', '#333');
+      .attr('font-size', '11px')
+      .attr('fill', '#cbd5e1')
+      .attr('pointer-events', 'none');
 
     // Add tooltips
     nodeGroups

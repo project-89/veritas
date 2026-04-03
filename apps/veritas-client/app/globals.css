@@ -1,6 +1,155 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-/* You can add global styles to this file, and also import other style files */
 
-/* You can add global styles here */
+/* ═══════════════════════════════════════════════════
+   NERV Design System — Global Styles
+   ═══════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    --nerv-bg-deep: #0a0a0f;
+    --nerv-bg: #0f0f1a;
+    --nerv-bg-panel: #1a1a2e;
+    --nerv-bg-elevated: #252540;
+    --nerv-border: #2a2a45;
+    --nerv-border-active: #3a3a5f;
+    --nerv-orange: #ff6b2b;
+    --nerv-green: #00ff41;
+    --nerv-red: #e94560;
+    --nerv-blue: #0ea5e9;
+    --nerv-amber: #f59e0b;
+    --nerv-purple: #a855f7;
+  }
+
+  body {
+    @apply bg-nerv-bg-deep text-nerv-text antialiased;
+    font-size: 14px;
+  }
+
+  /* Monospace for all data elements */
+  code,
+  pre,
+  kbd,
+  samp,
+  .font-mono {
+    font-feature-settings: 'liga' 1, 'calt' 1;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0a0a0f;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a2a45;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a3a5f;
+  }
+}
+
+@layer components {
+  /* NERV scan-line overlay */
+  .nerv-scanlines {
+    position: relative;
+  }
+  .nerv-scanlines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 255, 65, 0.012) 2px,
+      rgba(0, 255, 65, 0.012) 4px
+    );
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  /* NERV corner accents (top-left + bottom-right) */
+  .nerv-corners {
+    position: relative;
+  }
+  .nerv-corners::before,
+  .nerv-corners::after {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-color: var(--nerv-orange);
+    border-style: solid;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .nerv-corners::before {
+    top: 0;
+    left: 0;
+    border-width: 2px 0 0 2px;
+  }
+  .nerv-corners::after {
+    bottom: 0;
+    right: 0;
+    border-width: 0 2px 2px 0;
+  }
+
+  /* Glow effects */
+  .nerv-glow-red {
+    --nerv-glow-color: #e94560;
+    box-shadow: 0 0 4px #e94560;
+  }
+  .nerv-glow-orange {
+    --nerv-glow-color: #ff6b2b;
+    box-shadow: 0 0 4px #ff6b2b;
+  }
+  .nerv-glow-green {
+    --nerv-glow-color: #00ff41;
+    box-shadow: 0 0 4px #00ff41;
+  }
+
+  /* Resizable panel drag handle */
+  .resize-x::-webkit-resizer {
+    background: linear-gradient(
+      135deg,
+      transparent 40%,
+      var(--nerv-border-active) 40%,
+      var(--nerv-border-active) 45%,
+      transparent 45%,
+      transparent 55%,
+      var(--nerv-border-active) 55%,
+      var(--nerv-border-active) 60%,
+      transparent 60%,
+      transparent 70%,
+      var(--nerv-border-active) 70%,
+      var(--nerv-border-active) 75%,
+      transparent 75%
+    );
+    cursor: col-resize;
+  }
+
+  /* Panel left-border accent variants */
+  .nerv-accent-orange {
+    border-left: 2px solid var(--nerv-orange);
+  }
+  .nerv-accent-green {
+    border-left: 2px solid var(--nerv-green);
+  }
+  .nerv-accent-red {
+    border-left: 2px solid var(--nerv-red);
+  }
+  .nerv-accent-blue {
+    border-left: 2px solid var(--nerv-blue);
+  }
+  .nerv-accent-amber {
+    border-left: 2px solid var(--nerv-amber);
+  }
+  .nerv-accent-purple {
+    border-left: 2px solid var(--nerv-purple);
+  }
+}

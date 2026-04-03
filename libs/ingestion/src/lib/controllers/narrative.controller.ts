@@ -13,6 +13,7 @@ import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { NarrativeTrend } from '../../types/narrative-trend.interface';
 import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
 import { IngestionService } from '../services/ingestion.service';
+import { InvestigationRepository } from '../repositories/investigation.repository';
 import { SocialMediaPost } from '../../types/social-media.types';
 
 /**
@@ -26,7 +27,8 @@ export class NarrativeController {
   constructor(
     private readonly narrativeRepository: NarrativeRepository,
     private readonly transformService: TransformOnIngestService,
-    private readonly ingestionService: IngestionService
+    private readonly ingestionService: IngestionService,
+    private readonly investigationRepository: InvestigationRepository
   ) {}
 
   /**
@@ -82,16 +84,24 @@ export class NarrativeController {
       neutral: number;
       byPlatform: Record<string, number>;
     };
+    investigationId: string | null;
   }> {
     this.logger.log(`Searching narratives with query: "${body.query}"`);
 
-    const rawResult = await this.ingestionService.searchWithRawDataAll(
-      body.query,
-      {
-        platforms: body.platforms,
-        limit: body.limit,
-      }
-    );
+    let rawResult: { posts: SocialMediaPost[]; insights: NarrativeInsight[] };
+    try {
+      rawResult = await this.ingestionService.searchWithRawDataAll(
+        body.query,
+        {
+          platforms: body.platforms,
+          limit: body.limit,
+        }
+      );
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(`Search failed: ${err.message}`, err.stack);
+      throw error;
+    }
 
     // Deduplicate posts — use normalized text as primary key since tweet IDs
     // can vary across search queries
@@ -99,14 +109,15 @@ export class NarrativeController {
     const dedupedPosts: SocialMediaPost[] = [];
     const dedupedInsights: NarrativeInsight[] = [];
     for (let i = 0; i < rawResult.posts.length; i++) {
-      const post = rawResult.posts[i];
+      const post = rawResult.posts[i]!;
       // Normalize text for comparison: lowercase, strip whitespace, first 100 chars
       const textKey = post.text.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 100);
       if (!seenTexts.has(textKey)) {
         seenTexts.add(textKey);
         dedupedPosts.push(post);
-        if (rawResult.insights[i]) {
-          dedupedInsights.push(rawResult.insights[i]);
+        const insight = rawResult.insights[i];
+        if (insight) {
+          dedupedInsights.push(insight);
         }
       }
     }
@@ -149,7 +160,33 @@ export class NarrativeController {
       }, {}),
     };
 
-    return { posts: serializedPosts, insights, summary };
+    // Persist as investigation + snapshot
+    let investigationId: string | null = null;
+    try {
+      const investigation =
+        await this.investigationRepository.findOrCreateByQuery(body.query, {
+          platforms: body.platforms,
+          limit: body.limit,
+        });
+      investigationId =
+        investigation._id?.toString() ?? investigation.id ?? null;
+
+      await this.investigationRepository.addSnapshot(investigationId!, {
+        posts: serializedPosts,
+        narratives: [],
+        summary,
+      });
+    } catch (error) {
+      // Non-fatal — log but still return search results
+      const err = error as Error;
+      this.logger.warn(
+        `Failed to persist investigation: ${err.message}`
+      );
+    }
+
+    // Only send posts + summary to frontend — insights are heavy (embeddings, hashes)
+    // and the frontend uses server-side analysis (/narratives/analyze) instead
+    return { posts: serializedPosts, insights: [], summary, investigationId };
   }
 
   /**

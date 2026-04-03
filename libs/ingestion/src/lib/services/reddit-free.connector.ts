@@ -180,6 +180,36 @@ export class RedditFreeConnector
     }
   }
 
+  /**
+   * Search and return both raw posts AND transformed insights.
+   * This preserves the original post data for the frontend dashboard.
+   */
+  async searchWithRawData(
+    query: string,
+    options?: SearchOptions
+  ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> {
+    try {
+      this.logger.log(`Searching Reddit (with raw data) for: ${query}`);
+
+      const posts = await this.searchContent(query, options);
+
+      if (posts.length === 0) {
+        return { posts: [], insights: [] };
+      }
+
+      const insights = await this.transformService.transformBatch(posts);
+
+      this.logger.log(
+        `Reddit: ${posts.length} posts, ${insights.length} insights`
+      );
+
+      return { posts, insights };
+    } catch (error) {
+      this.logger.error('Error in Reddit searchWithRawData:', error);
+      throw error;
+    }
+  }
+
   streamContent(keywords: string[]): EventEmitter {
     const emitter = new EventEmitter();
     const streamId = Math.random().toString(36).substring(7);
@@ -265,6 +295,72 @@ export class RedditFreeConnector
     return emitter;
   }
 
+  /**
+   * Fetch a user's post history from Reddit.
+   * Uses the public /user/{username}/submitted.json endpoint.
+   */
+  async getUserTimeline(
+    username: string,
+    options?: { limit?: number; before?: string },
+  ): Promise<SocialMediaPost[]> {
+    const limit = Math.min(options?.limit ?? 50, 100);
+    const params = new URLSearchParams({
+      limit: String(limit),
+      sort: 'new',
+      raw_json: '1',
+    });
+    if (options?.before) params.set('before', options.before);
+
+    try {
+      const response = await this.rateLimitedRequest<{
+        data: {
+          children: Array<{
+            data: {
+              id: string;
+              title: string;
+              selftext: string;
+              author: string;
+              subreddit: string;
+              score: number;
+              num_comments: number;
+              upvote_ratio: number;
+              created_utc: number;
+              permalink: string;
+            };
+          }>;
+        };
+      }>(`/user/${encodeURIComponent(username)}/submitted.json?${params.toString()}`);
+
+      const posts: SocialMediaPost[] = [];
+      for (const child of response.data.children) {
+        const d = child.data;
+        posts.push({
+          id: d.id,
+          authorId: d.author,
+          authorName: d.author,
+          authorHandle: d.author,
+          platform: this.platform,
+          text: d.title + (d.selftext ? `\n${d.selftext}` : ''),
+          timestamp: new Date(d.created_utc * 1000),
+          url: `https://www.reddit.com${d.permalink}`,
+          engagementMetrics: {
+            likes: d.score,
+            shares: 0,
+            comments: d.num_comments,
+            reach: Math.round(d.score / Math.max(d.upvote_ratio, 0.01)),
+            viralityScore: d.upvote_ratio,
+          },
+        });
+      }
+
+      this.logger.debug(`Fetched ${posts.length} posts from u/${username}`);
+      return posts;
+    } catch (error) {
+      this.logger.error(`Error fetching timeline for u/${username}:`, error);
+      return [];
+    }
+  }
+
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
     try {
       const response = await this.rateLimitedRequest<{
@@ -332,6 +428,7 @@ export class RedditFreeConnector
       platform: this.platform,
       authorId: post.author,
       authorName: post.author,
+      authorHandle: post.author,
       url: `https://reddit.com${post.permalink}`,
       timestamp: new Date(post.created_utc * 1000),
       engagementMetrics: {

@@ -88,10 +88,6 @@ export class ContentService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     if (this.databaseService) {
       await this.initialize();
-    } else {
-      this.logger.warn(
-        'No database service provided to ContentService - database operations will not be available'
-      );
     }
   }
 

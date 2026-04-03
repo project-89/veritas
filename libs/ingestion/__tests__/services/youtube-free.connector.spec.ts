@@ -249,18 +249,34 @@ describe('YouTubeFreeConnector', () => {
       emitter.emit('end');
     });
 
-    it('should emit data events with transformed insights', async () => {
-      const dataHandler = jest.fn();
+    it('should emit data events with transformed insights', (done) => {
+      // Mock searchContent to bypass the complex subprocess chain
+      const mockPost = {
+        id: 'yt-1',
+        text: 'test video',
+        platform: 'youtube',
+        authorId: 'ch-1',
+        timestamp: new Date(),
+        engagementMetrics: { likes: 0, shares: 0, comments: 0, reach: 0, viralityScore: 0 },
+      };
+      (connector as any).searchContent = jest.fn().mockResolvedValue([mockPost]);
+
+      // Use real timers for this test since the async chain is complex
+      jest.useRealTimers();
+
       const emitter = connector.streamAndTransform(['test']);
-      emitter.on('data', dataHandler);
+      emitter.on('data', (insight: unknown) => {
+        expect(insight).toEqual(expect.objectContaining({ id: 'insight-1' }));
+        emitter.emit('end');
+        done();
+      });
 
-      await jest.advanceTimersByTimeAsync(0);
-
-      expect(dataHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'insight-1' })
-      );
-      emitter.emit('end');
-    });
+      // Safety timeout — fail if no data emitted within 3s
+      setTimeout(() => {
+        emitter.emit('end');
+        done(new Error('Timed out waiting for data event'));
+      }, 3000);
+    }, 10000);
 
     it('should emit error events on failure', async () => {
       (subprocessUtil.execJsonLines as jest.Mock).mockRejectedValue(

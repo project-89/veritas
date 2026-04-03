@@ -128,6 +128,23 @@ export class YouTubeFreeConnector
     }
   }
 
+  async searchWithRawData(
+    query: string,
+    options?: SearchOptions
+  ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> {
+    try {
+      this.logger.log(`Searching YouTube (with raw data) for: ${query}`);
+      const posts = await this.searchContent(query, options);
+      if (posts.length === 0) return { posts: [], insights: [] };
+      const insights = await this.transformService.transformBatch(posts);
+      this.logger.log(`YouTube: ${posts.length} posts, ${insights.length} insights`);
+      return { posts, insights };
+    } catch (error) {
+      this.logger.error('Error in YouTube searchWithRawData:', error);
+      throw error;
+    }
+  }
+
   streamAndTransform(keywords: string[]): EventEmitter {
     const emitter = new EventEmitter();
     const streamId = Math.random().toString(36).substring(7);
@@ -277,17 +294,21 @@ export class YouTubeFreeConnector
         { timeout: 60000 }
       );
 
-      // Second pass: fetch transcripts for each video in parallel
+      // Second pass: fetch transcripts in batches of 5 to limit concurrency
       const transcriptMap = new Map<string, string>();
       if (fetchTranscripts) {
-        const transcriptResults = await Promise.allSettled(
-          videos.map((video) => this.getVideoTranscript(video.id))
-        );
+        const TRANSCRIPT_CONCURRENCY = 5;
+        for (let i = 0; i < videos.length; i += TRANSCRIPT_CONCURRENCY) {
+          const batch = videos.slice(i, i + TRANSCRIPT_CONCURRENCY);
+          const batchResults = await Promise.allSettled(
+            batch.map((video) => this.getVideoTranscript(video.id))
+          );
 
-        for (let i = 0; i < videos.length; i++) {
-          const result = transcriptResults[i];
-          if (result.status === 'fulfilled' && result.value) {
-            transcriptMap.set(videos[i].id, result.value);
+          for (let j = 0; j < batch.length; j++) {
+            const result = batchResults[j]!;
+            if (result.status === 'fulfilled' && result.value) {
+              transcriptMap.set(batch[j]!.id, result.value);
+            }
           }
         }
 
@@ -296,9 +317,28 @@ export class YouTubeFreeConnector
         );
       }
 
-      return videos.map((video) =>
+      let posts = videos.map((video) =>
         this.transformVideoToSocialMediaPost(video, transcriptMap.get(video.id))
       );
+
+      // Post-fetch date filter — yt-dlp's --dateafter/--datebefore may not work
+      // with --flat-playlist, so filter results here as a safety net
+      if (options?.startDate || options?.endDate) {
+        const start = options.startDate?.getTime() ?? 0;
+        const end = options.endDate?.getTime() ?? Date.now();
+        const before = posts.length;
+        posts = posts.filter((p) => {
+          const ts = p.timestamp.getTime();
+          return ts >= start && ts <= end;
+        });
+        if (posts.length < before) {
+          this.logger.debug(
+            `Filtered YouTube results by date: ${before} → ${posts.length} (${options.startDate?.toISOString()} to ${options.endDate?.toISOString()})`,
+          );
+        }
+      }
+
+      return posts;
     } catch (error) {
       this.logger.error('Error searching YouTube with yt-dlp:', error);
       throw error;
@@ -316,12 +356,18 @@ export class YouTubeFreeConnector
       .join('\n\n')
       .slice(0, transcript ? TRANSCRIPT_MAX_CHARS : 2000);
 
+    // Extract username from uploader_id (e.g., "@username" or "UCxxxx")
+    const handle = video.uploader_id?.startsWith('@')
+      ? video.uploader_id
+      : video.uploader || video.uploader_id || 'unknown';
+
     return {
       id: video.id,
       text,
       platform: this.platform,
       authorId: video.channel_id || video.uploader_id || '',
-      authorName: video.uploader || '',
+      authorName: video.uploader || handle,
+      authorHandle: handle,
       url: video.webpage_url || `https://www.youtube.com/watch?v=${video.id}`,
       timestamp: this.parseYtDlpDate(video.upload_date),
       engagementMetrics: {

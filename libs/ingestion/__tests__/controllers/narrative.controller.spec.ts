@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NarrativeController } from '../../src/lib/controllers/narrative.controller';
 import { NarrativeRepository } from '../../src/lib/repositories/narrative-insight.repository';
 import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
+import { IngestionService } from '../../src/lib/services/ingestion.service';
+import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
 import { NarrativeInsight } from '../../src/types/narrative-insight.interface';
 import { NarrativeTrend } from '../../src/types/narrative-trend.interface';
 
@@ -85,6 +87,19 @@ describe('NarrativeController', () => {
         {
           provide: TransformOnIngestService,
           useValue: mockTransformService,
+        },
+        {
+          provide: IngestionService,
+          useValue: {
+            searchWithRawDataAll: jest.fn().mockResolvedValue({ posts: [], insights: [] }),
+          },
+        },
+        {
+          provide: InvestigationRepository,
+          useValue: {
+            findOrCreateByQuery: jest.fn().mockResolvedValue({ _id: 'inv-1', id: 'inv-1' }),
+            addSnapshot: jest.fn().mockResolvedValue({}),
+          },
         },
       ],
     }).compile();

@@ -165,8 +165,9 @@ export class ContentClassificationService {
         try {
           const geminiSentiments = await this.batchSentimentWithGemini(texts);
           for (let i = 0; i < localResults.length; i++) {
-            if (geminiSentiments[i]) {
-              localResults[i].sentiment = geminiSentiments[i];
+            const geminiResult = geminiSentiments[i];
+            if (geminiResult) {
+              localResults[i]!.sentiment = geminiResult;
             }
           }
           this.logger.debug(`Enhanced ${geminiSentiments.filter(Boolean).length}/${texts.length} texts with Gemini sentiment`);
@@ -494,8 +495,11 @@ export class ContentClassificationService {
     const BATCH_SIZE = 30;
     const allResults: Array<ContentClassification['sentiment'] | null> = [];
 
+    const totalBatches = Math.ceil(texts.length / BATCH_SIZE);
     for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
       const batch = texts.slice(i, i + BATCH_SIZE);
+      this.logger.log(`[Gemini] Processing batch ${batchNum}/${totalBatches} (${batch.length} texts)`);
       const numberedTexts = batch
         .map((t, idx) => `[${idx}] ${t.slice(0, 300)}`)
         .join('\n\n');
@@ -562,7 +566,7 @@ ${numberedTexts}`;
       // Strip punctuation from edges for better matching
       const cleaned = word.replace(/^[^a-z]+|[^a-z]+$/g, '');
       if (cleaned && cleaned in afinn165) {
-        totalScore += afinn165[cleaned];
+        totalScore += afinn165[cleaned] ?? 0;
         matchedCount++;
       }
     }

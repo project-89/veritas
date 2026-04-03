@@ -218,29 +218,43 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
         )
       : Array.from(this.connectors.values());
 
-    const searchPromises = targetConnectors.map(async (connector) => {
+    // Process connectors sequentially so we don't overwhelm Gemini with
+    // concurrent sentiment batches from multiple connectors at once.
+    // Each connector fetches posts + classifies them (including Gemini calls)
+    // before the next one starts.
+    const allPosts: SocialMediaPost[] = [];
+    const allInsights: NarrativeInsight[] = [];
+
+    for (const connector of targetConnectors) {
       try {
-        // Use searchWithRawData if the connector supports it (BaseSocialMediaConnector),
-        // otherwise fall back to searchAndTransform with empty posts
-        if ('searchWithRawData' in connector && typeof (connector as Record<string, unknown>).searchWithRawData === 'function') {
-          return await (connector as { searchWithRawData: (q: string, o?: ConnectorSearchOptions) => Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> }).searchWithRawData(query, options);
+        this.logger.log(`[search] Starting ${connector.platform}...`);
+        const start = Date.now();
+
+        let result: { posts: SocialMediaPost[]; insights: NarrativeInsight[] };
+        const connRec = connector as unknown as Record<string, unknown>;
+        if ('searchWithRawData' in connector && typeof connRec['searchWithRawData'] === 'function') {
+          result = await (connector as { searchWithRawData: (q: string, o?: ConnectorSearchOptions) => Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> }).searchWithRawData(query, options);
+        } else {
+          const insights = await connector.searchAndTransform(query, options);
+          result = { posts: [], insights };
         }
-        const insights = await connector.searchAndTransform(query, options);
-        return { posts: [] as SocialMediaPost[], insights };
+
+        const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+        this.logger.log(`[search] ${connector.platform} done: ${result.posts.length} posts, ${result.insights.length} insights (${elapsed}s)`);
+
+        allPosts.push(...result.posts);
+        allInsights.push(...result.insights);
       } catch (error) {
         const err = error as Error;
         this.logger.error(
-          `Error searching ${connector.platform}: ${err.message}`,
+          `[search] ${connector.platform} failed: ${err.message}`,
           err.stack
         );
-        return { posts: [] as SocialMediaPost[], insights: [] as NarrativeInsight[] };
+        // Continue with other connectors
       }
-    });
+    }
 
-    const results = await Promise.all(searchPromises);
-    return {
-      posts: results.flatMap((r) => r.posts),
-      insights: results.flatMap((r) => r.insights),
-    };
+    this.logger.log(`[search] All connectors done: ${allPosts.length} posts, ${allInsights.length} insights total`);
+    return { posts: allPosts, insights: allInsights };
   }
 }

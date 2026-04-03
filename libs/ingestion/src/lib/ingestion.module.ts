@@ -1,7 +1,18 @@
 import { Module, DynamicModule, Provider, Type, ForwardReference } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
 import { IngestionController } from './controllers/ingestion.controller';
 import { NarrativeController } from './controllers/narrative.controller';
+import { InvestigationController } from './controllers/investigation.controller';
+import { ScanController } from './controllers/scan.controller';
+import { AnalysisJobController } from './controllers/analysis-job.controller';
+import { InvestigationRepository } from './repositories/investigation.repository';
+import { ScanJobRepository } from './repositories/scan-job.repository';
+import { AlertRepository } from './repositories/alert.repository';
+import { SignalCacheRepository } from './repositories/signal-cache.repository';
+import { AnalysisJobRepository } from './repositories/analysis-job.repository';
+import { IdentityRecordRepository } from './repositories/identity-record.repository';
+import { IdentityController } from './controllers/identity.controller';
 import { DatabaseModule, DatabaseService } from '@veritas/database';
 import { IngestionResolver } from './resolvers/ingestion.resolver';
 import { TransformOnIngestService } from './services/transform/transform-on-ingest.service';
@@ -14,6 +25,7 @@ import { YouTubeFreeConnector } from './services/youtube-free.connector';
 import { IngestionService } from './services/ingestion.service';
 import { SubprocessUtil } from './services/utils/subprocess.util';
 import { JinaReaderService } from './services/utils/jina-reader.service';
+import { ScanProcessor } from './queue/scan.processor';
 import {
   ContentClassificationModule,
   ContentClassificationService,
@@ -143,11 +155,24 @@ export class IngestionModule {
       );
     }
 
+    // Add BullMQ queues
+    imports.push(
+      BullModule.registerQueue({ name: 'scan' }),
+      BullModule.registerQueue({ name: 'analysis' }),
+    );
+
     // Configure providers
     const providers: Provider[] = [
       IngestionService,
       TransformOnIngestService,
       IngestionResolver,
+      InvestigationRepository,
+      ScanJobRepository,
+      ScanProcessor,
+      AlertRepository,
+      SignalCacheRepository,
+      AnalysisJobRepository,
+      IdentityRecordRepository,
     ];
 
     // Configure repository
@@ -167,12 +192,14 @@ export class IngestionModule {
     providers.push(SubprocessUtil, JinaReaderService);
 
     // Configure connectors - default to 'free' (API-free) if not specified
+    // WebScraper disabled by default: uses placeholder example.com URLs that cause SSL errors
+    // RSS disabled by default: no feeds configured
     const connectorConfig = options?.connectors || {
       twitter: true,
       facebook: true,
       reddit: true,
-      rss: true,
-      webScraper: true,
+      rss: false,
+      webScraper: false,
       youtube: true,
     };
 
@@ -219,6 +246,13 @@ export class IngestionModule {
       IngestionService,
       NarrativeRepository,
       TransformOnIngestService,
+      InvestigationRepository,
+      ScanJobRepository,
+      AlertRepository,
+      SignalCacheRepository,
+      AnalysisJobRepository,
+      IdentityRecordRepository,
+      BullModule,
       // Only export EmbeddingsService if it's enabled
       ...(options?.enableEmbeddings ? [EmbeddingsService] : []),
     ];
@@ -226,7 +260,7 @@ export class IngestionModule {
     return {
       module: IngestionModule,
       imports,
-      controllers: [IngestionController, NarrativeController],
+      controllers: [IngestionController, NarrativeController, InvestigationController, ScanController, AnalysisJobController, IdentityController],
       providers,
       exports,
       global: options?.isGlobal || false,

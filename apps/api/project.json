@@ -27,7 +27,7 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "TS_NODE_PROJECT=tsconfig.base.json node -r @swc-node/register -r tsconfig-paths/register apps/api/src/main.ts",
+        "command": "TS_NODE_PROJECT=tsconfig.base.json node --max-old-space-size=4096 -r @swc-node/register -r tsconfig-paths/register apps/api/src/main.ts",
         "cwd": "{workspaceRoot}"
       }
     },

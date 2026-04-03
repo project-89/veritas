@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { NarrativeTrend } from '../../types/narrative-trend.interface';
@@ -17,24 +17,21 @@ import {
  * Uses our DatabaseService to access MongoDB collections
  */
 @Injectable()
-export class MongoNarrativeRepository implements NarrativeRepository {
+export class MongoNarrativeRepository implements NarrativeRepository, OnModuleInit {
   private readonly logger = new Logger(MongoNarrativeRepository.name);
   private insightRepository!: Repository<NarrativeInsight>;
   private trendRepository!: Repository<NarrativeTrend>;
+  private initialized = false;
 
-  constructor(private readonly databaseService: DatabaseService) {
-    this.logger.log('Initializing MongoDB narrative repository');
+  constructor(private readonly databaseService: DatabaseService) {}
+
+  async onModuleInit() {
     this.initializeRepositories();
   }
 
-  /**
-   * Initialize database repositories
-   */
   private initializeRepositories() {
     try {
-      // Register models with the proper Mongoose schemas
       try {
-        // Use the Mongoose schema models exported from our schema files
         this.databaseService.registerModel(
           'NarrativeInsight',
           NarrativeInsightModel
@@ -43,10 +40,6 @@ export class MongoNarrativeRepository implements NarrativeRepository {
           'NarrativeTrend',
           NarrativeTrendModel
         );
-
-        this.logger.debug(
-          'Successfully registered Narrative models with database service'
-        );
       } catch (error) {
         this.logger.warn(
           'Models already registered or error registering models',
@@ -54,7 +47,6 @@ export class MongoNarrativeRepository implements NarrativeRepository {
         );
       }
 
-      // Get repositories
       this.insightRepository =
         this.databaseService.getRepository<NarrativeInsight>(
           'NarrativeInsight'
@@ -62,14 +54,27 @@ export class MongoNarrativeRepository implements NarrativeRepository {
       this.trendRepository =
         this.databaseService.getRepository<NarrativeTrend>('NarrativeTrend');
 
-      this.logger.debug('Successfully acquired Narrative repositories');
+      this.initialized = true;
+      this.logger.log('MongoDB narrative repository initialized');
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Failed to initialize repositories: ${err.message}`,
         err.stack
       );
-      throw error;
+    }
+  }
+
+  private ensureInitialized() {
+    if (!this.initialized) {
+      try {
+        this.initializeRepositories();
+      } catch {
+        // already logged
+      }
+    }
+    if (!this.initialized) {
+      throw new Error('MongoNarrativeRepository not initialized');
     }
   }
 
@@ -77,15 +82,17 @@ export class MongoNarrativeRepository implements NarrativeRepository {
    * Save a narrative insight to the repository
    */
   async save(insight: NarrativeInsight): Promise<void> {
+    this.ensureInitialized();
     try {
       await this.insightRepository.create(insight);
       this.logger.debug(`Saved narrative insight: ${insight.id}`);
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error saving narrative insight: ${err.message}`,
-        err.stack
-      );
+      if (err.message?.includes('E11000') || err.message?.includes('duplicate key')) {
+        this.logger.debug(`Duplicate insight skipped: ${insight.id}`);
+        return;
+      }
+      this.logger.error(`Error saving narrative insight: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -94,11 +101,20 @@ export class MongoNarrativeRepository implements NarrativeRepository {
    * Save multiple narrative insights in a batch
    */
   async saveMany(insights: NarrativeInsight[]): Promise<void> {
+    this.ensureInitialized();
     try {
       await this.insightRepository.createMany(insights);
       this.logger.debug(`Saved ${insights.length} narrative insights`);
     } catch (error: unknown) {
       const err = error as Error;
+      // Duplicate key errors (E11000) are expected when re-searching —
+      // the same posts produce the same content hashes. Treat as success.
+      if (err.message?.includes('E11000') || err.message?.includes('duplicate key')) {
+        this.logger.debug(
+          `Batch insert had duplicates (expected on re-search) — ${insights.length} insights processed`,
+        );
+        return;
+      }
       this.logger.error(
         `Error saving narrative insights batch: ${err.message}`,
         err.stack
@@ -113,6 +129,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
   async findByContentHash(
     contentHash: string
   ): Promise<NarrativeInsight | null> {
+    this.ensureInitialized();
     try {
       return await this.insightRepository.findOne({ contentHash });
     } catch (error: unknown) {
@@ -132,6 +149,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
     timeframe: string,
     options?: { limit?: number; skip?: number }
   ): Promise<NarrativeInsight[]> {
+    this.ensureInitialized();
     try {
       // Extract start and end dates from timeframe (e.g., "2023-Q1")
       const { startDate, endDate } = this.parseTimeframe(timeframe);
@@ -163,6 +181,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
    * Get narrative trends by aggregating insights
    */
   async getTrendsByTimeframe(timeframe: string): Promise<NarrativeTrend[]> {
+    this.ensureInitialized();
     try {
       // First check if we already have trends for this timeframe
       const existingTrends = await this.trendRepository.find({ timeframe });
@@ -211,6 +230,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
    * Returns the number of deleted insights
    */
   async deleteOlderThan(cutoffDate: Date): Promise<number> {
+    this.ensureInitialized();
     try {
       const result = await this.insightRepository.deleteMany({
         expiresAt: { $lt: cutoffDate },
@@ -483,6 +503,7 @@ export class MongoNarrativeRepository implements NarrativeRepository {
     embedding: number[],
     options?: { limit?: number; minScore?: number }
   ): Promise<Array<{ insight: NarrativeInsight; score: number }>> {
+    this.ensureInitialized();
     try {
       const limit = options?.limit || 10;
       const minScore = options?.minScore || 0.7;

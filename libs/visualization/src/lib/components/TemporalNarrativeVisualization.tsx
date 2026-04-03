@@ -50,8 +50,8 @@ export const TemporalNarrativeVisualization: React.FC<
       .attr("width", width)
       .attr("height", height);
 
-    // Define margins
-    const margin = { top: 40, right: 80, bottom: 60, left: 50 };
+    // Define margins — left margin accommodates the legend
+    const margin = { top: 40, right: 30, bottom: 60, left: 200 };
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
@@ -191,54 +191,64 @@ export const TemporalNarrativeVisualization: React.FC<
         .text((d) => d.content);
     }
 
-    // Add legend
+    // Add legend on the left side
     const legend = svg
       .append("g")
-      .attr(
-        "transform",
-        `translate(${width - margin.right + 20}, ${margin.top})`
-      );
+      .attr("transform", `translate(10, ${margin.top})`);
+
+    const maxLabelWidth = margin.left - 30; // space for color square + padding
 
     data.streams.forEach((stream, i) => {
-      legend
-        .append("rect")
-        .attr("x", 0)
-        .attr("y", i * 20)
-        .attr("width", 15)
-        .attr("height", 15)
-        .attr("fill", stream.color)
+      const row = legend
+        .append("g")
+        .attr("transform", `translate(0, ${i * 22})`)
         .attr("cursor", "pointer")
         .on("click", () => {
           setSelectedStream(selectedStream === stream.id ? null : stream.id);
           if (onStreamClick) onStreamClick(stream.id);
         });
 
-      legend
+      row
+        .append("rect")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", 12)
+        .attr("height", 12)
+        .attr("rx", 2)
+        .attr("fill", stream.color)
+        .attr("opacity", selectedStream && selectedStream !== stream.id ? 0.3 : 1);
+
+      const label = stream.name.length > 22
+        ? stream.name.substring(0, 22) + "..."
+        : stream.name;
+
+      row
         .append("text")
-        .attr("x", 20)
-        .attr("y", i * 20 + 12)
-        .text(stream.name)
-        .attr("font-size", "12px")
-        .attr("cursor", "pointer")
-        .on("click", () => {
-          setSelectedStream(selectedStream === stream.id ? null : stream.id);
-          if (onStreamClick) onStreamClick(stream.id);
-        });
+        .attr("x", 18)
+        .attr("y", 11)
+        .text(label)
+        .attr("font-size", "11px")
+        .attr("fill", "#cbd5e1")
+        .attr("opacity", selectedStream && selectedStream !== stream.id ? 0.4 : 1)
+        .append("title")
+        .text(stream.name);
     });
 
     // Add reset button
-    legend
-      .append("text")
-      .attr("x", 0)
-      .attr("y", data.streams.length * 20 + 20)
-      .text("Reset View")
-      .attr("font-size", "12px")
-      .attr("cursor", "pointer")
-      .attr("fill", "blue")
-      .attr("text-decoration", "underline")
-      .on("click", () => {
-        setSelectedStream(null);
-      });
+    if (selectedStream) {
+      legend
+        .append("text")
+        .attr("x", 0)
+        .attr("y", data.streams.length * 22 + 18)
+        .text("Reset")
+        .attr("font-size", "11px")
+        .attr("cursor", "pointer")
+        .attr("fill", "#818cf8")
+        .attr("text-decoration", "underline")
+        .on("click", () => {
+          setSelectedStream(null);
+        });
+    }
   }, [data, width, height, selectedStream, onStreamClick, onEventClick]);
 
   return (

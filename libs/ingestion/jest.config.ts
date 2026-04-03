@@ -10,5 +10,6 @@ export default {
   roots: ['<rootDir>/src', '<rootDir>/__tests__'],
   moduleNameMapper: {
     '^franc-min$': '<rootDir>/src/__mocks__/franc-min.ts',
+    '^afinn-165$': '<rootDir>/src/__mocks__/afinn-165.ts',
   },
 };

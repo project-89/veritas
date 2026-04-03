@@ -103,6 +103,7 @@
     "@google/generative-ai": "^0.24.1",
     "@haruhunab1320/twitter-scraper": "file:../../twitter-scraper",
     "@nestjs/apollo": "^13.0.4",
+    "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.1",
     "@nestjs/core": "^11.0.0",
@@ -112,8 +113,10 @@
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.1.0",
     "@nx/next": "^22.6.1",
+    "@types/three": "^0.183.1",
     "afinn-165": "^2.0.2",
     "axios": "^1.6.0",
+    "bullmq": "^5.71.1",
     "cheerio": "^1.0.0",
     "class-transformer": "^0.5.1",
     "d3": "^7.9.0",
@@ -131,6 +134,8 @@
     "reflect-metadata": "^0.1.13",
     "rss-parser": "^3.13.0",
     "rxjs": "^7.8.0",
+    "three": "^0.183.2",
+    "three-globe": "^2.45.1",
     "zod": "^3.24.2"
   },
   "nx": {
