@@ -87,26 +87,22 @@ export function ScanHistoryBar({ scans, currentScanId, onSelectScan }: ScanHisto
         {/* Background track */}
         <line x1="0" y1="10" x2="100%" y2="10" stroke="#2a2a45" strokeWidth="1" />
 
-        {/* Segments */}
+        {/* Layer 1: Hit areas + bars (rendered first, underneath) */}
         {segments.map((seg) => {
           const x1Pct = ((seg.start - totalStart) / totalRange) * 100;
           const x2Pct = ((seg.end - totalStart) / totalRange) * 100;
           const isHovered = hoveredId === seg.scanId;
-
           const barColor = seg.isCurrent ? '#FF6B2B' : isHovered ? '#00FF41' : '#555570';
           const barOpacity = seg.isCurrent ? 1 : isHovered ? 0.8 : 0.35;
-          const dotRadius = isHovered ? 5 : 3.5;
-          const dotColor = seg.isCurrent ? '#FF6B2B' : isHovered ? '#00FF41' : '#555570';
 
           return (
             <g
-              key={seg.scanId}
+              key={`bar-${seg.scanId}`}
               onClick={() => onSelectScan?.(seg.scanId)}
               onMouseEnter={() => setHoveredId(seg.scanId)}
               onMouseLeave={() => setHoveredId(null)}
               style={{ cursor: 'pointer' }}
             >
-              {/* Invisible wider hit area */}
               <rect
                 x={`${x1Pct}%`}
                 y="0"
@@ -114,8 +110,6 @@ export function ScanHistoryBar({ scans, currentScanId, onSelectScan }: ScanHisto
                 height="20"
                 fill="transparent"
               />
-
-              {/* Span bar */}
               <line
                 x1={`${x1Pct}%`}
                 y1="10"
@@ -126,25 +120,42 @@ export function ScanHistoryBar({ scans, currentScanId, onSelectScan }: ScanHisto
                 opacity={barOpacity}
                 strokeLinecap="round"
               />
+            </g>
+          );
+        })}
 
-              {/* Start dot */}
+        {/* Layer 2: All dots (rendered last, always on top of all bars) */}
+        {segments.map((seg) => {
+          const x1Pct = ((seg.start - totalStart) / totalRange) * 100;
+          const x2Pct = ((seg.end - totalStart) / totalRange) * 100;
+          const isHovered = hoveredId === seg.scanId;
+          const dotRadius = isHovered ? 5 : 3.5;
+          const dotColor = seg.isCurrent ? '#FF6B2B' : isHovered ? '#00FF41' : '#555570';
+          const strokeColor = seg.isCurrent ? '#FF8B4B' : isHovered ? '#00FF41' : '#3a3a5f';
+
+          return (
+            <g
+              key={`dots-${seg.scanId}`}
+              onClick={() => onSelectScan?.(seg.scanId)}
+              onMouseEnter={() => setHoveredId(seg.scanId)}
+              onMouseLeave={() => setHoveredId(null)}
+              style={{ cursor: 'pointer' }}
+            >
               <circle
                 cx={`${x1Pct}%`}
                 cy="10"
                 r={dotRadius}
                 fill={dotColor}
-                stroke={seg.isCurrent ? '#FF8B4B' : isHovered ? '#00FF41' : '#3a3a5f'}
+                stroke={strokeColor}
                 strokeWidth="1.5"
                 style={{ transition: 'r 0.15s, fill 0.15s' }}
               />
-
-              {/* End dot */}
               <circle
                 cx={`${x2Pct}%`}
                 cy="10"
                 r={dotRadius}
                 fill={dotColor}
-                stroke={seg.isCurrent ? '#FF8B4B' : isHovered ? '#00FF41' : '#3a3a5f'}
+                stroke={strokeColor}
                 strokeWidth="1.5"
                 style={{ transition: 'r 0.15s, fill 0.15s' }}
               />
