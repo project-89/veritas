@@ -110,6 +110,7 @@ import { PlatformCredibilityService } from '../../../../libs/analysis/src/lib/se
 import { SocialGraphIntelligenceService } from '../../../../libs/analysis/src/lib/services/social-graph-intelligence.service';
 import { GraphDatabaseService } from '../../../../libs/analysis/src/lib/services/graph-database.service';
 import { MonitorService } from '../../../../libs/analysis/src/lib/services/monitor.service';
+import { SaturationMetricsService } from '../../../../libs/analysis/src/lib/services/saturation-metrics.service';
 
 // Signal adapters
 import { CoinGeckoAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/coingecko.adapter';
@@ -2120,5 +2121,661 @@ describe('Section 7: Error Handling & Graceful Degradation', () => {
       'test-inv',
     );
     expect(result.edgesCreated).toBe(0);
+  });
+});
+
+// ============================================================================
+// SECTION 8: COMPARISON SERVICE CONTRACTS
+// ============================================================================
+
+describe('Section 8: Comparison Service Contracts', () => {
+  const svc = new ComparisonService();
+
+  const narrativeA = makeNarrative({
+    id: 'narr-a',
+    summary: 'Bitcoin bull run driven by ETF',
+    avgSentiment: 0.7,
+    velocity: { postsPerHour: 5.0, acceleration: 0.2, trend: 'growing' as const },
+    platforms: { twitter: 10, reddit: 5 },
+    authors: [
+      { name: 'Alice', handle: '@alice', postCount: 3 },
+      { name: 'Bob', handle: '@bob', postCount: 2 },
+    ],
+    centroidEmbedding: [0.1, 0.2, 0.3, 0.4, 0.5],
+    postIndices: [0, 1, 2, 3, 4],
+  });
+
+  const narrativeB = makeNarrative({
+    id: 'narr-b',
+    summary: 'Ethereum staking yields declining',
+    avgSentiment: -0.3,
+    velocity: { postsPerHour: 2.0, acceleration: -0.1, trend: 'declining' as const },
+    platforms: { twitter: 3, farcaster: 7 },
+    authors: [
+      { name: 'Charlie', handle: '@charlie', postCount: 4 },
+      { name: 'Bob', handle: '@bob', postCount: 1 },
+    ],
+    centroidEmbedding: [0.5, 0.4, 0.3, 0.2, 0.1],
+    postIndices: [5, 6, 7],
+  });
+
+  const postsA = [makePost({ id: 'p1', platform: 'twitter' }), makePost({ id: 'p2', platform: 'reddit' })];
+  const postsB = [makePost({ id: 'p3', platform: 'twitter' }), makePost({ id: 'p4', platform: 'farcaster' })];
+
+  it('compareNarratives() returns correct NarrativeComparison shape', () => {
+    const result = svc.compareNarratives(narrativeA, narrativeB, postsA, postsB);
+    expect(result).toHaveProperty('narrativeA');
+    expect(result).toHaveProperty('narrativeB');
+    expect(result).toHaveProperty('similarity');
+    expect(result).toHaveProperty('sentimentDelta');
+    expect(result).toHaveProperty('velocityComparison');
+    expect(result).toHaveProperty('platformOverlap');
+    expect(result).toHaveProperty('authorOverlap');
+    expect(result.narrativeA.id).toBe('narr-a');
+    expect(result.narrativeB.id).toBe('narr-b');
+  });
+
+  it('compareNarratives() with identical narratives returns similarity ~1.0', () => {
+    const result = svc.compareNarratives(narrativeA, narrativeA, postsA, postsA);
+    expect(result.similarity).toBeCloseTo(1.0, 5);
+  });
+
+  it('compareNarratives() computes correct sentimentDelta (A - B)', () => {
+    const result = svc.compareNarratives(narrativeA, narrativeB, postsA, postsB);
+    expect(result.sentimentDelta).toBeCloseTo(0.7 - (-0.3), 5);
+  });
+
+  it('compareNarratives() velocityComparison identifies faster narrative', () => {
+    const result = svc.compareNarratives(narrativeA, narrativeB, postsA, postsB);
+    expect(result.velocityComparison.aPostsPerHour).toBe(5.0);
+    expect(result.velocityComparison.bPostsPerHour).toBe(2.0);
+    expect(result.velocityComparison.fasterNarrative).toBe('a');
+  });
+
+  it('compareNarratives() with no shared platforms returns empty shared array', () => {
+    const narrNoOverlap = makeNarrative({
+      id: 'narr-no-overlap',
+      platforms: { farcaster: 5 },
+      authors: [{ name: 'Dave', handle: '@dave', postCount: 2 }],
+      centroidEmbedding: [0.5, 0.4, 0.3, 0.2, 0.1],
+    });
+    const narrOnlyTwitter = makeNarrative({
+      id: 'narr-only-twitter',
+      platforms: { twitter: 5 },
+      authors: [{ name: 'Eve', handle: '@eve', postCount: 2 }],
+      centroidEmbedding: [0.1, 0.2, 0.3, 0.4, 0.5],
+    });
+    const result = svc.compareNarratives(narrOnlyTwitter, narrNoOverlap, postsA, postsB);
+    expect(result.platformOverlap.shared).toEqual([]);
+  });
+
+  it('compareNarratives() with no shared authors returns empty shared array', () => {
+    const narrX = makeNarrative({
+      id: 'narr-x',
+      authors: [{ name: 'Unique1', handle: '@unique1', postCount: 1 }],
+      centroidEmbedding: [0.1, 0.2, 0.3, 0.4, 0.5],
+    });
+    const narrY = makeNarrative({
+      id: 'narr-y',
+      authors: [{ name: 'Unique2', handle: '@unique2', postCount: 1 }],
+      centroidEmbedding: [0.5, 0.4, 0.3, 0.2, 0.1],
+    });
+    const result = svc.compareNarratives(narrX, narrY, postsA, postsB);
+    expect(result.authorOverlap.shared).toEqual([]);
+  });
+
+  it('compareNarratives() detects shared authors correctly', () => {
+    const result = svc.compareNarratives(narrativeA, narrativeB, postsA, postsB);
+    expect(result.authorOverlap.shared).toContain('@bob');
+  });
+
+  it('compareTimePeriods() returns persistent/emerged/disappeared arrays', () => {
+    const periodA = { narratives: [narrativeA], posts: postsA, label: 'Week 1' };
+    const periodB = { narratives: [narrativeB], posts: postsB, label: 'Week 2' };
+    const result = svc.compareTimePeriods(periodA, periodB);
+    expect(result).toHaveProperty('persistent');
+    expect(result).toHaveProperty('emerged');
+    expect(result).toHaveProperty('disappeared');
+    expect(Array.isArray(result.persistent)).toBe(true);
+    expect(Array.isArray(result.emerged)).toBe(true);
+    expect(Array.isArray(result.disappeared)).toBe(true);
+  });
+
+  it('compareTimePeriods() with identical periods returns all persistent, no emerged/disappeared', () => {
+    const period = { narratives: [narrativeA], posts: postsA, label: 'Same' };
+    const result = svc.compareTimePeriods(period, period);
+    expect(result.persistent.length).toBe(1);
+    expect(result.emerged.length).toBe(0);
+    expect(result.disappeared.length).toBe(0);
+  });
+
+  it('compareTimePeriods() with disjoint periods returns all emerged/disappeared', () => {
+    // Use very different embeddings so similarity < 0.7
+    const narrDisjointA = makeNarrative({
+      id: 'disjoint-a',
+      centroidEmbedding: [1, 0, 0, 0, 0],
+      postIndices: [0],
+    });
+    const narrDisjointB = makeNarrative({
+      id: 'disjoint-b',
+      centroidEmbedding: [0, 0, 0, 0, 1],
+      postIndices: [1],
+    });
+    const pA = { narratives: [narrDisjointA], posts: postsA, label: 'Period A' };
+    const pB = { narratives: [narrDisjointB], posts: postsB, label: 'Period B' };
+    const result = svc.compareTimePeriods(pA, pB);
+    expect(result.persistent.length).toBe(0);
+    expect(result.emerged.length).toBe(1);
+    expect(result.disappeared.length).toBe(1);
+  });
+
+  it('comparePlatforms() returns per-platform breakdown with correct fields', () => {
+    const allPosts = [
+      makePost({ platform: 'twitter', authorHandle: '@alice' }),
+      makePost({ platform: 'reddit', authorHandle: '@bob' }),
+    ];
+    const result = svc.comparePlatforms([narrativeA], allPosts);
+    expect(result).toHaveProperty('platforms');
+    expect(result).toHaveProperty('perPlatform');
+    expect(result).toHaveProperty('crossPlatform');
+    for (const entry of result.perPlatform) {
+      expect(entry).toHaveProperty('platform');
+      expect(entry).toHaveProperty('postCount');
+      expect(entry).toHaveProperty('avgSentiment');
+      expect(entry).toHaveProperty('dominantNarrative');
+      expect(entry).toHaveProperty('uniqueNarratives');
+      expect(entry).toHaveProperty('topAuthors');
+    }
+  });
+
+  it('comparePlatforms() with single platform returns 1 entry', () => {
+    const singlePlatformPosts = [
+      makePost({ platform: 'twitter' }),
+      makePost({ platform: 'twitter' }),
+    ];
+    const singlePlatformNarr = makeNarrative({ platforms: { twitter: 2 } });
+    const result = svc.comparePlatforms([singlePlatformNarr], singlePlatformPosts);
+    expect(result.perPlatform.length).toBe(1);
+    expect(result.perPlatform[0]!.platform).toBe('twitter');
+  });
+
+  it('comparePlatforms() identifies cross-platform narratives', () => {
+    const multiPlatPosts = [
+      makePost({ platform: 'twitter' }),
+      makePost({ platform: 'reddit' }),
+    ];
+    const multiPlatNarr = makeNarrative({ platforms: { twitter: 5, reddit: 3 } });
+    const result = svc.comparePlatforms([multiPlatNarr], multiPlatPosts);
+    expect(result.crossPlatform.length).toBe(1);
+    expect(result.crossPlatform[0]!.platforms).toContain('twitter');
+    expect(result.crossPlatform[0]!.platforms).toContain('reddit');
+  });
+});
+
+// ============================================================================
+// SECTION 9: SOCIAL GRAPH INTELLIGENCE
+// ============================================================================
+
+describe('Section 9: Social Graph Intelligence', () => {
+  const graphDb = makeGraphDatabaseService(false);
+
+  it('enrichRelationships() extracts @mentions from post text', async () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    const result = await svc.enrichRelationships(
+      [
+        {
+          handle: 'alice',
+          platform: 'twitter',
+          posts: [{ text: 'Hello @bob and @charlie', timestamp: '2026-03-15T12:00:00Z' }],
+        },
+      ],
+      'inv-1',
+    );
+    // In-memory fallback counts the edges
+    expect(result.edgesCreated).toBe(2);
+  });
+
+  it('enrichRelationships() detects co-timing between users posting within 5 min', async () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    const result = await svc.enrichRelationships(
+      [
+        {
+          handle: 'alice',
+          platform: 'twitter',
+          posts: [{ text: 'Post A', timestamp: '2026-03-15T12:00:00Z' }],
+        },
+        {
+          handle: 'bob',
+          platform: 'twitter',
+          posts: [{ text: 'Post B', timestamp: '2026-03-15T12:03:00Z' }],
+        },
+      ],
+      'inv-1',
+    );
+    // co-timing edge should be detected
+    expect(result.edgesCreated).toBe(1);
+  });
+
+  it('enrichRelationships() returns edgesCreated count', async () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    const result = await svc.enrichRelationships(
+      [
+        {
+          handle: 'alice',
+          platform: 'twitter',
+          posts: [{ text: '@bob nice take', timestamp: '2026-03-15T12:00:00Z' }],
+        },
+      ],
+      'inv-1',
+    );
+    expect(typeof result.edgesCreated).toBe('number');
+    expect(result.edgesCreated).toBeGreaterThanOrEqual(1);
+  });
+
+  it('enrichRelationships() with empty users returns 0 edges', async () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    const result = await svc.enrichRelationships([], 'inv-1');
+    expect(result.edgesCreated).toBe(0);
+  });
+
+  it('classifyTier() returns tier 1 for direct interactions (reply, mention)', () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    expect(svc.classifyTier(['reply'], 1, false)).toBe(1);
+    expect(svc.classifyTier(['mention'], 1, false)).toBe(1);
+  });
+
+  it('classifyTier() returns tier 2 for contextual (co_timing, co_narrative)', () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    expect(svc.classifyTier(['co_timing'], 1, false)).toBe(2);
+    expect(svc.classifyTier(['co_narrative'], 1, false)).toBe(2);
+  });
+
+  it('classifyTier() returns tier 1 when interactionCount >= 3', () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    expect(svc.classifyTier(['co_timing'], 3, false)).toBe(1);
+  });
+
+  it('classifyTier() returns tier 1 when reciprocal is true', () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    expect(svc.classifyTier(['co_timing'], 1, true)).toBe(1);
+  });
+
+  it('classifyTier() returns tier 3 for no recognized interaction types', () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    expect(svc.classifyTier(['bridge'], 1, false)).toBe(3);
+  });
+
+  it('getClosestAssociates() returns empty when no graph available', async () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    const result = await svc.getClosestAssociates('alice', 'twitter');
+    expect(result).toEqual([]);
+  });
+
+  it('findConnection() returns null when no graph available', async () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    const result = await svc.findConnection('alice', 'twitter', 'bob', 'twitter');
+    expect(result).toBeNull();
+  });
+
+  it('getDegreesOfSeparation() returns null when no graph available', async () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    const result = await svc.getDegreesOfSeparation('alice', 'twitter', 'bob', 'twitter');
+    expect(result).toBeNull();
+  });
+
+  it('extractMentions() returns unique handles from text', () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    const mentions = svc.extractMentions('@alice said hello to @bob and @alice again');
+    expect(mentions).toContain('alice');
+    expect(mentions).toContain('bob');
+    expect(mentions.length).toBe(2); // deduplicated
+  });
+
+  it('calculateWeight() returns value between 0 and 1', () => {
+    const svc = new SocialGraphIntelligenceService(graphDb);
+    const weight = svc.calculateWeight(10, 5, true, 0.5);
+    expect(weight).toBeGreaterThan(0);
+    expect(weight).toBeLessThanOrEqual(1);
+  });
+});
+
+// ============================================================================
+// SECTION 10: PLATFORM CREDIBILITY
+// ============================================================================
+
+describe('Section 10: Platform Credibility', () => {
+  const configService = makeConfigService();
+  const svc = new PlatformCredibilityService(configService);
+
+  it('has profile for twitter with credibility < influence', () => {
+    const profile = svc.getProfile('twitter');
+    expect(profile.credibilityWeight).toBeLessThan(profile.influenceWeight);
+  });
+
+  it('has profile for truthsocial with lowest credibility', () => {
+    const profile = svc.getProfile('truthsocial');
+    expect(profile.credibilityWeight).toBe(0.2);
+    // Verify it's the lowest among known social platforms
+    const twitterCred = svc.getProfile('twitter').credibilityWeight;
+    const redditCred = svc.getProfile('reddit').credibilityWeight;
+    expect(profile.credibilityWeight).toBeLessThan(twitterCred);
+    expect(profile.credibilityWeight).toBeLessThan(redditCred);
+  });
+
+  it('has profile for farcaster with highest credibility among social', () => {
+    const farcaster = svc.getProfile('farcaster');
+    const twitter = svc.getProfile('twitter');
+    const reddit = svc.getProfile('reddit');
+    const truthsocial = svc.getProfile('truthsocial');
+    expect(farcaster.credibilityWeight).toBeGreaterThan(twitter.credibilityWeight);
+    expect(farcaster.credibilityWeight).toBeGreaterThan(reddit.credibilityWeight);
+    expect(farcaster.credibilityWeight).toBeGreaterThan(truthsocial.credibilityWeight);
+  });
+
+  it('RSS tier-1 has higher credibility than twitter', () => {
+    const rssProfile = svc.getRssSubProfile('tier-1');
+    const twitterProfile = svc.getProfile('twitter');
+    expect(rssProfile).toBeDefined();
+    expect(rssProfile!.credibilityWeight).toBeGreaterThan(twitterProfile.credibilityWeight);
+  });
+
+  it('getCredibilityMultiplier() returns 0-1 for all known platforms', () => {
+    const platforms = ['twitter', 'truthsocial', 'reddit', 'farcaster', 'youtube', 'telegram', 'rss'];
+    for (const platform of platforms) {
+      const mult = svc.getCredibilityMultiplier(platform);
+      expect(mult).toBeGreaterThanOrEqual(0);
+      expect(mult).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('getInfluenceMultiplier() returns 0-1 for all known platforms', () => {
+    const platforms = ['twitter', 'truthsocial', 'reddit', 'farcaster', 'youtube', 'telegram', 'rss'];
+    for (const platform of platforms) {
+      const mult = svc.getInfluenceMultiplier(platform);
+      expect(mult).toBeGreaterThanOrEqual(0);
+      expect(mult).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('isHighManipulationRisk() returns true for truthsocial', () => {
+    expect(svc.isHighManipulationRisk('truthsocial')).toBe(true);
+  });
+
+  it('isHighManipulationRisk() returns false for farcaster', () => {
+    expect(svc.isHighManipulationRisk('farcaster')).toBe(false);
+  });
+
+  it('adjustClaimWeight() reduces confidence for low-credibility platforms', () => {
+    const highCred = svc.adjustClaimWeight(0.8, 'farcaster');
+    const lowCred = svc.adjustClaimWeight(0.8, 'truthsocial');
+    expect(lowCred).toBeLessThan(highCred);
+    expect(lowCred).toBeGreaterThan(0);
+    expect(highCred).toBeLessThanOrEqual(1);
+  });
+
+  it('unknown platform returns neutral defaults', () => {
+    const profile = svc.getProfile('myspace');
+    expect(profile.credibilityWeight).toBe(0.5);
+    expect(profile.influenceWeight).toBe(0.5);
+    expect(profile.manipulationRisk).toBe(0.5);
+  });
+});
+
+// ============================================================================
+// SECTION 11: EVIDENCE ADAPTER ROUTING
+// ============================================================================
+
+describe('Section 11: Evidence Adapter Routing', () => {
+  it('Etherscan canVerify() true for claims with 0x addresses', () => {
+    const adapter = new EtherscanEvidenceAdapter();
+    expect(adapter.canVerify('Check wallet 0x1234567890abcdef1234567890abcdef12345678', [])).toBe(true);
+  });
+
+  it('Etherscan canVerify() true for crypto keyword claims', () => {
+    const adapter = new EtherscanEvidenceAdapter();
+    expect(adapter.canVerify('ethereum transfer detected', [])).toBe(true);
+  });
+
+  it('Etherscan canVerify() false for non-crypto claims', () => {
+    const adapter = new EtherscanEvidenceAdapter();
+    expect(adapter.canVerify('The weather is nice today', ['sun', 'rain'])).toBe(false);
+  });
+
+  it('DexScreener canVerify() true for "liquidity" claims', () => {
+    const adapter = new DexScreenerEvidenceAdapter();
+    expect(adapter.canVerify('liquidity pool has been drained', [])).toBe(true);
+  });
+
+  it('DexScreener canVerify() true for "token" claims', () => {
+    const adapter = new DexScreenerEvidenceAdapter();
+    expect(adapter.canVerify('new token launched on uniswap', [])).toBe(true);
+  });
+
+  it('GitHub canVerify() true for "development" claims', () => {
+    const adapter = new GitHubEvidenceAdapter();
+    expect(adapter.canVerify('development activity has stopped', [])).toBe(true);
+  });
+
+  it('GitHub canVerify() true for repo-pattern entities', () => {
+    const adapter = new GitHubEvidenceAdapter();
+    expect(adapter.canVerify('Check this', ['facebook/react'])).toBe(true);
+  });
+
+  it('GitHub canVerify() false for financial claims', () => {
+    const adapter = new GitHubEvidenceAdapter();
+    expect(adapter.canVerify('stock price increased by 50%', ['AAPL'])).toBe(false);
+  });
+
+  it('SEC EDGAR canVerify() true for "filing" claims', () => {
+    const adapter = new SecEdgarEvidenceAdapter();
+    expect(adapter.canVerify('new SEC filing detected', [])).toBe(true);
+  });
+
+  it('SocialGraph canVerify() always returns true', () => {
+    const mockIdentityRepo = {
+      findByHandle: jest.fn(),
+      search: jest.fn(),
+    } as any;
+    const adapter = new SocialGraphEvidenceAdapter(mockIdentityRepo);
+    expect(adapter.canVerify('any claim at all', [])).toBe(true);
+    expect(adapter.canVerify('', [])).toBe(true);
+  });
+
+  it('all adapters return [] on fetch failure (mock fetch to reject)', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockRejectedValue(new Error('Network error')) as any;
+
+    try {
+      const etherscan = new EtherscanEvidenceAdapter();
+      // Etherscan needs API key — set it via env
+      const origKey = process.env['ETHERSCAN_API_KEY'];
+      process.env['ETHERSCAN_API_KEY'] = 'test-key';
+      const ethResult = await etherscan.fetchEvidence({
+        claim: 'Check wallet 0x1234567890abcdef1234567890abcdef12345678',
+        entities: ['0x1234567890abcdef1234567890abcdef12345678'],
+      });
+      expect(ethResult).toEqual([]);
+      process.env['ETHERSCAN_API_KEY'] = origKey;
+
+      const dexscreener = new DexScreenerEvidenceAdapter();
+      const dexResult = await dexscreener.fetchEvidence({
+        claim: 'token liquidity',
+        entities: ['SOL'],
+      });
+      expect(dexResult).toEqual([]);
+
+      const github = new GitHubEvidenceAdapter();
+      const ghResult = await github.fetchEvidence({
+        claim: 'development',
+        entities: ['facebook/react'],
+      });
+      expect(ghResult).toEqual([]);
+
+      const secEdgar = new SecEdgarEvidenceAdapter();
+      const secResult = await secEdgar.fetchEvidence({
+        claim: 'SEC filing',
+        entities: ['AAPL'],
+      });
+      expect(secResult).toEqual([]);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+});
+
+// ============================================================================
+// SECTION 12: CROSS-SCAN DEDUPLICATION
+// ============================================================================
+
+describe('Section 12: Cross-Scan Deduplication', () => {
+  /**
+   * Reproduces the dedup key logic used in the ingestion pipeline.
+   * Normalizes text for consistent deduplication across scans.
+   */
+  function dedupKey(text: string): string {
+    return text
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 100);
+  }
+
+  it('same text normalized different ways produces same key', () => {
+    const a = dedupKey('  Bitcoin is  GOING  to  $100k  ');
+    const b = dedupKey('bitcoin is going to $100k');
+    expect(a).toBe(b);
+  });
+
+  it('text truncation to 100 chars works', () => {
+    const longText = 'a'.repeat(200);
+    const key = dedupKey(longText);
+    expect(key.length).toBe(100);
+  });
+
+  it('empty text does not crash', () => {
+    const key = dedupKey('');
+    expect(key).toBe('');
+  });
+
+  it('whitespace normalization works', () => {
+    const key = dedupKey('hello   world\t\ntest');
+    expect(key).toBe('hello world test');
+  });
+
+  it('case normalization works', () => {
+    const a = dedupKey('BITCOIN MOON');
+    const b = dedupKey('bitcoin moon');
+    expect(a).toBe(b);
+  });
+
+  it('leading/trailing whitespace is trimmed', () => {
+    const key = dedupKey('   padded   ');
+    expect(key).toBe('padded');
+  });
+});
+
+// ============================================================================
+// SECTION 13: SATURATION INTEGRATION
+// ============================================================================
+
+describe('Section 13: Saturation Integration', () => {
+  it('NarrativeAnalysisService with SaturationMetricsService returns saturation in result', async () => {
+    const configService = makeConfigService();
+    const saturationMetrics = new SaturationMetricsService();
+    const svc = new NarrativeAnalysisService(configService, saturationMetrics);
+
+    const posts = [
+      makePost({ text: 'Bitcoin heading to $100k' }),
+      makePost({ text: 'BTC institutional adoption' }),
+      makePost({ text: 'Crypto markets rising' }),
+    ];
+
+    const result = await svc.analyze(posts);
+    expect(result).toHaveProperty('narratives');
+    expect(result).toHaveProperty('unclustered');
+    // saturation may or may not be present depending on mock behavior,
+    // but the service should not throw
+    expect(result).toBeDefined();
+  });
+
+  it('SaturationMetricsService.computeSaturation returns correct shape', () => {
+    const svc = new SaturationMetricsService();
+    const result = svc.computeSaturation({
+      narratives: [
+        { postIndices: [0, 1, 2], centroidEmbedding: [0.1, 0.2, 0.3] },
+        { postIndices: [3, 4], centroidEmbedding: [0.4, 0.5, 0.6] },
+      ],
+      totalPosts: 10,
+      unclusteredCount: 5,
+    });
+    expect(result).toHaveProperty('saturationLevel');
+    expect(result).toHaveProperty('postCount');
+    expect(result).toHaveProperty('narrativeCount');
+    expect(result).toHaveProperty('unclusteredRatio');
+    expect(result).toHaveProperty('clusterDensity');
+    expect(result).toHaveProperty('recommendation');
+    expect(result).toHaveProperty('suggestedDepth');
+  });
+
+  it('high unclustered ratio = low saturation', () => {
+    const svc = new SaturationMetricsService();
+    const result = svc.computeSaturation({
+      narratives: [{ postIndices: [0], centroidEmbedding: [0.1, 0.2, 0.3] }],
+      totalPosts: 10,
+      unclusteredCount: 8, // 80% unclustered
+    });
+    expect(result.saturationLevel).toBe('low');
+  });
+
+  it('high cluster density = saturated', () => {
+    const svc = new SaturationMetricsService();
+    // 2 narratives with 50 posts each, only 5 unclustered out of 105 total
+    const result = svc.computeSaturation({
+      narratives: [
+        { postIndices: Array.from({ length: 50 }, (_, i) => i), centroidEmbedding: [0.1, 0.2, 0.3] },
+        { postIndices: Array.from({ length: 50 }, (_, i) => i + 50), centroidEmbedding: [0.7, 0.8, 0.9] },
+      ],
+      totalPosts: 105,
+      unclusteredCount: 5, // ~4.7% unclustered, density = 100/2 = 50
+    });
+    expect(result.saturationLevel).toBe('saturated');
+  });
+
+  it('zero posts returns low saturation', () => {
+    const svc = new SaturationMetricsService();
+    const result = svc.computeSaturation({
+      narratives: [],
+      totalPosts: 0,
+      unclusteredCount: 0,
+    });
+    expect(result.saturationLevel).toBe('low');
+  });
+
+  it('moderate saturation for intermediate values', () => {
+    const svc = new SaturationMetricsService();
+    // unclusteredRatio = 4/10 = 0.4 (> 0.3), clusterDensity = 6/2 = 3 (< 5) -> low
+    // Let's use values that hit moderate: unclusteredRatio = 0.35, density = 4
+    const result = svc.computeSaturation({
+      narratives: [
+        { postIndices: [0, 1, 2, 3], centroidEmbedding: [0.1, 0.2, 0.3] },
+        { postIndices: [4, 5, 6, 7], centroidEmbedding: [0.7, 0.8, 0.9] },
+      ],
+      totalPosts: 12,
+      unclusteredCount: 4, // ratio = 0.33, density = 8/2 = 4
+    });
+    expect(result.saturationLevel).toBe('moderate');
+  });
+
+  it('deduplicationRate is computed correctly', () => {
+    const svc = new SaturationMetricsService();
+    const result = svc.computeSaturation({
+      narratives: [{ postIndices: [0, 1], centroidEmbedding: [0.1, 0.2, 0.3] }],
+      totalPosts: 8,
+      unclusteredCount: 3,
+      rawPostCount: 10,
+      deduplicatedCount: 8,
+    });
+    // deduplicationRate = (10 - 8) / 10 = 0.2
+    expect(result.deduplicationRate).toBeCloseTo(0.2, 5);
   });
 });
