@@ -264,6 +264,35 @@ export class ScanJobRepository implements OnModuleInit {
   }
 
   /**
+   * Get normalized text keys from all previous completed scans for the same query.
+   * Used for cross-scan deduplication — avoids re-scraping the same posts.
+   */
+  async getExistingPostKeys(query: string): Promise<string[]> {
+    this.ensureInitialized();
+    try {
+      const scans = await this.scanJobRepo.find(
+        { query, status: 'completed' } as Record<string, unknown>,
+        { sort: { createdAt: -1 }, limit: 5 }, // Last 5 scans for this query
+      );
+
+      const keys: string[] = [];
+      for (const scan of scans) {
+        const posts = (scan as any).posts ?? [];
+        for (const post of posts) {
+          const text = (post.text ?? '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 100);
+          if (text) keys.push(text);
+        }
+      }
+
+      return keys;
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(`Error getting existing post keys: ${err.message}`);
+      return [];
+    }
+  }
+
+  /**
    * Cancel a scan job and all its queued/running connectors.
    */
   async cancelJob(scanId: string): Promise<void> {

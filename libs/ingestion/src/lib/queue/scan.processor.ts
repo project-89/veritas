@@ -88,8 +88,20 @@ export class ScanProcessor extends WorkerHost {
         `[scan:${scanId}] ${connector}: fetched ${result.posts.length} posts, ${result.insights.length} insights`,
       );
 
-      // Deduplicate posts by normalized text
+      // Deduplicate posts by normalized text — including cross-scan dedup
+      // Load existing post text keys from previous scans for the same query
       const seenTexts = new Set<string>();
+      try {
+        const existingPosts = await this.scanJobRepository.getExistingPostKeys(query);
+        for (const key of existingPosts) {
+          seenTexts.add(key);
+        }
+        if (existingPosts.length > 0) {
+          this.logger.debug(`[scan:${scanId}] Cross-scan dedup: ${existingPosts.length} existing post keys loaded`);
+        }
+      } catch {
+        // Non-fatal — proceed without cross-scan dedup
+      }
       const dedupedPosts: SocialMediaPost[] = [];
       const dedupedInsights: NarrativeInsight[] = [];
       for (let i = 0; i < result.posts.length; i++) {
