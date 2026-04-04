@@ -76,6 +76,11 @@ export default function SearchPage() {
   const [timeRange, setTimeRange] = useState('7d');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [usernames, setUsernames] = useState('');
+  const [hashtags, setHashtags] = useState('');
+  const [wallets, setWallets] = useState('');
+  const [subreddits, setSubreddits] = useState('');
   const [depthPreset, setDepthPreset] = useState<string>('standard');
   const limit = DEPTH_PRESETS.find((p) => p.id === depthPreset)?.limit ?? 100;
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
@@ -117,9 +122,19 @@ export default function SearchPage() {
     } else {
       params.set('timeRange', timeRange);
     }
-    params.set('fresh', '1'); // Signal to results page to run full pipeline
+    // Advanced filters
+    const trimmedUsernames = usernames.trim();
+    const trimmedHashtags = hashtags.trim();
+    const trimmedWallets = wallets.trim();
+    const trimmedSubreddits = subreddits.trim();
+    if (trimmedUsernames) params.set('usernames', trimmedUsernames);
+    if (trimmedHashtags) params.set('hashtags', trimmedHashtags);
+    if (trimmedWallets) params.set('wallets', trimmedWallets);
+    if (trimmedSubreddits) params.set('subreddits', trimmedSubreddits);
+
+    params.set('fresh', '1');
     router.push(`/results?${params.toString()}`);
-  }, [query, platforms, limit, timeRange, router]);
+  }, [query, platforms, limit, timeRange, customStart, customEnd, usernames, hashtags, wallets, subreddits, router]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleScan();
@@ -155,6 +170,72 @@ export default function SearchPage() {
                 </button>
               </div>
             </div>
+
+            {/* Advanced toggle */}
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted hover:text-nerv-text-secondary transition-colors"
+            >
+              {showAdvanced ? '\u25B4' : '\u25BE'} Advanced Filters
+            </button>
+
+            {/* Advanced filters */}
+            {showAdvanced && (
+              <div className="grid grid-cols-2 gap-3 p-3 border border-nerv-border/50 rounded-sm bg-nerv-bg-panel/30">
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1">
+                    Usernames
+                  </label>
+                  <input
+                    type="text"
+                    value={usernames}
+                    onChange={(e) => setUsernames(e.target.value)}
+                    placeholder="@handle1, @handle2"
+                    className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
+                  />
+                  <span className="text-[7px] font-mono text-nerv-text-muted">Fetch timelines for these users</span>
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1">
+                    Hashtags
+                  </label>
+                  <input
+                    type="text"
+                    value={hashtags}
+                    onChange={(e) => setHashtags(e.target.value)}
+                    placeholder="#tag1, #tag2"
+                    className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
+                  />
+                  <span className="text-[7px] font-mono text-nerv-text-muted">Add to search terms</span>
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1">
+                    Wallet / Contract
+                  </label>
+                  <input
+                    type="text"
+                    value={wallets}
+                    onChange={(e) => setWallets(e.target.value)}
+                    placeholder="0x1234... or contract address"
+                    className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
+                  />
+                  <span className="text-[7px] font-mono text-nerv-text-muted">Triggers on-chain evidence lookup</span>
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1">
+                    Subreddits
+                  </label>
+                  <input
+                    type="text"
+                    value={subreddits}
+                    onChange={(e) => setSubreddits(e.target.value)}
+                    placeholder="r/cryptocurrency, r/bitcoin"
+                    className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
+                  />
+                  <span className="text-[7px] font-mono text-nerv-text-muted">Scope Reddit search to specific subs</span>
+                </div>
+              </div>
+            )}
 
             {/* Options row */}
             <div className="grid grid-cols-3 gap-4">

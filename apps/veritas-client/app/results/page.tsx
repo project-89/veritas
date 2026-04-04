@@ -181,6 +181,23 @@ function InvestigationWorkspace() {
   const freshSearch = searchParams.get('fresh') === '1';
   const urlPlatforms = searchParams.get('platforms')?.split(',').filter(Boolean) ?? undefined;
   const urlTimeRange = searchParams.get('timeRange') ?? '7d';
+  const urlUsernames = searchParams.get('usernames')?.split(',').map(s => s.trim().replace(/^@/, '')).filter(Boolean) ?? [];
+  const urlHashtags = searchParams.get('hashtags')?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+  const urlWallets = searchParams.get('wallets')?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+  const urlSubreddits = searchParams.get('subreddits')?.split(',').map(s => s.trim().replace(/^r\//, '')).filter(Boolean) ?? [];
+
+  // Build enhanced query: base query + hashtags + subreddit scoping
+  const enhancedQuery = useMemo(() => {
+    const parts = [query];
+    for (const tag of urlHashtags) {
+      const t = tag.startsWith('#') ? tag : `#${tag}`;
+      if (!query.includes(t)) parts.push(t);
+    }
+    for (const sub of urlSubreddits) {
+      if (!query.includes(`subreddit:${sub}`)) parts.push(`subreddit:${sub}`);
+    }
+    return parts.join(' ');
+  }, [query, urlHashtags, urlSubreddits]);
   const { state, dispatch, selectNarrative, selectActor, selectClaim, setCenterMode } =
     useInvestigation();
   const pipelineRan = useRef(false);
@@ -359,6 +376,28 @@ function InvestigationWorkspace() {
           cacheData.downstream = dsResult;
         } catch {
           dispatch({ type: 'SET_PIPELINE', stage: 'downstream', status: 'error' });
+        }
+      }
+
+      // Stage 7: Auto-investigate specified usernames (from advanced filters)
+      if (urlUsernames.length > 0 && activeScanIdRef.current) {
+        try {
+          const investigationJobs = urlUsernames.map((handle) => ({
+            type: 'investigation' as const,
+            narrativeIds: [] as string[],
+            input: {
+              query,
+              narrativeSummaries: [],
+              narratives: [] as Record<string, unknown>[],
+              userHandles: [handle],
+              postCount: posts.length,
+            },
+          }));
+          await startAnalysisJobs(activeScanIdRef.current, investigationJobs);
+          startAnalysisPolling(activeScanIdRef.current);
+          console.log(`Auto-investigating ${urlUsernames.length} usernames from advanced filters`);
+        } catch {
+          // Non-fatal
         }
       }
 
@@ -548,7 +587,7 @@ function InvestigationWorkspace() {
       // ---- FRESH SEARCH: Use scan queue ----
       if (freshSearch) {
         try {
-          const { scanId } = await startScan(query, urlPlatforms, undefined, urlTimeRange);
+          const { scanId } = await startScan(enhancedQuery, urlPlatforms, undefined, urlTimeRange);
           const initialStatus = await getScanStatus(scanId);
           setScanJob(initialStatus);
           scanPostsFetchedRef.current = false;
@@ -937,7 +976,7 @@ function InvestigationWorkspace() {
 
     // Start a new scan directly — don't navigate, don't rely on useEffect
     try {
-      const { scanId } = await startScan(query, urlPlatforms, undefined, urlTimeRange);
+      const { scanId } = await startScan(enhancedQuery, urlPlatforms, undefined, urlTimeRange);
       const initialStatus = await getScanStatus(scanId);
       setScanJob(initialStatus);
     } catch (err) {
