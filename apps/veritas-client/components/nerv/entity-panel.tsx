@@ -17,14 +17,16 @@ export interface EntityPanelProps {
   narratives: AnalyzedNarrative[];
 }
 
-type EntityTypeFilter = 'all' | 'person' | 'org' | 'topic' | 'hashtag' | 'mention';
+type EntityTypeFilter = 'all' | 'person' | 'org' | 'topic' | 'entity';
 
-const ENTITY_TYPES: EntityTypeFilter[] = ['all', 'person', 'org', 'topic', 'hashtag', 'mention'];
+const ENTITY_TYPES: EntityTypeFilter[] = ['all', 'person', 'org', 'topic', 'entity'];
 
 const TYPE_BADGE_VARIANT: Record<string, 'orange' | 'green' | 'red' | 'blue' | 'amber' | 'purple' | 'muted'> = {
   person: 'blue',
   org: 'purple',
+  organization: 'purple',
   topic: 'orange',
+  entity: 'muted',
   hashtag: 'green',
   mention: 'amber',
 };
@@ -53,7 +55,11 @@ export function EntityPanel({ entities, narratives }: EntityPanelProps) {
   const filtered = useMemo(() => {
     const sorted = [...dossiers].sort((a, b) => b.totalMentions - a.totalMentions);
     if (typeFilter === 'all') return sorted;
-    return sorted.filter((d) => d.type.toLowerCase() === typeFilter);
+    return sorted.filter((d) => {
+      const t = d.type.toLowerCase();
+      const normalized = t === 'organization' ? 'org' : t;
+      return normalized === typeFilter;
+    });
   }, [dossiers, typeFilter]);
 
   const selected: EntityDossier | null = useMemo(() => {

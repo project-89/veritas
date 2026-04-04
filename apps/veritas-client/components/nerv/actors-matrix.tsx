@@ -77,6 +77,21 @@ export function ActorsMatrix({
       }
     }
 
+    // Also collect unique authors directly from posts (covers authors not in narrative.authors)
+    for (const post of posts) {
+      const key = post.authorHandle || post.authorName || '';
+      if (!key) continue;
+      const existing = authorMap.get(key);
+      if (existing) continue;
+      authorMap.set(key, {
+        handle: key,
+        platform: post.platform ?? 'unknown',
+        postCount: posts.filter(
+          (p) => (p.authorHandle || p.authorName) === key,
+        ).length,
+      });
+    }
+
     return Array.from(authorMap.values()).map((a) => ({
       handle: a.handle,
       platform: a.platform,

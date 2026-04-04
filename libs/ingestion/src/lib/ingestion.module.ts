@@ -202,12 +202,11 @@ export class IngestionModule {
 
     // Configure connectors - default to 'free' (API-free) if not specified
     // WebScraper disabled by default: uses placeholder example.com URLs that cause SSL errors
-    // RSS disabled by default: no feeds configured
     const connectorConfig = options?.connectors || {
       twitter: true,
       facebook: true,
       reddit: true,
-      rss: false,
+      rss: true,
       webScraper: false,
       youtube: true,
     };

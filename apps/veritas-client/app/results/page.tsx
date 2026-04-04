@@ -305,16 +305,27 @@ function InvestigationWorkspace() {
       }
 
       // Stage 4: Propaganda
+      let propagandaResult: PropagandaAnalysisResult | null = null;
       if (narratives.length > 0) {
         try {
           dispatch({ type: 'SET_PIPELINE', stage: 'propaganda', status: 'running' });
           const propResult = await analyzePropaganda(narratives, posts);
+          propagandaResult = propResult;
           dispatch({ type: 'SET_PROPAGANDA', data: propResult });
           dispatch({ type: 'SET_PIPELINE', stage: 'propaganda', status: 'done' });
           cacheData.propaganda = propResult;
         } catch {
           dispatch({ type: 'SET_PIPELINE', stage: 'propaganda', status: 'error' });
         }
+      }
+
+      // Stage 4b: Auto-verify claims from propaganda analysis
+      if (propagandaResult?.claims?.length && propagandaResult.claims.length > 0) {
+        try {
+          const verificationResult = await verifyClaims(propagandaResult.claims);
+          dispatch({ type: 'SET_CLAIMS', data: verificationResult });
+          cacheData.claims = verificationResult;
+        } catch { /* silent */ }
       }
 
       // Stage 5: Entities
@@ -613,8 +624,11 @@ function InvestigationWorkspace() {
             dispatch({ type: 'SET_PROPAGANDA', data: j.result as any });
             dispatch({ type: 'SET_PIPELINE', stage: 'propaganda', status: 'done' });
           } else if (j.type === 'downstream') {
-            dispatch({ type: 'SET_DOWNSTREAM', data: j.result as any });
-            dispatch({ type: 'SET_PIPELINE', stage: 'downstream', status: 'done' });
+            const dsResult = j.result as any;
+            if (dsResult?.narrativeCorrelations?.length > 0) {
+              dispatch({ type: 'SET_DOWNSTREAM', data: dsResult });
+              dispatch({ type: 'SET_PIPELINE', stage: 'downstream', status: 'done' });
+            }
           }
         }
 
@@ -1120,14 +1134,39 @@ function InvestigationWorkspace() {
             narratives={state.narratives}
           />
         );
-      case 'genealogy':
+      case 'genealogy': {
+        // Build single-snapshot lineages from current narratives
+        const singleSnapshotLineages = state.narratives.map((n) => ({
+          currentId: n.id,
+          currentSummary: n.summary ?? 'Untitled',
+          history: [
+            {
+              snapshotId: 'current',
+              snapshotTimestamp: new Date().toISOString(),
+              narrativeId: n.id,
+              summary: n.summary ?? 'Untitled',
+              postCount: n.postIndices?.length ?? 0,
+              avgSentiment: n.avgSentiment ?? 0,
+              similarity: 1,
+            },
+          ],
+          events: [
+            {
+              timestamp: new Date().toISOString(),
+              type: 'emerged' as const,
+              description: `Narrative first detected`,
+            },
+          ],
+          status: 'active' as const,
+        }));
         return (
           <GenealogyPanel
-            lineages={[]}
+            lineages={singleSnapshotLineages}
             onRefresh={handleRefresh}
             refreshing={pipelineRunning}
           />
         );
+      }
       case 'flow':
         return (
           <PropagationFlow
