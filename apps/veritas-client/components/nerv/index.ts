@@ -44,3 +44,9 @@ export type { SocialGraphPanelProps } from './social-graph-panel';
 
 export { SaturationIndicator } from './saturation-indicator';
 export type { SaturationIndicatorProps } from './saturation-indicator';
+
+export { PlatformComparisonPanel } from './platform-comparison-panel';
+export type { PlatformComparisonPanelProps } from './platform-comparison-panel';
+
+export { NarrativeComparisonPanel } from './narrative-comparison-panel';
+export type { NarrativeComparisonPanelProps } from './narrative-comparison-panel';

@@ -22,6 +22,8 @@ import type {
   AnalysisJob,
   IdentityRecord,
   SaturationReport,
+  NarrativeComparison,
+  PlatformComparison,
 } from './api';
 
 // ---------------------------------------------------------------------------
@@ -49,7 +51,8 @@ export type CenterMode =
   | 'flow'
   | 'radar'
   | 'evidence'
-  | 'graph';
+  | 'graph'
+  | 'platforms';
 
 export interface SearchSummary {
   total: number;
@@ -90,6 +93,10 @@ export interface InvestigationState {
   // Analysis queue
   analysisJobs: AnalysisJob[];
   selectedNarrativeIds: string[]; // multi-select for batch analysis
+
+  // Comparisons
+  comparison: NarrativeComparison | null;
+  platformComparison: PlatformComparison | null;
 
   // Identity records (MAGI)
   selectedIdentity: IdentityRecord | null;
@@ -133,6 +140,8 @@ type Action =
   | { type: 'SELECT_ACTOR'; handle: string | null }
   | { type: 'SELECT_CLAIM'; index: number | null }
   | { type: 'SET_CENTER_MODE'; mode: CenterMode }
+  | { type: 'SET_COMPARISON'; data: NarrativeComparison | null }
+  | { type: 'SET_PLATFORM_COMPARISON'; data: PlatformComparison | null }
   | { type: 'RESET' };
 
 // ---------------------------------------------------------------------------
@@ -168,6 +177,8 @@ const initialState: InvestigationState = {
   investigatedNarrativeIds: [],
   investigationId: null,
   alerts: [],
+  comparison: null,
+  platformComparison: null,
   analysisJobs: [],
   selectedNarrativeIds: [],
   selectedIdentity: null,
@@ -279,6 +290,10 @@ function reducer(state: InvestigationState, action: Action): InvestigationState 
       };
     case 'SET_CENTER_MODE':
       return { ...state, centerMode: action.mode };
+    case 'SET_COMPARISON':
+      return { ...state, comparison: action.data };
+    case 'SET_PLATFORM_COMPARISON':
+      return { ...state, platformComparison: action.data };
     case 'RESET':
       return { ...initialState };
     default:

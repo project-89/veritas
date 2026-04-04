@@ -11,6 +11,7 @@ export interface NarrativeRadarProps {
   narratives: AnalyzedNarrative[];
   selectedIds: string[];
   deviations: DeviationResponse | null;
+  onCompare?: (narrativeIds: string[]) => void;
 }
 
 // 6 axes
@@ -82,7 +83,7 @@ function hexGridPath(cx: number, cy: number, radius: number, levels: number): st
 // Component
 // ---------------------------------------------------------------------------
 
-export function NarrativeRadar({ narratives, selectedIds, deviations }: NarrativeRadarProps) {
+export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare }: NarrativeRadarProps) {
   const radarData = useMemo(() => {
     if (narratives.length === 0) return null;
 
@@ -268,6 +269,14 @@ export function NarrativeRadar({ narratives, selectedIds, deviations }: Narrativ
           <span className="text-[8px] font-mono text-nerv-text-muted italic">
             Shift-click narratives to compare (max 3)
           </span>
+        )}
+        {onCompare && radarData.length >= 2 && (
+          <button
+            onClick={() => onCompare(radarData.map((d) => d.id))}
+            className="px-3 py-1 text-[9px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
+          >
+            COMPARE
+          </button>
         )}
       </div>
     </div>

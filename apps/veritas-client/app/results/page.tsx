@@ -45,6 +45,8 @@ import {
   type EntityAnalysisResponse,
   type DownstreamEffectsResult,
   type SaturationReport,
+  compareNarratives,
+  comparePlatforms,
 } from '../../lib/api';
 
 import {
@@ -72,6 +74,8 @@ import { EntityPanel } from '../../components/nerv/entity-panel';
 import { GenealogyPanel } from '../../components/nerv/genealogy-panel';
 import { PropagationFlow } from '../../components/nerv/propagation-flow';
 import { NarrativeRadar } from '../../components/nerv/narrative-radar';
+import { PlatformComparisonPanel } from '../../components/nerv/platform-comparison-panel';
+import { NarrativeComparisonPanel } from '../../components/nerv/narrative-comparison-panel';
 import { DetailPanel } from '../../components/nerv/detail-panel';
 import dynamic from 'next/dynamic';
 import { buildGlobeData } from '../../lib/globe-data';
@@ -97,6 +101,7 @@ const CENTER_MODES: { key: CenterMode; label: string; shortcut: string }[] = [
   { key: 'evidence', label: 'EVIDENCE', shortcut: '9' },
   { key: 'graph', label: 'GRAPH', shortcut: '0' },
   { key: 'radar', label: 'RADAR', shortcut: '' },
+  { key: 'platforms', label: 'PLATFORMS', shortcut: 'P' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -225,6 +230,42 @@ function InvestigationWorkspace() {
     },
     [selectNarrative, state.centerMode],
   );
+
+  // ---- Comparison handlers ----
+  const [comparingNarratives, setComparingNarratives] = useState(false);
+  const [comparingPlatforms, setComparingPlatforms] = useState(false);
+
+  const handleCompareNarratives = useCallback(async (ids: string[]) => {
+    if (ids.length < 2) return;
+    const [a, b] = ids;
+    const narrativeA = state.narratives.find(n => n.id === a);
+    const narrativeB = state.narratives.find(n => n.id === b);
+    if (!narrativeA || !narrativeB) return;
+    setComparingNarratives(true);
+    try {
+      const postsA = narrativeA.postIndices.map(i => state.posts[i]).filter((p): p is RawPost => Boolean(p));
+      const postsB = narrativeB.postIndices.map(i => state.posts[i]).filter((p): p is RawPost => Boolean(p));
+      const result = await compareNarratives(narrativeA, narrativeB, postsA, postsB);
+      dispatch({ type: 'SET_COMPARISON', data: result });
+    } catch {
+      // silently fail
+    } finally {
+      setComparingNarratives(false);
+    }
+  }, [state.narratives, state.posts, dispatch]);
+
+  const handlePlatformComparison = useCallback(async () => {
+    if (state.narratives.length === 0) return;
+    setComparingPlatforms(true);
+    try {
+      const result = await comparePlatforms(state.narratives, state.posts);
+      dispatch({ type: 'SET_PLATFORM_COMPARISON', data: result });
+    } catch {
+      // silently fail
+    } finally {
+      setComparingPlatforms(false);
+    }
+  }, [state.narratives, state.posts, dispatch]);
 
   // Load scan history for the current query
   useEffect(() => {
@@ -628,6 +669,10 @@ function InvestigationWorkspace() {
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
       ) {
+        return;
+      }
+      if (e.key.toUpperCase() === 'P') {
+        setCenterMode('platforms');
         return;
       }
       const idx = parseInt(e.key, 10);
@@ -1232,6 +1277,15 @@ function InvestigationWorkspace() {
             narratives={state.narratives}
             selectedIds={radarSelectedIds.length > 0 ? radarSelectedIds : (state.selectedNarrativeId ? [state.selectedNarrativeId] : [])}
             deviations={state.deviations}
+            onCompare={handleCompareNarratives}
+          />
+        );
+      case 'platforms':
+        return (
+          <PlatformComparisonPanel
+            comparison={state.platformComparison}
+            loading={comparingPlatforms}
+            onRunComparison={handlePlatformComparison}
           />
         );
       default:
@@ -1452,6 +1506,15 @@ function InvestigationWorkspace() {
       <div className="shrink-0">
         <NervTicker items={tickerItems} />
       </div>
+
+      {/* Narrative comparison overlay */}
+      {(state.comparison || comparingNarratives) && (
+        <NarrativeComparisonPanel
+          comparison={state.comparison}
+          loading={comparingNarratives}
+          onClose={() => dispatch({ type: 'SET_COMPARISON', data: null })}
+        />
+      )}
     </div>
   );
 }
