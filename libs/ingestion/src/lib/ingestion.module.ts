@@ -230,7 +230,7 @@ export class IngestionModule {
       providers.push({ provide: YOUTUBE_CONNECTOR, useClass: YouTubeFreeConnector });
     }
 
-    if (connectorConfig.truthsocial !== false) {
+    if (connectorConfig.truthsocial) {
       providers.push({ provide: TRUTHSOCIAL_CONNECTOR, useClass: TruthSocialFreeConnector });
     }
 
