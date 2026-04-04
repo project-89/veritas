@@ -159,6 +159,7 @@ export class TruthSocialFreeConnector
   }
 
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
+    if (!this.available) return {} as Partial<SourceNode>;
     try {
       const result = await this.subprocessUtil.exec(
         this.truthbrushPath,
@@ -204,6 +205,7 @@ export class TruthSocialFreeConnector
     username: string,
     options?: { limit?: number },
   ): Promise<SocialMediaPost[]> {
+    if (!this.available) return [];
     const limit = options?.limit ?? 50;
     try {
       const result = await this.subprocessUtil.exec(

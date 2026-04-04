@@ -269,7 +269,8 @@ export class TwitterFreeConnector
 
       this.logger.debug(`Fetched ${posts.length} tweets from @${cleanUsername}`);
     } catch (error) {
-      this.logger.error(`Error fetching timeline for @${username}:`, error);
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Timeline unavailable for @${username}: ${msg}`);
     }
 
     return posts;
