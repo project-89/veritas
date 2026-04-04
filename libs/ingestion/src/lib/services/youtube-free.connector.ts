@@ -263,7 +263,7 @@ export class YouTubeFreeConnector
     query: string,
     options?: SearchOptions
   ): Promise<SocialMediaPost[]> {
-    const limit = options?.maxResults || options?.limit || 10;
+    const limit = options?.maxResults || options?.limit || 25;
     const fetchTranscripts = options?.fetchTranscripts ?? true;
 
     try {

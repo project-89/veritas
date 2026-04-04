@@ -539,7 +539,9 @@ ${sections.join('\n\n')}`;
       const jsonMatch = responseText.match(/\[[\s\S]*\]/);
 
       if (jsonMatch) {
-        const summaries = JSON.parse(jsonMatch[0]!) as string[];
+        // Fix common LLM JSON issues: trailing commas
+        const cleaned = jsonMatch[0]!.replace(/,\s*]/g, ']').replace(/,\s*}/g, '}');
+        const summaries = JSON.parse(cleaned) as string[];
         for (let i = 0; i < Math.min(summaries.length, narratives.length); i++) {
           const summary = summaries[i];
           if (typeof summary === 'string' && summary.length > 0) {
