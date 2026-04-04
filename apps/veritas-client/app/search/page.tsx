@@ -74,6 +74,8 @@ export default function SearchPage() {
   const [query, setQuery] = useState('');
   const [platforms, setPlatforms] = useState<string[]>(['twitter', 'reddit', 'youtube', 'rss', 'farcaster']);
   const [timeRange, setTimeRange] = useState('7d');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
   const [depthPreset, setDepthPreset] = useState<string>('standard');
   const limit = DEPTH_PRESETS.find((p) => p.id === depthPreset)?.limit ?? 100;
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
@@ -110,7 +112,11 @@ export default function SearchPage() {
     if (limit !== 100) {
       params.set('limit', String(limit));
     }
-    params.set('timeRange', timeRange);
+    if (timeRange === 'custom' && customStart && customEnd) {
+      params.set('timeRange', `${customStart}_${customEnd}`);
+    } else {
+      params.set('timeRange', timeRange);
+    }
     params.set('fresh', '1'); // Signal to results page to run full pipeline
     router.push(`/results?${params.toString()}`);
   }, [query, platforms, limit, timeRange, router]);
@@ -219,7 +225,7 @@ export default function SearchPage() {
                   Time Range
                 </label>
                 <div className="space-y-1.5">
-                  {TIME_RANGES.map((t) => {
+                  {[...TIME_RANGES, { value: 'custom' as const, label: 'Custom' }].map((t) => {
                     const selected = timeRange === t.value;
                     return (
                       <label
@@ -251,6 +257,28 @@ export default function SearchPage() {
                     );
                   })}
                 </div>
+                {timeRange === 'custom' && (
+                  <div className="mt-2 space-y-1.5 pl-5">
+                    <div>
+                      <label className="text-[8px] uppercase tracking-widest text-nerv-text-muted block mb-0.5">From</label>
+                      <input
+                        type="date"
+                        value={customStart}
+                        onChange={(e) => setCustomStart(e.target.value)}
+                        className="w-full px-2 py-1 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text focus:outline-none focus:border-nerv-orange/50 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[8px] uppercase tracking-widest text-nerv-text-muted block mb-0.5">To</label>
+                      <input
+                        type="date"
+                        value={customEnd}
+                        onChange={(e) => setCustomEnd(e.target.value)}
+                        className="w-full px-2 py-1 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text focus:outline-none focus:border-nerv-orange/50 transition-all"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Depth */}

@@ -56,13 +56,18 @@ export class ScanProcessor extends WorkerHost {
         limit: options.limit,
       };
       if (options.timeRange) {
-        const match = options.timeRange.match(/^(\d+)([dhm])$/);
-        if (match) {
-          const value = parseInt(match[1]!, 10);
-          const unit = match[2]!;
+        // Support relative ranges (7d, 24h, 30m) and absolute ranges (2026-03-15_2026-03-22)
+        const relMatch = options.timeRange.match(/^(\d+)([dhm])$/);
+        const absMatch = options.timeRange.match(/^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/);
+        if (relMatch) {
+          const value = parseInt(relMatch[1]!, 10);
+          const unit = relMatch[2]!;
           const ms = unit === 'd' ? value * 86400000 : unit === 'h' ? value * 3600000 : value * 60000;
           searchOptions.endDate = new Date();
           searchOptions.startDate = new Date(Date.now() - ms);
+        } else if (absMatch) {
+          searchOptions.startDate = new Date(absMatch[1]! + 'T00:00:00Z');
+          searchOptions.endDate = new Date(absMatch[2]! + 'T23:59:59Z');
         }
       }
 
