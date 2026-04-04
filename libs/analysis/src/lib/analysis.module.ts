@@ -23,6 +23,7 @@ import { ClaimVerificationService } from './services/claim-verification.service'
 import { PsychologicalProfilerService } from './services/psychological-profiler.service';
 import { PlatformCredibilityService } from './services/platform-credibility.service';
 import { SocialGraphIntelligenceService } from './services/social-graph-intelligence.service';
+import { SaturationMetricsService } from './services/saturation-metrics.service';
 import { ANALYSIS_SERVICE } from './interfaces/analysis-service.interface';
 
 @Module({
@@ -52,6 +53,7 @@ import { ANALYSIS_SERVICE } from './interfaces/analysis-service.interface';
     PsychologicalProfilerService,
     PlatformCredibilityService,
     SocialGraphIntelligenceService,
+    SaturationMetricsService,
     {
       provide: ANALYSIS_SERVICE,
       useExisting: AnalysisService,
@@ -59,6 +61,6 @@ import { ANALYSIS_SERVICE } from './interfaces/analysis-service.interface';
     AnalysisResolver,
   ],
   controllers: [AnalysisController, NarrativeAnalysisController],
-  exports: [ANALYSIS_SERVICE, AnalysisService, NarrativeAnalysisService, MonitorService, DeviationService, DeepInvestigationService, CrossPlatformIdentityService, ReportService, PropagandaAnalysisService, ComparisonService, EntityAnalysisService, NarrativeGenealogyService, DownstreamEffectsService, CausalReasoningService, GraphDatabaseService, SourceCredibilityService, GraphBotDetectionService, ClaimVerificationService, PsychologicalProfilerService, PlatformCredibilityService, SocialGraphIntelligenceService],
+  exports: [ANALYSIS_SERVICE, AnalysisService, NarrativeAnalysisService, MonitorService, DeviationService, DeepInvestigationService, CrossPlatformIdentityService, ReportService, PropagandaAnalysisService, ComparisonService, EntityAnalysisService, NarrativeGenealogyService, DownstreamEffectsService, CausalReasoningService, GraphDatabaseService, SourceCredibilityService, GraphBotDetectionService, ClaimVerificationService, PsychologicalProfilerService, PlatformCredibilityService, SocialGraphIntelligenceService, SaturationMetricsService],
 })
 export class AnalysisModule {}

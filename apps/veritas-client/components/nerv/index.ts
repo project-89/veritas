@@ -41,3 +41,6 @@ export type { EvidenceChainPanelProps } from './evidence-chain-panel';
 
 export { SocialGraphPanel } from './social-graph-panel';
 export type { SocialGraphPanelProps } from './social-graph-panel';
+
+export { SaturationIndicator } from './saturation-indicator';
+export type { SaturationIndicatorProps } from './saturation-indicator';

@@ -21,6 +21,7 @@ import type {
   Alert,
   AnalysisJob,
   IdentityRecord,
+  SaturationReport,
 } from './api';
 
 // ---------------------------------------------------------------------------
@@ -80,6 +81,7 @@ export interface InvestigationState {
   entities: EntityAnalysisResponse | null;
   downstream: DownstreamEffectsResult | null;
   investigation: InvestigationResult | null;
+  saturation: SaturationReport | null;
   investigatingNarrativeId: string | null; // which narrative is currently being investigated
   investigatedNarrativeIds: string[]; // narratives that have been investigated
   investigationId: string | null;
@@ -116,6 +118,7 @@ type Action =
   | { type: 'SET_CLAIMS'; data: ClaimVerificationBatchResult }
   | { type: 'SET_ENTITIES'; data: EntityAnalysisResponse }
   | { type: 'SET_DOWNSTREAM'; data: DownstreamEffectsResult }
+  | { type: 'SET_SATURATION'; data: SaturationReport | null }
   | { type: 'SET_INVESTIGATING'; narrativeId: string | null }
   | { type: 'SET_INVESTIGATION'; data: InvestigationResult; narrativeId: string }
   | { type: 'SET_INVESTIGATION_ID'; id: string | null }
@@ -160,6 +163,7 @@ const initialState: InvestigationState = {
   entities: null,
   downstream: null,
   investigation: null,
+  saturation: null,
   investigatingNarrativeId: null,
   investigatedNarrativeIds: [],
   investigationId: null,
@@ -215,6 +219,8 @@ function reducer(state: InvestigationState, action: Action): InvestigationState 
       return { ...state, entities: action.data };
     case 'SET_DOWNSTREAM':
       return { ...state, downstream: action.data };
+    case 'SET_SATURATION':
+      return { ...state, saturation: action.data };
     case 'SET_INVESTIGATING':
       return { ...state, investigatingNarrativeId: action.narrativeId };
     case 'SET_INVESTIGATION':

@@ -39,6 +39,13 @@ const TIME_RANGES = [
   { value: '90d', label: '90d' },
 ] as const;
 
+const DEPTH_PRESETS = [
+  { id: 'quick', label: 'Quick', limit: 25, description: 'Fast overview (~100 posts)' },
+  { id: 'standard', label: 'Standard', limit: 100, description: 'Good coverage (~400 posts)' },
+  { id: 'deep', label: 'Deep', limit: 250, description: 'Comprehensive (~1000 posts)' },
+  { id: 'exhaustive', label: 'Exhaustive', limit: 500, description: 'Maximum coverage (~2000+ posts)' },
+] as const;
+
 const TIPS = [
   'Use quotes for exact phrases',
   '@handle to include specific accounts',
@@ -67,7 +74,8 @@ export default function SearchPage() {
   const [query, setQuery] = useState('');
   const [platforms, setPlatforms] = useState<string[]>(['twitter', 'reddit', 'youtube', 'rss', 'farcaster']);
   const [timeRange, setTimeRange] = useState('7d');
-  const [limit, setLimit] = useState(100);
+  const [depthPreset, setDepthPreset] = useState<string>('standard');
+  const limit = DEPTH_PRESETS.find((p) => p.id === depthPreset)?.limit ?? 100;
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
   const [loadingInv, setLoadingInv] = useState(true);
 
@@ -245,24 +253,48 @@ export default function SearchPage() {
                 </div>
               </div>
 
-              {/* Depth / Limit */}
+              {/* Depth */}
               <div>
                 <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
                   Depth
                 </label>
-                <div>
-                  <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1">
-                    Limit
-                  </label>
-                  <input
-                    type="number"
-                    min={10}
-                    max={500}
-                    step={10}
-                    value={limit}
-                    onChange={(e) => setLimit(Number(e.target.value) || 100)}
-                    className="w-20 px-2 py-1.5 font-mono text-xs bg-nerv-bg border border-nerv-border text-nerv-text focus:outline-none focus:border-nerv-orange/50 transition-all tabular-nums"
-                  />
+                <div className="space-y-1.5">
+                  {DEPTH_PRESETS.map((preset) => {
+                    const selected = depthPreset === preset.id;
+                    return (
+                      <label
+                        key={preset.id}
+                        className="flex items-center gap-2 cursor-pointer"
+                        onClick={() => setDepthPreset(preset.id)}
+                      >
+                        <span
+                          className={[
+                            'w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all',
+                            selected
+                              ? 'border-nerv-orange'
+                              : 'border-nerv-border hover:border-nerv-text-muted',
+                          ].join(' ')}
+                        >
+                          {selected && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-nerv-orange" />
+                          )}
+                        </span>
+                        <div className="flex flex-col">
+                          <span
+                            className={[
+                              'text-xs font-mono transition-colors leading-tight',
+                              selected ? 'text-nerv-orange' : 'text-nerv-text-muted',
+                            ].join(' ')}
+                          >
+                            {preset.label}
+                          </span>
+                          <span className="text-[8px] font-mono text-nerv-text-muted leading-tight">
+                            {preset.description}
+                          </span>
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             </div>

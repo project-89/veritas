@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { SaturationMetricsService } from './saturation-metrics.service';
+import type { SaturationReport } from './saturation-metrics.service';
 
 /**
  * A post with its embedding, used internally during clustering.
@@ -56,6 +58,8 @@ export interface AnalyzeResult {
   narratives: AnalyzedNarrative[];
   /** Posts that didn't cluster (noise) */
   unclustered: number[];
+  /** Saturation metrics (present when SaturationMetricsService is available) */
+  saturation?: SaturationReport;
 }
 
 /**
@@ -70,7 +74,10 @@ export class NarrativeAnalysisService {
   private readonly embeddingModel: string = 'gemini-embedding-2-preview';
   private readonly chatModel: string = 'gemini-2.0-flash';
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Optional() private readonly saturationMetrics?: SaturationMetricsService,
+  ) {
     const geminiKey =
       this.configService.get<string>('GEMINI_API_KEY') ||
       process.env['GEMINI_API_KEY'];
@@ -153,9 +160,21 @@ export class NarrativeAnalysisService {
     // Sort by post count descending
     narratives.sort((a, b) => b.postIndices.length - a.postIndices.length);
 
+    const unclustered = noise.map((p) => p.index);
+
+    // Step 6: Compute saturation metrics if service is available
+    const saturation = this.saturationMetrics
+      ? this.saturationMetrics.computeSaturation({
+          narratives,
+          totalPosts: posts.length,
+          unclusteredCount: unclustered.length,
+        })
+      : undefined;
+
     return {
       narratives,
-      unclustered: noise.map((p) => p.index),
+      unclustered,
+      ...(saturation ? { saturation } : {}),
     };
   }
 

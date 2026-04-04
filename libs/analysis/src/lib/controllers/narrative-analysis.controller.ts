@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Logger } from '@nestjs/common';
 import { NarrativeAnalysisService } from '../services/narrative-analysis.service';
 import type { AnalyzeResult, AnalyzedNarrative } from '../services/narrative-analysis.service';
+import type { SaturationReport } from '../services/saturation-metrics.service';
 import { DeviationService } from '../services/deviation.service';
 import type { DeviationResponse, RawPost } from '../services/deviation.service';
 import { ReportService } from '../services/report.service';

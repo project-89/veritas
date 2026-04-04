@@ -81,9 +81,26 @@ export interface AnalyzedNarrative {
   centroidEmbedding: number[];
 }
 
+export interface SaturationReport {
+  postCount: number;
+  narrativeCount: number;
+  unclusteredCount: number;
+  unclusteredRatio: number;
+  clusterDensity: number;
+  topicCoverage: number;
+  newTopicYield: number;
+  deduplicationRate: number;
+  avgInterClusterDistance: number;
+  embeddingSpread: number;
+  saturationLevel: 'low' | 'moderate' | 'high' | 'saturated';
+  recommendation: string;
+  suggestedDepth: number;
+}
+
 export interface AnalyzeResult {
   narratives: AnalyzedNarrative[];
   unclustered: number[];
+  saturation?: SaturationReport;
 }
 
 export interface InsightsResponse {

@@ -44,6 +44,7 @@ import {
   type PropagandaAnalysisResult,
   type EntityAnalysisResponse,
   type DownstreamEffectsResult,
+  type SaturationReport,
 } from '../../lib/api';
 
 import {
@@ -56,6 +57,7 @@ import {
   type NervTickerItem,
 } from '../../components/nerv';
 import { ScanProgress } from '../../components/nerv/scan-progress';
+import { SaturationIndicator } from '../../components/nerv/saturation-indicator';
 import { EvidenceChainPanel } from '../../components/nerv/evidence-chain-panel';
 import { SocialGraphPanel } from '../../components/nerv/social-graph-panel';
 import { AnalysisQueuePanel } from '../../components/nerv/analysis-queue-panel';
@@ -229,6 +231,9 @@ function InvestigationWorkspace() {
           dispatch({ type: 'SET_NARRATIVES', narratives: cache.narratives as AnalyzedNarrative[], unclusteredCount: (cache.unclusteredCount as number) ?? 0 });
           dispatch({ type: 'SET_PIPELINE', stage: 'analyze', status: 'done' });
         }
+        if (cache.saturation) {
+          dispatch({ type: 'SET_SATURATION', data: cache.saturation as SaturationReport });
+        }
         if (cache.deviations) {
           dispatch({ type: 'SET_DEVIATIONS', data: cache.deviations as DeviationResponse });
           dispatch({ type: 'SET_PIPELINE', stage: 'deviations', status: 'done' });
@@ -275,6 +280,10 @@ function InvestigationWorkspace() {
           unclusteredCount: analyzeResult.unclustered?.length ?? 0,
         });
         dispatch({ type: 'SET_PIPELINE', stage: 'analyze', status: 'done' });
+        if (analyzeResult.saturation) {
+          dispatch({ type: 'SET_SATURATION', data: analyzeResult.saturation });
+          cacheData.saturation = analyzeResult.saturation;
+        }
         cacheData.narratives = analyzeResult.narratives;
         cacheData.unclusteredCount = analyzeResult.unclustered?.length ?? 0;
       } catch (err) {
@@ -1177,6 +1186,10 @@ function InvestigationWorkspace() {
                 size="sm"
               />
             )}
+            <SaturationIndicator
+              saturation={state.saturation}
+              onSuggestDeepScan={pipelineRunning ? undefined : handleRefresh}
+            />
           </div>
           <button
             onClick={handleRefresh}
