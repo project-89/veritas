@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { cosineSimilarity } from '../utils/math';
 
 export interface SaturationReport {
   postCount: number;
@@ -112,15 +113,7 @@ export class SaturationMetricsService {
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {
-    let dot = 0;
-    let normA = 0;
-    let normB = 0;
-    for (let i = 0; i < a.length; i++) {
-      dot += a[i]! * b[i]!;
-      normA += a[i]! * a[i]!;
-      normB += b[i]! * b[i]!;
-    }
-    return dot / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
+    return cosineSimilarity(a, b);
   }
 
   private computeAvgInterClusterDistance(

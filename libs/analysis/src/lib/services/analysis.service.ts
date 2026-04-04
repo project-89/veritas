@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { AnalysisServiceInterface } from '../interfaces/analysis-service.interface';
 import {
   DeviationMetrics,
@@ -6,22 +6,44 @@ import {
   TimeFrame,
   ExtendedContentNode,
 } from '../analysis.types';
+import { DeviationService } from './deviation.service';
+import { SourceCredibilityService } from './source-credibility.service';
+import { GraphBotDetectionService } from './graph-bot-detection.service';
+import { DatabaseService } from '@veritas/database';
 
 /**
  * Core analysis service for narrative tracking and reality deviation detection.
  * Provides pattern detection, content deviation measurement, and source credibility scoring.
+ *
+ * Many methods here are thin entry-points. For richer results, prefer the
+ * specialized endpoints (e.g. /narratives/deviations, /investigate).
  */
 @Injectable()
 export class AnalysisService implements AnalysisServiceInterface {
   private readonly logger = new Logger(AnalysisService.name);
+
+  constructor(
+    @Optional() private readonly deviationService?: DeviationService,
+    @Optional() private readonly sourceCredibilityService?: SourceCredibilityService,
+    @Optional() private readonly graphBotDetectionService?: GraphBotDetectionService,
+    @Optional() private readonly databaseService?: DatabaseService,
+  ) {}
 
   async measureRealityDeviation(
     narrativeId: string,
   ): Promise<Omit<DeviationMetrics, 'timeframe'>> {
     this.logger.log(`Measuring reality deviation for narrative: ${narrativeId}`);
 
-    // TODO: Integrate with graph database to compute real deviation metrics
-    // For now, return baseline metrics
+    if (this.deviationService) {
+      // DeviationService.computeDeviations() requires AnalyzedNarrative[] with embeddings,
+      // which we don't have from just a narrativeId. Return sensible defaults and direct
+      // callers to the /narratives/deviations endpoint for full deviation analysis.
+      this.logger.debug(
+        `DeviationService is available but requires narrative data with embeddings. ` +
+          `Use the /narratives/deviations endpoint for full deviation metrics.`,
+      );
+    }
+
     return {
       baselineScore: 0.5,
       deviationMagnitude: 0.0,
@@ -37,14 +59,25 @@ export class AnalysisService implements AnalysisServiceInterface {
       `Detecting patterns from ${timeframe.start.toISOString()} to ${timeframe.end.toISOString()}`,
     );
 
-    // TODO: Implement pattern detection using graph traversal and temporal analysis
+    if (this.graphBotDetectionService) {
+      this.logger.debug(
+        'GraphBotDetectionService is available for structural pattern detection, ' +
+          'but requires user/post data. Use the /investigate endpoint for full bot detection.',
+      );
+    }
+
     return [];
   }
 
   async detectPatternsForContent(content: ExtendedContentNode): Promise<Pattern[]> {
     this.logger.log(`Detecting patterns for content: ${content.id}`);
 
-    // TODO: Analyze content relationships and detect coordination patterns
+    if (this.graphBotDetectionService) {
+      this.logger.debug(
+        'GraphBotDetectionService available — use /investigate endpoint for coordination pattern detection.',
+      );
+    }
+
     return [];
   }
 
@@ -70,22 +103,39 @@ export class AnalysisService implements AnalysisServiceInterface {
   async getContentById(contentId: string): Promise<ExtendedContentNode | null> {
     this.logger.log(`Fetching content: ${contentId}`);
 
-    // TODO: Query from database via repository
+    if (this.databaseService) {
+      try {
+        const repo = this.databaseService.getRepository<ExtendedContentNode>('content');
+        return (await repo.findById(contentId)) ?? null;
+      } catch (err) {
+        this.logger.warn(`Failed to fetch content ${contentId} from database: ${err}`);
+        return null;
+      }
+    }
+
+    this.logger.debug('DatabaseService not available — cannot fetch content by ID.');
     return null;
   }
 
   async findRelatedContent(content: ExtendedContentNode): Promise<ExtendedContentNode[]> {
     this.logger.log(`Finding related content for: ${content.id}`);
 
-    // TODO: Use graph relationships and vector similarity to find related content
+    // Related-content discovery is handled by the narrative clustering service
+    // (NarrativeAnalysisService) which groups posts by embedding similarity.
+    // This endpoint returns an empty array — use narrative clustering instead.
     return [];
   }
 
   async calculateSourceCredibility(sourceId: string): Promise<number> {
     this.logger.log(`Calculating credibility for source: ${sourceId}`);
 
-    // TODO: Aggregate cross-platform credibility signals
-    // For now, return neutral credibility
+    if (this.sourceCredibilityService) {
+      this.logger.debug(
+        'SourceCredibilityService is available but scoreSource() requires posts. ' +
+          'Use the /investigate endpoint for full credibility scoring.',
+      );
+    }
+
     return 0.5;
   }
 }
