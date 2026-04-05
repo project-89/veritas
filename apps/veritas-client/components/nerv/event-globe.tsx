@@ -116,15 +116,33 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         // Cosmetic — continue without
       }
 
-      // Points
+      // Points — altitude must be above country polygons (0.006)
       globe
         .pointsData(pointsRef.current)
         .pointLat((d: unknown) => (d as GlobePointData).lat)
         .pointLng((d: unknown) => (d as GlobePointData).lng)
-        .pointAltitude((d: unknown) => 0.01 + (d as GlobePointData).size * 0.03)
-        .pointRadius((d: unknown) => 0.2 + (d as GlobePointData).size * 0.4)
+        .pointAltitude((d: unknown) => 0.02 + (d as GlobePointData).size * 0.04)
+        .pointRadius((d: unknown) => 0.3 + (d as GlobePointData).size * 0.5)
         .pointColor((d: unknown) => (d as GlobePointData).color)
-        .pointResolution(6);
+        .pointResolution(8);
+
+      // Labels — dynamic text that appears for visible events
+      globe
+        .labelsData(pointsRef.current)
+        .labelLat((d: unknown) => (d as GlobePointData).lat)
+        .labelLng((d: unknown) => (d as GlobePointData).lng)
+        .labelAltitude((d: unknown) => 0.025 + (d as GlobePointData).size * 0.05)
+        .labelText((d: unknown) => {
+          const p = d as GlobePointData;
+          const ev = eventsRef.current.find(e => e.id === p.eventId);
+          return ev ? ev.title.slice(0, 40) : '';
+        })
+        .labelSize((d: unknown) => 0.4 + (d as GlobePointData).size * 0.2)
+        .labelColor((d: unknown) => (d as GlobePointData).color)
+        .labelDotRadius(0.3)
+        .labelDotOrientation(() => 'right' as const)
+        .labelResolution(2)
+        .labelIncludeDot(true);
 
       scene.add(globe);
       globeRef.current = globe;
@@ -226,9 +244,9 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         globe.pointAltitude((d: unknown) => {
           const p = d as GlobePointData;
           if (p.size >= 1.5) {
-            return 0.01 + p.size * 0.03 + 0.02 * Math.sin(pulsePhase);
+            return 0.02 + p.size * 0.04 + 0.03 * Math.sin(pulsePhase);
           }
-          return 0.01 + p.size * 0.03;
+          return 0.02 + p.size * 0.04;
         });
 
         controls.update();
@@ -276,13 +294,15 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
     };
   }, [initGlobe]);
 
-  // Update points when events change
+  // Update points + labels when events change
   useEffect(() => {
     const globe = globeRef.current as {
       pointsData: (d: GlobePointData[]) => void;
+      labelsData: (d: GlobePointData[]) => void;
     } | null;
     if (!globe || !loaded) return;
     globe.pointsData(pointsRef.current);
+    globe.labelsData(pointsRef.current);
   }, [events, loaded]);
 
   return (
