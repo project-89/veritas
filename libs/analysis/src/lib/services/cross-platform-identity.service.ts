@@ -1,9 +1,43 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { execFile } from 'child_process';
 import { readFile, mkdir, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomBytes } from 'crypto';
+
+/** Injection token for identity record persistence (optional — provided by app module) */
+export const IDENTITY_RECORD_STORE = Symbol('IDENTITY_RECORD_STORE');
+
+/** Interface to avoid hard dependency on ingestion lib */
+interface IdentityRecordStore {
+  findByHandle(handle: string, platform: string): Promise<{
+    _id: string;
+    id: string;
+    primaryHandle: string;
+    primaryPlatform: string;
+    platformAccounts: Array<{
+      platform: string;
+      handle: string;
+      url: string;
+      discoveredAt: Date;
+      discoveryMethod: string;
+      verified: boolean;
+    }>;
+    [key: string]: unknown;
+  } | null>;
+  updatePlatformAccounts?(
+    id: string,
+    accounts: Array<{
+      platform: string;
+      handle: string;
+      url: string;
+      discoveredAt: Date;
+      discoveryMethod: 'sherlock' | 'investigation' | 'manual';
+      verified: boolean;
+    }>,
+    sherlockResolvedAt: Date,
+  ): Promise<void>;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -93,7 +127,9 @@ export class CrossPlatformIdentityService {
   private readonly cache = new Map<string, { result: IdentityResolutionResult; timestamp: number }>();
   private readonly cacheTTL = 3600000; // 1 hour
 
-  constructor() {
+  constructor(
+    @Optional() @Inject(IDENTITY_RECORD_STORE) private readonly identityStore?: IdentityRecordStore,
+  ) {
     this.sherlockPath = 'sherlock';
     this.checkAvailability();
   }
@@ -114,14 +150,68 @@ export class CrossPlatformIdentityService {
    * Resolve a username across all platforms Sherlock supports.
    * Returns discovered accounts filtered to platforms relevant for narrative analysis.
    */
+  /** 24 hours — Sherlock runs at most once per user per day */
+  private static readonly PERSIST_TTL_MS = 24 * 60 * 60 * 1000;
+
   async resolveIdentity(username: string): Promise<IdentityResolutionResult> {
     const cleanUsername = username.replace(/^@/, '').replace(/^u\//, '');
 
-    // Check cache
+    // Check in-memory cache first
     const cached = this.cache.get(cleanUsername);
     if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
       this.logger.debug(`Cache hit for "${cleanUsername}"`);
       return cached.result;
+    }
+
+    // Check persisted identity record for recent Sherlock data (< 24 hours)
+    if (this.identityStore) {
+      try {
+        // Try multiple platform guesses since we don't know the primary
+        const record = await this.identityStore.findByHandle(cleanUsername, 'twitter')
+          ?? await this.identityStore.findByHandle(cleanUsername, 'reddit')
+          ?? await this.identityStore.findByHandle(cleanUsername, 'unknown');
+
+        if (record?.platformAccounts && record.platformAccounts.length > 0) {
+          // Check if any sherlock-discovered accounts exist and are recent
+          const sherlockAccounts = record.platformAccounts.filter(
+            (a) => a.discoveryMethod === 'sherlock',
+          );
+          if (sherlockAccounts.length > 0) {
+            const newest = sherlockAccounts.reduce(
+              (latest, a) => {
+                const t = new Date(a.discoveredAt).getTime();
+                return t > latest ? t : latest;
+              },
+              0,
+            );
+            if (Date.now() - newest < CrossPlatformIdentityService.PERSIST_TTL_MS) {
+              this.logger.debug(
+                `Using persisted Sherlock data for "${cleanUsername}" (${sherlockAccounts.length} accounts, age: ${Math.round((Date.now() - newest) / 3600000)}h)`,
+              );
+              const accounts: DiscoveredAccount[] = sherlockAccounts.map((a) => ({
+                platform: a.platform,
+                url: a.url,
+                username: a.handle,
+              }));
+              const relevantAccounts = accounts.filter((a) => RELEVANT_PLATFORMS.has(a.platform));
+
+              const result: IdentityResolutionResult = {
+                queriedUsername: cleanUsername,
+                accounts,
+                relevantAccounts,
+                totalFound: accounts.length,
+                searchDuration: 0,
+              };
+
+              // Warm in-memory cache
+              this.cache.set(cleanUsername, { result, timestamp: Date.now() });
+              return result;
+            }
+          }
+        }
+      } catch (err) {
+        this.logger.debug(`Identity store lookup failed for "${cleanUsername}": ${err}`);
+      }
     }
 
     const start = Date.now();
@@ -140,8 +230,15 @@ export class CrossPlatformIdentityService {
       searchDuration: Date.now() - start,
     };
 
-    // Cache result
+    // Cache result in memory
     this.cache.set(cleanUsername, { result, timestamp: Date.now() });
+
+    // Persist discovered accounts to identity record (fire-and-forget)
+    if (this.identityStore && accounts.length > 0) {
+      this.persistSherlockResults(cleanUsername, accounts).catch((err) => {
+        this.logger.debug(`Failed to persist Sherlock results: ${err}`);
+      });
+    }
 
     this.logger.log(
       `Found ${accounts.length} accounts for "${cleanUsername}" ` +
@@ -149,6 +246,67 @@ export class CrossPlatformIdentityService {
     );
 
     return result;
+  }
+
+  /**
+   * Persist Sherlock-discovered accounts to the identity record in MongoDB.
+   */
+  private async persistSherlockResults(
+    username: string,
+    accounts: DiscoveredAccount[],
+  ): Promise<void> {
+    if (!this.identityStore) return;
+
+    try {
+      const record = await this.identityStore.findByHandle(username, 'twitter')
+        ?? await this.identityStore.findByHandle(username, 'reddit')
+        ?? await this.identityStore.findByHandle(username, 'unknown');
+
+      if (!record) {
+        this.logger.debug(`No identity record for "${username}" — skipping Sherlock persistence`);
+        return;
+      }
+
+      const now = new Date();
+      const existingKeys = new Set(
+        record.platformAccounts.map((a) => `${a.platform}:${a.handle}`),
+      );
+
+      const newAccounts = accounts
+        .filter((a) => !existingKeys.has(`${a.platform}:${a.username}`))
+        .map((a) => ({
+          platform: a.platform,
+          handle: a.username,
+          url: a.url,
+          discoveredAt: now,
+          discoveryMethod: 'sherlock' as const,
+          verified: false,
+        }));
+
+      if (newAccounts.length === 0) return;
+
+      // Use updatePlatformAccounts if available, otherwise fall back to direct approach
+      if (this.identityStore.updatePlatformAccounts) {
+        await this.identityStore.updatePlatformAccounts(
+          record._id?.toString() ?? record.id,
+          [...record.platformAccounts, ...newAccounts] as Array<{
+            platform: string;
+            handle: string;
+            url: string;
+            discoveredAt: Date;
+            discoveryMethod: 'sherlock' | 'investigation' | 'manual';
+            verified: boolean;
+          }>,
+          now,
+        );
+      }
+
+      this.logger.debug(
+        `Persisted ${newAccounts.length} new Sherlock accounts for "${username}" to identity record`,
+      );
+    } catch (err) {
+      this.logger.warn(`Failed to persist Sherlock results for "${username}": ${err}`);
+    }
   }
 
   /**

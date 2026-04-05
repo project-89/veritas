@@ -173,7 +173,7 @@ export class SignalCacheRepository implements OnModuleInit {
         // Best effort cleanup
       }
 
-      // Insert fresh entry
+      // Insert fresh entry (with TTL-based auto-delete at 2x maxAge)
       await this.repo.create({
         adapterName: params.adapterName,
         scope: params.scope,
@@ -183,6 +183,7 @@ export class SignalCacheRepository implements OnModuleInit {
         signals: params.signals,
         fetchedAt: new Date(),
         maxAgeMs: params.maxAgeMs,
+        expiresAt: new Date(Date.now() + params.maxAgeMs * 2),
       } as Partial<SignalCacheEntry>);
 
       this.logger.debug(

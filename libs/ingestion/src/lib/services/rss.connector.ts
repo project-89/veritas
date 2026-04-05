@@ -3,6 +3,7 @@ import {
   OnModuleInit,
   OnModuleDestroy,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
@@ -17,6 +18,8 @@ import { getFeedsForQuery, getAllFeeds } from '../config/rss-feed-catalog';
 import { SourceNode } from '@veritas/shared/types';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { RssCacheRepository } from '../repositories/rss-cache.repository';
+import type { RssCacheItem } from '../schemas/rss-cache.schema';
 
 interface RSSItem {
   title?: string;
@@ -55,9 +58,13 @@ export class RSSConnector
   private readonly logger = new Logger(RSSConnector.name);
   private feedUrls: Map<string, string> = new Map();
 
+  /** Default max age per tier: tier-1=30m, tier-2=60m, tier-3=120m */
+  private static readonly DEFAULT_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
+
   constructor(
     private configService: ConfigService,
-    private transformService: TransformOnIngestService
+    private transformService: TransformOnIngestService,
+    @Optional() private rssCacheRepo?: RssCacheRepository,
   ) {
     this.parser = new Parser({
       customFields: {
@@ -249,32 +256,58 @@ export class RSSConnector
   }
 
   /**
-   * Fetch items from a feed URL
+   * Fetch items from a feed URL (with RSS cache layer)
    */
   private async fetchFeedItems(
     feedUrl: string,
     options?: SearchOptions
   ): Promise<RSSItem[]> {
     try {
+      // --- Check RSS cache first ---
+      if (this.rssCacheRepo) {
+        try {
+          const cached = await this.rssCacheRepo.getCachedFeed(feedUrl);
+          if (cached) {
+            this.logger.debug(`RSS cache hit for ${feedUrl} (${cached.length} items)`);
+            let items: RSSItem[] = cached.map((c) => ({
+              title: c.title,
+              link: c.link,
+              pubDate: c.pubDate,
+              isoDate: c.pubDate,
+              content: c.content,
+              contentSnippet: c.contentSnippet,
+            }));
+            // Apply date filters
+            items = this.applyDateFilters(items, options);
+            if (options?.limit && items.length > options.limit) {
+              items = items.slice(0, options.limit);
+            }
+            return items;
+          }
+        } catch {
+          // Cache miss — fetch fresh
+        }
+      }
+
       const feed = await this.parser.parseURL(feedUrl);
       let items = feed.items || [];
 
-      // Apply date filters if provided
-      if (options?.startDate || options?.endDate) {
-        items = items.filter((item) => {
-          const itemDate = new Date(item.isoDate || item.pubDate || Date.now());
-
-          if (options.startDate && itemDate < options.startDate) {
-            return false;
-          }
-
-          if (options.endDate && itemDate > options.endDate) {
-            return false;
-          }
-
-          return true;
-        });
+      // --- Store in RSS cache (before filtering) ---
+      if (this.rssCacheRepo && items.length > 0) {
+        const cacheItems: RssCacheItem[] = items.map((item) => ({
+          title: item.title ?? '',
+          link: item.link ?? '',
+          pubDate: item.isoDate ?? item.pubDate ?? '',
+          content: item.content ?? '',
+          contentSnippet: item.contentSnippet ?? '',
+        }));
+        this.rssCacheRepo
+          .setCachedFeed(feedUrl, feedUrl, cacheItems, RSSConnector.DEFAULT_CACHE_MAX_AGE_MS)
+          .catch(() => {});
       }
+
+      // Apply date filters if provided
+      items = this.applyDateFilters(items, options);
 
       // Apply limit if provided
       if (options?.limit && items.length > options.limit) {
@@ -286,6 +319,20 @@ export class RSSConnector
       this.logger.error(`Error fetching feed ${feedUrl}:`, error);
       return [];
     }
+  }
+
+  /**
+   * Apply date filters to RSS items.
+   */
+  private applyDateFilters(items: RSSItem[], options?: SearchOptions): RSSItem[] {
+    if (!options?.startDate && !options?.endDate) return items;
+
+    return items.filter((item) => {
+      const itemDate = new Date(item.isoDate || item.pubDate || Date.now());
+      if (options.startDate && itemDate < options.startDate) return false;
+      if (options.endDate && itemDate > options.endDate) return false;
+      return true;
+    });
   }
 
   /**

@@ -288,6 +288,14 @@ export class IdentityRecordSchema extends Document {
   })
   profileGenerationStatus!: string;
 
+  // Cached timeline (avoids re-fetching from connectors)
+  @Prop({ type: Object, default: null })
+  cachedTimeline!: {
+    posts: unknown[];
+    fetchedAt: string;
+    platforms: string[];
+  } | null;
+
   // Aggregated
   @Prop({ type: [String], default: [] })
   aggregatedFlags!: string[];
@@ -420,6 +428,11 @@ export interface IdentityRecord {
   lastInvestigatedAt: Date | null;
   psychologicalProfile: PsychologicalProfile | null;
   profileGenerationStatus: string;
+  cachedTimeline: {
+    posts: unknown[];
+    fetchedAt: string;
+    platforms: string[];
+  } | null;
   aggregatedFlags: string[];
   totalPostsAnalyzed: number;
   createdAt: Date;

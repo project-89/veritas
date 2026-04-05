@@ -57,6 +57,15 @@ export { AnalysisJobRepository } from './lib/repositories/analysis-job.repositor
 // Signal cache schema
 export * from './lib/schemas/signal-cache.schema';
 
+// Embedding cache
+export { EmbeddingCacheRepository } from './lib/repositories/embedding-cache.repository';
+export { hashText } from './lib/repositories/embedding-cache.repository';
+export * from './lib/schemas/embedding-cache.schema';
+
+// RSS cache
+export { RssCacheRepository } from './lib/repositories/rss-cache.repository';
+export * from './lib/schemas/rss-cache.schema';
+
 // Analysis job schema + types
 export * from './lib/schemas/analysis-job.schema';
 

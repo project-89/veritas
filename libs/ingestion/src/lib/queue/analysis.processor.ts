@@ -402,9 +402,28 @@ export class AnalysisProcessor extends WorkerHost {
   // Helpers
   // -------------------------------------------------------------------------
 
+  /** Max age for cached timelines: 6 hours */
+  private static readonly TIMELINE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
   private async fetchTimeline(handle: string): Promise<UserPost[]> {
+    // Check identity record for a cached timeline first
+    try {
+      const cached = await this.identityRepo.getCachedTimeline(
+        handle,
+        'unknown', // platform not known here — getCachedTimeline does a handle lookup
+        AnalysisProcessor.TIMELINE_CACHE_MAX_AGE_MS,
+      );
+      if (cached && cached.length > 0) {
+        this.logger.debug(`Using cached timeline for @${handle}: ${cached.length} posts`);
+        return cached;
+      }
+    } catch {
+      // Cache miss — fetch fresh
+    }
+
     const allConnectors = this.ingestionService.getAllConnectors() as any[];
     const allPosts: UserPost[] = [];
+    const platforms: string[] = [];
 
     for (const connector of allConnectors) {
       if (typeof connector?.getUserTimeline !== 'function') continue;
@@ -412,7 +431,9 @@ export class AnalysisProcessor extends WorkerHost {
       try {
         const timelinePosts = await connector.getUserTimeline(handle, { limit: 50 });
         if (timelinePosts?.length > 0) {
-          this.logger.debug(`Fetched ${timelinePosts.length} timeline posts for @${handle} from ${connector.platform ?? 'unknown'}`);
+          const connPlatform = connector.platform ?? 'unknown';
+          platforms.push(connPlatform);
+          this.logger.debug(`Fetched ${timelinePosts.length} timeline posts for @${handle} from ${connPlatform}`);
           for (const post of timelinePosts as any[]) {
             allPosts.push({
               text: post.text ?? '',
@@ -434,6 +455,14 @@ export class AnalysisProcessor extends WorkerHost {
     }
 
     this.logger.debug(`Timeline fetch for @${handle}: ${allPosts.length} total posts from ${allConnectors.length} connectors`);
+
+    // Cache the results on the identity record (fire-and-forget)
+    if (allPosts.length > 0) {
+      this.identityRepo
+        .setCachedTimeline(handle, 'unknown', allPosts, platforms)
+        .catch(() => {});
+    }
+
     return allPosts;
   }
 }

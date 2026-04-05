@@ -1,9 +1,32 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { cosineSimilarity } from '../utils/math';
 import { SaturationMetricsService } from './saturation-metrics.service';
 import type { SaturationReport } from './saturation-metrics.service';
+
+/** Injection token for the EmbeddingCacheRepository (optional — provided by app module) */
+export const EMBEDDING_CACHE_STORE = Symbol('EMBEDDING_CACHE_STORE');
+
+/** Interface for the embedding cache to avoid hard dependency on ingestion lib */
+interface EmbeddingCacheStore {
+  getEmbedding(contentHash: string, model: string): Promise<number[] | null>;
+  setEmbedding(contentHash: string, model: string, embedding: number[]): Promise<void>;
+  getBatchEmbeddings(contentHashes: string[], model: string): Promise<Map<string, number[]>>;
+}
+
+/**
+ * Hash text content for embedding cache lookups.
+ * Uses the first 2000 chars (same truncation as the embedding service).
+ */
+function hashText(text: string): string {
+  let hash = 0;
+  const str = text.slice(0, 2000);
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return `emb-${hash.toString(36)}`;
+}
 
 /**
  * A post with its embedding, used internally during clustering.
@@ -78,6 +101,7 @@ export class NarrativeAnalysisService {
   constructor(
     private readonly configService: ConfigService,
     @Optional() private readonly saturationMetrics?: SaturationMetricsService,
+    @Optional() @Inject(EMBEDDING_CACHE_STORE) private readonly embeddingCache?: EmbeddingCacheStore,
   ) {
     const geminiKey =
       this.configService.get<string>('GEMINI_API_KEY') ||
@@ -193,51 +217,115 @@ export class NarrativeAnalysisService {
       return texts.map((t) => this.fallbackEmbedding(t));
     }
 
-    // Try embedding models in order of preference
-    const modelsToTry = [this.embeddingModel, 'gemini-embedding-001'];
-    let model = this.genAI.getGenerativeModel({ model: modelsToTry[0]! });
-    const BATCH_SIZE = 100;
-    const allEmbeddings: number[][] = [];
-    let fallbackToNext = false;
+    const modelName = this.embeddingModel;
 
-    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-      const batch = texts.slice(i, i + BATCH_SIZE).map((t) => ({
-        content: { role: 'user' as const, parts: [{ text: t.slice(0, 2000) }] },
-      }));
+    // --- Check embedding cache for already-computed embeddings ---
+    const hashes = texts.map((t) => hashText(t));
+    const cachedMap = new Map<string, number[]>();
 
+    if (this.embeddingCache) {
       try {
-        const result = await model.batchEmbedContents({ requests: batch });
-        for (const emb of result.embeddings) {
-          allEmbeddings.push(emb.values);
+        const cached = await this.embeddingCache.getBatchEmbeddings(hashes, modelName);
+        for (const [h, emb] of cached) {
+          cachedMap.set(h, emb);
         }
-        this.logger.debug(
-          `Embedded batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(texts.length / BATCH_SIZE)}`,
-        );
+        if (cachedMap.size > 0) {
+          this.logger.log(`Embedding cache hit: ${cachedMap.size}/${texts.length} texts already cached`);
+        }
       } catch (err) {
-        // If first model fails on first batch, try fallback model
-        if (i === 0 && !fallbackToNext && modelsToTry.length > 1) {
-          this.logger.warn(
-            `Model ${modelsToTry[0]} failed, trying ${modelsToTry[1]}: ${err}`,
-          );
-          fallbackToNext = true;
-          model = this.genAI.getGenerativeModel({ model: modelsToTry[1]! });
-          // Retry this batch with fallback model
-          try {
-            const retryResult = await model.batchEmbedContents({ requests: batch });
-            for (const emb of retryResult.embeddings) {
-              allEmbeddings.push(emb.values);
-            }
-            continue;
-          } catch (retryErr) {
-            this.logger.error(`Fallback model also failed: ${retryErr}`);
+        this.logger.warn(`Embedding cache lookup failed: ${err}`);
+      }
+    }
+
+    // Build list of uncached texts (preserving original indices)
+    const uncachedIndices: number[] = [];
+    const uncachedTexts: string[] = [];
+    for (let i = 0; i < texts.length; i++) {
+      if (!cachedMap.has(hashes[i]!)) {
+        uncachedIndices.push(i);
+        uncachedTexts.push(texts[i]!);
+      }
+    }
+
+    // --- Embed only uncached texts via Gemini ---
+    const freshEmbeddings = new Map<number, number[]>();
+
+    if (uncachedTexts.length > 0) {
+      const modelsToTry = [modelName, 'gemini-embedding-001'];
+      let model = this.genAI.getGenerativeModel({ model: modelsToTry[0]! });
+      const BATCH_SIZE = 100;
+      let embIdx = 0;
+      let fallbackToNext = false;
+
+      for (let i = 0; i < uncachedTexts.length; i += BATCH_SIZE) {
+        const batchTexts = uncachedTexts.slice(i, i + BATCH_SIZE);
+        const batch = batchTexts.map((t) => ({
+          content: { role: 'user' as const, parts: [{ text: t.slice(0, 2000) }] },
+        }));
+
+        try {
+          const result = await model.batchEmbedContents({ requests: batch });
+          for (let j = 0; j < result.embeddings.length; j++) {
+            const origIdx = uncachedIndices[embIdx]!;
+            freshEmbeddings.set(origIdx, result.embeddings[j]!.values);
+            embIdx++;
           }
-        } else {
-          this.logger.error(`Embedding batch failed: ${err}`);
+          this.logger.debug(
+            `Embedded batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(uncachedTexts.length / BATCH_SIZE)}`,
+          );
+        } catch (err) {
+          if (i === 0 && !fallbackToNext && modelsToTry.length > 1) {
+            this.logger.warn(
+              `Model ${modelsToTry[0]} failed, trying ${modelsToTry[1]}: ${err}`,
+            );
+            fallbackToNext = true;
+            model = this.genAI.getGenerativeModel({ model: modelsToTry[1]! });
+            try {
+              const retryResult = await model.batchEmbedContents({ requests: batch });
+              for (let j = 0; j < retryResult.embeddings.length; j++) {
+                const origIdx = uncachedIndices[embIdx]!;
+                freshEmbeddings.set(origIdx, retryResult.embeddings[j]!.values);
+                embIdx++;
+              }
+              continue;
+            } catch (retryErr) {
+              this.logger.error(`Fallback model also failed: ${retryErr}`);
+            }
+          } else {
+            this.logger.error(`Embedding batch failed: ${err}`);
+          }
+          // Fill with fallback embeddings for this batch
+          for (const t of batchTexts) {
+            const origIdx = uncachedIndices[embIdx]!;
+            freshEmbeddings.set(origIdx, this.fallbackEmbedding(t));
+            embIdx++;
+          }
         }
-        // Fill with fallback embeddings for this batch
-        for (const t of texts.slice(i, i + BATCH_SIZE)) {
-          allEmbeddings.push(this.fallbackEmbedding(t));
+      }
+
+      // --- Store fresh embeddings in cache ---
+      if (this.embeddingCache) {
+        try {
+          for (const [origIdx, emb] of freshEmbeddings) {
+            const h = hashes[origIdx]!;
+            // Fire-and-forget — don't block on cache writes
+            this.embeddingCache.setEmbedding(h, modelName, emb).catch(() => {});
+          }
+        } catch {
+          // Best effort
         }
+      }
+    }
+
+    // --- Assemble final result in original order ---
+    const allEmbeddings: number[][] = [];
+    for (let i = 0; i < texts.length; i++) {
+      const h = hashes[i]!;
+      const cached = cachedMap.get(h);
+      if (cached) {
+        allEmbeddings.push(cached);
+      } else {
+        allEmbeddings.push(freshEmbeddings.get(i) ?? this.fallbackEmbedding(texts[i]!));
       }
     }
 

@@ -303,6 +303,109 @@ export class IdentityRecordRepository implements OnModuleInit {
   }
 
   // -------------------------------------------------------------------------
+  // Platform account management (Sherlock persistence)
+  // -------------------------------------------------------------------------
+
+  async updatePlatformAccounts(
+    id: string,
+    accounts: PlatformAccount[],
+    sherlockResolvedAt: Date,
+  ): Promise<void> {
+    this.ensureInitialized();
+    await this.repo.updateById(id, {
+      platformAccounts: accounts,
+    } as Partial<IdentityRecord>);
+    this.logger.debug(`Updated platform accounts for identity ${id} (${accounts.length} total, Sherlock at ${sherlockResolvedAt.toISOString()})`);
+  }
+
+  // -------------------------------------------------------------------------
+  // Timeline caching
+  // -------------------------------------------------------------------------
+
+  /**
+   * Get cached timeline posts if they exist and are within maxAgeMs.
+   */
+  async getCachedTimeline(
+    handle: string,
+    platform: string,
+    maxAgeMs: number,
+  ): Promise<Array<{
+    text: string;
+    timestamp: string;
+    platform: string;
+    url?: string;
+    engagement: { likes: number; comments: number; shares: number };
+    sentiment: { score: number; label: string };
+  }> | null> {
+    this.ensureInitialized();
+    try {
+      const record = await this.findByHandle(handle, platform);
+      if (!record?.cachedTimeline) return null;
+
+      const fetchedAt = new Date(record.cachedTimeline.fetchedAt).getTime();
+      const age = Date.now() - fetchedAt;
+      if (age > maxAgeMs) {
+        this.logger.debug(
+          `Timeline cache expired for @${handle} (age: ${Math.round(age / 3600000)}h, max: ${Math.round(maxAgeMs / 3600000)}h)`,
+        );
+        return null;
+      }
+
+      this.logger.debug(`Timeline cache hit for @${handle} (${record.cachedTimeline.posts.length} posts)`);
+      return record.cachedTimeline.posts as Array<{
+        text: string;
+        timestamp: string;
+        platform: string;
+        url?: string;
+        engagement: { likes: number; comments: number; shares: number };
+        sentiment: { score: number; label: string };
+      }>;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Cache timeline posts on the identity record.
+   */
+  async setCachedTimeline(
+    handle: string,
+    platform: string,
+    posts: Array<{
+      text: string;
+      timestamp: string;
+      platform: string;
+      url?: string;
+      engagement: { likes: number; comments: number; shares: number };
+      sentiment: { score: number; label: string };
+    }>,
+    platforms: string[],
+  ): Promise<void> {
+    this.ensureInitialized();
+    try {
+      const record = await this.findByHandle(handle, platform);
+      if (!record) {
+        this.logger.debug(`No identity record for @${handle} — skipping timeline cache`);
+        return;
+      }
+
+      const id = record._id?.toString() ?? record.id;
+      await this.repo.updateById(id, {
+        cachedTimeline: {
+          posts,
+          fetchedAt: new Date().toISOString(),
+          platforms,
+        },
+      } as Partial<IdentityRecord>);
+
+      this.logger.debug(`Cached ${posts.length} timeline posts for @${handle}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error caching timeline for @${handle}: ${err.message}`);
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Identity linking
   // -------------------------------------------------------------------------
 

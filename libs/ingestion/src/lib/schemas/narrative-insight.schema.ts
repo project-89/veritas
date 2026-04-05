@@ -82,7 +82,7 @@ export class NarrativeInsightSchema extends Document {
   @Prop({ required: true, type: Date })
   processedAt!: Date;
 
-  @Prop({ required: true, type: Date, index: true })
+  @Prop({ required: true, type: Date, index: { expires: 0 } })
   expiresAt!: Date;
 
   @Prop({ type: [Number] })

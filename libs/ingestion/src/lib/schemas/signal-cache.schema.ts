@@ -47,6 +47,10 @@ export class SignalCacheSchema extends Document {
   /** Per-adapter max age in ms — after this, re-fetch */
   @Prop({ type: Number, required: true })
   maxAgeMs!: number;
+
+  /** TTL index — MongoDB automatically deletes documents after this date */
+  @Prop({ type: Date, index: { expires: 0 } })
+  expiresAt?: Date;
 }
 
 export const SignalCacheModel = SchemaFactory.createForClass(SignalCacheSchema);
@@ -82,6 +86,7 @@ export interface SignalCacheEntry {
   signals: CachedSignal[];
   fetchedAt: Date;
   maxAgeMs: number;
+  expiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
