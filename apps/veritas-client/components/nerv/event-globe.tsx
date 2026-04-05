@@ -48,9 +48,6 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   const eventsRef = useRef(events);
   eventsRef.current = events;
 
-  const onEventClickRef = useRef(onEventClick);
-  onEventClickRef.current = onEventClick;
-
   const pointsRef = useRef<GlobePointData[]>([]);
   pointsRef.current = events.map(ev => ({
     lat: ev.location.lat,
@@ -121,66 +118,28 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         .pointsData(pointsRef.current)
         .pointLat((d: unknown) => (d as GlobePointData).lat)
         .pointLng((d: unknown) => (d as GlobePointData).lng)
-        .pointAltitude((d: unknown) => 0.02 + (d as GlobePointData).size * 0.04)
-        .pointRadius((d: unknown) => 0.3 + (d as GlobePointData).size * 0.5)
+        .pointAltitude(0.007)
+        .pointRadius((d: unknown) => 0.4 + (d as GlobePointData).size * 0.6)
         .pointColor((d: unknown) => (d as GlobePointData).color)
         .pointResolution(8);
 
-      // HTML labels — three-globe positions these at the correct 3D coordinates
-      // Only show top events by severity to avoid clutter
+      // Labels at event locations — uses three-globe's built-in label system
       const topPoints = [...pointsRef.current]
         .sort((a, b) => b.size - a.size)
-        .slice(0, 12);
+        .slice(0, 15);
 
       globe
-        .htmlElementsData(topPoints)
-        .htmlLat((d: unknown) => (d as GlobePointData).lat)
-        .htmlLng((d: unknown) => (d as GlobePointData).lng)
-        .htmlAltitude((d: unknown) => 0.05 + (d as GlobePointData).size * 0.06)
-        .htmlElement((d: unknown) => {
-          const pt = d as GlobePointData;
-          const el = document.createElement('div');
-          el.style.cssText = `
-            pointer-events: auto;
-            cursor: pointer;
-            white-space: nowrap;
-            transform: translateX(-50%);
-            transition: opacity 0.3s;
-          `;
-          el.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;">
-              <div style="
-                font-family:monospace;
-                font-size:10px;
-                line-height:1.2;
-                padding:2px 6px;
-                color:${pt.color};
-                background:rgba(10,10,15,0.9);
-                border:1px solid ${pt.color}40;
-                border-radius:2px;
-                letter-spacing:0.02em;
-                max-width:200px;
-                overflow:hidden;
-                text-overflow:ellipsis;
-              ">${pt.title}</div>
-              <div style="
-                width:1px;
-                height:20px;
-                background:${pt.color};
-                opacity:0.5;
-              "></div>
-            </div>
-          `;
-          el.addEventListener('click', () => {
-            const ev = eventsRef.current.find(e => e.id === pt.eventId);
-            if (!ev) return;
-            autoRotate.current = false;
-            targetRotationY.current = -ev.location.lng * (Math.PI / 180);
-            setTimeout(() => { autoRotate.current = true; }, 10000);
-            onEventClickRef.current?.(ev);
-          });
-          return el;
-        });
+        .labelsData(topPoints)
+        .labelLat((d: unknown) => (d as GlobePointData).lat)
+        .labelLng((d: unknown) => (d as GlobePointData).lng)
+        .labelAltitude(0.012)
+        .labelText((d: unknown) => (d as GlobePointData).title)
+        .labelSize((d: unknown) => 0.6 + (d as GlobePointData).size * 0.3)
+        .labelColor((d: unknown) => (d as GlobePointData).color)
+        .labelDotRadius(0.4)
+        .labelDotOrientation(() => 'right' as const)
+        .labelResolution(2)
+        .labelIncludeDot(true);
 
       scene.add(globe);
       globeRef.current = globe;
@@ -245,8 +204,8 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
 
         globe.pointAltitude((d: unknown) => {
           const p = d as GlobePointData;
-          if (p.size >= 1.5) return 0.02 + p.size * 0.04 + 0.03 * Math.sin(pulsePhase);
-          return 0.02 + p.size * 0.04;
+          if (p.size >= 1.5) return 0.007 + 0.008 * Math.sin(pulsePhase);
+          return 0.007;
         });
 
         controls.update();
@@ -297,15 +256,15 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   useEffect(() => {
     const globe = globeRef.current as {
       pointsData: (d: GlobePointData[]) => void;
-      htmlElementsData: (d: GlobePointData[]) => void;
+      labelsData: (d: GlobePointData[]) => void;
     } | null;
     if (!globe || !loaded) return;
     globe.pointsData(pointsRef.current);
 
     const topPoints = [...pointsRef.current]
       .sort((a, b) => b.size - a.size)
-      .slice(0, 12);
-    globe.htmlElementsData(topPoints);
+      .slice(0, 15);
+    globe.labelsData(topPoints);
   }, [events, loaded]);
 
   return (
