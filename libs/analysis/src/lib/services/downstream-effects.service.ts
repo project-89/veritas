@@ -15,6 +15,8 @@ import { FredAdapter } from './signal-adapters/fred.adapter';
 import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
 import { AcledAdapter } from './signal-adapters/acled.adapter';
 import { UsgsAdapter } from './signal-adapters/usgs.adapter';
+import { GdacsAdapter } from './signal-adapters/gdacs.adapter';
+import { ReliefWebAdapter } from './signal-adapters/reliefweb.adapter';
 import type { CausalReasoningService } from './causal-reasoning.service';
 
 /** Injection token for the causal reasoning service (avoids circular dependency). */
@@ -188,6 +190,8 @@ export class DownstreamEffectsService {
     this.adapters.push(new CoinGeckoAdapter());
     this.adapters.push(new AcledAdapter());
     this.adapters.push(new UsgsAdapter());
+    this.adapters.push(new GdacsAdapter());
+    this.adapters.push(new ReliefWebAdapter());
     this.adapters.push(new LlmHypothesisAdapter(this.genAI));
   }
 

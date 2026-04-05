@@ -23,6 +23,7 @@ import {
   TRUTHSOCIAL_CONNECTOR,
   FARCASTER_CONNECTOR,
   TELEGRAM_CONNECTOR,
+  WIKIPEDIA_CONNECTOR,
 } from '../interfaces/connector-tokens';
 
 /**
@@ -44,6 +45,7 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
     @Optional() @Inject(TRUTHSOCIAL_CONNECTOR) private readonly truthSocialConnector: any,
     @Optional() @Inject(FARCASTER_CONNECTOR) private readonly farcasterConnector: any,
     @Optional() @Inject(TELEGRAM_CONNECTOR) private readonly telegramConnector: any,
+    @Optional() @Inject(WIKIPEDIA_CONNECTOR) private readonly wikipediaConnector: any,
     @Optional() private readonly rssFeedConnector: RSSConnector,
     @Optional() private readonly webScraperConnector: WebScraperConnector,
     private readonly databaseService: DatabaseService,
@@ -101,6 +103,7 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
       this.truthSocialConnector,
       this.farcasterConnector,
       this.telegramConnector,
+      this.wikipediaConnector,
       this.rssFeedConnector,
       this.webScraperConnector,
     ].filter((connector) => connector !== undefined);

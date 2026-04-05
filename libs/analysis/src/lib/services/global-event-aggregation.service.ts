@@ -12,6 +12,8 @@ import { UsgsAdapter } from './signal-adapters/usgs.adapter';
 import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
 import { AcledAdapter } from './signal-adapters/acled.adapter';
 import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
+import { GdacsAdapter } from './signal-adapters/gdacs.adapter';
+import { ReliefWebAdapter } from './signal-adapters/reliefweb.adapter';
 import { resolveCountryCode, REGION_CENTROIDS } from '../utils/geocoding';
 import { getAllFeeds, getFeedsByTier, type RssFeedEntry } from '@veritas/ingestion';
 import type {
@@ -35,6 +37,8 @@ const USGS_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const GDELT_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes (GDELT rate-limits aggressively)
 const ACLED_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const COINGECKO_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+const GDACS_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const RELIEFWEB_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes
 const RSS_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const DEFAULT_EVENT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -64,12 +68,16 @@ export class GlobalEventAggregationService
   private readonly gdelt = new GdeltAdapter();
   private readonly acled = new AcledAdapter();
   private readonly coingecko = new CoinGeckoAdapter();
+  private readonly gdacs = new GdacsAdapter();
+  private readonly reliefweb = new ReliefWebAdapter();
 
   // Polling handles
   private usgsInterval: ReturnType<typeof setInterval> | null = null;
   private gdeltInterval: ReturnType<typeof setInterval> | null = null;
   private acledInterval: ReturnType<typeof setInterval> | null = null;
   private coingeckoInterval: ReturnType<typeof setInterval> | null = null;
+  private gdacsInterval: ReturnType<typeof setInterval> | null = null;
+  private reliefwebInterval: ReturnType<typeof setInterval> | null = null;
   private rssInterval: ReturnType<typeof setInterval> | null = null;
 
   // Deduplication: eventId → timestamp (ms)
@@ -95,7 +103,17 @@ export class GlobalEventAggregationService
     setTimeout(() => void this.pollCoingecko(), 10_000);  // 10s delay
     setTimeout(() => void this.pollRss(), 20_000);        // 20s delay
     setTimeout(() => void this.pollGdelt(), 60_000);      // 60s delay
-    setTimeout(() => void this.pollAcled(), 90_000);      // 90s delay
+    setTimeout(() => void this.pollGdacs(), 75_000);      // 75s delay
+    setTimeout(() => void this.pollReliefweb(), 80_000);  // 80s delay
+
+    // ACLED polling — disabled by default (requires API key setup)
+    const acledEnabled = process.env['ACLED_ENABLED'] === 'true';
+    if (acledEnabled) {
+      setTimeout(() => void this.pollAcled(), 90_000);
+      this.acledInterval = setInterval(() => void this.pollAcled(), ACLED_INTERVAL_MS);
+    } else {
+      this.logger.log('ACLED polling disabled (set ACLED_ENABLED=true to enable)');
+    }
 
     // Set up recurring intervals
     this.usgsInterval = setInterval(
@@ -106,13 +124,17 @@ export class GlobalEventAggregationService
       () => void this.pollGdelt(),
       GDELT_INTERVAL_MS,
     );
-    this.acledInterval = setInterval(
-      () => void this.pollAcled(),
-      ACLED_INTERVAL_MS,
-    );
     this.coingeckoInterval = setInterval(
       () => void this.pollCoingecko(),
       COINGECKO_INTERVAL_MS,
+    );
+    this.gdacsInterval = setInterval(
+      () => void this.pollGdacs(),
+      GDACS_INTERVAL_MS,
+    );
+    this.reliefwebInterval = setInterval(
+      () => void this.pollReliefweb(),
+      RELIEFWEB_INTERVAL_MS,
     );
     this.rssInterval = setInterval(
       () => void this.pollRss(),
@@ -126,6 +148,8 @@ export class GlobalEventAggregationService
     if (this.usgsInterval) clearInterval(this.usgsInterval);
     if (this.gdeltInterval) clearInterval(this.gdeltInterval);
     if (this.acledInterval) clearInterval(this.acledInterval);
+    if (this.gdacsInterval) clearInterval(this.gdacsInterval);
+    if (this.reliefwebInterval) clearInterval(this.reliefwebInterval);
     this.subject.complete();
     this.logger.log('Global event aggregation stopped');
   }
@@ -322,6 +346,46 @@ export class GlobalEventAggregationService
     }
   }
 
+  private async pollGdacs(): Promise<void> {
+    try {
+      const now = new Date();
+      const signals = await this.gdacs.fetchSignals({
+        keywords: [],
+        startDate: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+        endDate: now.toISOString(),
+      });
+
+      const events = signals
+        .map((s) => this.normalizeGdacs(s))
+        .filter((e): e is GlobalEvent => e !== null);
+
+      await this.processEvents(events);
+      this.logger.debug(`GDACS poll: ${events.length} events`);
+    } catch (err) {
+      this.logger.error(`GDACS poll error: ${err}`);
+    }
+  }
+
+  private async pollReliefweb(): Promise<void> {
+    try {
+      const now = new Date();
+      const signals = await this.reliefweb.fetchSignals({
+        keywords: [],
+        startDate: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+        endDate: now.toISOString(),
+      });
+
+      const events = signals
+        .map((s) => this.normalizeReliefweb(s))
+        .filter((e): e is GlobalEvent => e !== null);
+
+      await this.processEvents(events);
+      this.logger.debug(`ReliefWeb poll: ${events.length} events`);
+    } catch (err) {
+      this.logger.error(`ReliefWeb poll error: ${err}`);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Processing
   // ---------------------------------------------------------------------------
@@ -494,6 +558,89 @@ export class GlobalEventAggregationService
     if (absTone >= 15) return 'critical';
     if (absTone >= 10) return 'high';
     if (absTone >= 5) return 'medium';
+    return 'low';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Normalization — GDACS
+  // ---------------------------------------------------------------------------
+
+  private normalizeGdacs(signal: ExternalSignal): GlobalEvent | null {
+    const coords = signal.metadata['coordinates'] as
+      | { latitude?: number; longitude?: number }
+      | undefined;
+
+    const lat = coords?.latitude ?? 0;
+    const lng = coords?.longitude ?? 0;
+
+    const location: GeoLocation = {
+      lat,
+      lng,
+      label: (signal.metadata['country'] as string) || signal.title || 'Unknown',
+    };
+
+    return {
+      id: signal.id,
+      source: 'GDACS',
+      category: 'environmental' as EventCategory,
+      severity: this.gdacsSeverity(signal.magnitude),
+      title: signal.title,
+      description: signal.description,
+      timestamp: signal.timestamp,
+      location,
+      magnitude: signal.magnitude,
+      metadata: signal.metadata,
+      expiresAt: new Date(Date.now() + DEFAULT_EVENT_TTL_MS).toISOString(),
+    };
+  }
+
+  private gdacsSeverity(magnitude: number): EventSeverity {
+    if (magnitude >= 0.9) return 'critical';
+    if (magnitude >= 0.7) return 'high';
+    if (magnitude >= 0.4) return 'medium';
+    return 'low';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Normalization — ReliefWeb
+  // ---------------------------------------------------------------------------
+
+  private normalizeReliefweb(signal: ExternalSignal): GlobalEvent | null {
+    const country = (signal.metadata['country'] as string) || '';
+    const resolved = resolveCountryCode(country);
+
+    const location: GeoLocation = resolved
+      ? {
+          lat: resolved.lat,
+          lng: resolved.lng,
+          label: resolved.label,
+          countryCode: country,
+        }
+      : {
+          lat: 0,
+          lng: 0,
+          label: country || 'Unknown',
+        };
+
+    return {
+      id: signal.id,
+      source: 'ReliefWeb',
+      category: 'political' as EventCategory,
+      severity: this.reliefwebSeverity(signal.magnitude),
+      title: signal.title,
+      description: signal.description,
+      timestamp: signal.timestamp,
+      location,
+      magnitude: signal.magnitude,
+      metadata: signal.metadata,
+      expiresAt: new Date(Date.now() + DEFAULT_EVENT_TTL_MS).toISOString(),
+    };
+  }
+
+  private reliefwebSeverity(magnitude: number): EventSeverity {
+    if (magnitude >= 0.9) return 'critical';
+    if (magnitude >= 0.7) return 'high';
+    if (magnitude >= 0.5) return 'medium';
     return 'low';
   }
 }

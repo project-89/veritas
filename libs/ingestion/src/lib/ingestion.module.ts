@@ -26,6 +26,7 @@ import { YouTubeFreeConnector } from './services/youtube-free.connector';
 import { TruthSocialFreeConnector } from './services/truthsocial-free.connector';
 import { FarcasterFreeConnector } from './services/farcaster-free.connector';
 import { TelegramFreeConnector } from './services/telegram-free.connector';
+import { WikipediaEventsConnector } from './services/wikipedia-events.connector';
 import { IngestionService } from './services/ingestion.service';
 import { SubprocessUtil } from './services/utils/subprocess.util';
 import { JinaReaderService } from './services/utils/jina-reader.service';
@@ -48,6 +49,7 @@ import {
   TRUTHSOCIAL_CONNECTOR,
   FARCASTER_CONNECTOR,
   TELEGRAM_CONNECTOR,
+  WIKIPEDIA_CONNECTOR,
 } from './interfaces/connector-tokens';
 
 /**
@@ -114,6 +116,7 @@ export interface IngestionModuleOptions {
     truthsocial?: boolean;
     farcaster?: boolean;
     telegram?: boolean;
+    wikipedia?: boolean;
   };
 
   /**
@@ -242,6 +245,10 @@ export class IngestionModule {
 
     if (connectorConfig.telegram !== false) {
       providers.push({ provide: TELEGRAM_CONNECTOR, useClass: TelegramFreeConnector });
+    }
+
+    if ((connectorConfig as Record<string, unknown>).wikipedia !== false) {
+      providers.push({ provide: WIKIPEDIA_CONNECTOR, useClass: WikipediaEventsConnector });
     }
 
     // RSS and WebScraper are already API-free
