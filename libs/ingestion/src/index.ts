@@ -45,6 +45,9 @@ export * from './lib/schemas/alert.schema';
 export * from './lib/schemas/global-event.schema';
 export * from './lib/schemas/scan-job.schema';
 export { InvestigationRepository } from './lib/repositories/investigation.repository';
+
+// RSS Feed Catalog
+export { getAllFeeds, getFeedsByTier, getFeedsByCategory, getFeedsForQuery, type RssFeedEntry } from './lib/config/rss-feed-catalog';
 export { ScanJobRepository } from './lib/repositories/scan-job.repository';
 export { SignalCacheRepository } from './lib/repositories/signal-cache.repository';
 export { AnalysisJobRepository } from './lib/repositories/analysis-job.repository';

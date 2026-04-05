@@ -13,6 +13,7 @@ import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
 import { AcledAdapter } from './signal-adapters/acled.adapter';
 import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
 import { resolveCountryCode, REGION_CENTROIDS } from '../utils/geocoding';
+import { getAllFeeds, getFeedsByTier, type RssFeedEntry } from '@veritas/ingestion';
 import type {
   GlobalEvent,
   EventCategory,
@@ -34,6 +35,7 @@ const USGS_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const GDELT_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes (GDELT rate-limits aggressively)
 const ACLED_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const COINGECKO_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+const RSS_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const DEFAULT_EVENT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -68,6 +70,7 @@ export class GlobalEventAggregationService
   private gdeltInterval: ReturnType<typeof setInterval> | null = null;
   private acledInterval: ReturnType<typeof setInterval> | null = null;
   private coingeckoInterval: ReturnType<typeof setInterval> | null = null;
+  private rssInterval: ReturnType<typeof setInterval> | null = null;
 
   // Deduplication: eventId → timestamp (ms)
   private readonly seen = new Map<string, number>();
@@ -89,9 +92,10 @@ export class GlobalEventAggregationService
 
     // Stagger initial polls to avoid thundering herd / rate limits
     void this.pollUsgs();
-    setTimeout(() => void this.pollCoingecko(), 15_000);  // 15s delay
-    setTimeout(() => void this.pollGdelt(), 45_000);      // 45s delay
-    setTimeout(() => void this.pollAcled(), 75_000);      // 75s delay
+    setTimeout(() => void this.pollCoingecko(), 10_000);  // 10s delay
+    setTimeout(() => void this.pollRss(), 20_000);        // 20s delay
+    setTimeout(() => void this.pollGdelt(), 60_000);      // 60s delay
+    setTimeout(() => void this.pollAcled(), 90_000);      // 90s delay
 
     // Set up recurring intervals
     this.usgsInterval = setInterval(
@@ -110,9 +114,14 @@ export class GlobalEventAggregationService
       () => void this.pollCoingecko(),
       COINGECKO_INTERVAL_MS,
     );
+    this.rssInterval = setInterval(
+      () => void this.pollRss(),
+      RSS_INTERVAL_MS,
+    );
   }
 
   onModuleDestroy(): void {
+    if (this.rssInterval) clearInterval(this.rssInterval);
     if (this.coingeckoInterval) clearInterval(this.coingeckoInterval);
     if (this.usgsInterval) clearInterval(this.usgsInterval);
     if (this.gdeltInterval) clearInterval(this.gdeltInterval);
@@ -182,6 +191,95 @@ export class GlobalEventAggregationService
       this.logger.debug(`ACLED poll: ${events.length} events`);
     } catch (err) {
       this.logger.error(`ACLED poll error: ${err}`);
+    }
+  }
+
+  private async pollRss(): Promise<void> {
+    try {
+      // Only poll tier-1 feeds for the world map (most important ~15 feeds)
+      const tier1Feeds = getFeedsByTier(1);
+      const events: GlobalEvent[] = [];
+      const now = new Date();
+
+      // Fetch in batches of 5 to avoid overwhelming
+      for (let i = 0; i < tier1Feeds.length; i += 5) {
+        const batch = tier1Feeds.slice(i, i + 5);
+        const results = await Promise.allSettled(
+          batch.map(async (feed) => {
+            try {
+              const Parser = (await import('rss-parser')).default;
+              const parser = new Parser({ timeout: 10000 });
+              const parsed = await parser.parseURL(feed.url);
+              return { feed, items: parsed.items ?? [] };
+            } catch {
+              return { feed, items: [] };
+            }
+          }),
+        );
+
+        for (const result of results) {
+          if (result.status !== 'fulfilled') continue;
+          const { feed, items } = result.value;
+
+          // Only items from last 2 hours
+          const cutoff = now.getTime() - 2 * 60 * 60 * 1000;
+
+          for (const item of items.slice(0, 5)) { // Max 5 per feed
+            const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : 0;
+            if (pubDate < cutoff) continue;
+
+            const title = item.title ?? 'Untitled';
+            const id = `rss-${feed.name}-${title.slice(0, 50).replace(/\W/g, '-').toLowerCase()}`;
+
+            // Resolve location from feed region
+            const region = feed.region ?? 'global';
+            const centroid = REGION_CENTROIDS[region] ?? REGION_CENTROIDS['global'] ?? { lat: 20, lng: 0 };
+
+            // Classify category from feed category
+            let category: EventCategory = 'media';
+            if (['us_politics', 'europe', 'middle_east', 'africa', 'latin_america', 'asia_pacific'].includes(feed.category)) {
+              category = 'political';
+            } else if (['finance', 'crypto', 'energy'].includes(feed.category)) {
+              category = 'economic';
+            } else if (['science_health'].includes(feed.category)) {
+              category = 'environmental';
+            }
+
+            // Add some jitter to position so events don't stack exactly
+            const jitterLat = (Math.random() - 0.5) * 8;
+            const jitterLng = (Math.random() - 0.5) * 12;
+
+            events.push({
+              id,
+              source: `RSS:${feed.name}`,
+              category,
+              severity: feed.tier === 1 ? 'medium' : 'low',
+              title,
+              description: item.contentSnippet?.slice(0, 300) ?? item.content?.slice(0, 300) ?? '',
+              timestamp: item.pubDate ?? now.toISOString(),
+              location: {
+                lat: centroid.lat + jitterLat,
+                lng: centroid.lng + jitterLng,
+                label: feed.region ?? 'Global',
+                region,
+              },
+              magnitude: feed.tier === 1 ? 0.5 : 0.3,
+              metadata: {
+                feedName: feed.name,
+                feedCategory: feed.category,
+                feedTier: feed.tier,
+                link: item.link,
+              },
+              expiresAt: new Date(Date.now() + DEFAULT_EVENT_TTL_MS).toISOString(),
+            });
+          }
+        }
+      }
+
+      await this.processEvents(events);
+      this.logger.debug(`RSS poll: ${events.length} events from ${tier1Feeds.length} tier-1 feeds`);
+    } catch (err) {
+      this.logger.error(`RSS poll error: ${err}`);
     }
   }
 
