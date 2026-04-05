@@ -10,6 +10,7 @@ import { NervBadge } from './nerv-badge';
 const NAV_LINKS = [
   { href: '/monitor', label: 'Monitor' },
   { href: '/search', label: 'Search' },
+  { href: '/worldmap', label: 'World Map' },
 ] as const;
 
 function UtcClock() {

@@ -50,3 +50,12 @@ export type { PlatformComparisonPanelProps } from './platform-comparison-panel';
 
 export { NarrativeComparisonPanel } from './narrative-comparison-panel';
 export type { NarrativeComparisonPanelProps } from './narrative-comparison-panel';
+
+export { EventGlobe } from './event-globe';
+export type { EventGlobeProps } from './event-globe';
+
+export { EventFilterPanel } from './event-filter-panel';
+export type { EventFilterPanelProps, EventFilters } from './event-filter-panel';
+
+export { EventDetailFlyout } from './event-detail-flyout';
+export type { EventDetailFlyoutProps } from './event-detail-flyout';

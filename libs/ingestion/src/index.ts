@@ -37,9 +37,12 @@ export type { ContentClassification } from '@veritas/content-classification';
 // Repositories
 export * from './lib/repositories/narrative-insight.repository';
 export { AlertRepository } from './lib/repositories/alert.repository';
+export { GlobalEventRepository } from './lib/repositories/global-event.repository';
+export type { GlobalEventQueryOptions } from './lib/repositories/global-event.repository';
 
 // Schemas
 export * from './lib/schemas/alert.schema';
+export * from './lib/schemas/global-event.schema';
 export * from './lib/schemas/scan-job.schema';
 export { InvestigationRepository } from './lib/repositories/investigation.repository';
 export { ScanJobRepository } from './lib/repositories/scan-job.repository';

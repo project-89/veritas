@@ -33,6 +33,7 @@ import { ContentClassificationModule } from '@veritas/content-classification';
 import { IngestionModule } from '@veritas/ingestion';
 import { InvestigationController } from './controllers/investigation.controller';
 import { MonitorController } from './controllers/monitor.controller';
+import { EventsController } from './controllers/events.controller';
 import { LoggingService } from './services/logging.service';
 import { RefreshService } from './services/refresh.service';
 import { SchedulerService } from './services/scheduler.service';
@@ -119,7 +120,7 @@ import { DatabaseService } from '@veritas/database';
     // Uncomment when Redis is available:
     // { provide: 'REDIS_SERVICE', useFactory: (db: DatabaseService) => db, inject: [DatabaseService] },
   ],
-  controllers: [InvestigationController, MonitorController],
+  controllers: [InvestigationController, MonitorController, EventsController],
   exports: ['MONGODB_SERVICE'],
 })
 export class AppModule implements NestModule {

@@ -28,3 +28,5 @@ export * from './services/signal-adapters/signal-adapter.interface';
 export * from './services/signal-adapters/llm-hypothesis.adapter';
 export * from './services/evidence-adapters/evidence-adapter.interface';
 export * from './interfaces/analysis-service.interface';
+export * from './types/global-event';
+export * from './services/global-event-aggregation.service';

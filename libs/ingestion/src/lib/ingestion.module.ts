@@ -12,6 +12,7 @@ import { AlertRepository } from './repositories/alert.repository';
 import { SignalCacheRepository } from './repositories/signal-cache.repository';
 import { AnalysisJobRepository } from './repositories/analysis-job.repository';
 import { IdentityRecordRepository } from './repositories/identity-record.repository';
+import { GlobalEventRepository } from './repositories/global-event.repository';
 import { IdentityController } from './controllers/identity.controller';
 import { DatabaseModule, DatabaseService } from '@veritas/database';
 import { IngestionResolver } from './resolvers/ingestion.resolver';
@@ -182,6 +183,7 @@ export class IngestionModule {
       SignalCacheRepository,
       AnalysisJobRepository,
       IdentityRecordRepository,
+      GlobalEventRepository,
     ];
 
     // Configure repository
@@ -272,6 +274,7 @@ export class IngestionModule {
       SignalCacheRepository,
       AnalysisJobRepository,
       IdentityRecordRepository,
+      GlobalEventRepository,
       BullModule,
       // Only export EmbeddingsService if it's enabled
       ...(options?.enableEmbeddings ? [EmbeddingsService] : []),
