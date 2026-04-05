@@ -33,26 +33,17 @@ interface GlobePointData {
   eventId: string;
 }
 
-interface ProjectedLabel {
-  id: string;
-  screenX: number;
-  screenY: number;
-  title: string;
-  color: string;
-  severity: string;
-  visible: boolean;
-}
-
 export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<unknown>(null);
   const rendererRef = useRef<unknown>(null);
   const cameraRef = useRef<unknown>(null);
+  const labelSvgRef = useRef<SVGSVGElement>(null);
+  const labelDivRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number>(0);
   const mouseDown = useRef(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [projectedLabels, setProjectedLabels] = useState<ProjectedLabel[]>([]);
 
   // Keep latest events in ref for click handler
   const eventsRef = useRef(events);
@@ -281,46 +272,88 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         controls.update();
         renderer.render(scene, camera);
 
-        // Project labels every 3rd frame (performance)
-        if (labelFrame % 3 === 0) {
-          const labels: ProjectedLabel[] = [];
-          const usedSlots: number[] = []; // Y positions already taken
+        // Project labels every 5th frame via direct DOM (no React re-render)
+        if (labelFrame % 5 === 0 && labelSvgRef.current && labelDivRef.current) {
+          const svg = labelSvgRef.current;
+          const div = labelDivRef.current;
+          const cw = container.clientWidth;
+          const ch = container.clientHeight;
+          const MARGIN = 12;
+          const LABEL_H = 16;
+          const MAX_LABELS = 12;
+          const sev: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
+          // Collect visible points
+          const visible: Array<{ pt: GlobePointData; sx: number; sy: number; ev: GlobalEvent }> = [];
           for (const pt of pointsRef.current) {
             const worldPos = latLngToVector(pt.lat, pt.lng, 0.03);
             const screen = projectToScreen(worldPos, globe.rotation.y);
             if (!screen) continue;
-
+            if (screen.x < 0 || screen.x > cw || screen.y < 0 || screen.y > ch) continue;
             const ev = eventsRef.current.find(e => e.id === pt.eventId);
             if (!ev) continue;
-
-            // Anti-collision: find nearest free Y slot (20px apart)
-            let slotY = screen.y;
-            for (const used of usedSlots) {
-              if (Math.abs(slotY - used) < 20) {
-                slotY = used + (slotY > used ? 20 : -20);
-              }
-            }
-            usedSlots.push(slotY);
-
-            labels.push({
-              id: ev.id,
-              screenX: screen.x,
-              screenY: slotY,
-              title: ev.title.slice(0, 45),
-              color: pt.color,
-              severity: ev.severity,
-              visible: true,
-            });
+            visible.push({ pt, sx: screen.x, sy: screen.y, ev });
           }
 
-          // Limit to top 15 by severity to avoid clutter
-          labels.sort((a, b) => {
-            const order: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-            return (order[a.severity] ?? 3) - (order[b.severity] ?? 3);
-          });
+          // Sort by severity, limit
+          visible.sort((a, b) => (sev[a.ev.severity] ?? 3) - (sev[b.ev.severity] ?? 3));
+          const labels = visible.slice(0, MAX_LABELS);
 
-          setProjectedLabels(labels.slice(0, 15));
+          // Assign label Y slots on left and right sides (no overlaps)
+          const leftSlots: number[] = [];
+          const rightSlots: number[] = [];
+
+          type LabelInfo = { sx: number; sy: number; labelY: number; textX: number; isLeft: boolean; title: string; color: string; id: string };
+          const resolved: LabelInfo[] = [];
+
+          for (const l of labels) {
+            const isLeft = l.sx < cw / 2;
+            const slots = isLeft ? leftSlots : rightSlots;
+            const textX = isLeft ? MARGIN : cw - MARGIN;
+
+            // Find free Y slot
+            let labelY = Math.max(MARGIN, Math.min(ch - MARGIN, l.sy));
+            let attempts = 0;
+            while (attempts < 30) {
+              const conflict = slots.some(s => Math.abs(s - labelY) < LABEL_H);
+              if (!conflict) break;
+              labelY += LABEL_H;
+              if (labelY > ch - MARGIN) labelY = MARGIN + attempts * LABEL_H;
+              attempts++;
+            }
+            slots.push(labelY);
+
+            resolved.push({ sx: l.sx, sy: l.sy, labelY, textX, isLeft, title: l.ev.title.slice(0, 40), color: l.pt.color, id: l.ev.id });
+          }
+
+          // Build SVG stems (polyline: point → elbow → text)
+          let svgHtml = '';
+          for (const r of resolved) {
+            const elbowX = r.isLeft ? MARGIN + 140 : cw - MARGIN - 140;
+            svgHtml += `<polyline points="${r.sx},${r.sy} ${elbowX},${r.labelY} ${r.textX},${r.labelY}" fill="none" stroke="${r.color}" stroke-width="0.7" opacity="0.5"/>`;
+            svgHtml += `<circle cx="${r.sx}" cy="${r.sy}" r="2.5" fill="${r.color}" opacity="0.8"/>`;
+          }
+          svg.innerHTML = svgHtml;
+
+          // Build text labels
+          let divHtml = '';
+          for (const r of resolved) {
+            const align = r.isLeft ? 'left:8px;text-align:left;' : 'right:8px;text-align:right;';
+            const border = r.isLeft ? `border-left:2px solid ${r.color};` : `border-right:2px solid ${r.color};`;
+            divHtml += `<div data-eid="${r.id}" style="position:absolute;top:${r.labelY - 7}px;${align}z-index:6;cursor:pointer;transition:opacity 0.2s;">`;
+            divHtml += `<span style="font-family:monospace;font-size:8px;line-height:1;padding:2px 4px;color:${r.color};background:rgba(10,10,15,0.9);${border}white-space:nowrap;">${r.title}</span>`;
+            divHtml += '</div>';
+          }
+          div.innerHTML = divHtml;
+
+          // Attach click handlers
+          for (const el of div.querySelectorAll('[data-eid]')) {
+            el.addEventListener('click', () => {
+              const eid = el.getAttribute('data-eid');
+              const ev = eventsRef.current.find(e => e.id === eid);
+              if (ev) onEventClick?.(ev);
+            });
+          }
         }
       };
       animate();
@@ -405,76 +438,11 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
       {/* Globe container */}
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* Dynamic label overlay with stems */}
-      {loaded && (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 5 }}>
-            {projectedLabels.map((label) => {
-              // Determine which side the label text goes to
-              const containerW = containerRef.current?.clientWidth ?? 800;
-              const isLeftSide = label.screenX < containerW / 2;
-              const textX = isLeftSide ? 30 : containerW - 30;
-              return (
-                <g key={label.id} style={{ transition: 'opacity 0.3s' }}>
-                  {/* Stem line from point to text */}
-                  <line
-                    x1={label.screenX}
-                    y1={label.screenY}
-                    x2={textX}
-                    y2={label.screenY}
-                    stroke={label.color}
-                    strokeWidth={0.5}
-                    opacity={0.6}
-                  />
-                  {/* Small dot at the point end */}
-                  <circle
-                    cx={label.screenX}
-                    cy={label.screenY}
-                    r={2}
-                    fill={label.color}
-                    opacity={0.8}
-                  />
-                </g>
-              );
-            })}
-          </svg>
-          {/* Text labels */}
-          {projectedLabels.map((label) => {
-            const containerW = containerRef.current?.clientWidth ?? 800;
-            const isLeftSide = label.screenX < containerW / 2;
-            return (
-              <div
-                key={`text-${label.id}`}
-                className="absolute pointer-events-auto cursor-pointer"
-                style={{
-                  top: label.screenY - 7,
-                  left: isLeftSide ? 8 : undefined,
-                  right: isLeftSide ? undefined : 8,
-                  textAlign: isLeftSide ? 'left' : 'right',
-                  transition: 'top 0.3s ease-out, opacity 0.3s',
-                  zIndex: 6,
-                }}
-                onClick={() => {
-                  const ev = events.find(e => e.id === label.id);
-                  if (ev) onEventClick?.(ev);
-                }}
-              >
-                <span
-                  className="text-[8px] font-mono leading-none px-1 py-0.5 rounded-sm"
-                  style={{
-                    color: label.color,
-                    backgroundColor: 'rgba(10,10,15,0.85)',
-                    borderLeft: isLeftSide ? `2px solid ${label.color}` : undefined,
-                    borderRight: isLeftSide ? undefined : `2px solid ${label.color}`,
-                  }}
-                >
-                  {label.title}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* Label overlay — direct DOM manipulation via refs (no React re-renders) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 5 }}>
+        <svg ref={labelSvgRef} className="absolute inset-0 w-full h-full" />
+        <div ref={labelDivRef} className="absolute inset-0 pointer-events-auto" />
+      </div>
 
       {/* Scan-line overlay */}
       <div
