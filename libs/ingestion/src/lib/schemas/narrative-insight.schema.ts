@@ -94,9 +94,8 @@ export const NarrativeInsightModel = SchemaFactory.createForClass(
 );
 
 // Create indices for common queries
-NarrativeInsightModel.index({ timestamp: -1 });
+// timestamp and themes already indexed via @Prop({ index: true })
 NarrativeInsightModel.index({ 'sentiment.score': 1 });
-NarrativeInsightModel.index({ themes: 1 });
 NarrativeInsightModel.index({ platform: 1, timestamp: -1 });
 
 // We'll set up the vector index at runtime in the MongoNarrativeRepository

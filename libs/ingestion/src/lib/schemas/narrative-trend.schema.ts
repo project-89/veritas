@@ -47,6 +47,6 @@ export const NarrativeTrendModel =
   SchemaFactory.createForClass(NarrativeTrendSchema);
 
 // Create indices for common queries
+// primaryTheme already indexed via @Prop({ index: true })
 NarrativeTrendModel.index({ timeframe: 1, narrativeScore: -1 });
-NarrativeTrendModel.index({ primaryTheme: 1 });
 NarrativeTrendModel.index({ sentimentTrend: 1 });
