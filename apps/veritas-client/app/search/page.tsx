@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NervBadge, NervPanel } from '../../components/nerv';
 import type { Investigation } from '../../lib/api';
-import { fetchInvestigations } from '../../lib/api';
+import { fetchInvestigations, createOrGetInvestigation } from '../../lib/api';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -107,22 +107,19 @@ export default function SearchPage() {
     );
   }, []);
 
-  const handleScan = useCallback(() => {
+  const handleScan = useCallback(async () => {
     const q = query.trim();
     if (!q) return;
+
+    // Build URL params for the investigation workspace
     const params = new URLSearchParams({ q });
-    if (platforms.length > 0) {
-      params.set('platforms', platforms.join(','));
-    }
-    if (limit !== 100) {
-      params.set('limit', String(limit));
-    }
+    if (platforms.length > 0) params.set('platforms', platforms.join(','));
+    if (limit !== 100) params.set('limit', String(limit));
     if (timeRange === 'custom' && customStart && customEnd) {
       params.set('timeRange', `${customStart}_${customEnd}`);
     } else {
       params.set('timeRange', timeRange);
     }
-    // Advanced filters
     const trimmedUsernames = usernames.trim();
     const trimmedHashtags = hashtags.trim();
     const trimmedWallets = wallets.trim();
@@ -131,9 +128,20 @@ export default function SearchPage() {
     if (trimmedHashtags) params.set('hashtags', trimmedHashtags);
     if (trimmedWallets) params.set('wallets', trimmedWallets);
     if (trimmedSubreddits) params.set('subreddits', trimmedSubreddits);
-
     params.set('fresh', '1');
-    router.push(`/results?${params.toString()}`);
+
+    // Create or find investigation, then navigate to it
+    try {
+      const inv = await createOrGetInvestigation(q, {
+        platforms: platforms.length > 0 ? platforms : undefined,
+        timeRange: timeRange === 'custom' ? `${customStart}_${customEnd}` : timeRange,
+        limit,
+      });
+      router.push(`/investigate/${inv._id}?${params.toString()}`);
+    } catch {
+      // Fallback to results page if investigation creation fails
+      router.push(`/results?${params.toString()}`);
+    }
   }, [query, platforms, limit, timeRange, customStart, customEnd, usernames, hashtags, wallets, subreddits, router]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

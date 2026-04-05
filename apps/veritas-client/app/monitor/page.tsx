@@ -1,319 +1,45 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   fetchInvestigations,
   fetchAlerts,
+  fetchInvestigation,
   markAlertRead,
   markAllAlertsRead,
   fetchUnreadAlertCount,
-  fetchMonitorConfig,
-  updateMonitorConfig,
   type Investigation,
   type Alert,
-  type AlertType,
-  type MonitorConfig,
 } from '../../lib/api';
+import {
+  NervAlert,
+  NervBadge,
+  NervMetric,
+  NervPanel,
+  NervStatus,
+  NervTicker,
+  type NervTickerItem,
+} from '../../components/nerv';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const ALERT_TYPE_ICONS: Record<AlertType, string> = {
-  new_narrative: 'N',
-  velocity_spike: 'V',
-  sentiment_reversal: 'S',
-  coordination_detected: 'C',
-  new_platform: 'P',
-  volume_surge: 'U',
-};
-
-const ALERT_TYPE_LABELS: Record<AlertType, string> = {
-  new_narrative: 'New Narrative',
-  velocity_spike: 'Velocity Spike',
-  sentiment_reversal: 'Sentiment Shift',
-  coordination_detected: 'Coordination',
-  new_platform: 'New Platform',
-  volume_surge: 'Volume Surge',
-};
-
-const SEVERITY_COLORS: Record<string, string> = {
-  info: 'border-blue-500/30 bg-blue-500/5',
-  warning: 'border-amber-500/30 bg-amber-500/5',
-  critical: 'border-red-500/30 bg-red-500/5',
-};
-
-const SEVERITY_DOT: Record<string, string> = {
-  info: 'bg-blue-400',
-  warning: 'bg-amber-400',
-  critical: 'bg-red-400',
-};
-
-const INTERVAL_OPTIONS = [
-  { label: '15 min', value: 15 },
-  { label: '30 min', value: 30 },
-  { label: '1 hour', value: 60 },
-  { label: '6 hours', value: 360 },
-  { label: '12 hours', value: 720 },
-  { label: '24 hours', value: 1440 },
-];
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function formatNextRun(dateStr: string | null): string {
-  if (!dateStr) return '--';
-  const diff = new Date(dateStr).getTime() - Date.now();
-  if (diff <= 0) return 'due now';
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 60) return `in ${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `in ${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `in ${days}d`;
-}
-
-// ---------------------------------------------------------------------------
-// Components
-// ---------------------------------------------------------------------------
-
-function ScheduleConfig({
-  investigationId,
-  config,
-  onConfigChange,
-}: {
-  investigationId: string;
-  config: MonitorConfig | null;
-  onConfigChange: (config: MonitorConfig) => void;
-}) {
-  const [saving, setSaving] = useState(false);
-
-  const handleToggle = async () => {
-    setSaving(true);
-    try {
-      const newEnabled = !config?.enabled;
-      await updateMonitorConfig(investigationId, {
-        enabled: newEnabled,
-        intervalMinutes: config?.intervalMinutes ?? 60,
-      });
-      const updated = await fetchMonitorConfig(investigationId);
-      onConfigChange(updated);
-    } catch (err) {
-      console.error('Failed to toggle auto-refresh:', err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleIntervalChange = async (minutes: number) => {
-    setSaving(true);
-    try {
-      await updateMonitorConfig(investigationId, {
-        enabled: config?.enabled ?? false,
-        intervalMinutes: minutes,
-      });
-      const updated = await fetchMonitorConfig(investigationId);
-      onConfigChange(updated);
-    } catch (err) {
-      console.error('Failed to update interval:', err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-slate-800">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] text-slate-500 uppercase tracking-wider">
-          Auto-refresh
-        </span>
-        <button
-          onClick={handleToggle}
-          disabled={saving}
-          className={`relative w-8 h-4 rounded-full transition-colors ${
-            config?.enabled
-              ? 'bg-emerald-600'
-              : 'bg-slate-700'
-          } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-        >
-          <span
-            className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
-              config?.enabled ? 'translate-x-4' : 'translate-x-0.5'
-            }`}
-          />
-        </button>
-      </div>
-
-      {config?.enabled && (
-        <>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {INTERVAL_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => handleIntervalChange(opt.value)}
-                disabled={saving}
-                className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-                  config?.intervalMinutes === opt.value
-                    ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/30'
-                    : 'bg-slate-800 text-slate-500 border border-slate-700 hover:border-slate-600'
-                } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-between text-[10px] text-slate-600">
-            {config?.lastRunAt && (
-              <span>Last: {timeAgo(config.lastRunAt)}</span>
-            )}
-            {config?.nextRunAt && (
-              <span>Next: {formatNextRun(config.nextRunAt)}</span>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function InvestigationCard({
-  investigation,
-  alertCount,
-  refreshing,
-  onRefresh,
-  config,
-  onConfigChange,
-}: {
-  investigation: Investigation;
-  alertCount: number;
-  refreshing: boolean;
-  onRefresh: () => void;
-  config: MonitorConfig | null;
-  onConfigChange: (config: MonitorConfig) => void;
-}) {
-  return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 flex flex-col gap-3">
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-medium text-white truncate">
-            {investigation.name}
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5 truncate">
-            {investigation.query}
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 ml-2">
-          {config?.enabled && (
-            <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-medium px-1.5 py-0.5 rounded-full">
-              Auto
-            </span>
-          )}
-          {alertCount > 0 && (
-            <span className="bg-red-500/20 text-red-300 text-xs font-medium px-2 py-0.5 rounded-full">
-              {alertCount}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] text-slate-600">
-          Updated {timeAgo(investigation.updatedAt)}
-        </span>
-        <button
-          onClick={onRefresh}
-          disabled={refreshing}
-          className={`text-xs px-3 py-1 rounded-md transition-colors ${
-            refreshing
-              ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
-              : 'bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30'
-          }`}
-        >
-          {refreshing ? 'Scanning...' : 'Refresh Now'}
-        </button>
-      </div>
-
-      <ScheduleConfig
-        investigationId={investigation._id}
-        config={config}
-        onConfigChange={onConfigChange}
-      />
-    </div>
-  );
-}
-
-function AlertRow({
-  alert,
-  investigationName,
-  onMarkRead,
-  onNavigate,
-}: {
-  alert: Alert;
-  investigationName: string;
-  onMarkRead: (id: string) => void;
-  onNavigate: (investigationId: string) => void;
-}) {
-  return (
-    <button
-      onClick={() => {
-        if (!alert.read) onMarkRead(alert._id);
-        onNavigate(alert.investigationId);
-      }}
-      className={`w-full text-left border rounded-lg p-3 transition-colors ${
-        alert.read
-          ? 'border-slate-800/50 bg-slate-900/50 opacity-60'
-          : SEVERITY_COLORS[alert.severity] ?? SEVERITY_COLORS['info']
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        {/* Type icon + severity dot */}
-        <div className="flex flex-col items-center gap-1 pt-0.5">
-          <span className="text-xs font-mono font-bold text-slate-400 bg-slate-800 w-6 h-6 flex items-center justify-center rounded">
-            {ALERT_TYPE_ICONS[alert.type] ?? '?'}
-          </span>
-          {!alert.read && (
-            <span
-              className={`w-2 h-2 rounded-full ${SEVERITY_DOT[alert.severity] ?? SEVERITY_DOT['info']}`}
-            />
-          )}
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-white">
-              {alert.title}
-            </span>
-            <span className="text-[10px] text-slate-600">
-              {ALERT_TYPE_LABELS[alert.type] ?? alert.type}
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">
-            {alert.description}
-          </p>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="text-[10px] text-slate-600">
-              {investigationName}
-            </span>
-            <span className="text-[10px] text-slate-700">|</span>
-            <span className="text-[10px] text-slate-600">
-              {timeAgo(alert.createdAt)}
-            </span>
-          </div>
-        </div>
-      </div>
-    </button>
-  );
+function severityVariant(severity: string): 'blue' | 'amber' | 'red' {
+  if (severity === 'critical') return 'red';
+  if (severity === 'warning') return 'amber';
+  return 'blue';
 }
 
 // ---------------------------------------------------------------------------
@@ -324,219 +50,318 @@ export default function MonitorPage() {
   const router = useRouter();
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedInvId, setSelectedInvId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ investigation: Investigation; snapshot: any } | null>(null);
+  const [alertFilter, setAlertFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
-  const [alertCountByInvestigation, setAlertCountByInvestigation] = useState<
-    Record<string, number>
-  >({});
-  const [configs, setConfigs] = useState<Record<string, MonitorConfig>>({});
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const loadData = useCallback(async () => {
-    try {
-      const [invs, allAlerts] = await Promise.all([
-        fetchInvestigations(),
-        fetchAlerts(),
-      ]);
-
-      const activeInvs = invs.filter((i) => i.status === 'active');
-      setInvestigations(activeInvs);
-      setAlerts(allAlerts);
-
-      // Count unread alerts per investigation
-      const counts: Record<string, number> = {};
-      for (const a of allAlerts) {
-        if (!a.read) {
-          counts[a.investigationId] = (counts[a.investigationId] ?? 0) + 1;
-        }
-      }
-      setAlertCountByInvestigation(counts);
-
-      // Load monitor configs for all active investigations
-      const configResults = await Promise.allSettled(
-        activeInvs.map((inv) => fetchMonitorConfig(inv._id)),
-      );
-      const configMap: Record<string, MonitorConfig> = {};
-      for (let i = 0; i < activeInvs.length; i++) {
-        const result = configResults[i];
-        if (result && result.status === 'fulfilled') {
-          configMap[activeInvs[i]!._id] = result.value;
-        }
-      }
-      setConfigs(configMap);
-    } catch (err) {
-      console.error('Failed to load monitor data:', err);
-    } finally {
+  // Load data on mount
+  useEffect(() => {
+    Promise.all([
+      fetchInvestigations().catch(() => []),
+      fetchAlerts().catch(() => []),
+      fetchUnreadAlertCount().catch(() => 0),
+    ]).then(([invs, alts, count]) => {
+      setInvestigations(invs);
+      setAlerts(alts);
+      setUnreadCount(count as number);
       setLoading(false);
-    }
+    });
   }, []);
 
+  // Poll alerts every 30s
   useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Build investigation lookup maps
-  const invNameMap: Record<string, string> = {};
-  const invQueryMap: Record<string, string> = {};
-  for (const inv of investigations) {
-    invNameMap[inv._id] = inv.name;
-    invQueryMap[inv._id] = inv.query;
-  }
-
-  const handleRefresh = useCallback(
-    (investigationId: string) => {
-      // Navigate to the investigation's results page with fresh=1 to trigger scan queue
-      const query = invQueryMap[investigationId];
-      if (query) {
-        router.push(`/results?q=${encodeURIComponent(query)}&fresh=1`);
-      }
-    },
-    [router, invQueryMap],
-  );
-
-  const handleMarkRead = useCallback(
-    async (alertId: string) => {
+    pollRef.current = setInterval(async () => {
       try {
-        await markAlertRead(alertId);
-        setAlerts((prev) =>
-          prev.map((a) => (a._id === alertId ? { ...a, read: true } : a)),
-        );
-        // Recalculate counts
-        setAlertCountByInvestigation((prev) => {
-          const alert = alerts.find((a) => a._id === alertId);
-          if (!alert || alert.read) return prev;
-          const next = { ...prev };
-          const count = (next[alert.investigationId] ?? 1) - 1;
-          if (count <= 0) {
-            delete next[alert.investigationId];
-          } else {
-            next[alert.investigationId] = count;
-          }
-          return next;
-        });
-      } catch (err) {
-        console.error('Mark read failed:', err);
-      }
-    },
-    [alerts],
-  );
+        const [alts, count] = await Promise.all([
+          fetchAlerts(),
+          fetchUnreadAlertCount(),
+        ]);
+        setAlerts(alts);
+        setUnreadCount(count);
+      } catch { /* silent */ }
+    }, 30000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  // Load preview when investigation selected
+  useEffect(() => {
+    if (!selectedInvId) { setPreview(null); return; }
+    fetchInvestigation(selectedInvId)
+      .then((data) => setPreview(data as any))
+      .catch(() => setPreview(null));
+  }, [selectedInvId]);
+
+  const handleMarkRead = useCallback(async (alertId: string) => {
+    await markAlertRead(alertId);
+    setAlerts((prev) => prev.map((a) => a._id === alertId ? { ...a, read: true } : a));
+    setUnreadCount((c) => Math.max(0, c - 1));
+  }, []);
 
   const handleMarkAllRead = useCallback(async () => {
-    try {
-      await markAllAlertsRead();
-      setAlerts((prev) => prev.map((a) => ({ ...a, read: true })));
-      setAlertCountByInvestigation({});
-    } catch (err) {
-      console.error('Mark all read failed:', err);
-    }
+    await markAllAlertsRead();
+    setAlerts((prev) => prev.map((a) => ({ ...a, read: true })));
+    setUnreadCount(0);
   }, []);
 
-  const handleConfigChange = useCallback(
-    (investigationId: string, config: MonitorConfig) => {
-      setConfigs((prev) => ({ ...prev, [investigationId]: config }));
-    },
-    [],
-  );
+  const filteredAlerts = alertFilter === 'all'
+    ? alerts
+    : alerts.filter((a) => a.severity === alertFilter);
 
-  const handleNavigateToInvestigation = useCallback(
-    (investigationId: string) => {
-      const query = invQueryMap[investigationId];
-      if (query) {
-        router.push(`/results?q=${encodeURIComponent(query)}&inv=${investigationId}`);
-      }
-    },
-    [router, invQueryMap],
-  );
+  const tickerItems: NervTickerItem[] = alerts
+    .filter((a) => a.severity === 'critical' || a.severity === 'warning')
+    .slice(0, 10)
+    .map((a) => ({
+      id: a._id,
+      text: `[${a.severity.toUpperCase()}] ${a.title}`,
+      severity: a.severity,
+      timestamp: a.createdAt,
+    }));
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-800 rounded w-48" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-28 bg-slate-800/50 rounded-lg" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const criticalCount = alerts.filter((a) => a.severity === 'critical' && !a.read).length;
+  const warningCount = alerts.filter((a) => a.severity === 'warning' && !a.read).length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-white">Monitor</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Track narrative changes across your investigations
-          </p>
-        </div>
-      </div>
+    <div className="h-[calc(100vh-3.5rem)] flex flex-col">
+      {/* Main 3-column layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left: Investigation list */}
+        <div className="w-[260px] shrink-0 border-r border-nerv-border overflow-y-auto">
+          <div className="p-2">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+                Investigations
+              </span>
+              <button
+                onClick={() => router.push('/search')}
+                className="text-[8px] font-mono uppercase text-nerv-orange hover:underline"
+              >
+                + New Scan
+              </button>
+            </div>
 
-      {/* Investigation grid */}
-      {investigations.length === 0 ? (
-        <div className="text-center py-16 text-slate-600">
-          <p className="text-sm">No active investigations.</p>
-          <p className="text-xs mt-1">
-            Search for a topic to create your first investigation.
-          </p>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-4 h-4 border-2 border-nerv-border border-t-nerv-blue rounded-full animate-spin" />
+              </div>
+            ) : investigations.length === 0 ? (
+              <div className="py-8 text-center text-[10px] font-mono text-nerv-text-muted">
+                No investigations yet
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {investigations.map((inv) => {
+                  const isSelected = selectedInvId === inv._id;
+                  return (
+                    <button
+                      key={inv._id}
+                      onClick={() => setSelectedInvId(isSelected ? null : inv._id)}
+                      className={`w-full text-left px-2 py-2 rounded-sm border transition-all ${
+                        isSelected
+                          ? 'border-nerv-orange/50 bg-nerv-orange/5'
+                          : 'border-transparent hover:border-nerv-border hover:bg-nerv-bg-elevated/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono text-nerv-text truncate">
+                          {inv.name || inv.query}
+                        </span>
+                        <NervBadge
+                          label={inv.status === 'active' ? 'ACTIVE' : 'ARCHIVED'}
+                          variant={inv.status === 'active' ? 'green' : 'muted'}
+                          size="sm"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[8px] font-mono text-nerv-text-muted">
+                          {timeAgo(inv.updatedAt as unknown as string)}
+                        </span>
+                        {inv.settings?.platforms?.length > 0 && (
+                          <span className="text-[8px] font-mono text-nerv-text-muted">
+                            {inv.settings.platforms.length} sources
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {investigations.map((inv) => (
-            <InvestigationCard
-              key={inv._id}
-              investigation={inv}
-              alertCount={alertCountByInvestigation[inv._id] ?? 0}
-              refreshing={refreshingIds.has(inv._id)}
-              onRefresh={() => handleRefresh(inv._id)}
-              config={configs[inv._id] ?? null}
-              onConfigChange={(c) => handleConfigChange(inv._id, c)}
-            />
-          ))}
-        </div>
-      )}
 
-      {/* Alert feed */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium text-slate-300">
-            Recent Alerts
-          </h2>
-          {alerts.some((a) => !a.read) && (
-            <button
-              onClick={handleMarkAllRead}
-              className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              Mark all read
-            </button>
+        {/* Center: Overview / Investigation Preview */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {!selectedInvId ? (
+            /* Aggregate overview */
+            <div className="space-y-4">
+              <NervPanel title="System Overview" accent="orange" status="online">
+                <div className="grid grid-cols-4 gap-4 p-4">
+                  <NervMetric
+                    label="Active Investigations"
+                    value={String(investigations.filter((i) => i.status === 'active').length)}
+                  />
+                  <NervMetric
+                    label="Critical Alerts"
+                    value={String(criticalCount)}
+                    severity={criticalCount > 0 ? 'critical' : undefined}
+                  />
+                  <NervMetric
+                    label="Warnings"
+                    value={String(warningCount)}
+                    severity={warningCount > 0 ? 'warning' : undefined}
+                  />
+                  <NervMetric
+                    label="Unread Alerts"
+                    value={String(unreadCount)}
+                  />
+                </div>
+              </NervPanel>
+
+              <NervPanel title="Active Investigations" accent="blue" corners>
+                <div className="divide-y divide-nerv-border">
+                  {investigations.filter((i) => i.status === 'active').map((inv) => (
+                    <div
+                      key={inv._id}
+                      className="flex items-center justify-between px-3 py-2 hover:bg-nerv-bg-elevated/20 transition-colors"
+                    >
+                      <div>
+                        <span className="text-xs font-mono text-nerv-text">{inv.name || inv.query}</span>
+                        <span className="text-[9px] font-mono text-nerv-text-muted ml-2">
+                          {timeAgo(inv.updatedAt as unknown as string)}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => router.push(`/investigate/${inv._id}`)}
+                        className="text-[9px] font-mono uppercase text-nerv-orange hover:underline tracking-widest"
+                      >
+                        Investigate
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </NervPanel>
+            </div>
+          ) : (
+            /* Investigation preview */
+            <div className="space-y-4">
+              <NervPanel
+                title={preview?.investigation?.name || 'Loading...'}
+                accent="orange"
+                status="online"
+              >
+                <div className="p-4 space-y-3">
+                  {preview ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-4">
+                        <NervMetric label="Query" value={preview.investigation.query} />
+                        <NervMetric label="Time Range" value={preview.investigation.settings?.timeRange || '7d'} />
+                        <NervMetric label="Status" value={preview.investigation.status} />
+                      </div>
+
+                      {preview.snapshot && (
+                        <div className="grid grid-cols-3 gap-4 mt-3">
+                          <NervMetric label="Posts" value={String(preview.snapshot.postCount ?? 0)} />
+                          <NervMetric label="Narratives" value={String(preview.snapshot.narrativeCount ?? 0)} />
+                          <NervMetric
+                            label="Last Scan"
+                            value={preview.snapshot.timestamp ? timeAgo(preview.snapshot.timestamp) : 'N/A'}
+                          />
+                        </div>
+                      )}
+
+                      <div className="pt-3 flex gap-2">
+                        <button
+                          onClick={() => router.push(`/investigate/${preview.investigation._id}`)}
+                          className="px-4 py-2 bg-nerv-orange/20 border border-nerv-orange/50 text-nerv-orange text-[10px] font-mono uppercase tracking-widest hover:bg-nerv-orange/30 transition-all"
+                        >
+                          Open Investigation
+                        </button>
+                        <button
+                          onClick={() => router.push(`/search?q=${encodeURIComponent(preview.investigation.query)}`)}
+                          className="px-4 py-2 bg-nerv-bg border border-nerv-border text-nerv-text-muted text-[10px] font-mono uppercase tracking-widest hover:border-nerv-text-muted transition-all"
+                        >
+                          Re-scan
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center py-6">
+                      <div className="w-4 h-4 border-2 border-nerv-border border-t-nerv-orange rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+              </NervPanel>
+            </div>
           )}
         </div>
 
-        {alerts.length === 0 ? (
-          <div className="text-center py-12 text-slate-700">
-            <p className="text-sm">No alerts yet.</p>
-            <p className="text-xs mt-1">
-              Alerts appear when narrative changes are detected during a refresh.
-            </p>
+        {/* Right: Alert feed */}
+        <div className="w-[320px] shrink-0 border-l border-nerv-border overflow-y-auto">
+          <div className="p-2">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+                Alert Feed {unreadCount > 0 && <NervBadge label={String(unreadCount)} variant="red" size="sm" />}
+              </span>
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllRead}
+                  className="text-[8px] font-mono uppercase text-nerv-text-muted hover:text-nerv-text-secondary"
+                >
+                  Mark All Read
+                </button>
+              )}
+            </div>
+
+            {/* Severity filter */}
+            <div className="flex gap-1 mb-2">
+              {['all', 'critical', 'warning', 'info'].map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setAlertFilter(f)}
+                  className={`text-[8px] font-mono uppercase px-2 py-0.5 border rounded-sm transition-all ${
+                    alertFilter === f
+                      ? 'border-nerv-orange text-nerv-orange'
+                      : 'border-nerv-border text-nerv-text-muted hover:border-nerv-text-muted'
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+
+            {/* Alert list */}
+            <div className="space-y-1">
+              {filteredAlerts.length === 0 ? (
+                <div className="py-6 text-center text-[10px] font-mono text-nerv-text-muted">
+                  No alerts
+                </div>
+              ) : (
+                filteredAlerts.slice(0, 50).map((alert) => (
+                  <div
+                    key={alert._id}
+                    onClick={() => handleMarkRead(alert._id)}
+                    className={`cursor-pointer transition-opacity ${alert.read ? 'opacity-40' : 'opacity-100'}`}
+                  >
+                    <NervAlert
+                      type={alert.type}
+                      severity={alert.severity as 'info' | 'warning' | 'critical'}
+                      title={alert.title}
+                      description={alert.description}
+                      timestamp={timeAgo(alert.createdAt)}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="space-y-2">
-            {alerts.map((alert) => (
-              <AlertRow
-                key={alert._id}
-                alert={alert}
-                investigationName={
-                  invNameMap[alert.investigationId] ?? 'Unknown'
-                }
-                onMarkRead={handleMarkRead}
-                onNavigate={handleNavigateToInvestigation}
-              />
-            ))}
-          </div>
-        )}
+        </div>
       </div>
+
+      {/* Bottom ticker */}
+      {tickerItems.length > 0 && <NervTicker items={tickerItems} />}
     </div>
   );
 }

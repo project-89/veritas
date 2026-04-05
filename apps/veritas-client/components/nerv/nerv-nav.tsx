@@ -8,9 +8,8 @@ import { NervStatus } from './nerv-status';
 import { NervBadge } from './nerv-badge';
 
 const NAV_LINKS = [
-  { href: '/', label: 'Command Center' },
-  { href: '/search', label: 'Search' },
   { href: '/monitor', label: 'Monitor' },
+  { href: '/search', label: 'Search' },
 ] as const;
 
 function UtcClock() {
@@ -56,6 +55,8 @@ export function NervNav() {
     };
   }, []);
 
+  const isInvestigating = pathname.startsWith('/investigate/') || pathname.startsWith('/results');
+
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
@@ -80,9 +81,25 @@ export function NervNav() {
           </span>
         </Link>
 
-        {/* Center: Navigation */}
+        {/* Center: Navigation + breadcrumb */}
         <div className="flex items-center gap-1">
-          {NAV_LINKS.map((link) => {
+          {isInvestigating && (
+            <Link
+              href="/monitor"
+              className="px-2 py-1.5 text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted hover:text-nerv-orange transition-colors"
+            >
+              {'\u2190'} Monitor
+            </Link>
+          )}
+          {isInvestigating && (
+            <span className="text-[10px] font-mono text-nerv-orange/60 px-1">{'\u25B8'}</span>
+          )}
+          {isInvestigating && (
+            <span className="text-[10px] font-mono text-nerv-orange uppercase tracking-wider">
+              Investigation
+            </span>
+          )}
+          {!isInvestigating ? NAV_LINKS.map((link) => {
             const active = isActive(link.href);
             return (
               <Link
@@ -108,7 +125,7 @@ export function NervNav() {
                 )}
               </Link>
             );
-          })}
+          }) : null}
         </div>
 
         {/* Right: System status + time */}
