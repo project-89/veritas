@@ -38,10 +38,13 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   const globeRef = useRef<unknown>(null);
   const rendererRef = useRef<unknown>(null);
   const cameraRef = useRef<unknown>(null);
+  const controlsRef = useRef<unknown>(null);
   const labelSvgRef = useRef<SVGSVGElement>(null);
   const labelDivRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number>(0);
   const mouseDown = useRef(false);
+  const autoRotate = useRef(true);
+  const targetRotationY = useRef<number | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -218,6 +221,7 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
       });
 
       cameraRef.current = camera;
+      controlsRef.current = controls;
 
       // Lat/lng to 3D world position (matching three-globe's coordinate system)
       const latLngToVector = (lat: number, lng: number, alt: number) => {
@@ -256,7 +260,18 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         pulsePhase += 0.03;
         labelFrame++;
 
-        if (!mouseDown.current) {
+        // Animate to target rotation if set (from label click)
+        if (targetRotationY.current !== null) {
+          const diff = targetRotationY.current - globe.rotation.y;
+          // Normalize to shortest path
+          const shortDiff = ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
+          if (Math.abs(shortDiff) < 0.005) {
+            globe.rotation.y = targetRotationY.current;
+            targetRotationY.current = null;
+          } else {
+            globe.rotation.y += shortDiff * 0.05;
+          }
+        } else if (autoRotate.current && !mouseDown.current) {
           globe.rotation.y += 0.0004;
         }
 
@@ -279,7 +294,7 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
           const cw = container.clientWidth;
           const ch = container.clientHeight;
           const MARGIN = 12;
-          const LABEL_H = 16;
+          const LABEL_H = 20;
           const MAX_LABELS = 12;
           const sev: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
@@ -341,17 +356,31 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
             const align = r.isLeft ? 'left:8px;text-align:left;' : 'right:8px;text-align:right;';
             const border = r.isLeft ? `border-left:2px solid ${r.color};` : `border-right:2px solid ${r.color};`;
             divHtml += `<div data-eid="${r.id}" style="position:absolute;top:${r.labelY - 7}px;${align}z-index:6;cursor:pointer;pointer-events:auto;transition:opacity 0.2s;">`;
-            divHtml += `<span style="font-family:monospace;font-size:8px;line-height:1;padding:2px 4px;color:${r.color};background:rgba(10,10,15,0.9);${border}white-space:nowrap;">${r.title}</span>`;
+            divHtml += `<span style="font-family:monospace;font-size:11px;line-height:1.2;padding:3px 6px;color:${r.color};background:rgba(10,10,15,0.92);${border}white-space:nowrap;letter-spacing:0.02em;">${r.title}</span>`;
             divHtml += '</div>';
           }
           div.innerHTML = divHtml;
 
-          // Attach click handlers
+          // Attach click handlers — rotate globe to event + open detail
           for (const el of div.querySelectorAll('[data-eid]')) {
             el.addEventListener('click', () => {
               const eid = el.getAttribute('data-eid');
               const ev = eventsRef.current.find(e => e.id === eid);
-              if (ev) onEventClick?.(ev);
+              if (!ev) return;
+
+              // Stop auto-rotation
+              autoRotate.current = false;
+
+              // Calculate target rotation to face this event's longitude
+              // Globe default: lng 0 faces camera at rotation.y = 0
+              // To face lng L, rotate to: -L * PI/180 (convert degrees to radians, negate)
+              const targetY = -(ev.location.lng + 90) * (Math.PI / 180);
+              targetRotationY.current = targetY;
+
+              // Resume auto-rotation after 10 seconds
+              setTimeout(() => { autoRotate.current = true; }, 10000);
+
+              onEventClick?.(ev);
             });
           }
         }
