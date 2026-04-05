@@ -59,3 +59,6 @@ export type { EventFilterPanelProps, EventFilters } from './event-filter-panel';
 
 export { EventDetailFlyout } from './event-detail-flyout';
 export type { EventDetailFlyoutProps } from './event-detail-flyout';
+
+export { IntelligenceReportPanel } from './intelligence-report-panel';
+export type { IntelligenceReportPanelProps } from './intelligence-report-panel';

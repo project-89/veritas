@@ -1411,3 +1411,138 @@ export async function searchIdentities(query: string): Promise<IdentityRecord[]>
 export async function getRecentIdentities(limit = 20): Promise<IdentityRecord[]> {
   return request<IdentityRecord[]>(`/api/identity/recent?limit=${limit}`);
 }
+
+// ---------------------------------------------------------------------------
+// Intelligence Engine types (mirrors backend IntelligenceEngineService)
+// ---------------------------------------------------------------------------
+
+export interface CampaignSignal {
+  type: 'temporal_cluster' | 'content_similarity' | 'bot_network' | 'coordination_pattern';
+  description: string;
+  confidence: number;
+  actors: string[];
+  timestamp?: string;
+}
+
+export interface CampaignActor {
+  handle: string;
+  platform: string;
+  role: 'orchestrator' | 'amplifier' | 'bot' | 'organic';
+  botProbability: number;
+  adoptionTimestamp: string | null;
+  influenceScore: number;
+  flags: string[];
+}
+
+export interface CampaignTimeline {
+  timestamp: string;
+  actor: string;
+  event: string;
+}
+
+export interface CoordinatedCampaignReport {
+  campaignDetected: boolean;
+  confidence: number;
+  actors: CampaignActor[];
+  signals: CampaignSignal[];
+  timeline: CampaignTimeline[];
+  coordinationClusters: Array<{ users: string[]; pattern: string; confidence: number }>;
+  structuralPatterns: Array<{ type: string; members: string[]; description: string; confidence: number }>;
+  summary: string;
+}
+
+export interface ManipulationPattern {
+  ticker: string;
+  type: 'pump' | 'fud' | 'wash_narrative' | 'coordinated_shill';
+  narrativeSentiment: number;
+  priceDirection: 'up' | 'down' | 'flat';
+  correlation: number;
+  confidence: number;
+  description: string;
+  involvedActors: string[];
+}
+
+export interface MarketManipulationReport {
+  manipulationDetected: boolean;
+  confidence: number;
+  patterns: ManipulationPattern[];
+  tickersMentioned: string[];
+  signalsMatched: ExternalSignal[];
+  summary: string;
+}
+
+export interface CrisisAlertItem {
+  region: string;
+  severity: 'watch' | 'warning' | 'emergency';
+  sourceCount: number;
+  sources: string[];
+  events: unknown[];
+  narrativeCorrelation: number;
+  description: string;
+}
+
+export interface CrisisWarningReport {
+  alerts: CrisisAlertItem[];
+  highestSeverity: 'none' | 'watch' | 'warning' | 'emergency';
+  totalEventsAnalyzed: number;
+  regionsAffected: string[];
+  summary: string;
+}
+
+export interface AttributionNode {
+  handle: string;
+  platform: string;
+  role: 'originator' | 'amplifier' | 'target' | 'beneficiary';
+  confidence: number;
+  evidence: string[];
+}
+
+export interface InfluenceOperationReport {
+  operationDetected: boolean;
+  confidence: number;
+  attributionChain: AttributionNode[];
+  propagationPath: string[];
+  beneficiaries: Array<{ entity: string; howTheyBenefit: string; confidence: number }>;
+  platformsInvolved: string[];
+  investigativeLeads: Array<{ question: string; dataSources: string[]; priority: string; automatable: boolean }>;
+  summary: string;
+}
+
+export interface NarrativeLegitimacyReport {
+  score: number;
+  verdict: 'legitimate' | 'likely_legitimate' | 'uncertain' | 'likely_false' | 'false';
+  verifiedClaimCount: number;
+  disputedClaimCount: number;
+  unverifiedClaimCount: number;
+  evidenceBalance: number;
+  platformCredibilityAvg: number;
+  claimBreakdown: Array<{ claim: string; status: string; weight: number }>;
+  summary: string;
+}
+
+export type IntelligenceReport =
+  | { type: 'campaign'; report: CoordinatedCampaignReport }
+  | { type: 'manipulation'; report: MarketManipulationReport }
+  | { type: 'crisis'; report: CrisisWarningReport }
+  | { type: 'influence'; report: InfluenceOperationReport }
+  | { type: 'legitimacy'; report: NarrativeLegitimacyReport };
+
+// ---------------------------------------------------------------------------
+// Intelligence Engine API
+// ---------------------------------------------------------------------------
+
+export async function runIntelligenceAssessment(params: {
+  type: string;
+  narratives: AnalyzedNarrative[];
+  posts: RawPost[];
+  investigation?: unknown;
+  botScores?: unknown[];
+  claims?: unknown;
+  globalEvents?: unknown[];
+  signals?: unknown[];
+}): Promise<IntelligenceReport> {
+  return request<IntelligenceReport>('/api/narratives/intelligence', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}

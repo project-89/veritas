@@ -18,6 +18,8 @@ import { DownstreamEffectsService } from '../services/downstream-effects.service
 import type { DownstreamEffectsResult, MyceliumData } from '../services/downstream-effects.service';
 import { ClaimVerificationService } from '../services/claim-verification.service';
 import type { ClaimVerificationBatchResult } from '../services/claim-verification.service';
+import { IntelligenceEngineService } from '../services/intelligence-engine.service';
+import type { IntelligenceReport } from '../services/intelligence-engine.service';
 
 interface AnalyzeRequestPost {
   text: string;
@@ -43,6 +45,7 @@ export class NarrativeAnalysisController {
     private readonly genealogyService: NarrativeGenealogyService,
     private readonly downstreamEffectsService: DownstreamEffectsService,
     private readonly claimVerificationService: ClaimVerificationService,
+    private readonly intelligenceEngineService: IntelligenceEngineService,
   ) {}
 
   /**
@@ -239,5 +242,88 @@ export class NarrativeAnalysisController {
     const claims = body.claims ?? [];
     this.logger.log(`Claim verification: ${claims.length} claims`);
     return this.claimVerificationService.verifyBatch(claims);
+  }
+
+  /**
+   * Run an intelligence assessment of the specified type.
+   * Routes to the appropriate IntelligenceEngineService method.
+   */
+  @Post('intelligence')
+  async runIntelligenceAssessment(
+    @Body() body: {
+      type: 'campaign' | 'manipulation' | 'crisis' | 'influence' | 'legitimacy';
+      narratives: AnalyzedNarrative[];
+      posts: RawPost[];
+      investigation?: any;
+      botScores?: any[];
+      claims?: any;
+      globalEvents?: any[];
+      signals?: any[];
+    },
+  ): Promise<IntelligenceReport> {
+    const { type, narratives = [], posts = [] } = body;
+    this.logger.log(`Intelligence assessment: type=${type}, ${narratives.length} narratives, ${posts.length} posts`);
+
+    switch (type) {
+      case 'campaign': {
+        // Build a BotDetectionResult stub if bot scores are available, otherwise use defaults
+        const botResult = {
+          scores: (body.botScores ?? []) as any[],
+          structuralPatterns: [] as any[],
+          graphEnhanced: false,
+          summary: '',
+        };
+        const investigation = body.investigation ?? {
+          topic: '',
+          users: [],
+          originAnalysis: { firstMover: '', firstPlatform: '', firstTimestamp: '', propagationChain: [] },
+          cuiBono: { beneficiaries: [], agendas: [], summary: '' },
+          coordination: { clusters: [], summary: '' },
+        };
+        const report = this.intelligenceEngineService.detectCoordinatedCampaign(botResult, investigation);
+        return { type: 'campaign', report };
+      }
+      case 'manipulation': {
+        const signals = (body.signals ?? []) as any[];
+        const postData = posts.map((p) => ({ text: p.text, authorHandle: (p as any).authorHandle ?? '' }));
+        const report = this.intelligenceEngineService.detectMarketManipulation(narratives, signals, postData);
+        return { type: 'manipulation', report };
+      }
+      case 'crisis': {
+        const events = (body.globalEvents ?? []) as any[];
+        const report = this.intelligenceEngineService.assessCrisisRisk(events, narratives);
+        return { type: 'crisis', report };
+      }
+      case 'influence': {
+        const botResult = {
+          scores: (body.botScores ?? []) as any[],
+          structuralPatterns: [] as any[],
+          graphEnhanced: false,
+          summary: '',
+        };
+        const investigation = body.investigation ?? {
+          topic: '',
+          users: [],
+          originAnalysis: { firstMover: '', firstPlatform: '', firstTimestamp: '', propagationChain: [] },
+          cuiBono: { beneficiaries: [], agendas: [], summary: '' },
+          coordination: { clusters: [], summary: '' },
+        };
+        const report = this.intelligenceEngineService.attributeInfluenceOperation(investigation, botResult, narratives);
+        return { type: 'influence', report };
+      }
+      case 'legitimacy': {
+        const verification = body.claims ?? { results: [], summary: '', verifiedCount: 0, disputedCount: 0, unverifiedCount: 0 };
+        const platforms: Record<string, number> = {};
+        for (const n of narratives) {
+          for (const [p, count] of Object.entries(n.platforms ?? {})) {
+            platforms[p] = (platforms[p] ?? 0) + count;
+          }
+        }
+        const report = this.intelligenceEngineService.scoreNarrativeLegitimacy(verification, platforms);
+        return { type: 'legitimacy', report };
+      }
+      default:
+        throw new Error(`Unknown intelligence assessment type: ${type}`);
+    }
   }
 }

@@ -24,6 +24,7 @@ import type {
   SaturationReport,
   NarrativeComparison,
   PlatformComparison,
+  IntelligenceReport,
 } from './api';
 
 // ---------------------------------------------------------------------------
@@ -52,7 +53,8 @@ export type CenterMode =
   | 'radar'
   | 'evidence'
   | 'graph'
-  | 'platforms';
+  | 'platforms'
+  | 'intelligence';
 
 export interface SearchSummary {
   total: number;
@@ -98,6 +100,9 @@ export interface InvestigationState {
   comparison: NarrativeComparison | null;
   platformComparison: PlatformComparison | null;
 
+  // Intelligence Engine
+  intelligenceReport: IntelligenceReport | null;
+
   // Identity records (MAGI)
   selectedIdentity: IdentityRecord | null;
   identityLoading: boolean;
@@ -142,6 +147,7 @@ type Action =
   | { type: 'SET_CENTER_MODE'; mode: CenterMode }
   | { type: 'SET_COMPARISON'; data: NarrativeComparison | null }
   | { type: 'SET_PLATFORM_COMPARISON'; data: PlatformComparison | null }
+  | { type: 'SET_INTELLIGENCE_REPORT'; data: IntelligenceReport | null }
   | { type: 'RESET' };
 
 // ---------------------------------------------------------------------------
@@ -179,6 +185,7 @@ const initialState: InvestigationState = {
   alerts: [],
   comparison: null,
   platformComparison: null,
+  intelligenceReport: null,
   analysisJobs: [],
   selectedNarrativeIds: [],
   selectedIdentity: null,
@@ -294,6 +301,8 @@ function reducer(state: InvestigationState, action: Action): InvestigationState 
       return { ...state, comparison: action.data };
     case 'SET_PLATFORM_COMPARISON':
       return { ...state, platformComparison: action.data };
+    case 'SET_INTELLIGENCE_REPORT':
+      return { ...state, intelligenceReport: action.data };
     case 'RESET':
       return { ...initialState };
     default:

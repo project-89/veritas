@@ -47,6 +47,7 @@ import {
   type SaturationReport,
   compareNarratives,
   comparePlatforms,
+  runIntelligenceAssessment,
 } from '../../lib/api';
 
 import {
@@ -76,6 +77,7 @@ import { PropagationFlow } from '../../components/nerv/propagation-flow';
 import { NarrativeRadar } from '../../components/nerv/narrative-radar';
 import { PlatformComparisonPanel } from '../../components/nerv/platform-comparison-panel';
 import { NarrativeComparisonPanel } from '../../components/nerv/narrative-comparison-panel';
+import { IntelligenceReportPanel } from '../../components/nerv/intelligence-report-panel';
 import { DetailPanel } from '../../components/nerv/detail-panel';
 import dynamic from 'next/dynamic';
 import { buildGlobeData } from '../../lib/globe-data';
@@ -102,6 +104,7 @@ const CENTER_MODES: { key: CenterMode; label: string; shortcut: string }[] = [
   { key: 'graph', label: 'GRAPH', shortcut: '0' },
   { key: 'radar', label: 'RADAR', shortcut: '' },
   { key: 'platforms', label: 'PLATFORMS', shortcut: 'P' },
+  { key: 'intelligence', label: 'INTEL', shortcut: 'I' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -234,6 +237,7 @@ function InvestigationWorkspace() {
   // ---- Comparison handlers ----
   const [comparingNarratives, setComparingNarratives] = useState(false);
   const [comparingPlatforms, setComparingPlatforms] = useState(false);
+  const [intelligenceLoading, setIntelligenceLoading] = useState(false);
 
   const handleCompareNarratives = useCallback(async (ids: string[]) => {
     if (ids.length < 2) return;
@@ -266,6 +270,24 @@ function InvestigationWorkspace() {
       setComparingPlatforms(false);
     }
   }, [state.narratives, state.posts, dispatch]);
+
+  const handleIntelligence = useCallback(async (type: string) => {
+    setIntelligenceLoading(true);
+    try {
+      const result = await runIntelligenceAssessment({
+        type,
+        narratives: state.narratives,
+        posts: state.posts,
+        investigation: state.investigation ?? undefined,
+        claims: state.claims ?? undefined,
+      });
+      dispatch({ type: 'SET_INTELLIGENCE_REPORT', data: result });
+    } catch {
+      // silently fail
+    } finally {
+      setIntelligenceLoading(false);
+    }
+  }, [state.narratives, state.posts, state.investigation, state.claims, dispatch]);
 
   // Load scan history for the current query
   useEffect(() => {
@@ -673,6 +695,10 @@ function InvestigationWorkspace() {
       }
       if (e.key.toUpperCase() === 'P') {
         setCenterMode('platforms');
+        return;
+      }
+      if (e.key.toUpperCase() === 'I') {
+        setCenterMode('intelligence');
         return;
       }
       const idx = parseInt(e.key, 10);
@@ -1286,6 +1312,14 @@ function InvestigationWorkspace() {
             comparison={state.platformComparison}
             loading={comparingPlatforms}
             onRunComparison={handlePlatformComparison}
+          />
+        );
+      case 'intelligence':
+        return (
+          <IntelligenceReportPanel
+            report={state.intelligenceReport}
+            loading={intelligenceLoading}
+            onRunAssessment={handleIntelligence}
           />
         );
       default:

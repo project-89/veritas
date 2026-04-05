@@ -12,6 +12,7 @@ import { EntityAnalysisService } from '../../src/lib/services/entity-analysis.se
 import { NarrativeGenealogyService } from '../../src/lib/services/genealogy.service';
 import { DownstreamEffectsService } from '../../src/lib/services/downstream-effects.service';
 import { ClaimVerificationService } from '../../src/lib/services/claim-verification.service';
+import { IntelligenceEngineService } from '../../src/lib/services/intelligence-engine.service';
 
 describe('NarrativeAnalysisController', () => {
   let controller: NarrativeAnalysisController;
@@ -103,6 +104,16 @@ describe('NarrativeAnalysisController', () => {
           provide: ClaimVerificationService,
           useValue: {
             verifyClaims: jest.fn().mockResolvedValue({ results: [], summary: '', verifiedCount: 0, disputedCount: 0, unverifiedCount: 0 }),
+          },
+        },
+        {
+          provide: IntelligenceEngineService,
+          useValue: {
+            detectCoordinatedCampaign: jest.fn().mockReturnValue({ detected: false, confidence: 0, signals: [], actors: [], timeline: [], summary: '' }),
+            detectMarketManipulation: jest.fn().mockReturnValue({ detected: false, confidence: 0, patterns: [], affectedAssets: [], timeline: [], summary: '' }),
+            assessCrisisRisk: jest.fn().mockReturnValue({ alerts: [], regions: [], summary: '' }),
+            attributeInfluenceOperation: jest.fn().mockReturnValue({ detected: false, confidence: 0, originators: [], amplificationNetwork: [], beneficiaries: [], techniques: [], timeline: [], summary: '' }),
+            scoreNarrativeLegitimacy: jest.fn().mockReturnValue({ narrativeId: '', narrativeSummary: '', legitimacyScore: 0.5, verdict: 'uncertain', factualClaims: [], platformBreakdown: [], sourceQuality: 0.5, evidenceBalance: { supporting: 0, contradicting: 0, neutral: 0 }, investigativeLeads: [], summary: '' }),
           },
         },
       ],
