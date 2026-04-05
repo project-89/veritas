@@ -91,21 +91,51 @@ const NarrativeGlobeLazy = dynamic(
 // Mode definitions
 // ---------------------------------------------------------------------------
 
-const CENTER_MODES: { key: CenterMode; label: string; shortcut: string }[] = [
-  { key: 'temporal', label: 'TEMPORAL', shortcut: '1' },
-  { key: 'actors', label: 'ACTORS', shortcut: '2' },
-  { key: 'claims', label: 'CLAIMS', shortcut: '3' },
-  { key: 'effects', label: 'EFFECTS', shortcut: '4' },
-  { key: 'globe', label: 'GLOBE', shortcut: '5' },
-  { key: 'entities', label: 'ENTITIES', shortcut: '6' },
-  { key: 'genealogy', label: 'GENEALOGY', shortcut: '7' },
-  { key: 'flow', label: 'FLOW', shortcut: '8' },
-  { key: 'evidence', label: 'EVIDENCE', shortcut: '9' },
-  { key: 'graph', label: 'GRAPH', shortcut: '0' },
-  { key: 'radar', label: 'RADAR', shortcut: '' },
-  { key: 'platforms', label: 'PLATFORMS', shortcut: 'P' },
-  { key: 'intelligence', label: 'INTEL', shortcut: 'I' },
+const CENTER_MODE_GROUPS: {
+  label: string;
+  modes: { key: CenterMode; label: string; shortcut: string }[];
+}[] = [
+  {
+    label: 'Analysis',
+    modes: [
+      { key: 'temporal', label: 'TEMPORAL', shortcut: '1' },
+      { key: 'radar', label: 'RADAR', shortcut: '2' },
+      { key: 'entities', label: 'ENTITIES', shortcut: '3' },
+    ],
+  },
+  {
+    label: 'Actors',
+    modes: [
+      { key: 'actors', label: 'ACTORS', shortcut: '4' },
+      { key: 'graph', label: 'GRAPH', shortcut: '5' },
+      { key: 'flow', label: 'FLOW', shortcut: '6' },
+    ],
+  },
+  {
+    label: 'Verification',
+    modes: [
+      { key: 'claims', label: 'CLAIMS', shortcut: '7' },
+      { key: 'evidence', label: 'EVIDENCE', shortcut: '8' },
+      { key: 'intelligence', label: 'INTEL', shortcut: 'I' },
+    ],
+  },
+  {
+    label: 'Impact',
+    modes: [
+      { key: 'effects', label: 'EFFECTS', shortcut: '9' },
+      { key: 'platforms', label: 'PLATFORMS', shortcut: 'P' },
+      { key: 'globe', label: 'GLOBE', shortcut: 'G' },
+      { key: 'genealogy', label: 'GENEALOGY', shortcut: '0' },
+    ],
+  },
 ];
+
+/** Flat lookup from shortcut key to CenterMode */
+const SHORTCUT_MAP = new Map<string, CenterMode>(
+  CENTER_MODE_GROUPS.flatMap((g) =>
+    g.modes.filter((m) => m.shortcut).map((m) => [m.shortcut.toUpperCase(), m.key]),
+  ),
+);
 
 // ---------------------------------------------------------------------------
 // Pipeline stages for progress bar
@@ -706,7 +736,7 @@ function InvestigationWorkspace() {
       .catch(() => {});
   }, [state.investigationId, dispatch]);
 
-  // ---- Keyboard shortcuts (1-6 for modes) ----
+  // ---- Keyboard shortcuts for center modes ----
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input
@@ -716,17 +746,10 @@ function InvestigationWorkspace() {
       ) {
         return;
       }
-      if (e.key.toUpperCase() === 'P') {
-        setCenterMode('platforms');
-        return;
-      }
-      if (e.key.toUpperCase() === 'I') {
-        setCenterMode('intelligence');
-        return;
-      }
-      const idx = parseInt(e.key, 10);
-      if (idx >= 1 && idx <= 9) {
-        setCenterMode(CENTER_MODES[idx - 1]!.key);
+      const key = e.key.toUpperCase();
+      const mode = SHORTCUT_MAP.get(key);
+      if (mode) {
+        setCenterMode(mode);
       }
     };
     window.addEventListener('keydown', handler);
@@ -1354,15 +1377,15 @@ function InvestigationWorkspace() {
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 44px)' }}>
-      {/* Top bar: investigation header + pipeline progress */}
+      {/* Top bar: compact header + grouped tabs */}
       <div className="shrink-0 border-b border-nerv-border bg-nerv-bg">
-        {/* Investigation header */}
-        <div className="flex items-center justify-between px-4 h-9">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-[10px] font-mono text-nerv-text-muted uppercase tracking-wider shrink-0">
-              NERV {'\u25B8'} Investigation:
+        {/* Row 1: query + status badges + refresh — single compact line */}
+        <div className="flex items-center justify-between px-4 h-8">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[9px] font-mono text-nerv-text-muted uppercase tracking-wider shrink-0">
+              NERV {'\u25B8'}
             </span>
-            <span className="text-[11px] font-mono font-bold text-nerv-orange truncate">
+            <span className="text-[11px] font-mono font-bold text-nerv-orange truncate max-w-[300px]" title={query}>
               &quot;{query}&quot;
             </span>
             <NervStatus
@@ -1372,7 +1395,7 @@ function InvestigationWorkspace() {
             />
             {state.narratives.length > 0 && (
               <NervBadge
-                label={`SNAP:${state.narratives.length}N`}
+                label={`${state.narratives.length}N`}
                 variant="muted"
                 size="sm"
               />
@@ -1383,7 +1406,7 @@ function InvestigationWorkspace() {
             />
             {state.intelligenceReport && (
               <NervBadge
-                label={`INTEL: ${state.intelligenceReport.type.toUpperCase()}`}
+                label={`INTEL:${state.intelligenceReport.type.toUpperCase()}`}
                 variant="blue"
                 size="sm"
               />
@@ -1393,7 +1416,7 @@ function InvestigationWorkspace() {
             onClick={handleRefresh}
             disabled={pipelineRunning}
             className={[
-              'text-[9px] font-mono uppercase tracking-wider px-2 py-1 border rounded-sm transition-colors',
+              'text-[9px] font-mono uppercase tracking-wider px-2 py-1 border rounded-sm transition-colors shrink-0',
               pipelineRunning
                 ? 'border-nerv-border text-nerv-text-muted cursor-wait'
                 : 'border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10',
@@ -1403,14 +1426,44 @@ function InvestigationWorkspace() {
           </button>
         </div>
 
-        {/* Pipeline progress */}
-        <div className="px-4 pb-1">
-          <NervProgress stages={getPipelineStages(state.pipeline)} />
+        {/* Row 2: Grouped mode tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto px-4 py-1 border-t border-nerv-border/50">
+          {CENTER_MODE_GROUPS.map((group) => (
+            <div key={group.label} className="flex items-center gap-0.5 shrink-0">
+              <span className="text-[7px] font-mono uppercase text-nerv-text-muted/50 mr-1">{group.label}</span>
+              {group.modes.map((mode) => {
+                const active = state.centerMode === mode.key;
+                return (
+                  <button
+                    key={mode.key}
+                    onClick={() => setCenterMode(mode.key)}
+                    className={`px-2 py-1 text-[9px] font-mono uppercase tracking-wider transition-all rounded-sm ${
+                      active
+                        ? 'text-nerv-orange bg-nerv-orange/10'
+                        : 'text-nerv-text-muted hover:text-nerv-text-secondary hover:bg-nerv-bg-panel/30'
+                    }`}
+                    title={`${mode.label} (${mode.shortcut})`}
+                  >
+                    {mode.label}
+                  </button>
+                );
+              })}
+              {/* Group separator */}
+              <span className="w-px h-3 bg-nerv-border/30 mx-1" />
+            </div>
+          ))}
         </div>
 
-        {/* Scan progress — only shown while active */}
+        {/* Progress bars — only shown when actively running */}
+        {pipelineRunning && (
+          <div className="px-4 pb-1 border-t border-nerv-border/30">
+            <NervProgress stages={getPipelineStages(state.pipeline)} />
+          </div>
+        )}
+
+        {/* Scan progress — only shown while scan is active */}
         {scanJob && (scanJob.status === 'pending' || scanJob.status === 'running') && (
-          <div className="px-4 pb-2">
+          <div className="px-4 pb-1">
             <ScanProgress
               scanJob={scanJob}
               onCancel={handleCancelScan}
@@ -1419,39 +1472,39 @@ function InvestigationWorkspace() {
           </div>
         )}
 
-        {/* Scan history timeline — shows coverage of previous scans */}
-        <ScanHistoryBar
-          scans={scanHistory}
-          currentScanId={scanJob?._id ?? scanJob?.id}
-          onSelectScan={async (scanId) => {
-            // Load cached analysis data from a previous scan
-            try {
-              const cached = await getAnalysisCache(scanId);
-              if (cached) {
-                if (cached.narratives) {
-                  dispatch({ type: 'SET_NARRATIVES', narratives: cached.narratives as AnalyzedNarrative[], unclusteredCount: (cached.unclusteredCount as number) ?? 0 });
-                }
-                if (cached.propaganda) dispatch({ type: 'SET_PROPAGANDA', data: cached.propaganda as PropagandaAnalysisResult });
-                if (cached.downstream) dispatch({ type: 'SET_DOWNSTREAM', data: cached.downstream as DownstreamEffectsResult });
-                if (cached.investigation) dispatch({ type: 'SET_INVESTIGATION', data: cached.investigation as any, narrativeId: (cached.investigationNarrativeId as string) ?? '' });
-                // Update the scan history to show which one is selected
-                const scanStatus = await getScanStatus(scanId);
-                setScanJob(scanStatus);
-              }
-            } catch {
-              dispatch({ type: 'SET_ERROR', error: 'Failed to load historical scan data' });
-            }
-          }}
-        />
-
         {/* Analysis queue progress — only shown while jobs are active */}
         {state.analysisJobs.length > 0 && state.analysisJobs.some((j) => j.status === 'pending' || j.status === 'running') && (
-          <div className="px-4 pb-2">
+          <div className="px-4 pb-1">
             <AnalysisQueuePanel
               jobs={state.analysisJobs}
               onCancel={handleCancelAnalysisJob}
             />
           </div>
+        )}
+
+        {/* Scan history — only shown when 2+ scans exist */}
+        {scanHistory.length >= 2 && (
+          <ScanHistoryBar
+            scans={scanHistory}
+            currentScanId={scanJob?._id ?? scanJob?.id}
+            onSelectScan={async (scanId) => {
+              try {
+                const cached = await getAnalysisCache(scanId);
+                if (cached) {
+                  if (cached.narratives) {
+                    dispatch({ type: 'SET_NARRATIVES', narratives: cached.narratives as AnalyzedNarrative[], unclusteredCount: (cached.unclusteredCount as number) ?? 0 });
+                  }
+                  if (cached.propaganda) dispatch({ type: 'SET_PROPAGANDA', data: cached.propaganda as PropagandaAnalysisResult });
+                  if (cached.downstream) dispatch({ type: 'SET_DOWNSTREAM', data: cached.downstream as DownstreamEffectsResult });
+                  if (cached.investigation) dispatch({ type: 'SET_INVESTIGATION', data: cached.investigation as any, narrativeId: (cached.investigationNarrativeId as string) ?? '' });
+                  const scanStatus = await getScanStatus(scanId);
+                  setScanJob(scanStatus);
+                }
+              } catch {
+                dispatch({ type: 'SET_ERROR', error: 'Failed to load historical scan data' });
+              }
+            }}
+          />
         )}
       </div>
 
@@ -1516,27 +1569,6 @@ function InvestigationWorkspace() {
             {renderCenterPanel()}
           </div>
 
-          {/* Mode selector bar */}
-          <div className="shrink-0 border-t border-nerv-border bg-nerv-bg px-2 py-1.5 flex items-center gap-1">
-            <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mr-2">
-              MODE:
-            </span>
-            {CENTER_MODES.map((mode) => (
-              <button
-                key={mode.key}
-                onClick={() => setCenterMode(mode.key)}
-                className={[
-                  'px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider rounded-sm transition-colors',
-                  state.centerMode === mode.key
-                    ? 'bg-nerv-orange text-nerv-bg-deep font-bold'
-                    : 'text-nerv-text-muted hover:text-nerv-text-secondary hover:bg-nerv-bg-elevated/40',
-                ].join(' ')}
-                title={`${mode.label} (${mode.shortcut})`}
-              >
-                {mode.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* RIGHT resize handle */}
