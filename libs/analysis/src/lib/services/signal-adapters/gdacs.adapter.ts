@@ -69,23 +69,23 @@ export class GdacsAdapter implements SignalAdapter {
     return features.map((feature, i) => {
       const props = feature.properties ?? {};
       const coords = feature.geometry?.coordinates ?? [0, 0];
-      const alertLevel = (props.alertlevel as string) ?? 'Green';
-      const eventtype = (props.eventtype as string) ?? 'UNK';
+      const alertLevel = (props['alertlevel'] as string) ?? 'Green';
+      const eventtype = (props['eventtype'] as string) ?? 'UNK';
 
       return {
         id: `gdacs-${eventtype}-${i}-${Date.now()}`,
         domain: 'social' as const,
         source: 'GDACS',
-        title: (props.name as string) ?? `${this.eventTypeLabel(eventtype)} Alert`,
-        description: (props.description as string) ?? '',
-        timestamp: props.fromdate
-          ? new Date(props.fromdate as string).toISOString()
+        title: (props['name'] as string) ?? `${this.eventTypeLabel(eventtype)} Alert`,
+        description: (props['description'] as string) ?? '',
+        timestamp: props['fromdate']
+          ? new Date(props['fromdate'] as string).toISOString()
           : new Date().toISOString(),
         magnitude: this.alertMagnitude(alertLevel),
         metadata: {
           eventtype,
           alertlevel: alertLevel,
-          country: (props.country as string) ?? '',
+          country: (props['country'] as string) ?? '',
           coordinates: { latitude: coords[1], longitude: coords[0] },
         },
       };

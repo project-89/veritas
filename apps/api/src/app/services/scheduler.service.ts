@@ -1,11 +1,6 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-  OnModuleDestroy,
-} from '@nestjs/common';
-import { AlertRepository } from '@veritas/ingestion';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { MonitorService } from '@veritas/analysis';
+import { AlertRepository } from '@veritas/ingestion';
 import { RefreshService } from './refresh.service';
 
 /**
@@ -46,10 +41,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(
       `Scheduler started — checking for due investigations every ${SchedulerService.CHECK_INTERVAL_MS / 1000}s`,
     );
-    this.intervalHandle = setInterval(
-      () => void this.tick(),
-      SchedulerService.CHECK_INTERVAL_MS,
-    );
+    this.intervalHandle = setInterval(() => void this.tick(), SchedulerService.CHECK_INTERVAL_MS);
   }
 
   onModuleDestroy(): void {
@@ -87,9 +79,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      this.logger.log(
-        `${dueConfigs.length} investigation(s) due for refresh`,
-      );
+      this.logger.log(`${dueConfigs.length} investigation(s) due for refresh`);
 
       // 3. Process each due investigation sequentially to avoid overload
       for (const config of dueConfigs) {
@@ -99,9 +89,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
           // Update nextRunAt (RefreshService already updates lastRunAt,
           // but we recalculate nextRunAt based on the config interval
           // to ensure accuracy)
-          const nextRun = new Date(
-            Date.now() + config.intervalMinutes * 60_000,
-          );
+          const nextRun = new Date(Date.now() + config.intervalMinutes * 60_000);
           await this.alertRepository.upsertConfig(config.investigationId, {
             lastRunAt: new Date(),
             nextRunAt: nextRun,
@@ -111,9 +99,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
             `Refreshed investigation ${config.investigationId}, next run at ${nextRun.toISOString()}`,
           );
         } catch (err) {
-          this.logger.error(
-            `Failed to refresh investigation ${config.investigationId}: ${err}`,
-          );
+          this.logger.error(`Failed to refresh investigation ${config.investigationId}: ${err}`);
         }
       }
     } catch (err) {

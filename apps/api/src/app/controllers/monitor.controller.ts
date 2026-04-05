@@ -1,20 +1,15 @@
 import {
+  Body,
   Controller,
   Get,
-  Put,
-  Post,
-  Param,
-  Query,
-  Body,
   Logger,
   NotFoundException,
+  Param,
+  Post,
+  Put,
+  Query,
 } from '@nestjs/common';
-import {
-  AlertRepository,
-  InvestigationRepository,
-  Alert,
-  MonitorConfig,
-} from '@veritas/ingestion';
+import { Alert, AlertRepository, InvestigationRepository, MonitorConfig } from '@veritas/ingestion';
 import { RefreshService } from '../services/refresh.service';
 
 /**
@@ -137,20 +132,15 @@ export class MonitorController {
   ): Promise<MonitorConfig> {
     this.logger.log(`Updating monitor config for: ${investigationId}`);
 
-    const investigation =
-      await this.investigationRepository.findById(investigationId);
+    const investigation = await this.investigationRepository.findById(investigationId);
     if (!investigation) {
-      throw new NotFoundException(
-        `Investigation not found: ${investigationId}`,
-      );
+      throw new NotFoundException(`Investigation not found: ${investigationId}`);
     }
 
     // If enabling monitoring, set the next run time
     const update: Partial<MonitorConfig> = { ...body };
     if (body.enabled && body.intervalMinutes) {
-      update.nextRunAt = new Date(
-        Date.now() + body.intervalMinutes * 60 * 1000,
-      );
+      update.nextRunAt = new Date(Date.now() + body.intervalMinutes * 60 * 1000);
     }
 
     return this.alertRepository.upsertConfig(investigationId, update);

@@ -1,18 +1,15 @@
 import {
   Controller,
   Get,
+  MessageEvent,
+  NotFoundException,
   Param,
   Query,
   Sse,
-  MessageEvent,
-  NotFoundException,
 } from '@nestjs/common';
-import { Observable, map, merge, interval, filter } from 'rxjs';
-import {
-  GlobalEventAggregationService,
-  GlobalEvent,
-} from '@veritas/analysis';
+import { GlobalEvent, GlobalEventAggregationService } from '@veritas/analysis';
 import { GlobalEventRepository } from '@veritas/ingestion';
+import { filter, interval, map, merge, Observable } from 'rxjs';
 
 @Controller('events')
 export class EventsController {

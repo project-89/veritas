@@ -1,14 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { MonitorService, NarrativeAnalysisService } from '@veritas/analysis';
 import {
-  IngestionService,
-  AlertRepository,
-  InvestigationRepository,
   Alert,
+  AlertRepository,
+  IngestionService,
+  InvestigationRepository,
 } from '@veritas/ingestion';
-import {
-  NarrativeAnalysisService,
-  MonitorService,
-} from '@veritas/analysis';
 
 /**
  * Shared service that encapsulates the investigation refresh pipeline.
@@ -43,31 +40,29 @@ export class RefreshService {
    *
    * @throws Error if the investigation does not exist.
    */
-  async refresh(
-    investigationId: string,
-  ): Promise<{ alerts: Alert[]; snapshotId: string }> {
-    const investigation =
-      await this.investigationRepository.findById(investigationId);
+  async refresh(investigationId: string): Promise<{ alerts: Alert[]; snapshotId: string }> {
+    const investigation = await this.investigationRepository.findById(investigationId);
     if (!investigation) {
       throw new Error(`Investigation not found: ${investigationId}`);
     }
 
     // Get previous snapshot for comparison
-    const previousSnapshot =
-      await this.investigationRepository.getLatestSnapshot(investigationId);
+    const previousSnapshot = await this.investigationRepository.getLatestSnapshot(investigationId);
 
     // Step 1: Re-run search
     this.logger.log(
       `Searching: "${investigation.query}" (platforms: ${investigation.settings.platforms.join(', ') || 'all'})`,
     );
-    const { posts, insights } =
-      await this.ingestionService.searchWithRawDataAll(investigation.query, {
+    const { posts, insights } = await this.ingestionService.searchWithRawDataAll(
+      investigation.query,
+      {
         platforms:
           investigation.settings.platforms.length > 0
             ? investigation.settings.platforms
             : undefined,
         limit: investigation.settings.limit,
-      });
+      },
+    );
 
     // Step 2: Run analysis
     const analysisPosts = posts.map((p) => ({
@@ -75,10 +70,7 @@ export class RefreshService {
       platform: p.platform,
       authorName: p.authorName ?? 'Unknown',
       authorHandle: p.authorHandle ?? '',
-      timestamp:
-        p.timestamp instanceof Date
-          ? p.timestamp.toISOString()
-          : String(p.timestamp),
+      timestamp: p.timestamp instanceof Date ? p.timestamp.toISOString() : String(p.timestamp),
       engagement: p.engagementMetrics
         ? {
             likes: p.engagementMetrics.likes,
@@ -88,22 +80,15 @@ export class RefreshService {
         : undefined,
     }));
 
-    const { narratives } =
-      await this.narrativeAnalysisService.analyze(analysisPosts);
+    const { narratives } = await this.narrativeAnalysisService.analyze(analysisPosts);
 
     // Step 3: Build and save snapshot summary
     const summary = {
       total: posts.length,
-      positive: insights.filter(
-        (i) => i.sentiment && i.sentiment.score > 0.2,
-      ).length,
-      negative: insights.filter(
-        (i) => i.sentiment && i.sentiment.score < -0.2,
-      ).length,
+      positive: insights.filter((i) => i.sentiment && i.sentiment.score > 0.2).length,
+      negative: insights.filter((i) => i.sentiment && i.sentiment.score < -0.2).length,
       neutral: insights.filter(
-        (i) =>
-          !i.sentiment ||
-          (i.sentiment.score >= -0.2 && i.sentiment.score <= 0.2),
+        (i) => !i.sentiment || (i.sentiment.score >= -0.2 && i.sentiment.score <= 0.2),
       ).length,
       byPlatform: posts.reduce(
         (acc, p) => {
@@ -114,14 +99,14 @@ export class RefreshService {
       ),
     };
 
-    const snapshot = await this.investigationRepository.addSnapshot(
-      investigationId,
-      { posts, narratives, summary },
-    );
+    const snapshot = await this.investigationRepository.addSnapshot(investigationId, {
+      posts,
+      narratives,
+      summary,
+    });
 
     const snapshotId =
-      snapshot._id?.toString() ??
-      ((snapshot as unknown as Record<string, unknown>)['id'] as string);
+      snapshot._id?.toString() ?? ((snapshot as unknown as Record<string, unknown>).id as string);
 
     // Step 4 + 5: Compare snapshots and generate alerts
     let savedAlerts: Alert[] = [];

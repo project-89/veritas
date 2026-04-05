@@ -1,45 +1,45 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { GraphQLModule } from '@nestjs/graphql';
+import { join } from 'node:path';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { BullModule } from '@nestjs/bullmq';
-import { join } from 'path';
-import { DatabaseModule } from '@veritas/database';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { GraphQLModule } from '@nestjs/graphql';
 import {
   AnalysisModule,
-  SIGNAL_CACHE_STORE,
-  GLOBAL_EVENT_REPOSITORY,
-  PropagandaAnalysisService,
   ClaimVerificationService,
-  DownstreamEffectsService,
-  DeepInvestigationService,
   CrossPlatformIdentityService,
-  SourceCredibilityService,
+  DeepInvestigationService,
+  DownstreamEffectsService,
+  GLOBAL_EVENT_REPOSITORY,
   GraphBotDetectionService,
+  PropagandaAnalysisService,
   PsychologicalProfilerService,
+  SIGNAL_CACHE_STORE,
+  SourceCredibilityService,
 } from '@veritas/analysis';
-import { SignalCacheRepository, GlobalEventRepository } from '@veritas/ingestion';
-import {
-  PROPAGANDA_SERVICE,
-  CLAIM_VERIFICATION_SERVICE,
-  DOWNSTREAM_EFFECTS_SERVICE,
-  DEEP_INVESTIGATION_SERVICE,
-  CROSS_PLATFORM_SERVICE,
-  SOURCE_CREDIBILITY_SERVICE,
-  GRAPH_BOT_DETECTION_SERVICE,
-  PSYCHOLOGICAL_PROFILER_SERVICE,
-} from '@veritas/ingestion';
-import { AnalysisProcessor } from '@veritas/ingestion';
 import { ContentClassificationModule } from '@veritas/content-classification';
-import { IngestionModule } from '@veritas/ingestion';
+import { DatabaseModule, DatabaseService } from '@veritas/database';
+import {
+  AnalysisProcessor,
+  CLAIM_VERIFICATION_SERVICE,
+  CROSS_PLATFORM_SERVICE,
+  DEEP_INVESTIGATION_SERVICE,
+  DOWNSTREAM_EFFECTS_SERVICE,
+  GlobalEventRepository,
+  GRAPH_BOT_DETECTION_SERVICE,
+  IngestionModule,
+  PROPAGANDA_SERVICE,
+  PSYCHOLOGICAL_PROFILER_SERVICE,
+  SignalCacheRepository,
+  SOURCE_CREDIBILITY_SERVICE,
+} from '@veritas/ingestion';
+import { EventsController } from './controllers/events.controller';
 import { InvestigationController } from './controllers/investigation.controller';
 import { MonitorController } from './controllers/monitor.controller';
-import { EventsController } from './controllers/events.controller';
+import { LoggingMiddleware } from './middleware/logging.middleware';
 import { LoggingService } from './services/logging.service';
 import { RefreshService } from './services/refresh.service';
 import { SchedulerService } from './services/scheduler.service';
-import { LoggingMiddleware } from './middleware/logging.middleware';
-import { DatabaseService } from '@veritas/database';
 
 @Module({
   imports: [
@@ -52,8 +52,8 @@ import { DatabaseService } from '@veritas/database';
     // BullMQ — Redis-backed job queue (used by scan workers)
     BullModule.forRoot({
       connection: {
-        host: process.env['REDIS_HOST'] || 'localhost',
-        port: parseInt(process.env['REDIS_PORT'] || '6379', 10),
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379', 10),
       },
     }),
 
@@ -62,14 +62,14 @@ import { DatabaseService } from '@veritas/database';
       driver: ApolloDriver,
       autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
       sortSchema: true,
-      playground: process.env['NODE_ENV'] !== 'production',
+      playground: process.env.NODE_ENV !== 'production',
     }),
 
     // Database Modules
     DatabaseModule.register({
       providerType: 'mongodb',
       providerOptions: {
-        uri: process.env['MONGODB_URI'] || 'mongodb://localhost:27017',
+        uri: process.env.MONGODB_URI || 'mongodb://localhost:27017',
         databaseName: 'veritas',
       },
       isGlobal: true,
@@ -102,8 +102,7 @@ import { DatabaseService } from '@veritas/database';
     AnalysisProcessor,
     {
       provide: 'MONGODB_SERVICE',
-      useFactory: (configService: ConfigService, dbService: DatabaseService) =>
-        dbService,
+      useFactory: (_configService: ConfigService, dbService: DatabaseService) => dbService,
       inject: [ConfigService, DatabaseService],
     },
     // Bridge ingestion repositories to analysis tokens

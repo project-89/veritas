@@ -1,22 +1,15 @@
+import { Body, Controller, HttpException, HttpStatus, Logger, Post } from '@nestjs/common';
+import type { BotDetectionResult, SourceCredibilityScore } from '@veritas/analysis';
 import {
-  Controller,
-  Post,
-  Body,
-  Logger,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
-import { IngestionService, IdentityRecordRepository } from '@veritas/ingestion';
-import {
-  DeepInvestigationService,
-  DeepInvestigationResult,
-  UserPost,
   CrossPlatformIdentityService,
-  SourceCredibilityService,
+  DeepInvestigationResult,
+  DeepInvestigationService,
   GraphBotDetectionService,
   SocialGraphIntelligenceService,
+  SourceCredibilityService,
+  UserPost,
 } from '@veritas/analysis';
-import type { SourceCredibilityScore, BotDetectionResult } from '@veritas/analysis';
+import { IdentityRecordRepository, IngestionService } from '@veritas/ingestion';
 
 // ---------------------------------------------------------------------------
 // Request DTO
@@ -142,7 +135,7 @@ export class InvestigationController {
         if (!topicPostsByHandle.has(handle)) {
           topicPostsByHandle.set(handle, []);
         }
-        topicPostsByHandle.get(handle)!.push(post);
+        topicPostsByHandle.get(handle)?.push(post);
       }
     }
 
@@ -279,13 +272,13 @@ export class InvestigationController {
       const bot = botScoreMap.get(userResult.user.handle);
 
       // Extend the result object with credibility, bot data, and profile details
-      (userResult as unknown as Record<string, unknown>)['credibility'] = cred ?? null;
-      (userResult as unknown as Record<string, unknown>)['botScore'] = bot ?? null;
+      (userResult as unknown as Record<string, unknown>).credibility = cred ?? null;
+      (userResult as unknown as Record<string, unknown>).botScore = bot ?? null;
 
       // Attach author profile (followers, following, etc.) if available
       const profile = authorProfileMap.get(userResult.user.handle);
       if (profile) {
-        (userResult as unknown as Record<string, unknown>)['authorProfile'] = profile;
+        (userResult as unknown as Record<string, unknown>).authorProfile = profile;
       }
 
       // Add credibility flags to the existing flags array
@@ -301,7 +294,7 @@ export class InvestigationController {
     }
 
     // Attach bot detection summary and structural patterns to the result
-    (investigationResult as unknown as Record<string, unknown>)['botDetection'] = botDetection
+    (investigationResult as unknown as Record<string, unknown>).botDetection = botDetection
       ? {
           summary: botDetection.summary,
           structuralPatterns: botDetection.structuralPatterns,
@@ -318,7 +311,7 @@ export class InvestigationController {
       }));
       const graphResult = await this.socialGraph.enrichRelationships(graphUsers, query);
       this.logger.log(`Social graph: ${graphResult.edgesCreated} edges, ${graphResult.communitiesDetected} communities`);
-      (investigationResult as any)['socialGraph'] = graphResult;
+      (investigationResult as any).socialGraph = graphResult;
     } catch (err) {
       this.logger.warn(`Social graph enrichment failed: ${err}`);
     }
@@ -374,14 +367,12 @@ export class InvestigationController {
    * Determine which platforms to try for a given user's timeline fetch.
    */
   private resolvePlatforms(
-    handle: string,
+    _handle: string,
     userTopicDtos: RawPostDto[],
     requestedPlatforms?: string[],
   ): string[] {
     // Deduplicate platforms the user already appeared on
-    const seenPlatforms = new Set(
-      userTopicDtos.map((p) => p.platform.toLowerCase()),
-    );
+    const seenPlatforms = new Set(userTopicDtos.map((p) => p.platform.toLowerCase()));
 
     if (seenPlatforms.size > 0) {
       return Array.from(seenPlatforms);
@@ -399,35 +390,26 @@ export class InvestigationController {
    * Attempt to fetch a user's timeline from the first connector that
    * supports `getUserTimeline`.
    */
-  private async fetchTimeline(
-    handle: string,
-    platformsToTry: string[],
-  ): Promise<UserPost[]> {
+  private async fetchTimeline(handle: string, platformsToTry: string[]): Promise<UserPost[]> {
     for (const platform of platformsToTry) {
       const connector = this.ingestionService.getConnector(platform);
       if (!connector) {
-        this.logger.debug(
-          `No connector registered for platform "${platform}"`,
-        );
+        this.logger.debug(`No connector registered for platform "${platform}"`);
         continue;
       }
 
       // getUserTimeline is not on the DataConnector interface — it's specific
       // to TwitterFreeConnector and RedditFreeConnector
       const connectorWithTimeline = connector as unknown as Record<string, unknown>;
-      if (typeof connectorWithTimeline['getUserTimeline'] !== 'function') {
-        this.logger.debug(
-          `Connector for "${platform}" does not support getUserTimeline`,
-        );
+      if (typeof connectorWithTimeline.getUserTimeline !== 'function') {
+        this.logger.debug(`Connector for "${platform}" does not support getUserTimeline`);
         continue;
       }
 
       try {
-        this.logger.debug(
-          `Fetching timeline for @${handle} from ${platform}...`,
-        );
+        this.logger.debug(`Fetching timeline for @${handle} from ${platform}...`);
         const timelinePosts = await (
-          connectorWithTimeline['getUserTimeline'] as (
+          connectorWithTimeline.getUserTimeline as (
             username: string,
             options?: { limit?: number },
           ) => Promise<
@@ -450,9 +432,7 @@ export class InvestigationController {
         return timelinePosts.map((post) => ({
           text: post.text,
           timestamp:
-            post.timestamp instanceof Date
-              ? post.timestamp.toISOString()
-              : String(post.timestamp),
+            post.timestamp instanceof Date ? post.timestamp.toISOString() : String(post.timestamp),
           platform: post.platform,
           url: post.url,
           engagement: {
@@ -489,25 +469,25 @@ export class InvestigationController {
       if (!connector) continue;
 
       const connectorAny = connector as unknown as Record<string, unknown>;
-      if (typeof connectorAny['getAuthorDetails'] !== 'function') continue;
+      if (typeof connectorAny.getAuthorDetails !== 'function') continue;
 
       try {
         const details = await (
-          connectorAny['getAuthorDetails'] as (handle: string) => Promise<Record<string, unknown>>
+          connectorAny.getAuthorDetails as (handle: string) => Promise<Record<string, unknown>>
         ).call(connector, handle);
 
         if (details) {
           return {
             platform,
-            followersCount: (details['metadata'] as Record<string, unknown>)?.['followersCount'] ?? null,
-            followingCount: (details['metadata'] as Record<string, unknown>)?.['followingCount'] ?? null,
-            tweetsCount: (details['metadata'] as Record<string, unknown>)?.['tweetsCount'] ?? null,
-            isVerified: details['verificationStatus'] === 'verified',
-            name: details['name'] ?? handle,
-            description: details['description'] ?? '',
-            url: details['url'] ?? '',
-            avatar: (details['metadata'] as Record<string, unknown>)?.['avatar'] ?? null,
-            banner: (details['metadata'] as Record<string, unknown>)?.['banner'] ?? null,
+            followersCount: (details.metadata as Record<string, unknown>)?.followersCount ?? null,
+            followingCount: (details.metadata as Record<string, unknown>)?.followingCount ?? null,
+            tweetsCount: (details.metadata as Record<string, unknown>)?.tweetsCount ?? null,
+            isVerified: details.verificationStatus === 'verified',
+            name: details.name ?? handle,
+            description: details.description ?? '',
+            url: details.url ?? '',
+            avatar: (details.metadata as Record<string, unknown>)?.avatar ?? null,
+            banner: (details.metadata as Record<string, unknown>)?.banner ?? null,
           };
         }
       } catch (err) {

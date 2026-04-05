@@ -71,19 +71,19 @@ export class ReliefWebAdapter implements SignalAdapter {
     return items.map((item) => {
       const fields = item.fields ?? {};
 
-      const title = (fields.title as string) ?? 'Untitled report';
+      const title = (fields['title'] as string) ?? 'Untitled report';
 
-      const dateObj = fields.date as { created?: string } | undefined;
+      const dateObj = fields['date'] as { created?: string } | undefined;
       const timestamp = dateObj?.created
         ? new Date(dateObj.created).toISOString()
         : new Date().toISOString();
 
-      const countryArr = fields.country as Array<{ name?: string }> | undefined;
+      const countryArr = fields['country'] as Array<{ name?: string }> | undefined;
       const country = Array.isArray(countryArr) && countryArr.length > 0
         ? countryArr[0]?.name ?? ''
         : '';
 
-      const sourceArr = fields.source as Array<{ name?: string }> | undefined;
+      const sourceArr = fields['source'] as Array<{ name?: string }> | undefined;
       const sourceName = Array.isArray(sourceArr) && sourceArr.length > 0
         ? sourceArr[0]?.name ?? ''
         : '';
