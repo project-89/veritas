@@ -11,7 +11,8 @@ import type { ExternalSignal } from './signal-adapters/signal-adapter.interface'
 import { UsgsAdapter } from './signal-adapters/usgs.adapter';
 import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
 import { AcledAdapter } from './signal-adapters/acled.adapter';
-import { resolveCountryCode } from '../utils/geocoding';
+import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
+import { resolveCountryCode, REGION_CENTROIDS } from '../utils/geocoding';
 import type {
   GlobalEvent,
   EventCategory,
@@ -30,10 +31,11 @@ interface EventRepository {
 // ---------------------------------------------------------------------------
 
 const USGS_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-const GDELT_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const GDELT_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes (GDELT rate-limits aggressively)
 const ACLED_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const COINGECKO_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const DEFAULT_EVENT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DEFAULT_EVENT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // ---------------------------------------------------------------------------
 // Service
@@ -59,11 +61,13 @@ export class GlobalEventAggregationService
   private readonly usgs = new UsgsAdapter();
   private readonly gdelt = new GdeltAdapter();
   private readonly acled = new AcledAdapter();
+  private readonly coingecko = new CoinGeckoAdapter();
 
   // Polling handles
   private usgsInterval: ReturnType<typeof setInterval> | null = null;
   private gdeltInterval: ReturnType<typeof setInterval> | null = null;
   private acledInterval: ReturnType<typeof setInterval> | null = null;
+  private coingeckoInterval: ReturnType<typeof setInterval> | null = null;
 
   // Deduplication: eventId → timestamp (ms)
   private readonly seen = new Map<string, number>();
@@ -83,10 +87,11 @@ export class GlobalEventAggregationService
   onModuleInit(): void {
     this.logger.log('Starting global event aggregation');
 
-    // Fire-and-forget initial polls
+    // Stagger initial polls to avoid thundering herd / rate limits
     void this.pollUsgs();
-    void this.pollGdelt();
-    void this.pollAcled();
+    setTimeout(() => void this.pollCoingecko(), 15_000);  // 15s delay
+    setTimeout(() => void this.pollGdelt(), 45_000);      // 45s delay
+    setTimeout(() => void this.pollAcled(), 75_000);      // 75s delay
 
     // Set up recurring intervals
     this.usgsInterval = setInterval(
@@ -101,9 +106,14 @@ export class GlobalEventAggregationService
       () => void this.pollAcled(),
       ACLED_INTERVAL_MS,
     );
+    this.coingeckoInterval = setInterval(
+      () => void this.pollCoingecko(),
+      COINGECKO_INTERVAL_MS,
+    );
   }
 
   onModuleDestroy(): void {
+    if (this.coingeckoInterval) clearInterval(this.coingeckoInterval);
     if (this.usgsInterval) clearInterval(this.usgsInterval);
     if (this.gdeltInterval) clearInterval(this.gdeltInterval);
     if (this.acledInterval) clearInterval(this.acledInterval);
@@ -172,6 +182,45 @@ export class GlobalEventAggregationService
       this.logger.debug(`ACLED poll: ${events.length} events`);
     } catch (err) {
       this.logger.error(`ACLED poll error: ${err}`);
+    }
+  }
+
+  private async pollCoingecko(): Promise<void> {
+    try {
+      const now = new Date();
+      const signals = await this.coingecko.fetchSignals({
+        keywords: [],
+        startDate: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+        endDate: now.toISOString(),
+      });
+
+      // CoinGecko signals are global market data — create events for significant movers
+      const events: GlobalEvent[] = signals
+        .filter((s) => s.magnitude >= 0.3) // Only significant moves
+        .map((s) => {
+          const priceChange = (s.metadata?.['price_change_percentage_24h'] as number) ?? 0;
+          const direction = priceChange >= 0 ? 'up' : 'down';
+          const symbol = (s.metadata?.['symbol'] as string)?.toUpperCase() ?? '???';
+
+          return {
+            id: `coingecko-${s.id}`,
+            source: 'CoinGecko',
+            category: 'economic' as EventCategory,
+            severity: (s.magnitude >= 0.7 ? 'high' : s.magnitude >= 0.5 ? 'medium' : 'low') as EventSeverity,
+            title: `${symbol} ${direction} ${Math.abs(priceChange).toFixed(1)}% in 24h`,
+            description: s.description,
+            timestamp: s.timestamp,
+            location: { lat: 20, lng: 0, label: 'Global', region: 'global' }, // Crypto is global
+            magnitude: s.magnitude,
+            metadata: s.metadata,
+            expiresAt: new Date(Date.now() + DEFAULT_EVENT_TTL_MS).toISOString(),
+          };
+        });
+
+      await this.processEvents(events);
+      this.logger.debug(`CoinGecko poll: ${events.length} events`);
+    } catch (err) {
+      this.logger.error(`CoinGecko poll error: ${err}`);
     }
   }
 
