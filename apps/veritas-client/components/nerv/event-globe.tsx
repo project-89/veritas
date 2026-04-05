@@ -9,114 +9,91 @@ export interface EventGlobeProps {
   onEventClick?: (event: GlobalEvent) => void;
 }
 
-const SEVERITY_SIZE: Record<string, number> = {
-  critical: 1.5,
-  high: 1.0,
-  medium: 0.7,
-  low: 0.4,
-};
-
+const SEVERITY_SIZE: Record<string, number> = { critical: 1.5, high: 1.0, medium: 0.7, low: 0.4 };
 const NERV_COLORS = { bgDeep: 0x0a0a0f, orange: 0xff6b2b };
-
-const COUNTRIES_GEOJSON_URL =
-  'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson';
+const COUNTRIES_URL = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson';
+const GLOBE_RADIUS = 100;
+const LABEL_HEIGHT = 28;
+const LABEL_SPACING = 4;
+const SIDE_WIDTH = 260;
+const SIDE_MARGIN = 10;
+const MAX_LABELS = 14;
 
 interface GlobePointData {
-  lat: number;
-  lng: number;
-  color: string;
-  size: number;
-  eventId: string;
-  title: string;
+  lat: number; lng: number; color: string; size: number; eventId: string; title: string;
+}
+
+// Lat/lng to 3D position in globe local space
+function latLngToXYZ(lat: number, lng: number, alt: number) {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lng + 180) * (Math.PI / 180);
+  const r = GLOBE_RADIUS * (1 + alt);
+  return { x: -(r * Math.sin(phi) * Math.cos(theta)), y: r * Math.cos(phi), z: r * Math.sin(phi) * Math.sin(theta) };
 }
 
 export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const labelsRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<unknown>(null);
   const frameRef = useRef<number>(0);
   const mouseDown = useRef(false);
   const autoRotate = useRef(true);
   const targetRotationY = useRef<number | null>(null);
-  const labelGroupsRef = useRef<unknown[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Refs for render-loop access (no React re-renders)
   const eventsRef = useRef(events);
   eventsRef.current = events;
-
   const onClickRef = useRef(onEventClick);
   onClickRef.current = onEventClick;
-
   const pointsRef = useRef<GlobePointData[]>([]);
   pointsRef.current = events.map(ev => ({
-    lat: ev.location.lat,
-    lng: ev.location.lng,
+    lat: ev.location.lat, lng: ev.location.lng,
     color: EVENT_COLORS[ev.category] ?? '#ffffff',
     size: SEVERITY_SIZE[ev.severity] ?? 0.4,
-    eventId: ev.id,
-    title: ev.title.slice(0, 45),
+    eventId: ev.id, title: ev.title.slice(0, 42),
   }));
+
+  // Store Three.js objects for render loop
+  const threeRef = useRef<{ camera: unknown; globe: unknown; Vector3: unknown } | null>(null);
 
   const initGlobe = useCallback(async (): Promise<(() => void) | undefined> => {
     if (!containerRef.current) return undefined;
-
     try {
       const THREE = await import('three');
       const { default: ThreeGlobe } = await import('three-globe');
       const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
-      const { CSS2DRenderer, CSS2DObject } = await import('three/examples/jsm/renderers/CSS2DRenderer.js');
 
       const container = containerRef.current;
       const w = container.clientWidth;
       const h = container.clientHeight;
 
-      // Scene + camera
       const scene = new THREE.Scene();
       scene.background = null;
       const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 2000);
       camera.position.set(0, 0, 340);
 
-      // WebGL renderer
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
       renderer.setSize(w, h);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      container.innerHTML = '';
-      container.appendChild(renderer.domElement);
-
-      // CSS2D renderer for labels (overlays on top of WebGL)
-      const labelRenderer = new CSS2DRenderer();
-      labelRenderer.setSize(w, h);
-      labelRenderer.domElement.style.position = 'absolute';
-      labelRenderer.domElement.style.top = '0';
-      labelRenderer.domElement.style.left = '0';
-      labelRenderer.domElement.style.pointerEvents = 'none';
-      container.appendChild(labelRenderer.domElement);
+      container.querySelector('canvas')?.remove();
+      container.insertBefore(renderer.domElement, container.firstChild);
 
       // Globe
       const globe = new ThreeGlobe({ animateIn: true })
-        .showGlobe(true)
-        .showAtmosphere(true)
-        .atmosphereColor('#FF6B2B')
-        .atmosphereAltitude(0.18);
-
+        .showGlobe(true).showAtmosphere(true).atmosphereColor('#FF6B2B').atmosphereAltitude(0.18);
       const gMat = globe.globeMaterial() as InstanceType<typeof THREE.MeshPhongMaterial>;
-      gMat.color.setHex(NERV_COLORS.bgDeep);
-      gMat.transparent = true;
-      gMat.opacity = 0.85;
-      gMat.shininess = 0.4;
+      gMat.color.setHex(NERV_COLORS.bgDeep); gMat.transparent = true; gMat.opacity = 0.85; gMat.shininess = 0.4;
 
-      // Country polygons
       try {
-        const geoRes = await fetch(COUNTRIES_GEOJSON_URL);
-        const geoJson = await geoRes.json();
+        const geoJson = await (await fetch(COUNTRIES_URL)).json();
         globe.polygonsData(geoJson.features || [])
-          .polygonCapColor(() => '#12122a')
-          .polygonSideColor(() => '#1a1a3a')
-          .polygonStrokeColor(() => '#2a2a55')
-          .polygonAltitude(0.006);
+          .polygonCapColor(() => '#12122a').polygonSideColor(() => '#1a1a3a')
+          .polygonStrokeColor(() => '#2a2a55').polygonAltitude(0.006);
       } catch { /* cosmetic */ }
 
-      // Colored dots on the globe (all events)
       globe.pointsData(pointsRef.current)
         .pointLat((d: unknown) => (d as GlobePointData).lat)
         .pointLng((d: unknown) => (d as GlobePointData).lng)
@@ -127,152 +104,43 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
 
       scene.add(globe);
       globeRef.current = globe;
-
-      // --- LEADER LINE LABELS (CSS2D) ---
-      // Convert lat/lng to 3D position on the globe surface
-      const GLOBE_RADIUS = 100;
-      const latLngTo3D = (lat: number, lng: number, altitude: number) => {
-        const phi = (90 - lat) * (Math.PI / 180);
-        const theta = (lng + 180) * (Math.PI / 180);
-        const r = GLOBE_RADIUS * (1 + altitude);
-        return new THREE.Vector3(
-          -(r * Math.sin(phi) * Math.cos(theta)),
-          r * Math.cos(phi),
-          r * Math.sin(phi) * Math.sin(theta),
-        );
-      };
-
-      const buildLabels = (pts: GlobePointData[]) => {
-        // Remove old label groups
-        for (const grp of labelGroupsRef.current) {
-          globe.remove(grp as InstanceType<typeof THREE.Object3D>);
-        }
-        labelGroupsRef.current = [];
-
-        // Top events by severity
-        const top = [...pts].sort((a, b) => b.size - a.size).slice(0, 12);
-
-        for (const pt of top) {
-          const group = new THREE.Group();
-          const surfacePos = latLngTo3D(pt.lat, pt.lng, 0.01);
-          group.position.copy(surfacePos);
-
-          // Leader line: from surface up to label anchor
-          const normal = surfacePos.clone().normalize();
-          const lineEnd = normal.clone().multiplyScalar(35); // extend 35 units outward
-          const lineGeom = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(0, 0, 0),
-            lineEnd,
-          ]);
-          const lineMat = new THREE.LineBasicMaterial({
-            color: new THREE.Color(pt.color),
-            transparent: true,
-            opacity: 0.5,
-          });
-          group.add(new THREE.Line(lineGeom, lineMat));
-
-          // Small sphere at the base
-          const dotGeom = new THREE.SphereGeometry(0.6, 8, 8);
-          const dotMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(pt.color) });
-          group.add(new THREE.Mesh(dotGeom, dotMat));
-
-          // CSS2D label at the end of the leader line
-          const labelDiv = document.createElement('div');
-          labelDiv.style.cssText = `
-            font-family: monospace;
-            font-size: 11px;
-            line-height: 1.3;
-            padding: 3px 8px;
-            color: ${pt.color};
-            background: rgba(10, 10, 15, 0.92);
-            border-left: 2px solid ${pt.color};
-            white-space: nowrap;
-            pointer-events: auto;
-            cursor: pointer;
-            letter-spacing: 0.03em;
-          `;
-          labelDiv.textContent = pt.title;
-          labelDiv.addEventListener('click', () => {
-            const ev = eventsRef.current.find(e => e.id === pt.eventId);
-            if (!ev) return;
-            autoRotate.current = false;
-            targetRotationY.current = -ev.location.lng * (Math.PI / 180);
-            setTimeout(() => { autoRotate.current = true; }, 10000);
-            onClickRef.current?.(ev);
-          });
-
-          const cssLabel = new CSS2DObject(labelDiv);
-          cssLabel.position.copy(lineEnd);
-          group.add(cssLabel);
-
-          globe.add(group);
-          labelGroupsRef.current.push(group);
-        }
-      };
-
-      buildLabels(pointsRef.current);
-
-      // Store buildLabels for updates
-      (globe as unknown as Record<string, unknown>)['_buildLabels'] = buildLabels;
+      threeRef.current = { camera, globe, Vector3: THREE.Vector3 };
 
       // Lights
       scene.add(new THREE.AmbientLight(0x444466, 1.2));
-      const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-      dirLight.position.set(200, 200, 200);
-      scene.add(dirLight);
-      const accentLight = new THREE.PointLight(NERV_COLORS.orange, 0.3, 800);
-      accentLight.position.set(-200, 100, 200);
-      scene.add(accentLight);
+      const dl = new THREE.DirectionalLight(0xffffff, 0.6); dl.position.set(200, 200, 200); scene.add(dl);
+      const al = new THREE.PointLight(NERV_COLORS.orange, 0.3, 800); al.position.set(-200, 100, 200); scene.add(al);
 
       // Stars
-      const starGeom = new THREE.BufferGeometry();
-      const starPos = new Float32Array(1500 * 3);
-      for (let i = 0; i < 1500 * 3; i += 3) {
-        const t = Math.random() * Math.PI * 2;
-        const p = Math.acos(2 * Math.random() - 1);
-        const r = 600 + Math.random() * 400;
-        starPos[i] = r * Math.sin(p) * Math.cos(t);
-        starPos[i + 1] = r * Math.sin(p) * Math.sin(t);
-        starPos[i + 2] = r * Math.cos(p);
-      }
-      starGeom.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-      const starMat = new THREE.PointsMaterial({ color: 0x6b6b8a, size: 0.6, transparent: true, opacity: 0.5 });
-      scene.add(new THREE.Points(starGeom, starMat));
+      const sg = new THREE.BufferGeometry(); const sp = new Float32Array(1500 * 3);
+      for (let i = 0; i < 1500 * 3; i += 3) { const t = Math.random()*Math.PI*2; const p = Math.acos(2*Math.random()-1); const r = 600+Math.random()*400; sp[i]=r*Math.sin(p)*Math.cos(t); sp[i+1]=r*Math.sin(p)*Math.sin(t); sp[i+2]=r*Math.cos(p); }
+      sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+      scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0x6b6b8a, size: 0.6, transparent: true, opacity: 0.5 })));
 
       // Controls
       const controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-      controls.enablePan = false;
-      controls.minDistance = 150;
-      controls.maxDistance = 600;
-      controls.rotateSpeed = 0.5;
-      controls.zoomSpeed = 0.8;
-
+      controls.enableDamping = true; controls.dampingFactor = 0.05; controls.enablePan = false;
+      controls.minDistance = 150; controls.maxDistance = 600; controls.rotateSpeed = 0.5; controls.zoomSpeed = 0.8;
       renderer.domElement.addEventListener('mousedown', () => { mouseDown.current = true; });
       renderer.domElement.addEventListener('mouseup', () => { mouseDown.current = false; });
 
-      // Animation loop
+      // --- RENDER LOOP ---
       let pulsePhase = 0;
       const animate = () => {
         frameRef.current = requestAnimationFrame(animate);
         pulsePhase += 0.03;
 
-        // Rotate to target or auto-rotate
+        // Globe rotation
         if (targetRotationY.current !== null) {
           const diff = targetRotationY.current - globe.rotation.y;
           const short = ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
-          if (Math.abs(short) < 0.005) {
-            globe.rotation.y = targetRotationY.current;
-            targetRotationY.current = null;
-          } else {
-            globe.rotation.y += short * 0.05;
-          }
+          if (Math.abs(short) < 0.005) { globe.rotation.y = targetRotationY.current; targetRotationY.current = null; }
+          else { globe.rotation.y += short * 0.05; }
         } else if (autoRotate.current && !mouseDown.current) {
           globe.rotation.y += 0.0004;
         }
 
-        // Pulse critical dots
+        // Pulse
         globe.pointAltitude((d: unknown) => {
           const p = d as GlobePointData;
           return p.size >= 1.5 ? 0.007 + 0.006 * Math.sin(pulsePhase) : 0.007;
@@ -280,35 +148,117 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
 
         controls.update();
         renderer.render(scene, camera);
-        labelRenderer.render(scene, camera);
+
+        // --- SCREEN-SPACE LABEL UPDATE (every 3rd frame) ---
+        if (pulsePhase % 0.09 < 0.031 && svgRef.current && labelsRef.current) {
+          const cw = container.clientWidth;
+          const ch = container.clientHeight;
+          const svg = svgRef.current;
+          const labelContainer = labelsRef.current;
+
+          // Sort by severity for priority
+          const sorted = [...pointsRef.current].sort((a, b) => b.size - a.size).slice(0, MAX_LABELS);
+
+          // Project each point to screen space + front-facing check
+          type ScreenLabel = { sx: number; sy: number; color: string; title: string; eventId: string; visible: boolean };
+          const screenLabels: ScreenLabel[] = [];
+
+          for (const pt of sorted) {
+            const local = latLngToXYZ(pt.lat, pt.lng, 0.01);
+            const v = new THREE.Vector3(local.x, local.y, local.z);
+            // Transform to world space through globe's matrix
+            globe.localToWorld(v);
+
+            // Front-facing check
+            const toCamera = camera.position.clone().sub(v).normalize();
+            const globeCenter = new THREE.Vector3();
+            globe.getWorldPosition(globeCenter);
+            const normal = v.clone().sub(globeCenter).normalize();
+            const isFront = toCamera.dot(normal) > 0.05;
+
+            if (!isFront) continue;
+
+            // Project to screen
+            const projected = v.clone().project(camera);
+            const sx = (projected.x * 0.5 + 0.5) * cw;
+            const sy = (-projected.y * 0.5 + 0.5) * ch;
+
+            if (sx < 0 || sx > cw || sy < 0 || sy > ch) continue;
+
+            screenLabels.push({ sx, sy, color: pt.color, title: pt.title, eventId: pt.eventId, visible: true });
+          }
+
+          // Split into left and right based on screen X
+          const leftLabels = screenLabels.filter(l => l.sx < cw / 2).sort((a, b) => a.sy - b.sy);
+          const rightLabels = screenLabels.filter(l => l.sx >= cw / 2).sort((a, b) => a.sy - b.sy);
+
+          // Stack labels vertically on each side (no overlap)
+          const stackLabels = (labels: ScreenLabel[], startX: number) => {
+            let nextY = SIDE_MARGIN;
+            return labels.map(l => {
+              const labelY = Math.max(nextY, l.sy - LABEL_HEIGHT / 2);
+              nextY = labelY + LABEL_HEIGHT + LABEL_SPACING;
+              return { ...l, labelX: startX, labelY };
+            });
+          };
+
+          const leftStacked = stackLabels(leftLabels, SIDE_MARGIN);
+          const rightStacked = stackLabels(rightLabels, cw - SIDE_WIDTH - SIDE_MARGIN);
+
+          const allStacked = [...leftStacked, ...rightStacked];
+
+          // Build SVG leader lines
+          let svgPaths = '';
+          for (const l of allStacked) {
+            const isLeft = l.labelX < cw / 2;
+            const labelEdgeX = isLeft ? l.labelX + SIDE_WIDTH : l.labelX;
+            const labelMidY = l.labelY + LABEL_HEIGHT / 2;
+            // L-shape: point → horizontal offset → label edge
+            const elbowX = isLeft ? Math.max(l.sx - 30, labelEdgeX + 10) : Math.min(l.sx + 30, labelEdgeX - 10);
+            svgPaths += `<path d="M${l.sx},${l.sy} L${elbowX},${labelMidY} L${labelEdgeX},${labelMidY}" fill="none" stroke="${l.color}" stroke-width="0.8" opacity="0.45"/>`;
+            svgPaths += `<circle cx="${l.sx}" cy="${l.sy}" r="3" fill="${l.color}" opacity="0.7"/>`;
+          }
+          svg.innerHTML = svgPaths;
+
+          // Build label DOM
+          let html = '';
+          for (const l of allStacked) {
+            const isLeft = l.labelX < cw / 2;
+            const border = isLeft ? `border-right:2px solid ${l.color}` : `border-left:2px solid ${l.color}`;
+            const textAlign = isLeft ? 'text-align:right' : 'text-align:left';
+            html += `<div data-eid="${l.eventId}" style="position:absolute;left:${l.labelX}px;top:${l.labelY}px;width:${SIDE_WIDTH}px;height:${LABEL_HEIGHT}px;display:flex;align-items:center;pointer-events:auto;cursor:pointer;">`;
+            html += `<span style="font-family:monospace;font-size:10px;line-height:1.2;padding:2px 8px;color:${l.color};background:rgba(10,10,15,0.92);${border};${textAlign};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;letter-spacing:0.02em;">${l.title}</span>`;
+            html += '</div>';
+          }
+          labelContainer.innerHTML = html;
+
+          // Click handlers
+          for (const el of labelContainer.querySelectorAll('[data-eid]')) {
+            el.addEventListener('click', () => {
+              const eid = el.getAttribute('data-eid');
+              const ev = eventsRef.current.find(e => e.id === eid);
+              if (!ev) return;
+              autoRotate.current = false;
+              targetRotationY.current = -ev.location.lng * (Math.PI / 180);
+              setTimeout(() => { autoRotate.current = true; }, 10000);
+              onClickRef.current?.(ev);
+            });
+          }
+        }
       };
       animate();
 
       // Resize
-      const resizeObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const { width: cw, height: ch } = entry.contentRect;
-          if (cw && ch) {
-            camera.aspect = cw / ch;
-            camera.updateProjectionMatrix();
-            renderer.setSize(cw, ch);
-            labelRenderer.setSize(cw, ch);
-          }
+      const ro = new ResizeObserver(entries => {
+        for (const e of entries) {
+          const { width: cw, height: ch } = e.contentRect;
+          if (cw && ch) { camera.aspect = cw / ch; camera.updateProjectionMatrix(); renderer.setSize(cw, ch); }
         }
       });
-      resizeObserver.observe(container);
-
+      ro.observe(container);
       setLoaded(true);
 
-      return () => {
-        resizeObserver.disconnect();
-        cancelAnimationFrame(frameRef.current);
-        renderer.dispose();
-        controls.dispose();
-        starGeom.dispose();
-        starMat.dispose();
-        container.innerHTML = '';
-      };
+      return () => { ro.disconnect(); cancelAnimationFrame(frameRef.current); renderer.dispose(); controls.dispose(); sg.dispose(); };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initialize globe');
       return undefined;
@@ -317,17 +267,15 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
 
   useEffect(() => {
     let cleanup: (() => void) | undefined;
-    initGlobe().then((fn) => { cleanup = fn as (() => void) | undefined; });
+    initGlobe().then(fn => { cleanup = fn as (() => void) | undefined; });
     return () => { cancelAnimationFrame(frameRef.current); cleanup?.(); };
   }, [initGlobe]);
 
-  // Update when events change
+  // Update points when events change
   useEffect(() => {
-    const globe = globeRef.current as Record<string, unknown> | null;
+    const globe = globeRef.current as { pointsData: (d: GlobePointData[]) => void } | null;
     if (!globe || !loaded) return;
-    (globe as { pointsData: (d: GlobePointData[]) => void }).pointsData(pointsRef.current);
-    const buildLabels = globe['_buildLabels'] as ((pts: GlobePointData[]) => void) | undefined;
-    buildLabels?.(pointsRef.current);
+    globe.pointsData(pointsRef.current);
   }, [events, loaded]);
 
   return (
@@ -341,13 +289,17 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
       )}
       {error && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="text-center max-w-sm">
-            <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-red mb-2">GLOBE RENDER ERROR</div>
-            <div className="text-[9px] font-mono text-nerv-text-muted">{error}</div>
-          </div>
+          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-red mb-2">GLOBE RENDER ERROR</div>
+          <div className="text-[9px] font-mono text-nerv-text-muted">{error}</div>
         </div>
       )}
-      <div ref={containerRef} className="w-full h-full" />
+      <div ref={containerRef} className="w-full h-full">
+        {/* SVG overlay for leader lines */}
+        <svg ref={svgRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 5 }} />
+        {/* Label container */}
+        <div ref={labelsRef} className="absolute inset-0 pointer-events-none" style={{ zIndex: 6 }} />
+      </div>
+      {/* Scanline overlay */}
       <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{
         backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,107,43,0.1) 2px, rgba(255,107,43,0.1) 4px)',
       }} />
