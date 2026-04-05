@@ -340,7 +340,7 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
           for (const r of resolved) {
             const align = r.isLeft ? 'left:8px;text-align:left;' : 'right:8px;text-align:right;';
             const border = r.isLeft ? `border-left:2px solid ${r.color};` : `border-right:2px solid ${r.color};`;
-            divHtml += `<div data-eid="${r.id}" style="position:absolute;top:${r.labelY - 7}px;${align}z-index:6;cursor:pointer;transition:opacity 0.2s;">`;
+            divHtml += `<div data-eid="${r.id}" style="position:absolute;top:${r.labelY - 7}px;${align}z-index:6;cursor:pointer;pointer-events:auto;transition:opacity 0.2s;">`;
             divHtml += `<span style="font-family:monospace;font-size:8px;line-height:1;padding:2px 4px;color:${r.color};background:rgba(10,10,15,0.9);${border}white-space:nowrap;">${r.title}</span>`;
             divHtml += '</div>';
           }
@@ -441,7 +441,7 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
       {/* Label overlay — direct DOM manipulation via refs (no React re-renders) */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 5 }}>
         <svg ref={labelSvgRef} className="absolute inset-0 w-full h-full" />
-        <div ref={labelDivRef} className="absolute inset-0 pointer-events-auto" />
+        <div ref={labelDivRef} className="absolute inset-0 pointer-events-none" />
       </div>
 
       {/* Scan-line overlay */}

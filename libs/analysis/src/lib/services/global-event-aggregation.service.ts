@@ -96,7 +96,7 @@ export class GlobalEventAggregationService
   // ---------------------------------------------------------------------------
 
   onModuleInit(): void {
-    this.logger.log('Starting global event aggregation');
+    this.logger.log(`Starting global event aggregation (persistence: ${this.eventRepo ? 'enabled' : 'DISABLED — GLOBAL_EVENT_REPOSITORY not injected'})`);
 
     // Stagger initial polls to avoid thundering herd / rate limits
     void this.pollUsgs();
