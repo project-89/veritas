@@ -366,7 +366,7 @@ export class NarrativeAnalysisService {
     }
 
     // Start with each post as its own cluster
-    let clusters: EmbeddedPost[][] = posts.map((p) => [p]);
+    const clusters: EmbeddedPost[][] = posts.map((p) => [p]);
 
     // Precompute similarity matrix (upper triangle)
     const n = posts.length;

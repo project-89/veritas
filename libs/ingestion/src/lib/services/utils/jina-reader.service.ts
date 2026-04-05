@@ -82,7 +82,7 @@ export class JinaReaderService {
         lastError = error instanceof Error ? error : new Error(String(error));
 
         if (attempt < this.maxRetries - 1) {
-          const delay = this.baseDelayMs * Math.pow(2, attempt);
+          const delay = this.baseDelayMs * 2 ** attempt;
           this.logger.warn(
             `Jina Reader request failed (attempt ${attempt + 1}/${this.maxRetries}), retrying in ${delay}ms: ${lastError.message}`
           );
