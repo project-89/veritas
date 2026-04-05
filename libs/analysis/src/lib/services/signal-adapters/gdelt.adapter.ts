@@ -99,7 +99,7 @@ export class GdeltAdapter implements SignalAdapter {
     return data.articles.map((article, i) => {
       const tone = this.parseTone(article.tone);
       return {
-        id: `gdelt-${i}-${Date.now()}`,
+        id: `gdelt-${article.url ? article.url.replace(/\W/g, '').slice(-30) : i}`,
         domain: 'media' as const,
         source: 'GDELT',
         title: article.title ?? 'Untitled article',

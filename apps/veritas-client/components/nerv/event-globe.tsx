@@ -12,7 +12,6 @@ export interface EventGlobeProps {
 const SEVERITY_SIZE: Record<string, number> = { critical: 1.5, high: 1.0, medium: 0.7, low: 0.4 };
 const NERV_COLORS = { bgDeep: 0x0a0a0f, orange: 0xff6b2b };
 const COUNTRIES_URL = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson';
-const GLOBE_RADIUS = 100;
 const LABEL_HEIGHT = 28;
 const LABEL_SPACING = 4;
 const SIDE_WIDTH = 260;
@@ -23,12 +22,8 @@ interface GlobePointData {
   lat: number; lng: number; color: string; size: number; eventId: string; title: string;
 }
 
-// Lat/lng to 3D position in globe local space
-function latLngToXYZ(lat: number, lng: number, alt: number) {
-  const phi = (90 - lat) * (Math.PI / 180);
-  const theta = (lng + 180) * (Math.PI / 180);
-  const r = GLOBE_RADIUS * (1 + alt);
-  return { x: -(r * Math.sin(phi) * Math.cos(theta)), y: r * Math.cos(phi), z: r * Math.sin(phi) * Math.sin(theta) };
+function getPointAltitude(point: GlobePointData, pulsePhase: number) {
+  return point.size >= 1.5 ? 0.007 + 0.006 * Math.sin(pulsePhase) : 0.007;
 }
 
 export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
@@ -141,10 +136,7 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         }
 
         // Pulse
-        globe.pointAltitude((d: unknown) => {
-          const p = d as GlobePointData;
-          return p.size >= 1.5 ? 0.007 + 0.006 * Math.sin(pulsePhase) : 0.007;
-        });
+        globe.pointAltitude((d: unknown) => getPointAltitude(d as GlobePointData, pulsePhase));
 
         controls.update();
         renderer.render(scene, camera);
@@ -164,7 +156,7 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
           const screenLabels: ScreenLabel[] = [];
 
           for (const pt of sorted) {
-            const local = latLngToXYZ(pt.lat, pt.lng, 0.01);
+            const local = globe.getCoords(pt.lat, pt.lng, getPointAltitude(pt, pulsePhase));
             const v = new THREE.Vector3(local.x, local.y, local.z);
             // Transform to world space through globe's matrix
             globe.localToWorld(v);
@@ -207,15 +199,18 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
 
           const allStacked = [...leftStacked, ...rightStacked];
 
-          // Build SVG leader lines
+          // Build SVG leader lines (L-shape from globe point → elbow → label)
           let svgPaths = '';
           for (const l of allStacked) {
             const isLeft = l.labelX < cw / 2;
-            const labelEdgeX = isLeft ? l.labelX + SIDE_WIDTH : l.labelX;
+            // Label connection point: right edge for left labels, left edge for right labels
+            const labelConnectX = isLeft ? l.labelX + SIDE_WIDTH : l.labelX;
             const labelMidY = l.labelY + LABEL_HEIGHT / 2;
-            // L-shape: point → horizontal offset → label edge
-            const elbowX = isLeft ? Math.max(l.sx - 30, labelEdgeX + 10) : Math.min(l.sx + 30, labelEdgeX - 10);
-            svgPaths += `<path d="M${l.sx},${l.sy} L${elbowX},${labelMidY} L${labelEdgeX},${labelMidY}" fill="none" stroke="${l.color}" stroke-width="0.8" opacity="0.45"/>`;
+            // Elbow: horizontal step from the globe point toward the label side
+            const elbowX = isLeft
+              ? Math.min(l.sx, labelConnectX) - 15  // step left of whichever is more left
+              : Math.max(l.sx, labelConnectX) + 15;  // step right of whichever is more right
+            svgPaths += `<path d="M${l.sx},${l.sy} L${elbowX},${l.sy} L${elbowX},${labelMidY} L${labelConnectX},${labelMidY}" fill="none" stroke="${l.color}" stroke-width="0.8" opacity="0.45"/>`;
             svgPaths += `<circle cx="${l.sx}" cy="${l.sy}" r="3" fill="${l.color}" opacity="0.7"/>`;
           }
           svg.innerHTML = svgPaths;
@@ -226,14 +221,15 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
             const isLeft = l.labelX < cw / 2;
             const border = isLeft ? `border-right:2px solid ${l.color}` : `border-left:2px solid ${l.color}`;
             const textAlign = isLeft ? 'text-align:right' : 'text-align:left';
-            html += `<div data-eid="${l.eventId}" style="position:absolute;left:${l.labelX}px;top:${l.labelY}px;width:${SIDE_WIDTH}px;height:${LABEL_HEIGHT}px;display:flex;align-items:center;pointer-events:auto;cursor:pointer;">`;
+            const justify = isLeft ? 'justify-content:flex-end' : 'justify-content:flex-start';
+            html += `<div data-eid="${l.eventId}" style="position:absolute;left:${l.labelX}px;top:${l.labelY}px;width:${SIDE_WIDTH}px;height:${LABEL_HEIGHT}px;display:flex;align-items:center;${justify};pointer-events:auto;cursor:pointer;">`;
             html += `<span style="font-family:monospace;font-size:10px;line-height:1.2;padding:2px 8px;color:${l.color};background:rgba(10,10,15,0.92);${border};${textAlign};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;letter-spacing:0.02em;">${l.title}</span>`;
             html += '</div>';
           }
           labelContainer.innerHTML = html;
 
           // Click handlers
-          for (const el of labelContainer.querySelectorAll('[data-eid]')) {
+          for (const el of Array.from(labelContainer.querySelectorAll('[data-eid]'))) {
             el.addEventListener('click', () => {
               const eid = el.getAttribute('data-eid');
               const ev = eventsRef.current.find(e => e.id === eid);

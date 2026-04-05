@@ -75,7 +75,7 @@ export class UsgsAdapter implements SignalAdapter {
       const tsunami = props.tsunami ?? 0;
 
       return {
-        id: `usgs-${i}-${Date.now()}`,
+        id: `usgs-${(feature as Record<string, unknown>)['id'] ?? i}`,
         domain: 'social' as const,
         source: 'USGS',
         title: `M${mag.toFixed(1)} Earthquake — ${props.place ?? 'Unknown location'}`,

@@ -87,7 +87,7 @@ export class AcledAdapter implements SignalAdapter {
     return data.data.map((event, i) => {
       const fatalities = Number(event.fatalities) || 0;
       return {
-        id: `acled-${i}-${Date.now()}`,
+        id: `acled-${(event as Record<string, unknown>)['data_id'] ?? i}`,
         domain: 'political' as const,
         source: 'ACLED',
         title: `${event.event_type ?? 'Unknown event'} — ${event.country ?? 'Unknown'}`,

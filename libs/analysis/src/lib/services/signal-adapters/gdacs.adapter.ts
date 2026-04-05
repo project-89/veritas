@@ -73,7 +73,7 @@ export class GdacsAdapter implements SignalAdapter {
       const eventtype = (props['eventtype'] as string) ?? 'UNK';
 
       return {
-        id: `gdacs-${eventtype}-${i}-${Date.now()}`,
+        id: `gdacs-${eventtype}-${(feature as Record<string, unknown>)['id'] ?? i}`,
         domain: 'social' as const,
         source: 'GDACS',
         title: (props['name'] as string) ?? `${this.eventTypeLabel(eventtype)} Alert`,

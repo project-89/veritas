@@ -106,7 +106,7 @@ export class CoinGeckoAdapter implements SignalAdapter {
     if (!Array.isArray(coins)) return [];
 
     return coins.map((coin, i) => ({
-      id: `coingecko-market-${i}-${Date.now()}`,
+      id: `coingecko-market-${coin.id ?? i}`,
       domain: 'market' as const,
       source: 'CoinGecko',
       title: `${coin.name ?? 'Unknown'} (${(coin.symbol ?? '').toUpperCase()})`,
@@ -129,7 +129,7 @@ export class CoinGeckoAdapter implements SignalAdapter {
     return data.coins.map((entry, i) => {
       const coin = entry.item;
       return {
-        id: `coingecko-trending-${i}-${Date.now()}`,
+        id: `coingecko-trending-${coin.id ?? i}`,
         domain: 'market' as const,
         source: 'CoinGecko',
         title: `[Trending] ${coin.name ?? 'Unknown'} (${(coin.symbol ?? '').toUpperCase()})`,
