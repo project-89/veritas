@@ -3,28 +3,10 @@ import type { ExternalSignal, SignalAdapter } from './signal-adapter.interface';
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
 
-/** Themes that indicate higher-severity humanitarian situations. */
-const HIGH_SEVERITY_THEMES = new Set([
-  'Protection and Human Rights',
-  'Shelter and Non-Food Items',
-  'Mine Action',
-  'Peacekeeping and Peacebuilding',
-  'Camp Coordination and Camp Management',
-]);
-
-const MEDIUM_SEVERITY_THEMES = new Set([
-  'Food and Nutrition',
-  'Health',
-  'Water Sanitation Hygiene',
-  'Education',
-  'Agriculture',
-  'Climate Change and Environment',
-]);
-
 /**
  * ReliefWeb adapter — UN OCHA humanitarian reports.
  *
- * Fetches the latest humanitarian situation reports from the ReliefWeb API.
+ * Fetches the latest humanitarian situation reports from the ReliefWeb API v1.
  * Free, no API key required (just an appname parameter).
  *
  * Docs: https://apidoc.rwlabs.org/
@@ -38,25 +20,22 @@ export class ReliefWebAdapter implements SignalAdapter {
   private readonly logger = new Logger(ReliefWebAdapter.name);
   private readonly baseUrl = 'https://api.reliefweb.int/v1/reports';
 
-  async fetchSignals(params: {
+  async fetchSignals(_params: {
     keywords: string[];
     startDate: string;
     endDate: string;
   }): Promise<ExternalSignal[]> {
-    const url = new URL(this.baseUrl);
-    url.searchParams.set('appname', 'veritas');
-    url.searchParams.set('limit', '50');
-    url.searchParams.set('filter[operator]', 'AND');
-    url.searchParams.set('filter[conditions][0][field]', 'date.created');
-    url.searchParams.set('filter[conditions][0][value][from]', params.startDate);
-    url.searchParams.set('filter[conditions][0][value][to]', params.endDate);
-    url.searchParams.set('sort[]', 'date.created:desc');
-    // Request specific fields
-    url.searchParams.set('fields[include][]', 'title,date,country,primary_country,source,theme');
+    const url =
+      `${this.baseUrl}?appname=veritas&limit=50&preset=latest` +
+      '&fields[include][]=title' +
+      '&fields[include][]=date.created' +
+      '&fields[include][]=country.name' +
+      '&fields[include][]=source.name' +
+      '&fields[include][]=body-html';
 
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const response = await fetch(url.toString(), {
+        const response = await fetch(url, {
           headers: { 'User-Agent': USER_AGENT },
           signal: AbortSignal.timeout(15_000),
         });
@@ -89,49 +68,58 @@ export class ReliefWebAdapter implements SignalAdapter {
     const items = data.data;
     if (!Array.isArray(items)) return [];
 
-    return items.map((item, i) => {
+    return items.map((item) => {
       const fields = item.fields ?? {};
-      const themes: string[] = Array.isArray(fields.theme)
-        ? fields.theme.map((t: { name?: string }) => t.name ?? '')
-        : [];
-      const primaryCountry = fields.primary_country as { name?: string } | undefined;
-      const countryArr = fields.country as Array<{ name?: string }> | undefined;
-      const country = primaryCountry?.name
-        ?? (Array.isArray(countryArr) && countryArr.length > 0
-          ? countryArr[0]?.name
-          : '')
-        ?? '';
-      const sources: string[] = Array.isArray(fields.source)
-        ? fields.source.map((s: { name?: string }) => s.name ?? '')
-        : [];
+
+      const title = (fields.title as string) ?? 'Untitled report';
 
       const dateObj = fields.date as { created?: string } | undefined;
-      const dateCreated = dateObj?.created
+      const timestamp = dateObj?.created
         ? new Date(dateObj.created).toISOString()
         : new Date().toISOString();
 
+      const countryArr = fields.country as Array<{ name?: string }> | undefined;
+      const country = Array.isArray(countryArr) && countryArr.length > 0
+        ? countryArr[0]?.name ?? ''
+        : '';
+
+      const sourceArr = fields.source as Array<{ name?: string }> | undefined;
+      const sourceName = Array.isArray(sourceArr) && sourceArr.length > 0
+        ? sourceArr[0]?.name ?? ''
+        : '';
+
+      const bodyHtml = (fields['body-html'] as string) ?? '';
+      const description = this.stripHtml(bodyHtml).slice(0, 300) || title;
+
       return {
-        id: `reliefweb-${item.id ?? i}-${Date.now()}`,
+        id: `reliefweb-${item.id}`,
         domain: 'political' as const,
         source: 'ReliefWeb',
-        title: (fields.title as string) ?? 'Untitled report',
-        description: [country, ...sources.slice(0, 2)].filter(Boolean).join(' | '),
-        timestamp: dateCreated,
-        magnitude: this.themeMagnitude(themes),
+        title,
+        description,
+        timestamp,
+        magnitude: 0.5,
         metadata: {
           country,
-          themes,
-          sources,
+          source: sourceName,
         },
       };
     });
   }
 
-  /** Derive a 0-1 magnitude from the report's themes. */
-  private themeMagnitude(themes: string[]): number {
-    if (themes.some((t) => HIGH_SEVERITY_THEMES.has(t))) return 0.9;
-    if (themes.some((t) => MEDIUM_SEVERITY_THEMES.has(t))) return 0.6;
-    return 0.4;
+  /** Strip HTML tags and decode common entities. */
+  private stripHtml(html: string): string {
+    return html
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<\/p>/gi, ' ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 }
 
@@ -145,5 +133,6 @@ export interface ReliefWebItem {
 }
 
 export interface ReliefWebResponse {
+  count?: number;
   data?: ReliefWebItem[];
 }

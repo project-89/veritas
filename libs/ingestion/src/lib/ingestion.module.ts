@@ -27,6 +27,8 @@ import { TruthSocialFreeConnector } from './services/truthsocial-free.connector'
 import { FarcasterFreeConnector } from './services/farcaster-free.connector';
 import { TelegramFreeConnector } from './services/telegram-free.connector';
 import { WikipediaEventsConnector } from './services/wikipedia-events.connector';
+import { BlueskyFreeConnector } from './services/bluesky-free.connector';
+import { FourChanFreeConnector } from './services/4chan-free.connector';
 import { IngestionService } from './services/ingestion.service';
 import { SubprocessUtil } from './services/utils/subprocess.util';
 import { JinaReaderService } from './services/utils/jina-reader.service';
@@ -50,6 +52,8 @@ import {
   FARCASTER_CONNECTOR,
   TELEGRAM_CONNECTOR,
   WIKIPEDIA_CONNECTOR,
+  BLUESKY_CONNECTOR,
+  FOURCHAN_CONNECTOR,
 } from './interfaces/connector-tokens';
 
 /**
@@ -117,6 +121,8 @@ export interface IngestionModuleOptions {
     farcaster?: boolean;
     telegram?: boolean;
     wikipedia?: boolean;
+    bluesky?: boolean;
+    fourchan?: boolean;
   };
 
   /**
@@ -249,6 +255,14 @@ export class IngestionModule {
 
     if ((connectorConfig as Record<string, unknown>).wikipedia !== false) {
       providers.push({ provide: WIKIPEDIA_CONNECTOR, useClass: WikipediaEventsConnector });
+    }
+
+    if ((connectorConfig as Record<string, unknown>).bluesky !== false) {
+      providers.push({ provide: BLUESKY_CONNECTOR, useClass: BlueskyFreeConnector });
+    }
+
+    if ((connectorConfig as Record<string, unknown>).fourchan !== false) {
+      providers.push({ provide: FOURCHAN_CONNECTOR, useClass: FourChanFreeConnector });
     }
 
     // RSS and WebScraper are already API-free

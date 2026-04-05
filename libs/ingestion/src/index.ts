@@ -22,6 +22,8 @@ export { TwitterFreeConnector } from './lib/services/twitter-free.connector';
 export { YouTubeFreeConnector } from './lib/services/youtube-free.connector';
 export { FacebookJinaConnector } from './lib/services/facebook-jina.connector';
 export { TelegramFreeConnector } from './lib/services/telegram-free.connector';
+export { BlueskyFreeConnector } from './lib/services/bluesky-free.connector';
+export { FourChanFreeConnector } from './lib/services/4chan-free.connector';
 
 // Utilities
 export { SubprocessUtil } from './lib/services/utils/subprocess.util';

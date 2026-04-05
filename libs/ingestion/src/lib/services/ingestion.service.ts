@@ -24,6 +24,8 @@ import {
   FARCASTER_CONNECTOR,
   TELEGRAM_CONNECTOR,
   WIKIPEDIA_CONNECTOR,
+  BLUESKY_CONNECTOR,
+  FOURCHAN_CONNECTOR,
 } from '../interfaces/connector-tokens';
 
 /**
@@ -46,6 +48,8 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
     @Optional() @Inject(FARCASTER_CONNECTOR) private readonly farcasterConnector: any,
     @Optional() @Inject(TELEGRAM_CONNECTOR) private readonly telegramConnector: any,
     @Optional() @Inject(WIKIPEDIA_CONNECTOR) private readonly wikipediaConnector: any,
+    @Optional() @Inject(BLUESKY_CONNECTOR) private readonly blueskyConnector: any,
+    @Optional() @Inject(FOURCHAN_CONNECTOR) private readonly fourchanConnector: any,
     @Optional() private readonly rssFeedConnector: RSSConnector,
     @Optional() private readonly webScraperConnector: WebScraperConnector,
     private readonly databaseService: DatabaseService,
@@ -104,6 +108,8 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
       this.farcasterConnector,
       this.telegramConnector,
       this.wikipediaConnector,
+      this.blueskyConnector,
+      this.fourchanConnector,
       this.rssFeedConnector,
       this.webScraperConnector,
     ].filter((connector) => connector !== undefined);
