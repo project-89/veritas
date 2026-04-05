@@ -33,14 +33,26 @@ interface GlobePointData {
   eventId: string;
 }
 
+interface ProjectedLabel {
+  id: string;
+  screenX: number;
+  screenY: number;
+  title: string;
+  color: string;
+  severity: string;
+  visible: boolean;
+}
+
 export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<unknown>(null);
   const rendererRef = useRef<unknown>(null);
+  const cameraRef = useRef<unknown>(null);
   const frameRef = useRef<number>(0);
   const mouseDown = useRef(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [projectedLabels, setProjectedLabels] = useState<ProjectedLabel[]>([]);
 
   // Keep latest events in ref for click handler
   const eventsRef = useRef(events);
@@ -126,23 +138,7 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         .pointColor((d: unknown) => (d as GlobePointData).color)
         .pointResolution(8);
 
-      // Labels — dynamic text that appears for visible events
-      globe
-        .labelsData(pointsRef.current)
-        .labelLat((d: unknown) => (d as GlobePointData).lat)
-        .labelLng((d: unknown) => (d as GlobePointData).lng)
-        .labelAltitude((d: unknown) => 0.025 + (d as GlobePointData).size * 0.05)
-        .labelText((d: unknown) => {
-          const p = d as GlobePointData;
-          const ev = eventsRef.current.find(e => e.id === p.eventId);
-          return ev ? ev.title.slice(0, 40) : '';
-        })
-        .labelSize((d: unknown) => 0.4 + (d as GlobePointData).size * 0.2)
-        .labelColor((d: unknown) => (d as GlobePointData).color)
-        .labelDotRadius(0.3)
-        .labelDotOrientation(() => 'right' as const)
-        .labelResolution(2)
-        .labelIncludeDot(true);
+      // Labels handled via custom HTML overlay (see animation loop below)
 
       scene.add(globe);
       globeRef.current = globe;
@@ -230,11 +226,44 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         }
       });
 
+      cameraRef.current = camera;
+
+      // Lat/lng to 3D world position (matching three-globe's coordinate system)
+      const latLngToVector = (lat: number, lng: number, alt: number) => {
+        const phi = (90 - lat) * (Math.PI / 180);
+        const theta = (lng + 180) * (Math.PI / 180);
+        const r = 100 * (1 + alt);
+        return new THREE.Vector3(
+          -(r * Math.sin(phi) * Math.cos(theta)),
+          r * Math.cos(phi),
+          r * Math.sin(phi) * Math.sin(theta),
+        );
+      };
+
+      // Project 3D to screen with visibility check
+      const projectToScreen = (worldPos: InstanceType<typeof THREE.Vector3>, globeRotY: number) => {
+        // Apply globe rotation
+        const rotated = worldPos.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), globeRotY);
+        // Check if point faces camera (dot product with camera direction)
+        const cameraDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        const toPoint = rotated.clone().normalize();
+        const facing = toPoint.dot(cameraDir);
+        // Point is visible if facing camera (dot < -0.1 means front-facing)
+        if (facing > -0.05) return null;
+
+        const projected = rotated.clone().project(camera);
+        const hw = container.clientWidth / 2;
+        const hh = container.clientHeight / 2;
+        return { x: projected.x * hw + hw, y: -(projected.y * hh) + hh };
+      };
+
       // Animation
       let pulsePhase = 0;
+      let labelFrame = 0;
       const animate = () => {
         frameRef.current = requestAnimationFrame(animate);
         pulsePhase += 0.03;
+        labelFrame++;
 
         if (!mouseDown.current) {
           globe.rotation.y += 0.0004;
@@ -251,6 +280,48 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
 
         controls.update();
         renderer.render(scene, camera);
+
+        // Project labels every 3rd frame (performance)
+        if (labelFrame % 3 === 0) {
+          const labels: ProjectedLabel[] = [];
+          const usedSlots: number[] = []; // Y positions already taken
+
+          for (const pt of pointsRef.current) {
+            const worldPos = latLngToVector(pt.lat, pt.lng, 0.03);
+            const screen = projectToScreen(worldPos, globe.rotation.y);
+            if (!screen) continue;
+
+            const ev = eventsRef.current.find(e => e.id === pt.eventId);
+            if (!ev) continue;
+
+            // Anti-collision: find nearest free Y slot (20px apart)
+            let slotY = screen.y;
+            for (const used of usedSlots) {
+              if (Math.abs(slotY - used) < 20) {
+                slotY = used + (slotY > used ? 20 : -20);
+              }
+            }
+            usedSlots.push(slotY);
+
+            labels.push({
+              id: ev.id,
+              screenX: screen.x,
+              screenY: slotY,
+              title: ev.title.slice(0, 45),
+              color: pt.color,
+              severity: ev.severity,
+              visible: true,
+            });
+          }
+
+          // Limit to top 15 by severity to avoid clutter
+          labels.sort((a, b) => {
+            const order: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+            return (order[a.severity] ?? 3) - (order[b.severity] ?? 3);
+          });
+
+          setProjectedLabels(labels.slice(0, 15));
+        }
       };
       animate();
 
@@ -294,15 +365,13 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
     };
   }, [initGlobe]);
 
-  // Update points + labels when events change
+  // Update points when events change
   useEffect(() => {
     const globe = globeRef.current as {
       pointsData: (d: GlobePointData[]) => void;
-      labelsData: (d: GlobePointData[]) => void;
     } | null;
     if (!globe || !loaded) return;
     globe.pointsData(pointsRef.current);
-    globe.labelsData(pointsRef.current);
   }, [events, loaded]);
 
   return (
@@ -335,6 +404,77 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
 
       {/* Globe container */}
       <div ref={containerRef} className="w-full h-full" />
+
+      {/* Dynamic label overlay with stems */}
+      {loaded && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 5 }}>
+            {projectedLabels.map((label) => {
+              // Determine which side the label text goes to
+              const containerW = containerRef.current?.clientWidth ?? 800;
+              const isLeftSide = label.screenX < containerW / 2;
+              const textX = isLeftSide ? 30 : containerW - 30;
+              return (
+                <g key={label.id} style={{ transition: 'opacity 0.3s' }}>
+                  {/* Stem line from point to text */}
+                  <line
+                    x1={label.screenX}
+                    y1={label.screenY}
+                    x2={textX}
+                    y2={label.screenY}
+                    stroke={label.color}
+                    strokeWidth={0.5}
+                    opacity={0.6}
+                  />
+                  {/* Small dot at the point end */}
+                  <circle
+                    cx={label.screenX}
+                    cy={label.screenY}
+                    r={2}
+                    fill={label.color}
+                    opacity={0.8}
+                  />
+                </g>
+              );
+            })}
+          </svg>
+          {/* Text labels */}
+          {projectedLabels.map((label) => {
+            const containerW = containerRef.current?.clientWidth ?? 800;
+            const isLeftSide = label.screenX < containerW / 2;
+            return (
+              <div
+                key={`text-${label.id}`}
+                className="absolute pointer-events-auto cursor-pointer"
+                style={{
+                  top: label.screenY - 7,
+                  left: isLeftSide ? 8 : undefined,
+                  right: isLeftSide ? undefined : 8,
+                  textAlign: isLeftSide ? 'left' : 'right',
+                  transition: 'top 0.3s ease-out, opacity 0.3s',
+                  zIndex: 6,
+                }}
+                onClick={() => {
+                  const ev = events.find(e => e.id === label.id);
+                  if (ev) onEventClick?.(ev);
+                }}
+              >
+                <span
+                  className="text-[8px] font-mono leading-none px-1 py-0.5 rounded-sm"
+                  style={{
+                    color: label.color,
+                    backgroundColor: 'rgba(10,10,15,0.85)',
+                    borderLeft: isLeftSide ? `2px solid ${label.color}` : undefined,
+                    borderRight: isLeftSide ? undefined : `2px solid ${label.color}`,
+                  }}
+                >
+                  {label.title}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Scan-line overlay */}
       <div
