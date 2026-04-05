@@ -18,6 +18,7 @@ import { NervBar } from './nerv-bar';
 export interface EvidenceChainPanelProps {
   claims: ClaimVerificationBatchResult | null;
   propaganda: PropagandaAnalysisResult | null;
+  onTriggerAnalysis?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -263,6 +264,7 @@ function ClaimCard({ result }: { result: VerificationResult }) {
 export function EvidenceChainPanel({
   claims,
   propaganda,
+  onTriggerAnalysis,
 }: EvidenceChainPanelProps) {
   if (!claims) {
     return (
@@ -273,8 +275,16 @@ export function EvidenceChainPanel({
             EVIDENCE CHAINS
           </div>
           <div className="text-[11px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed">
-            Run claim verification to see evidence chains.
+            Evidence chains populate after claim verification. Run propaganda analysis first.
           </div>
+          {onTriggerAnalysis && (
+            <button
+              onClick={onTriggerAnalysis}
+              className="mt-4 px-4 py-2 text-[10px] font-mono uppercase tracking-wider border border-nerv-amber text-nerv-amber hover:bg-nerv-amber/10 rounded-sm transition-colors font-bold"
+            >
+              RUN ANALYSIS
+            </button>
+          )}
           <div className="text-[11px] font-mono text-nerv-orange mt-3 max-w-[320px] leading-relaxed">
             {'\u2192'} Click <span className="font-bold">ANALYZE</span> on a
             scanned narrative to generate claims and verify them.

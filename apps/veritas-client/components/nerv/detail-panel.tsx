@@ -50,6 +50,7 @@ interface DetailPanelProps {
   onRunPropaganda?: () => void;
   onVerifyClaims?: () => void;
   onGenerateReport?: () => void;
+  onRunIntelligence?: (type: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +86,7 @@ function NarrativeDetail({
   onRunPropaganda,
   onVerifyClaims,
   onGenerateReport,
+  onRunIntelligence,
 }: {
   narrative: AnalyzedNarrative;
   posts: RawPost[];
@@ -95,6 +97,7 @@ function NarrativeDetail({
   onRunPropaganda?: () => void;
   onVerifyClaims?: () => void;
   onGenerateReport?: () => void;
+  onRunIntelligence?: (type: string) => void;
 }) {
   const narrativePosts = useMemo(
     () => narrative.postIndices.map((i) => posts[i]).filter(Boolean),
@@ -354,6 +357,22 @@ function NarrativeDetail({
             className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-text-muted text-nerv-text-secondary hover:bg-nerv-bg-elevated rounded-sm transition-colors"
           >
             REPORT
+          </button>
+        )}
+        {onRunIntelligence && (
+          <button
+            onClick={() => onRunIntelligence('legitimacy')}
+            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-green text-nerv-green hover:bg-nerv-green/10 rounded-sm transition-colors"
+          >
+            LEGITIMACY SCORE
+          </button>
+        )}
+        {onRunIntelligence && (
+          <button
+            onClick={() => onRunIntelligence('campaign')}
+            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-red text-nerv-red hover:bg-nerv-red/10 rounded-sm transition-colors"
+          >
+            DETECT CAMPAIGN
           </button>
         )}
       </div>
@@ -824,6 +843,7 @@ export function DetailPanel({
   onRunPropaganda,
   onVerifyClaims,
   onGenerateReport,
+  onRunIntelligence,
 }: DetailPanelProps) {
   const selectedNarrative = narratives.find((n) => n.id === selectedNarrativeId);
 
@@ -846,6 +866,7 @@ export function DetailPanel({
         onRunPropaganda={onRunPropaganda}
         onVerifyClaims={onVerifyClaims}
         onGenerateReport={onGenerateReport}
+        onRunIntelligence={onRunIntelligence}
       />
     );
   } else if (selectedActorHandle) {

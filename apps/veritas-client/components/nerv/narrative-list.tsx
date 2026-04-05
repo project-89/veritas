@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import type { AnalyzedNarrative, AnalysisJob } from '../../lib/api';
 import { NervBadge } from './nerv-badge';
 import { NervBar } from './nerv-bar';
+import { PlatformCredibilityBadge } from './platform-credibility-badge';
 
 type SortKey = 'velocity' | 'sentiment' | 'posts' | 'recency';
 
@@ -239,7 +240,7 @@ export function NarrativeList({
                 </span>
               </div>
 
-              {/* Row 3: Platform chips */}
+              {/* Row 3: Platform chips + credibility badges */}
               <div className="flex items-center gap-1 mt-1 ml-4">
                 {Object.entries(narrative.platforms).map(([platform, count]) => (
                   <NervBadge
@@ -248,6 +249,9 @@ export function NarrativeList({
                     variant={PLATFORM_COLOR[platform] ?? 'muted'}
                     size="sm"
                   />
+                ))}
+                {Object.keys(narrative.platforms).slice(0, 2).map(p => (
+                  <PlatformCredibilityBadge key={`cred-${p}`} platform={p} size="sm" />
                 ))}
               </div>
             </button>

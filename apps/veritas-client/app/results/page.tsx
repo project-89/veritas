@@ -366,6 +366,29 @@ function InvestigationWorkspace() {
         }
         cacheData.narratives = analyzeResult.narratives;
         cacheData.unclusteredCount = analyzeResult.unclustered?.length ?? 0;
+
+        // Stage 2b: Auto-investigate top narrative actors (unlocks graph, credibility, evidence)
+        const topNarrative = narratives[0];
+        if (topNarrative && activeScanIdRef.current) {
+          try {
+            const topAuthors = (topNarrative.authors ?? []).slice(0, 5).map(a => a.handle);
+            if (topAuthors.length > 0) {
+              const investigationJobs = [{
+                type: 'investigation' as const,
+                narrativeIds: [topNarrative.id],
+                input: {
+                  query,
+                  narrativeSummaries: [topNarrative.summary],
+                  narratives: narratives.slice(0, 3).map(n => ({ id: n.id, summary: n.summary })),
+                  userHandles: topAuthors,
+                  postCount: posts.length,
+                },
+              }];
+              await startAnalysisJobs(activeScanIdRef.current, investigationJobs);
+              startAnalysisPolling(activeScanIdRef.current);
+            }
+          } catch { /* non-fatal */ }
+        }
       } catch (err) {
         dispatch({ type: 'SET_PIPELINE', stage: 'analyze', status: 'error' });
         dispatch({ type: 'SET_ERROR', error: `Analysis failed: ${err instanceof Error ? err.message : 'unknown'}` });
@@ -1288,6 +1311,7 @@ function InvestigationWorkspace() {
           <EvidenceChainPanel
             claims={state.claims}
             propaganda={state.propaganda}
+            onTriggerAnalysis={() => handleRunPropaganda()}
           />
         );
       case 'graph':
@@ -1295,6 +1319,7 @@ function InvestigationWorkspace() {
           <SocialGraphPanel
             investigation={state.investigation}
             onSelectActor={selectActor}
+            onTriggerAnalysis={() => handleAnalyzeSelected()}
           />
         );
       case 'radar':
@@ -1356,6 +1381,13 @@ function InvestigationWorkspace() {
               saturation={state.saturation}
               onSuggestDeepScan={pipelineRunning ? undefined : handleRefresh}
             />
+            {state.intelligenceReport && (
+              <NervBadge
+                label={`INTEL: ${state.intelligenceReport.type.toUpperCase()}`}
+                variant="blue"
+                size="sm"
+              />
+            )}
           </div>
           <button
             onClick={handleRefresh}
@@ -1532,6 +1564,7 @@ function InvestigationWorkspace() {
             onRunPropaganda={handleRunPropaganda}
             onVerifyClaims={handleVerifyClaims}
             onGenerateReport={handleGenerateReport}
+            onRunIntelligence={(type) => handleIntelligence(type)}
           />
         </div>
       </div>

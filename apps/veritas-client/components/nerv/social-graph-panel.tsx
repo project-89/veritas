@@ -12,6 +12,7 @@ import { NervBar } from './nerv-bar';
 export interface SocialGraphPanelProps {
   investigation: InvestigationResult | null;
   onSelectActor?: (handle: string) => void;
+  onTriggerAnalysis?: () => void;
 }
 
 interface Connection {
@@ -325,6 +326,7 @@ function UserConnectionGroup({
 export function SocialGraphPanel({
   investigation,
   onSelectActor,
+  onTriggerAnalysis,
 }: SocialGraphPanelProps) {
   const graphData = useMemo(() => {
     if (!investigation) return null;
@@ -340,8 +342,16 @@ export function SocialGraphPanel({
             SOCIAL GRAPH
           </div>
           <div className="text-[11px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed">
-            Run an investigation to map social connections.
+            Run an investigation on a narrative to map social connections.
           </div>
+          {onTriggerAnalysis && (
+            <button
+              onClick={onTriggerAnalysis}
+              className="mt-4 px-4 py-2 text-[10px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors font-bold"
+            >
+              ANALYZE TOP NARRATIVE
+            </button>
+          )}
           <div className="text-[11px] font-mono text-nerv-orange mt-3 max-w-[320px] leading-relaxed">
             {'\u2192'} Select a narrative in the left panel, then click{' '}
             <span className="font-bold">INVESTIGATE THIS NARRATIVE</span> in
