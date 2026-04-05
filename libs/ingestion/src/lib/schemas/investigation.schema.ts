@@ -66,6 +66,10 @@ export class InvestigationSchema extends Document {
 
   @Prop({ type: String, default: null })
   lastSnapshotId!: string | null;
+
+  /** Persisted UI session state — restored when user returns to this investigation */
+  @Prop({ type: Object, default: null })
+  sessionState!: Record<string, unknown> | null;
 }
 
 export const InvestigationModel =
@@ -132,6 +136,7 @@ export interface Investigation {
   status: 'active' | 'archived';
   settings: InvestigationSettings;
   lastSnapshotId: string | null;
+  sessionState: Record<string, unknown> | null;
 }
 
 export interface SnapshotSummary {

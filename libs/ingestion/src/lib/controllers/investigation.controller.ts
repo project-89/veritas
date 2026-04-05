@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Put,
+  Patch,
   Delete,
   Param,
   Query,
@@ -38,6 +39,24 @@ export class InvestigationController {
       status,
       limit: limit ? Number(limit) : undefined,
       skip: skip ? Number(skip) : undefined,
+    });
+  }
+
+  /**
+   * PUT /investigations — create or find an investigation for a query.
+   */
+  @Put()
+  async createOrGet(
+    @Body() body: { query: string; platforms?: string[]; timeRange?: string; limit?: number },
+  ): Promise<Investigation> {
+    const { query, platforms, timeRange, limit } = body;
+    if (!query?.trim()) {
+      throw new NotFoundException('Query is required');
+    }
+    return this.investigationRepository.findOrCreateByQuery(query.trim(), {
+      platforms: platforms ?? [],
+      timeRange: timeRange ?? '7d',
+      limit: limit ?? 100,
     });
   }
 
@@ -94,6 +113,38 @@ export class InvestigationController {
     }
 
     await this.investigationRepository.archive(id);
+    return { success: true };
+  }
+
+  /**
+   * PATCH /investigations/:id/session — save UI session state.
+   */
+  @Patch(':id/session')
+  async saveSessionState(
+    @Param('id') id: string,
+    @Body() body: { sessionState: Record<string, unknown> },
+  ): Promise<{ success: boolean }> {
+    const existing = await this.investigationRepository.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Investigation not found: ${id}`);
+    }
+    await this.investigationRepository.saveSessionState(id, body.sessionState);
+    return { success: true };
+  }
+
+  /**
+   * PATCH /investigations/:id/rename — rename an investigation.
+   */
+  @Patch(':id/rename')
+  async renameInvestigation(
+    @Param('id') id: string,
+    @Body() body: { name: string },
+  ): Promise<{ success: boolean }> {
+    const existing = await this.investigationRepository.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Investigation not found: ${id}`);
+    }
+    await this.investigationRepository.update(id, { name: body.name } as any);
     return { success: true };
   }
 

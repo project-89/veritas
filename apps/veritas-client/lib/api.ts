@@ -491,6 +491,29 @@ export async function renameInvestigation(id: string, name: string): Promise<voi
   });
 }
 
+/**
+ * Save UI session state for an investigation.
+ */
+export async function saveSessionState(id: string, sessionState: Record<string, unknown>): Promise<void> {
+  await request<void>(`/api/investigations/${encodeURIComponent(id)}/session`, {
+    method: 'PATCH',
+    body: JSON.stringify({ sessionState }),
+  });
+}
+
+/**
+ * Create or find an investigation for a query. Returns the investigation.
+ */
+export async function createOrGetInvestigation(
+  query: string,
+  settings?: { platforms?: string[]; timeRange?: string; limit?: number },
+): Promise<Investigation> {
+  return request<Investigation>('/api/investigations', {
+    method: 'PUT',
+    body: JSON.stringify({ query, ...settings }),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Report generation
 // ---------------------------------------------------------------------------

@@ -190,6 +190,19 @@ export class InvestigationRepository implements OnModuleInit {
   }
 
   /**
+   * Save UI session state for an investigation (centerMode, selections, panel widths).
+   */
+  async saveSessionState(id: string, sessionState: Record<string, unknown>): Promise<void> {
+    this.ensureInitialized();
+    try {
+      await this.investigationRepo.updateById(id, { sessionState } as Partial<Investigation>);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error saving session state: ${err.message}`);
+    }
+  }
+
+  /**
    * Soft-delete an investigation by setting status to 'archived'.
    */
   async archive(id: string): Promise<void> {
