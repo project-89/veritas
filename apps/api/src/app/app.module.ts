@@ -8,6 +8,7 @@ import { DatabaseModule } from '@veritas/database';
 import {
   AnalysisModule,
   SIGNAL_CACHE_STORE,
+  GLOBAL_EVENT_REPOSITORY,
   PropagandaAnalysisService,
   ClaimVerificationService,
   DownstreamEffectsService,
@@ -17,7 +18,7 @@ import {
   GraphBotDetectionService,
   PsychologicalProfilerService,
 } from '@veritas/analysis';
-import { SignalCacheRepository } from '@veritas/ingestion';
+import { SignalCacheRepository, GlobalEventRepository } from '@veritas/ingestion';
 import {
   PROPAGANDA_SERVICE,
   CLAIM_VERIFICATION_SERVICE,
@@ -105,8 +106,9 @@ import { DatabaseService } from '@veritas/database';
         dbService,
       inject: [ConfigService, DatabaseService],
     },
-    // Bridge ingestion's SignalCacheRepository to analysis's SIGNAL_CACHE_STORE token
+    // Bridge ingestion repositories to analysis tokens
     { provide: SIGNAL_CACHE_STORE, useExisting: SignalCacheRepository },
+    { provide: GLOBAL_EVENT_REPOSITORY, useExisting: GlobalEventRepository },
     // Bridge analysis services to ingestion's AnalysisProcessor tokens
     { provide: PROPAGANDA_SERVICE, useExisting: PropagandaAnalysisService },
     { provide: CLAIM_VERIFICATION_SERVICE, useExisting: ClaimVerificationService },

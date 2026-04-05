@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Inject,
   Logger,
   OnModuleInit,
   OnModuleDestroy,
@@ -17,7 +18,12 @@ import type {
   EventSeverity,
   GeoLocation,
 } from '../types/global-event';
-import { GlobalEventRepository } from '@veritas/ingestion';
+/** Injection token for the global event repository (avoids cross-module dependency). */
+export const GLOBAL_EVENT_REPOSITORY = Symbol('GLOBAL_EVENT_REPOSITORY');
+
+interface EventRepository {
+  upsertEvent(event: GlobalEvent): Promise<unknown>;
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -67,7 +73,7 @@ export class GlobalEventAggregationService
   readonly events$: Observable<GlobalEvent> = this.subject.asObservable();
 
   constructor(
-    @Optional() private readonly eventRepo?: GlobalEventRepository,
+    @Optional() @Inject(GLOBAL_EVENT_REPOSITORY) private readonly eventRepo?: EventRepository,
   ) {}
 
   // ---------------------------------------------------------------------------
