@@ -11,9 +11,9 @@ export interface NarrativeComparisonPanelProps {
 }
 
 function sentimentColor(v: number): string {
-  if (v > 0.15) return 'var(--nerv-green)';
-  if (v < -0.15) return 'var(--nerv-red)';
-  return 'var(--nerv-orange)';
+  if (v > 0.15) return 'rgb(var(--nerv-green))';
+  if (v < -0.15) return 'rgb(var(--nerv-red))';
+  return 'rgb(var(--nerv-orange))';
 }
 
 export function NarrativeComparisonPanel({

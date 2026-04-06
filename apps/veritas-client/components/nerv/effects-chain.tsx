@@ -4,12 +4,12 @@ import { useMemo, useState, useRef, useCallback } from 'react';
 import type { DownstreamEffectsResult, NarrativeCorrelation, TransmissionChain } from '../../lib/api';
 
 const DOMAIN_COLORS: Record<string, string> = {
-  economic: 'var(--nerv-amber)',
-  political: 'var(--nerv-red)',
-  social: 'var(--nerv-purple)',
-  market: 'var(--nerv-green)',
-  media: 'var(--nerv-blue)',
-  narrative: 'var(--nerv-orange)',
+  economic: 'rgb(var(--nerv-amber))',
+  political: 'rgb(var(--nerv-red))',
+  social: 'rgb(var(--nerv-purple))',
+  market: 'rgb(var(--nerv-green))',
+  media: 'rgb(var(--nerv-blue))',
+  narrative: 'rgb(var(--nerv-orange))',
 };
 
 const DOMAIN_ICONS: Record<string, string> = {
@@ -187,7 +187,7 @@ export function EffectsChain({
           fromId: prevNodeId,
           toId: nodeKey,
           strength,
-          color: DOMAIN_COLORS[step.type] ?? 'var(--nerv-text-muted)',
+          color: DOMAIN_COLORS[step.type] ?? 'rgb(var(--nerv-text-muted))',
         });
 
         prevNodeId = nodeKey;
@@ -406,7 +406,7 @@ export function EffectsChain({
           {/* Nodes */}
           {nodes.map((node) => {
             const y = 30 + node.row * ROW_HEIGHT;
-            const color = DOMAIN_COLORS[node.domain] ?? 'var(--nerv-text-muted)';
+            const color = DOMAIN_COLORS[node.domain] ?? 'rgb(var(--nerv-text-muted))';
             const highlighted = isHighlighted(node.id);
             const isNarrative = node.col === 0;
             const isSelected = node.id === `nar-${selectedNarrativeId}`;
@@ -439,11 +439,11 @@ export function EffectsChain({
                 >
                   <div
                     className="text-[9px] font-mono leading-tight"
-                    style={{ color: highlighted ? 'var(--nerv-text)' : 'var(--nerv-text-muted)' }}
+                    style={{ color: highlighted ? 'rgb(var(--nerv-text))' : 'rgb(var(--nerv-text-muted))' }}
                   >
                     <span style={{ color }}>{DOMAIN_ICONS[node.domain] ?? '\u25CB'}</span>{' '}
                     {node.label}
-                    <div className="text-[8px] mt-0.5" style={{ color: 'var(--nerv-text-muted)' }}>
+                    <div className="text-[8px] mt-0.5" style={{ color: 'rgb(var(--nerv-text-muted))' }}>
                       {node.domain.toUpperCase()}
                     </div>
                   </div>
@@ -476,7 +476,7 @@ export function EffectsChain({
                 </div>
                 <div className="flex items-stretch gap-0 overflow-x-auto pb-1">
                   {chain.steps.map((step, si) => {
-                    const color = DOMAIN_COLORS[step.domain] ?? 'var(--nerv-text-muted)';
+                    const color = DOMAIN_COLORS[step.domain] ?? 'rgb(var(--nerv-text-muted))';
                     const isLast = si === chain.steps.length - 1;
                     return (
                       <div key={si} className="flex items-stretch shrink-0">

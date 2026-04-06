@@ -27,7 +27,7 @@ export interface IntelligenceReportPanelProps {
 
 function ConfidenceBar({ value, label }: { value: number; label?: string }) {
   const color =
-    value > 0.7 ? 'var(--nerv-red)' : value > 0.4 ? 'var(--nerv-orange)' : 'var(--nerv-green)';
+    value > 0.7 ? 'rgb(var(--nerv-red))' : value > 0.4 ? 'rgb(var(--nerv-orange))' : 'rgb(var(--nerv-green))';
   return (
     <div className="space-y-1">
       {label && (
@@ -587,7 +587,7 @@ function LegitimacyReportView({ report }: { report: NarrativeLegitimacyReport })
         <div className="mt-2">
           <NervBar
             value={(report.evidenceBalance + 1) / 2}
-            color={report.evidenceBalance > 0.2 ? 'var(--nerv-green)' : report.evidenceBalance < -0.2 ? 'var(--nerv-red)' : 'var(--nerv-orange)'}
+            color={report.evidenceBalance > 0.2 ? 'rgb(var(--nerv-green))' : report.evidenceBalance < -0.2 ? 'rgb(var(--nerv-red))' : 'rgb(var(--nerv-orange))'}
           />
         </div>
       </div>

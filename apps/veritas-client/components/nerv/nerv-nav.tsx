@@ -153,10 +153,10 @@ export function NervNav() {
         <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={toggleTheme}
-            className="text-[9px] font-mono uppercase tracking-wider px-2 py-1 rounded-sm transition-all text-nerv-text-muted hover:text-nerv-orange hover:bg-nerv-bg-panel/50"
+            className="text-base px-2 py-1 rounded-sm transition-all text-nerv-text-secondary hover:text-nerv-orange hover:bg-nerv-bg-panel/50"
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
           >
-            {theme === 'dark' ? '\u2600' : '\u263E'}
+            {theme === 'dark' ? '\u2600\uFE0F' : '\u{1F319}'}
           </button>
           <div className="w-px h-4 bg-nerv-border hidden sm:block" />
           <div className="hidden sm:flex items-center gap-1.5">

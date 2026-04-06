@@ -10,21 +10,21 @@
   /* ── DARK THEME (default — classic NERV) ── */
   :root,
   [data-theme='dark'] {
-    --nerv-bg-deep: #0a0a0f;
-    --nerv-bg: #0f0f1a;
-    --nerv-bg-panel: #1a1a2e;
-    --nerv-bg-elevated: #252540;
-    --nerv-border: #2a2a45;
-    --nerv-border-active: #3a3a5f;
-    --nerv-text: #e0e0e8;
-    --nerv-text-secondary: #8888a0;
-    --nerv-text-muted: #555570;
-    --nerv-orange: #ff6b2b;
-    --nerv-green: #00ff41;
-    --nerv-red: #e94560;
-    --nerv-blue: #0ea5e9;
-    --nerv-amber: #f59e0b;
-    --nerv-purple: #a855f7;
+    --nerv-bg-deep: 10 10 15;
+    --nerv-bg: 15 15 26;
+    --nerv-bg-panel: 26 26 46;
+    --nerv-bg-elevated: 37 37 64;
+    --nerv-border: 42 42 69;
+    --nerv-border-active: 58 58 95;
+    --nerv-text: 224 224 232;
+    --nerv-text-secondary: 136 136 160;
+    --nerv-text-muted: 85 85 112;
+    --nerv-orange: 255 107 43;
+    --nerv-green: 0 255 65;
+    --nerv-red: 233 69 96;
+    --nerv-blue: 14 165 233;
+    --nerv-amber: 245 158 11;
+    --nerv-purple: 168 85 247;
     --nerv-scanline-color: rgba(0, 255, 65, 0.012);
     --nerv-scrollbar-track: #0a0a0f;
     --nerv-scrollbar-thumb: #2a2a45;
@@ -33,21 +33,21 @@
 
   /* ── LIGHT THEME (NERV — clean white command center) ── */
   [data-theme='light'] {
-    --nerv-bg-deep: #ffffff;
-    --nerv-bg: #fafafa;
-    --nerv-bg-panel: #f3f3f5;
-    --nerv-bg-elevated: #eaeaee;
-    --nerv-border: #d8d8e0;
-    --nerv-border-active: #c0c0cc;
-    --nerv-text: #1a1a2e;
-    --nerv-text-secondary: #50506a;
-    --nerv-text-muted: #9090a8;
-    --nerv-orange: #ff6b2b;
-    --nerv-green: #0a8a2e;
-    --nerv-red: #d03545;
-    --nerv-blue: #0b7ec0;
-    --nerv-amber: #c07d08;
-    --nerv-purple: #7c3aed;
+    --nerv-bg-deep: 255 255 255;
+    --nerv-bg: 250 250 250;
+    --nerv-bg-panel: 243 243 245;
+    --nerv-bg-elevated: 234 234 238;
+    --nerv-border: 216 216 224;
+    --nerv-border-active: 192 192 204;
+    --nerv-text: 26 26 46;
+    --nerv-text-secondary: 80 80 106;
+    --nerv-text-muted: 144 144 168;
+    --nerv-orange: 255 107 43;
+    --nerv-green: 10 138 46;
+    --nerv-red: 208 53 69;
+    --nerv-blue: 11 126 192;
+    --nerv-amber: 192 125 8;
+    --nerv-purple: 124 58 237;
     --nerv-scanline-color: rgba(255, 107, 43, 0.015);
     --nerv-scrollbar-track: #fafafa;
     --nerv-scrollbar-thumb: #d8d8e0;
@@ -55,8 +55,7 @@
   }
 
   body {
-    @apply bg-nerv-bg-deep antialiased;
-    color: var(--nerv-text);
+    @apply bg-nerv-bg-deep text-nerv-text antialiased;
     font-size: 14px;
   }
 

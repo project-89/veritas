@@ -7,7 +7,7 @@ export interface NervBarProps {
 
 export function NervBar({
   value,
-  color = 'var(--nerv-orange)',
+  color = 'rgb(var(--nerv-orange))',
   showLabel = false,
   height = 6,
 }: NervBarProps) {
