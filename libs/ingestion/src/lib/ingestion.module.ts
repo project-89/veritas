@@ -31,6 +31,7 @@ import { TelegramFreeConnector } from './services/telegram-free.connector';
 import { WikipediaEventsConnector } from './services/wikipedia-events.connector';
 import { BlueskyFreeConnector } from './services/bluesky-free.connector';
 import { FourChanFreeConnector } from './services/4chan-free.connector';
+import { InvestigationEvidenceService } from './services/investigation-evidence.service';
 import { IngestionService } from './services/ingestion.service';
 import { SubprocessUtil } from './services/utils/subprocess.util';
 import { JinaReaderService } from './services/utils/jina-reader.service';
@@ -195,6 +196,7 @@ export class IngestionModule {
       AnalysisJobRepository,
       IdentityRecordRepository,
       GlobalEventRepository,
+      InvestigationEvidenceService,
       EmbeddingCacheRepository,
       RssCacheRepository,
     ];

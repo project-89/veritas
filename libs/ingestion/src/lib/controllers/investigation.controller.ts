@@ -14,6 +14,7 @@ import {
 import { randomUUID } from 'crypto';
 import { InvestigationRepository } from '../repositories/investigation.repository';
 import { EvidenceSeed, Investigation, Snapshot } from '../schemas/investigation.schema';
+import { InvestigationEvidenceService } from '../services/investigation-evidence.service';
 
 /**
  * REST controller for managing investigations and their snapshots.
@@ -23,7 +24,8 @@ export class InvestigationController {
   private readonly logger = new Logger(InvestigationController.name);
 
   constructor(
-    private readonly investigationRepository: InvestigationRepository
+    private readonly investigationRepository: InvestigationRepository,
+    private readonly investigationEvidenceService: InvestigationEvidenceService,
   ) {}
 
   /**
@@ -175,7 +177,7 @@ export class InvestigationController {
     }
 
     const now = new Date();
-    const seed: EvidenceSeed = {
+    const seed = await this.investigationEvidenceService.prepareSeed({
       id: randomUUID(),
       kind: body.kind,
       value: body.value.trim(),
@@ -186,7 +188,7 @@ export class InvestigationController {
       extractedEntities: body.extractedEntities ?? [],
       createdAt: now,
       updatedAt: now,
-    };
+    } satisfies EvidenceSeed);
 
     const investigation = await this.investigationRepository.addEvidenceSeed(id, seed);
     return { success: true, investigation };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type {
   AnalyzedNarrative,
   RawPost,
@@ -13,6 +13,8 @@ import type {
   EvidenceItem,
   IdentityRecord,
   MagiProfileMode,
+  Investigation as InvestigationRecord,
+  InvestigationEvidenceSeed,
 } from '../../lib/api';
 import { IdentityDossier } from './identity-dossier';
 import type { SearchSummary } from '../../lib/investigation-context';
@@ -33,6 +35,7 @@ interface DetailPanelProps {
   posts: RawPost[];
   summary: SearchSummary | null;
   investigation: InvestigationResult | null;
+  investigationRecord?: InvestigationRecord | null;
   deviations: DeviationResponse | null;
   propaganda: PropagandaAnalysisResult | null;
   claims: ClaimVerificationBatchResult | null;
@@ -44,7 +47,13 @@ interface DetailPanelProps {
   // Identity (MAGI)
   selectedIdentity?: IdentityRecord | null;
   identityLoading?: boolean;
+  evidenceSeedSaving?: boolean;
   onGenerateProfile?: (id: string, mode: MagiProfileMode) => void;
+  onAddEvidenceSeed?: (seed: {
+    kind: InvestigationEvidenceSeed['kind'];
+    value: string;
+    notes?: string | null;
+  }) => Promise<void>;
 
   // Actions
   onInvestigate?: (narrativeId: string) => void;
@@ -72,6 +81,22 @@ const PLATFORM_BADGE_VARIANT: Record<string, 'blue' | 'orange' | 'red' | 'purple
   youtube: 'red',
   tiktok: 'purple',
 };
+
+const EVIDENCE_SEED_OPTIONS: Array<{
+  value: InvestigationEvidenceSeed['kind'];
+  label: string;
+  placeholder: string;
+}> = [
+  { value: 'youtube', label: 'YouTube', placeholder: 'https://www.youtube.com/watch?v=...' },
+  { value: 'article', label: 'Article', placeholder: 'https://source.example/report' },
+  { value: 'url', label: 'URL', placeholder: 'https://source.example/path' },
+  { value: 'wallet', label: 'Wallet', placeholder: '0x...' },
+  { value: 'contract', label: 'Contract', placeholder: '0x...' },
+  { value: 'domain', label: 'Domain', placeholder: 'example.com' },
+  { value: 'post', label: 'Post', placeholder: 'https://x.com/... or source permalink' },
+  { value: 'document', label: 'Document', placeholder: 'https://source.example/file.pdf' },
+  { value: 'note', label: 'Note', placeholder: 'Analyst note or lead...' },
+];
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -695,26 +720,68 @@ function InvestigationSummary({
   posts,
   narratives,
   summary,
+  investigationRecord,
+  evidenceSeedSaving,
+  onAddEvidenceSeed,
   onRunPropaganda,
   onGenerateReport,
 }: {
   posts: RawPost[];
   narratives: AnalyzedNarrative[];
   summary: SearchSummary | null;
+  investigationRecord?: InvestigationRecord | null;
+  evidenceSeedSaving?: boolean;
+  onAddEvidenceSeed?: (seed: {
+    kind: InvestigationEvidenceSeed['kind'];
+    value: string;
+    notes?: string | null;
+  }) => Promise<void>;
   onRunPropaganda?: () => void;
   onGenerateReport?: () => void;
 }) {
-  if (!summary) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <span className="text-[10px] font-mono text-nerv-text-muted uppercase tracking-widest">
-          AWAITING DATA...
-        </span>
-      </div>
-    );
-  }
+  const [seedKind, setSeedKind] = useState<InvestigationEvidenceSeed['kind']>('youtube');
+  const [seedValue, setSeedValue] = useState('');
+  const [seedNotes, setSeedNotes] = useState('');
+  const [seedError, setSeedError] = useState<string | null>(null);
 
-  const platforms = Object.entries(summary.byPlatform);
+  const platforms = Object.entries(summary?.byPlatform ?? {});
+  const selectedSeedOption = EVIDENCE_SEED_OPTIONS.find((option) => option.value === seedKind) ?? EVIDENCE_SEED_OPTIONS[0];
+  const sortedSeeds = useMemo(
+    () =>
+      [...(investigationRecord?.evidenceSeeds ?? [])].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      ),
+    [investigationRecord?.evidenceSeeds],
+  );
+
+  const handleAttachSeed = async () => {
+    if (!onAddEvidenceSeed) return;
+    const trimmedValue = seedValue.trim();
+    if (!trimmedValue) {
+      setSeedError('A seed value is required.');
+      return;
+    }
+
+    setSeedError(null);
+    try {
+      await onAddEvidenceSeed({
+        kind: seedKind,
+        value: trimmedValue,
+        notes: seedNotes.trim() || null,
+      });
+      setSeedValue('');
+      setSeedNotes('');
+    } catch (error) {
+      setSeedError(error instanceof Error ? error.message : 'Failed to attach evidence seed.');
+    }
+  };
+
+  const statusVariant: Record<InvestigationEvidenceSeed['status'], 'muted' | 'blue' | 'green' | 'red'> = {
+    pending: 'muted',
+    fetched: 'blue',
+    processed: 'green',
+    error: 'red',
+  };
 
   return (
     <div className="space-y-3 p-3">
@@ -722,82 +789,197 @@ function InvestigationSummary({
         INVESTIGATION OVERVIEW
       </div>
 
-      <div className="grid grid-cols-2 gap-0 border border-nerv-border rounded-sm overflow-hidden">
-        <NervMetric label="Total Posts" value={summary.total} />
-        <NervMetric label="Narratives" value={narratives.length} />
-        <NervMetric
-          label="Positive"
-          value={summary.positive}
-          severity="normal"
-        />
-        <NervMetric
-          label="Negative"
-          value={summary.negative}
-          severity={summary.negative > summary.positive ? 'critical' : 'normal'}
-        />
-      </div>
-
-      {/* Sentiment breakdown */}
-      <div>
-        <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
-          SENTIMENT DISTRIBUTION
-        </div>
-        <div className="flex h-4 overflow-hidden rounded-sm border border-nerv-border">
-          {summary.positive > 0 && (
-            <div
-              className="bg-nerv-green/60"
-              style={{ width: `${(summary.positive / summary.total) * 100}%` }}
+      {summary ? (
+        <>
+          <div className="grid grid-cols-2 gap-0 border border-nerv-border rounded-sm overflow-hidden">
+            <NervMetric label="Total Posts" value={summary.total} />
+            <NervMetric label="Narratives" value={narratives.length} />
+            <NervMetric
+              label="Positive"
+              value={summary.positive}
+              severity="normal"
             />
-          )}
-          {summary.neutral > 0 && (
-            <div
-              className="bg-nerv-text-muted/40"
-              style={{ width: `${(summary.neutral / summary.total) * 100}%` }}
+            <NervMetric
+              label="Negative"
+              value={summary.negative}
+              severity={summary.negative > summary.positive ? 'critical' : 'normal'}
             />
-          )}
-          {summary.negative > 0 && (
-            <div
-              className="bg-nerv-red/60"
-              style={{ width: `${(summary.negative / summary.total) * 100}%` }}
-            />
-          )}
-        </div>
-        <div className="flex justify-between mt-1">
-          <span className="text-[9px] font-mono text-nerv-green">+{summary.positive}</span>
-          <span className="text-[9px] font-mono text-nerv-text-muted">~{summary.neutral}</span>
-          <span className="text-[9px] font-mono text-nerv-red">-{summary.negative}</span>
-        </div>
-      </div>
-
-      {/* Platform breakdown */}
-      {platforms.length > 0 && (
-        <div>
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
-            PLATFORMS
           </div>
-          <div className="space-y-1">
-            {platforms.map(([platform, count]) => (
-              <div key={platform} className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-nerv-text-secondary w-16">
-                  {platform === 'twitter' ? 'X' : platform}
-                </span>
-                <div className="flex-1">
-                  <NervBar
-                    value={count / summary.total}
-                    color={PLATFORM_COLORS[platform] ?? '#555570'}
-                    height={5}
-                  />
-                </div>
-                <span className="text-[10px] font-mono tabular-nums text-nerv-text-muted w-8 text-right">
-                  {count}
-                </span>
+
+          <div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+              SENTIMENT DISTRIBUTION
+            </div>
+            <div className="flex h-4 overflow-hidden rounded-sm border border-nerv-border">
+              {summary.positive > 0 && (
+                <div
+                  className="bg-nerv-green/60"
+                  style={{ width: `${(summary.positive / summary.total) * 100}%` }}
+                />
+              )}
+              {summary.neutral > 0 && (
+                <div
+                  className="bg-nerv-text-muted/40"
+                  style={{ width: `${(summary.neutral / summary.total) * 100}%` }}
+                />
+              )}
+              {summary.negative > 0 && (
+                <div
+                  className="bg-nerv-red/60"
+                  style={{ width: `${(summary.negative / summary.total) * 100}%` }}
+                />
+              )}
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-[9px] font-mono text-nerv-green">+{summary.positive}</span>
+              <span className="text-[9px] font-mono text-nerv-text-muted">~{summary.neutral}</span>
+              <span className="text-[9px] font-mono text-nerv-red">-{summary.negative}</span>
+            </div>
+          </div>
+
+          {platforms.length > 0 && (
+            <div>
+              <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+                PLATFORMS
               </div>
-            ))}
-          </div>
+              <div className="space-y-1">
+                {platforms.map(([platform, count]) => (
+                  <div key={platform} className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-nerv-text-secondary w-16">
+                      {platform === 'twitter' ? 'X' : platform}
+                    </span>
+                    <div className="flex-1">
+                      <NervBar
+                        value={count / summary.total}
+                        color={PLATFORM_COLORS[platform] ?? '#555570'}
+                        height={5}
+                      />
+                    </div>
+                    <span className="text-[10px] font-mono tabular-nums text-nerv-text-muted w-8 text-right">
+                      {count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="px-3 py-4 border border-dashed border-nerv-border rounded-sm text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
+          AWAITING DATA...
         </div>
       )}
 
-      {/* Quick actions */}
+      <div className="pt-2 border-t border-nerv-border space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+            EVIDENCE SEEDS
+          </div>
+          <NervBadge
+            label={String(sortedSeeds.length)}
+            variant={sortedSeeds.length > 0 ? 'orange' : 'muted'}
+            size="sm"
+          />
+        </div>
+        <p className="text-[10px] font-mono text-nerv-text-secondary leading-relaxed">
+          Attach explicit source material, wallet leads, domains, notes, or videos directly to this investigation.
+        </p>
+
+        <div className="space-y-2 border border-nerv-border rounded-sm p-2 bg-nerv-bg-elevated/30">
+          <div className="grid grid-cols-[110px_1fr] gap-2">
+            <select
+              value={seedKind}
+              onChange={(event) => setSeedKind(event.target.value as InvestigationEvidenceSeed['kind'])}
+              className="px-2 py-2 bg-nerv-bg border border-nerv-border text-[10px] font-mono text-nerv-text focus:outline-none focus:border-nerv-orange/50"
+            >
+              {EVIDENCE_SEED_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <textarea
+              value={seedValue}
+              onChange={(event) => setSeedValue(event.target.value)}
+              rows={3}
+              placeholder={selectedSeedOption.placeholder}
+              className="w-full px-2 py-2 bg-nerv-bg border border-nerv-border text-[10px] font-mono text-nerv-text placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-orange/50 resize-none"
+            />
+          </div>
+          <input
+            value={seedNotes}
+            onChange={(event) => setSeedNotes(event.target.value)}
+            placeholder="Optional context, theory, or why this seed matters"
+            className="w-full px-2 py-2 bg-nerv-bg border border-nerv-border text-[10px] font-mono text-nerv-text placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-orange/50"
+          />
+          {seedError && (
+            <div className="text-[9px] font-mono text-nerv-red">
+              {seedError}
+            </div>
+          )}
+          <button
+            onClick={handleAttachSeed}
+            disabled={evidenceSeedSaving || !onAddEvidenceSeed}
+            className="w-full px-3 py-2 text-[9px] font-mono uppercase tracking-wider border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors disabled:opacity-40 disabled:cursor-wait"
+          >
+            {evidenceSeedSaving ? 'INGESTING EVIDENCE...' : 'ATTACH EVIDENCE SEED'}
+          </button>
+        </div>
+
+        <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+          {sortedSeeds.length > 0 ? (
+            sortedSeeds.map((seed) => (
+              <div
+                key={seed.id}
+                className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 px-2 py-2 space-y-1.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-mono text-nerv-text break-words">
+                      {seed.label || seed.value}
+                    </div>
+                    <div className="text-[9px] font-mono text-nerv-text-muted break-all">
+                      {seed.value}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <NervBadge label={seed.kind.toUpperCase()} variant="blue" size="sm" />
+                    <NervBadge label={seed.status.toUpperCase()} variant={statusVariant[seed.status]} size="sm" />
+                  </div>
+                </div>
+                {seed.notes && (
+                  <div className="text-[9px] font-mono text-nerv-text-secondary leading-relaxed">
+                    {seed.notes}
+                  </div>
+                )}
+                {typeof seed.metadata?.contentPreview === 'string' && seed.metadata.contentPreview && (
+                  <div className="text-[9px] font-mono text-nerv-green/80 leading-relaxed whitespace-pre-wrap">
+                    {seed.metadata.contentPreview}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-1">
+                  {typeof seed.metadata?.host === 'string' && seed.metadata.host && (
+                    <NervBadge label={String(seed.metadata.host)} variant="muted" size="sm" />
+                  )}
+                  {seed.extractedEntities.slice(0, 8).map((entity, index) => (
+                    <NervBadge
+                      key={`${seed.id}-${entity.type}-${entity.value}-${index}`}
+                      label={`${entity.type}:${entity.value}`}
+                      variant="orange"
+                      size="sm"
+                    />
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
+              No explicit evidence seeds attached yet.
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-nerv-border">
         {onGenerateReport && (
           <button
@@ -832,6 +1014,7 @@ export function DetailPanel({
   posts,
   summary,
   investigation,
+  investigationRecord,
   deviations,
   propaganda,
   claims,
@@ -839,7 +1022,9 @@ export function DetailPanel({
   investigatedNarrativeIds,
   selectedIdentity,
   identityLoading,
+  evidenceSeedSaving,
   onGenerateProfile,
+  onAddEvidenceSeed,
   onInvestigate,
   onRunPropaganda,
   onVerifyClaims,
@@ -903,6 +1088,9 @@ export function DetailPanel({
         posts={posts}
         narratives={narratives}
         summary={summary}
+        investigationRecord={investigationRecord}
+        evidenceSeedSaving={evidenceSeedSaving}
+        onAddEvidenceSeed={onAddEvidenceSeed}
         onRunPropaganda={onRunPropaganda}
         onGenerateReport={onGenerateReport}
       />

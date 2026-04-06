@@ -356,10 +356,10 @@ Success criteria:
 
 ### Phase 1
 
-- [ ] Add seed ingestion for YouTube URLs
-- [ ] Add seed ingestion for websites and article URLs
-- [ ] Add manual wallet / contract / domain seeds
-- [ ] Persist fetched seed content and extraction status
+- [x] Add seed ingestion for YouTube URLs
+- [x] Add seed ingestion for websites and article URLs
+- [x] Add manual wallet / contract / domain seeds
+- [x] Persist fetched seed content and extraction status
 
 ### Phase 2
 

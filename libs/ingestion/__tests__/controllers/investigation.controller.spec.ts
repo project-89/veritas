@@ -2,10 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { InvestigationController } from '../../src/lib/controllers/investigation.controller';
 import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
+import { InvestigationEvidenceService } from '../../src/lib/services/investigation-evidence.service';
 
 describe('InvestigationController', () => {
   let controller: InvestigationController;
   let mockRepository: any;
+  let mockEvidenceService: any;
 
   const mockInvestigation = {
     _id: 'inv-1',
@@ -46,6 +48,21 @@ describe('InvestigationController', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
+    mockEvidenceService = {
+      prepareSeed: jest.fn().mockImplementation(async (seed) => ({
+        ...seed,
+        status: 'processed',
+        metadata: {
+          ...(seed.metadata ?? {}),
+          videoId: 'abc',
+        },
+        extractedEntities: [
+          ...(seed.extractedEntities ?? []),
+          { type: 'youtube_video', value: 'abc' },
+        ],
+      })),
+    };
+
     mockRepository = {
       findAll: jest.fn().mockResolvedValue([mockInvestigation]),
       findById: jest.fn().mockResolvedValue(mockInvestigation),
@@ -64,10 +81,10 @@ describe('InvestigationController', () => {
             kind: 'youtube',
             value: 'https://www.youtube.com/watch?v=abc',
             label: 'Explainer',
-            status: 'pending',
+            status: 'processed',
             notes: null,
-            metadata: {},
-            extractedEntities: [],
+            metadata: { videoId: 'abc' },
+            extractedEntities: [{ type: 'youtube_video', value: 'abc' }],
             createdAt: new Date('2026-04-06'),
             updatedAt: new Date('2026-04-06'),
           },
@@ -81,6 +98,10 @@ describe('InvestigationController', () => {
         {
           provide: InvestigationRepository,
           useValue: mockRepository,
+        },
+        {
+          provide: InvestigationEvidenceService,
+          useValue: mockEvidenceService,
         },
       ],
     }).compile();
@@ -254,9 +275,11 @@ describe('InvestigationController', () => {
           kind: 'youtube',
           value: 'https://www.youtube.com/watch?v=abc',
           label: 'Explainer',
-          status: 'pending',
+          status: 'processed',
+          extractedEntities: [{ type: 'youtube_video', value: 'abc' }],
         }),
       );
+      expect(mockEvidenceService.prepareSeed).toHaveBeenCalled();
       expect(result.success).toBe(true);
       expect(result.investigation.evidenceSeeds).toHaveLength(1);
     });

@@ -12,10 +12,12 @@ import {
 
 import {
   analyzeNarratives,
+  addInvestigationEvidenceSeed,
   fetchDeviations,
   analyzePropaganda,
   analyzeEntities,
   fetchDownstreamEffects,
+  createOrGetInvestigation,
   fetchInvestigation,
   fetchInvestigations,
   verifyClaims,
@@ -30,6 +32,7 @@ import {
   retryScanConnector,
   getRecentScans,
   type RawPost,
+  type Investigation,
   type AnalyzedNarrative,
   type ExtractedClaim,
   type ScanJob,
@@ -243,10 +246,49 @@ function InvestigationWorkspace() {
   const [radarSelectedIds, setRadarSelectedIds] = useState<string[]>([]);
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(380);
+  const [investigationRecord, setInvestigationRecord] = useState<Investigation | null>(null);
+  const [evidenceSeedSaving, setEvidenceSeedSaving] = useState(false);
   const [scanJob, setScanJob] = useState<ScanJob | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanJob[]>([]);
   const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scanPostsFetchedRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadInvestigationRecord = async () => {
+      try {
+        let resolved: Investigation | null = null;
+
+        if (invId) {
+          const { investigation } = await fetchInvestigation(invId);
+          resolved = investigation;
+        } else if (query) {
+          const allInvestigations = await fetchInvestigations();
+          const match = allInvestigations.find((item) => item.query === query) ?? null;
+          if (match?._id) {
+            const { investigation } = await fetchInvestigation(match._id);
+            resolved = investigation;
+          }
+        }
+
+        if (!cancelled) {
+          setInvestigationRecord(resolved);
+          dispatch({ type: 'SET_INVESTIGATION_ID', id: resolved?._id ?? null });
+        }
+      } catch {
+        if (!cancelled) {
+          setInvestigationRecord(null);
+          dispatch({ type: 'SET_INVESTIGATION_ID', id: null });
+        }
+      }
+    };
+
+    loadInvestigationRecord();
+    return () => {
+      cancelled = true;
+    };
+  }, [invId, query, dispatch]);
 
   // Shift-click handler for radar multi-select
   const handleNarrativeSelect = useCallback(
@@ -1193,6 +1235,49 @@ function InvestigationWorkspace() {
     }
   }, [state.query, state.summary, state.narratives, state.investigation]);
 
+  const handleAddEvidenceSeed = useCallback(async (seed: {
+    kind: 'url' | 'youtube' | 'article' | 'post' | 'wallet' | 'contract' | 'domain' | 'document' | 'note';
+    value: string;
+    notes?: string | null;
+  }) => {
+    setEvidenceSeedSaving(true);
+    try {
+      let targetInvestigation = investigationRecord;
+
+      if (!targetInvestigation) {
+        targetInvestigation = await createOrGetInvestigation(query, {
+          platforms: urlPlatforms?.length ? urlPlatforms : undefined,
+          timeRange: urlTimeRange,
+        });
+        setInvestigationRecord(targetInvestigation);
+        dispatch({ type: 'SET_INVESTIGATION_ID', id: targetInvestigation._id });
+
+        const nextParams = new URLSearchParams(searchParams.toString());
+        nextParams.set('inv', targetInvestigation._id);
+        if (!nextParams.has('q')) {
+          nextParams.set('q', query);
+        }
+        router.replace(`/results?${nextParams.toString()}`, { scroll: false });
+      }
+
+      const updated = await addInvestigationEvidenceSeed(targetInvestigation._id, {
+        kind: seed.kind,
+        value: seed.value,
+        notes: seed.notes ?? null,
+      });
+
+      setInvestigationRecord(updated);
+      dispatch({ type: 'SET_INVESTIGATION_ID', id: updated._id });
+    } catch (err) {
+      dispatch({
+        type: 'SET_ERROR',
+        error: `Failed to attach evidence seed: ${err instanceof Error ? err.message : 'unknown error'}`,
+      });
+    } finally {
+      setEvidenceSeedSaving(false);
+    }
+  }, [investigationRecord, query, urlPlatforms, urlTimeRange, searchParams, router, dispatch]);
+
   const handleRefresh = useCallback(async () => {
     // Reset all state
     scanPostsFetchedRef.current = false;
@@ -1701,6 +1786,7 @@ function InvestigationWorkspace() {
             posts={state.posts}
             summary={state.summary}
             investigation={state.investigation}
+            investigationRecord={investigationRecord}
             deviations={state.deviations}
             propaganda={state.propaganda}
             claims={state.claims}
@@ -1708,6 +1794,8 @@ function InvestigationWorkspace() {
             investigatedNarrativeIds={state.investigatedNarrativeIds}
             selectedIdentity={state.selectedIdentity}
             identityLoading={state.identityLoading}
+            evidenceSeedSaving={evidenceSeedSaving}
+            onAddEvidenceSeed={handleAddEvidenceSeed}
             onGenerateProfile={handleGenerateProfile}
             onInvestigate={handleInvestigate}
             onRunPropaganda={handleRunPropaganda}
