@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import type { PsychologicalProfileMode } from './analysis-job.schema';
 
 // ---------------------------------------------------------------------------
 // Sub-schemas
@@ -21,6 +22,9 @@ class PlatformAccountEmbed {
 
   @Prop({ type: String, enum: ['sherlock', 'investigation', 'manual'], default: 'investigation' })
   discoveryMethod!: 'sherlock' | 'investigation' | 'manual';
+
+  @Prop({ type: String, enum: ['actionable', 'corroborating', 'extended'], default: 'corroborating' })
+  discoveryTier!: 'actionable' | 'corroborating' | 'extended';
 
   @Prop({ type: Boolean, default: false })
   verified!: boolean;
@@ -101,6 +105,36 @@ class InvestigationSnapshotEmbed {
   influenceScore!: number;
 }
 
+@Schema({ _id: false })
+class ObservedPostEmbed {
+  @Prop({ type: String, default: '' })
+  text!: string;
+
+  @Prop({ type: String, required: true })
+  timestamp!: string;
+
+  @Prop({ type: String, default: 'unknown' })
+  platform!: string;
+
+  @Prop({ type: String, default: null })
+  url!: string | null;
+
+  @Prop({ type: Object, default: { likes: 0, comments: 0, shares: 0 } })
+  engagement!: { likes: number; comments: number; shares: number };
+
+  @Prop({ type: Object, default: { score: 0, label: 'neutral' } })
+  sentiment!: { score: number; label: string };
+
+  @Prop({ type: String, default: null })
+  investigationQuery!: string | null;
+
+  @Prop({ type: String, default: 'investigation' })
+  sourceKind!: 'investigation' | 'timeline';
+
+  @Prop({ type: Date, default: () => new Date() })
+  capturedAt!: Date;
+}
+
 // ---------------------------------------------------------------------------
 // Psychological profile sub-schema
 // ---------------------------------------------------------------------------
@@ -148,6 +182,27 @@ class PsychologicalProfileEmbed {
 
   @Prop({ type: Number, default: 0 })
   postCountAnalyzed!: number;
+
+  @Prop({
+    type: String,
+    enum: ['investigation-window', 'current-state', 'historical'],
+    default: 'current-state',
+  })
+  profileMode!: PsychologicalProfileMode;
+
+  @Prop({ type: String, default: '' })
+  scopeLabel!: string;
+
+  @Prop({ type: Object, default: {} })
+  scope!: {
+    investigationId: string | null;
+    scanId: string | null;
+    startDate: Date | null;
+    endDate: Date | null;
+    platforms: string[];
+    scanPostCount: number;
+    timelinePostCount: number;
+  };
 
   @Prop({ type: CommunicationStyleEmbed, default: () => ({}) })
   communicationStyle!: CommunicationStyleEmbed;
@@ -288,6 +343,9 @@ export class IdentityRecordSchema extends Document {
   })
   profileGenerationStatus!: string;
 
+  @Prop({ type: [ObservedPostEmbed], default: [] })
+  observedPosts!: ObservedPostEmbed[];
+
   // Cached timeline (avoids re-fetching from connectors)
   @Prop({ type: Object, default: null })
   cachedTimeline!: {
@@ -320,6 +378,7 @@ export interface PlatformAccount {
   url: string;
   discoveredAt: Date;
   discoveryMethod: 'sherlock' | 'investigation' | 'manual';
+  discoveryTier?: 'actionable' | 'corroborating' | 'extended';
   verified: boolean;
 }
 
@@ -347,11 +406,34 @@ export interface InvestigationSnapshot {
   influenceScore: number;
 }
 
+export interface ObservedPost {
+  text: string;
+  timestamp: string;
+  platform: string;
+  url?: string | null;
+  engagement: { likes: number; comments: number; shares: number };
+  sentiment: { score: number; label: string };
+  investigationQuery?: string | null;
+  sourceKind?: 'investigation' | 'timeline';
+  capturedAt?: Date;
+}
+
 export interface PsychologicalProfile {
   version: number;
   generatedAt: Date;
   modelUsed: string;
   postCountAnalyzed: number;
+  profileMode?: PsychologicalProfileMode;
+  scopeLabel?: string;
+  scope?: {
+    investigationId: string | null;
+    scanId: string | null;
+    startDate: Date | null;
+    endDate: Date | null;
+    platforms: string[];
+    scanPostCount: number;
+    timelinePostCount: number;
+  };
   communicationStyle: {
     formality: string;
     tone: string;
@@ -428,6 +510,7 @@ export interface IdentityRecord {
   lastInvestigatedAt: Date | null;
   psychologicalProfile: PsychologicalProfile | null;
   profileGenerationStatus: string;
+  observedPosts: ObservedPost[];
   cachedTimeline: {
     posts: unknown[];
     fetchedAt: string;

@@ -174,17 +174,39 @@ export class InvestigationController {
           try {
             const identity = await Promise.race([
               this.crossPlatformIdentity.resolveIdentity(handle),
-              new Promise<{ queriedUsername: string; accounts: never[]; relevantAccounts: never[]; totalFound: 0; searchDuration: 0 }>((resolve) =>
-                setTimeout(() => resolve({ queriedUsername: handle, accounts: [], relevantAccounts: [], totalFound: 0 as const, searchDuration: 0 as const }), 15_000),
+              new Promise<{
+                queriedUsername: string;
+                accounts: never[];
+                actionableAccounts: never[];
+                corroboratingAccounts: never[];
+                extendedAccounts: never[];
+                relevantAccounts: never[];
+                totalFound: 0;
+                searchDuration: 0;
+              }>((resolve) =>
+                setTimeout(
+                  () =>
+                    resolve({
+                      queriedUsername: handle,
+                      accounts: [],
+                      actionableAccounts: [],
+                      corroboratingAccounts: [],
+                      extendedAccounts: [],
+                      relevantAccounts: [],
+                      totalFound: 0 as const,
+                      searchDuration: 0 as const,
+                    }),
+                  15_000,
+                ),
               ),
             ]);
-            if (identity.relevantAccounts.length > 0) {
-              const discoveredPlatforms = identity.relevantAccounts
+            if (identity.actionableAccounts.length > 0) {
+              const discoveredPlatforms = identity.actionableAccounts
                 .map((a) => a.platform)
                 .filter((p) => !platformsToTry.includes(p));
               if (discoveredPlatforms.length > 0) {
                 this.logger.log(
-                  `Sherlock discovered @${handle} on: ${discoveredPlatforms.join(', ')}`,
+                  `Sherlock actionable matches for @${handle}: ${discoveredPlatforms.join(', ')}`,
                 );
                 platformsToTry = [...platformsToTry, ...discoveredPlatforms];
               }
@@ -349,6 +371,20 @@ export class InvestigationController {
           credibilityScore: cred?.overallScore ?? null,
           botProbability: bot?.botProbability ?? null,
           flags: userResult.flags,
+          observedPosts: [
+            ...(userResult.user.topicPosts ?? []),
+            ...(userResult.user.historicalPosts ?? []),
+          ].map((post: any) => ({
+            text: post.text ?? '',
+            timestamp: post.timestamp ?? new Date().toISOString(),
+            platform: post.platform ?? userResult.user.platform ?? 'unknown',
+            url: post.url ?? null,
+            engagement: post.engagement ?? { likes: 0, comments: 0, shares: 0 },
+            sentiment: post.sentiment ?? { score: 0, label: 'neutral' },
+            investigationQuery: query,
+            sourceKind: 'investigation' as const,
+            capturedAt: new Date(),
+          })),
         });
       }
       this.logger.log(`Upserted ${investigationResult.users.length} identity records`);

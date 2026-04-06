@@ -22,18 +22,24 @@ import { RssCacheRepository } from '../repositories/rss-cache.repository';
 import type { RssCacheItem } from '../schemas/rss-cache.schema';
 
 interface RSSItem {
-  title?: string;
-  link?: string;
-  pubDate?: string;
-  creator?: string;
-  content?: string;
-  contentSnippet?: string;
-  guid?: string;
-  categories?: string[];
-  isoDate?: string;
+  title?: unknown;
+  link?: unknown;
+  pubDate?: unknown;
+  creator?: unknown;
+  content?: unknown;
+  contentSnippet?: unknown;
+  guid?: unknown;
+  categories?: unknown;
+  isoDate?: unknown;
   sourceName?: string;
   sourceUrl?: string;
   [key: string]: unknown;
+}
+
+interface FeedFailureState {
+  consecutiveFailures: number;
+  lastErrorSignature: string;
+  suppressedUntil: number;
 }
 
 interface SearchOptions {
@@ -51,15 +57,18 @@ export class RSSConnector
   implements TransformOnIngestConnector, OnModuleInit, OnModuleDestroy
 {
   platform = 'rss' as const;
+  private static readonly DEFAULT_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
+  private static readonly FEED_FETCH_TIMEOUT_MS = 15000;
+  private static readonly FEED_FAILURE_BASE_COOLDOWN_MS = 5 * 60 * 1000;
+  private static readonly FEED_FAILURE_MAX_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
   private parser: Parser;
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 300000; // 5 minutes
   private interval: NodeJS.Timeout | null = null;
   private readonly logger = new Logger(RSSConnector.name);
   private feedUrls: Map<string, string> = new Map();
-
-  /** Default max age per tier: tier-1=30m, tier-2=60m, tier-3=120m */
-  private static readonly DEFAULT_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
+  private readonly feedFailureState: Map<string, FeedFailureState> = new Map();
 
   constructor(
     private configService: ConfigService,
@@ -100,7 +109,7 @@ export class RSSConnector
       }
     }
 
-    // 2. Fall back to curated catalog (177 feeds across 15 categories)
+    // 2. Fall back to curated catalog
     const catalogFeeds = getAllFeeds();
     for (const feed of catalogFeeds) {
       this.feedUrls.set(feed.name, feed.url);
@@ -232,7 +241,8 @@ export class RSSConnector
   async addFeed(name: string, url: string): Promise<boolean> {
     try {
       // Validate the feed URL
-      await this.parser.parseURL(url);
+      const feedXml = await this.fetchFeedXml(url);
+      await this.parser.parseString(feedXml);
 
       // Add to feedUrls
       this.feedUrls.set(name, url);
@@ -289,17 +299,24 @@ export class RSSConnector
         }
       }
 
-      const feed = await this.parser.parseURL(feedUrl);
-      let items = feed.items || [];
+      if (this.isFeedTemporarilySuppressed(feedUrl)) {
+        return [];
+      }
+
+      const feedXml = await this.fetchFeedXml(feedUrl);
+      const feed = await this.parser.parseString(feedXml);
+      let items = (feed.items || []) as RSSItem[];
+
+      this.clearFeedFailureState(feedUrl);
 
       // --- Store in RSS cache (before filtering) ---
       if (this.rssCacheRepo && items.length > 0) {
         const cacheItems: RssCacheItem[] = items.map((item) => ({
-          title: item.title ?? '',
-          link: item.link ?? '',
-          pubDate: item.isoDate ?? item.pubDate ?? '',
-          content: item.content ?? '',
-          contentSnippet: item.contentSnippet ?? '',
+          title: this.coerceToText(item.title),
+          link: this.coerceToText(item.link),
+          pubDate: this.coerceToText(item.isoDate) || this.coerceToText(item.pubDate),
+          content: this.coerceToText(item.content),
+          contentSnippet: this.coerceToText(item.contentSnippet),
         }));
         this.rssCacheRepo
           .setCachedFeed(feedUrl, feedUrl, cacheItems, RSSConnector.DEFAULT_CACHE_MAX_AGE_MS)
@@ -316,9 +333,45 @@ export class RSSConnector
 
       return items;
     } catch (error) {
-      this.logger.error(`Error fetching feed ${feedUrl}:`, error);
+      this.recordFeedFailure(feedUrl, error);
       return [];
     }
+  }
+
+  private async fetchFeedXml(feedUrl: string): Promise<string> {
+    const response = await axios.get<string>(feedUrl, {
+      responseType: 'text',
+      timeout: RSSConnector.FEED_FETCH_TIMEOUT_MS,
+      headers: {
+        'User-Agent':
+          this.configService.get<string>('RSS_USER_AGENT') ??
+          'Mozilla/5.0 (compatible; VeritasRSS/1.0; +https://oneirocom.com)',
+        Accept:
+          'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
+      },
+    });
+
+    return this.sanitizeFeedXml(feedUrl, response.data);
+  }
+
+  private sanitizeFeedXml(feedUrl: string, rawXml: unknown): string {
+    const xml = this.coerceToText(rawXml);
+    if (!xml) {
+      throw new Error(`Empty RSS response from ${feedUrl}`);
+    }
+
+    const withoutBom = xml.replace(/^\uFEFF/, '');
+    const firstTagIndex = withoutBom.indexOf('<');
+    const trimmedToFirstTag =
+      firstTagIndex > 0 ? withoutBom.slice(firstTagIndex) : withoutBom;
+
+    return trimmedToFirstTag
+      .replace(/&(?!#\d+;|#x[a-fA-F0-9]+;|[a-zA-Z][\w.-]*;)/g, '&amp;')
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+      .trim();
   }
 
   /**
@@ -328,7 +381,11 @@ export class RSSConnector
     if (!options?.startDate && !options?.endDate) return items;
 
     return items.filter((item) => {
-      const itemDate = new Date(item.isoDate || item.pubDate || Date.now());
+      const itemDate = new Date(
+        this.coerceToText(item.isoDate) ||
+          this.coerceToText(item.pubDate) ||
+          Date.now()
+      );
       if (options.startDate && itemDate < options.startDate) return false;
       if (options.endDate && itemDate > options.endDate) return false;
       return true;
@@ -339,13 +396,20 @@ export class RSSConnector
    * Check if an item matches the search query
    */
   private itemMatchesQuery(item: RSSItem, query: string): boolean {
-    const searchTerms = query.toLowerCase().split(' ');
-    const itemText = `
-      ${item.title || ''} 
-      ${item.contentSnippet || ''} 
-      ${item.content || ''} 
-      ${item.categories?.join(' ') || ''}
-    `.toLowerCase();
+    const searchTerms = query
+      .toLowerCase()
+      .split(/\s+/)
+      .map((term) => term.trim())
+      .filter(Boolean);
+    const itemText = [
+      this.coerceToSearchText(item.title),
+      this.coerceToSearchText(item.contentSnippet),
+      this.coerceToSearchText(item.content),
+      this.coerceToSearchText(item.categories),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
 
     return searchTerms.some((term) => itemText.includes(term));
   }
@@ -355,16 +419,25 @@ export class RSSConnector
    */
   private transformToSocialMediaPosts(items: RSSItem[]): SocialMediaPost[] {
     return items.map((item) => {
-      const pubDate = new Date(item.isoDate || item.pubDate || Date.now());
+      const pubDate = new Date(
+        this.coerceToText(item.isoDate) ||
+          this.coerceToText(item.pubDate) ||
+          Date.now()
+      );
+      const guid = this.coerceToText(item.guid);
+      const link = this.coerceToText(item.link);
+      const contentSnippet = this.coerceToText(item.contentSnippet);
+      const title = this.coerceToText(item.title);
+      const creator = this.coerceToText(item.creator);
 
       return {
-        id: item.guid || item.link || `rss-${Date.now()}-${Math.random()}`,
-        text: item.contentSnippet || item.title || '',
+        id: guid || link || `rss-${Date.now()}-${Math.random()}`,
+        text: contentSnippet || title || '',
         platform: this.platform,
         timestamp: pubDate,
-        authorId: item.creator || item.sourceName || 'unknown',
-        authorName: item.creator || item.sourceName || 'unknown',
-        url: item.link || item.sourceUrl || '',
+        authorId: creator || item.sourceName || 'unknown',
+        authorName: creator || item.sourceName || 'unknown',
+        url: link || item.sourceUrl || '',
         engagementMetrics: {
           likes: 0,
           shares: 0,
@@ -374,6 +447,114 @@ export class RSSConnector
         },
       };
     });
+  }
+
+  private coerceToText(value: unknown): string {
+    if (value == null) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map((entry) => this.coerceToText(entry))
+        .filter(Boolean)
+        .join(' ');
+    }
+    if (typeof value === 'object') {
+      const candidateKeys = [
+        'name',
+        'term',
+        'label',
+        'value',
+        'text',
+        'content',
+        'title',
+      ] as const;
+
+      for (const key of candidateKeys) {
+        const candidate = (value as Record<string, unknown>)[key];
+        const text = this.coerceToText(candidate);
+        if (text) return text;
+      }
+
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return '';
+      }
+    }
+
+    return '';
+  }
+
+  private coerceToSearchText(value: unknown): string {
+    return this.coerceToText(value).replace(/\s+/g, ' ').trim();
+  }
+
+  private isFeedTemporarilySuppressed(feedUrl: string): boolean {
+    const state = this.feedFailureState.get(feedUrl);
+    if (!state) {
+      return false;
+    }
+
+    if (state.suppressedUntil <= Date.now()) {
+      this.feedFailureState.delete(feedUrl);
+      return false;
+    }
+
+    return true;
+  }
+
+  private clearFeedFailureState(feedUrl: string): void {
+    this.feedFailureState.delete(feedUrl);
+  }
+
+  private recordFeedFailure(feedUrl: string, error: unknown): void {
+    const summary = this.summarizeFeedError(error);
+    const previous = this.feedFailureState.get(feedUrl);
+    const consecutiveFailures =
+      previous?.lastErrorSignature === summary ? previous.consecutiveFailures + 1 : 1;
+    const cooldownMs = Math.min(
+      RSSConnector.FEED_FAILURE_BASE_COOLDOWN_MS *
+        2 ** Math.max(0, consecutiveFailures - 1),
+      RSSConnector.FEED_FAILURE_MAX_COOLDOWN_MS
+    );
+
+    this.feedFailureState.set(feedUrl, {
+      consecutiveFailures,
+      lastErrorSignature: summary,
+      suppressedUntil: Date.now() + cooldownMs,
+    });
+
+    const shouldLog =
+      !previous ||
+      previous.lastErrorSignature !== summary ||
+      previous.consecutiveFailures < 2;
+
+    if (shouldLog) {
+      this.logger.warn(
+        `RSS feed unavailable (${summary}). Suppressing ${feedUrl} for ${Math.round(cooldownMs / 60000)}m`
+      );
+    }
+  }
+
+  private summarizeFeedError(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status) {
+        return `HTTP ${error.response.status}`;
+      }
+
+      if (error.code) {
+        return error.code;
+      }
+    }
+
+    if (error instanceof Error) {
+      return error.message.split('\n')[0] || error.name;
+    }
+
+    return 'Unknown RSS fetch error';
   }
 
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
@@ -521,12 +702,15 @@ export class RSSConnector
     }
 
     return items.filter((item) => {
-      const itemText = `
-        ${item.title || ''} 
-        ${item.contentSnippet || ''} 
-        ${item.content || ''} 
-        ${item.categories?.join(' ') || ''}
-      `.toLowerCase();
+      const itemText = [
+        this.coerceToSearchText(item.title),
+        this.coerceToSearchText(item.contentSnippet),
+        this.coerceToSearchText(item.content),
+        this.coerceToSearchText(item.categories),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
 
       return keywords.some((keyword) =>
         itemText.includes(keyword.toLowerCase())
@@ -536,7 +720,7 @@ export class RSSConnector
 
   async validateCredentials(): Promise<boolean> {
     try {
-      // RSS always available — curated catalog has 177 feeds
+      // RSS always available when the curated catalog has at least one usable feed
       if (this.feedUrls.size === 0) {
         // Load from catalog if not yet loaded
         const catalogFeeds = getAllFeeds();
@@ -549,7 +733,8 @@ export class RSSConnector
       const firstEntry = [...this.feedUrls.entries()][0];
       if (!firstEntry) return false;
       const [feedName, feedUrl] = firstEntry;
-      await this.parser.parseURL(feedUrl);
+      const feedXml = await this.fetchFeedXml(feedUrl);
+      await this.parser.parseString(feedXml);
 
       this.logger.log(`RSS feed validation successful for ${feedName}`);
       return true;

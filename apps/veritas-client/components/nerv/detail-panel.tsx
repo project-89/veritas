@@ -12,6 +12,7 @@ import type {
   VerificationResult,
   EvidenceItem,
   IdentityRecord,
+  MagiProfileMode,
 } from '../../lib/api';
 import { IdentityDossier } from './identity-dossier';
 import type { SearchSummary } from '../../lib/investigation-context';
@@ -43,7 +44,7 @@ interface DetailPanelProps {
   // Identity (MAGI)
   selectedIdentity?: IdentityRecord | null;
   identityLoading?: boolean;
-  onGenerateProfile?: (id: string) => void;
+  onGenerateProfile?: (id: string, mode: MagiProfileMode) => void;
 
   // Actions
   onInvestigate?: (narrativeId: string) => void;

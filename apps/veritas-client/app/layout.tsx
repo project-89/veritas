@@ -1,19 +1,5 @@
 import './globals.css';
-import { JetBrains_Mono, Inter } from 'next/font/google';
 import { NervNav } from '../components/nerv/nerv-nav';
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-jetbrains',
-  display: 'swap',
-  weight: ['400', '500', '700'],
-});
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
 
 export const metadata = {
   title: 'VERITAS',
@@ -24,7 +10,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`dark ${jetbrainsMono.variable} ${inter.variable}`}
+      className="dark"
       translate="no"
     >
       <head>

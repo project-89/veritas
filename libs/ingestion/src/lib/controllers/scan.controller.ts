@@ -91,6 +91,15 @@ export class ScanController {
 
     const scanId = scanJob._id?.toString() ?? scanJob.id;
 
+    if (investigationId && investigationId !== 'unknown') {
+      try {
+        await this.investigationRepository.setLastScanId(investigationId, scanId);
+      } catch (error) {
+        const err = error as Error;
+        this.logger.warn(`Failed to persist lastScanId for investigation ${investigationId}: ${err.message}`);
+      }
+    }
+
     // Enqueue a BullMQ job for each connector
     for (const platform of targetPlatforms) {
       const jobData: ScanJobData = {

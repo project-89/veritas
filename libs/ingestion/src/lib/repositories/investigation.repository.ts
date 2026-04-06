@@ -7,6 +7,7 @@ import {
   Snapshot,
   InvestigationSettings,
   SnapshotSummary,
+  EvidenceSeed,
 } from '../schemas/investigation.schema';
 
 /**
@@ -103,6 +104,8 @@ export class InvestigationRepository implements OnModuleInit {
           limit: settings?.limit ?? 50,
         },
         lastSnapshotId: null,
+        lastScanId: null,
+        evidenceSeeds: [],
       } as Partial<Investigation>);
 
       this.logger.log(`Created new investigation for query: "${query}"`);
@@ -203,6 +206,39 @@ export class InvestigationRepository implements OnModuleInit {
   }
 
   /**
+   * Persist the most recent scan for an investigation so the UI can reopen it exactly.
+   */
+  async setLastScanId(id: string, scanId: string): Promise<void> {
+    this.ensureInitialized();
+    try {
+      await this.investigationRepo.updateById(id, {
+        lastScanId: scanId,
+      } as Partial<Investigation>);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error setting lastScanId: ${err.message}`, err.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Append a new evidence seed to an investigation.
+   */
+  async addEvidenceSeed(
+    id: string,
+    seed: EvidenceSeed,
+  ): Promise<Investigation> {
+    this.ensureInitialized();
+    const investigation = await this.findById(id);
+    if (!investigation) {
+      throw new Error(`Investigation not found: ${id}`);
+    }
+
+    const evidenceSeeds = [...(investigation.evidenceSeeds ?? []), seed];
+    return this.update(id, { evidenceSeeds } as Partial<Investigation>);
+  }
+
+  /**
    * Soft-delete an investigation by setting status to 'archived'.
    */
   async archive(id: string): Promise<void> {
@@ -228,6 +264,7 @@ export class InvestigationRepository implements OnModuleInit {
   async addSnapshot(
     investigationId: string,
     data: {
+      scanId?: string | null;
       posts: unknown[];
       narratives: unknown[];
       summary: SnapshotSummary;
@@ -237,6 +274,7 @@ export class InvestigationRepository implements OnModuleInit {
     try {
       const snapshot = await this.snapshotRepo.create({
         investigationId,
+        scanId: data.scanId ?? null,
         timestamp: new Date(),
         postCount: data.posts.length,
         narrativeCount: data.narratives.length,

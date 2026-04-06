@@ -70,6 +70,9 @@ describe('InvestigationController', () => {
             resolveIdentity: jest.fn().mockResolvedValue({
               queriedUsername: 'testuser',
               accounts: [],
+              actionableAccounts: [],
+              corroboratingAccounts: [],
+              extendedAccounts: [],
               relevantAccounts: [],
               totalFound: 0,
               searchDuration: 0,

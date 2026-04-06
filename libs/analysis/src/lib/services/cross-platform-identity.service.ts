@@ -21,6 +21,7 @@ interface IdentityRecordStore {
       url: string;
       discoveredAt: Date;
       discoveryMethod: string;
+      discoveryTier?: string;
       verified: boolean;
     }>;
     [key: string]: unknown;
@@ -33,6 +34,7 @@ interface IdentityRecordStore {
       url: string;
       discoveredAt: Date;
       discoveryMethod: 'sherlock' | 'investigation' | 'manual';
+      discoveryTier?: 'actionable' | 'corroborating' | 'extended';
       verified: boolean;
     }>,
     sherlockResolvedAt: Date,
@@ -48,12 +50,16 @@ export interface DiscoveredAccount {
   platform: string;
   url: string;
   username: string;
+  tier: 'actionable' | 'corroborating' | 'extended';
 }
 
 /** Result of cross-platform identity resolution for one username */
 export interface IdentityResolutionResult {
   queriedUsername: string;
   accounts: DiscoveredAccount[];
+  actionableAccounts: DiscoveredAccount[];
+  corroboratingAccounts: DiscoveredAccount[];
+  extendedAccounts: DiscoveredAccount[];
   /** Platforms we care about for narrative analysis */
   relevantAccounts: DiscoveredAccount[];
   totalFound: number;
@@ -80,6 +86,16 @@ const RELEVANT_PLATFORMS = new Set([
   'truthsocial',
   'farcaster',
   'wikipedia',
+]);
+
+/** Platforms we can materially act on in the investigation pipeline today. */
+const ACTIONABLE_PLATFORMS = new Set([
+  'twitter',
+  'reddit',
+  'bluesky',
+  'telegram',
+  'truthsocial',
+  'farcaster',
 ]);
 
 /**
@@ -192,12 +208,17 @@ export class CrossPlatformIdentityService {
                 platform: a.platform,
                 url: a.url,
                 username: a.handle,
+                tier: this.normalizeTier(a.platform, a.discoveryTier),
               }));
-              const relevantAccounts = accounts.filter((a) => RELEVANT_PLATFORMS.has(a.platform));
+              const { actionableAccounts, corroboratingAccounts, extendedAccounts, relevantAccounts } =
+                this.partitionAccounts(accounts);
 
               const result: IdentityResolutionResult = {
                 queriedUsername: cleanUsername,
                 accounts,
+                actionableAccounts,
+                corroboratingAccounts,
+                extendedAccounts,
                 relevantAccounts,
                 totalFound: accounts.length,
                 searchDuration: 0,
@@ -218,13 +239,15 @@ export class CrossPlatformIdentityService {
     this.logger.log(`Resolving cross-platform identity for "${cleanUsername}"...`);
 
     const accounts = await this.runSherlock(cleanUsername);
-    const relevantAccounts = accounts.filter((a) =>
-      RELEVANT_PLATFORMS.has(a.platform),
-    );
+    const { actionableAccounts, corroboratingAccounts, extendedAccounts, relevantAccounts } =
+      this.partitionAccounts(accounts);
 
     const result: IdentityResolutionResult = {
       queriedUsername: cleanUsername,
       accounts,
+      actionableAccounts,
+      corroboratingAccounts,
+      extendedAccounts,
       relevantAccounts,
       totalFound: accounts.length,
       searchDuration: Date.now() - start,
@@ -280,6 +303,7 @@ export class CrossPlatformIdentityService {
           url: a.url,
           discoveredAt: now,
           discoveryMethod: 'sherlock' as const,
+          discoveryTier: a.tier,
           verified: false,
         }));
 
@@ -295,6 +319,7 @@ export class CrossPlatformIdentityService {
             url: string;
             discoveredAt: Date;
             discoveryMethod: 'sherlock' | 'investigation' | 'manual';
+            discoveryTier?: 'actionable' | 'corroborating' | 'extended';
             verified: boolean;
           }>,
           now,
@@ -327,6 +352,9 @@ export class CrossPlatformIdentityService {
         results.set(username, {
           queriedUsername: username.replace(/^@/, ''),
           accounts: [],
+          actionableAccounts: [],
+          corroboratingAccounts: [],
+          extendedAccounts: [],
           relevantAccounts: [],
           totalFound: 0,
           searchDuration: 0,
@@ -394,10 +422,39 @@ export class CrossPlatformIdentityService {
         platform,
         url,
         username,
+        tier: this.classifyPlatform(platform),
       });
     }
 
     return accounts;
+  }
+
+  private classifyPlatform(platform: string): 'actionable' | 'corroborating' | 'extended' {
+    if (ACTIONABLE_PLATFORMS.has(platform)) return 'actionable';
+    if (RELEVANT_PLATFORMS.has(platform)) return 'corroborating';
+    return 'extended';
+  }
+
+  private normalizeTier(
+    platform: string,
+    tier?: string,
+  ): 'actionable' | 'corroborating' | 'extended' {
+    if (tier === 'actionable' || tier === 'corroborating' || tier === 'extended') {
+      return tier;
+    }
+    return this.classifyPlatform(platform);
+  }
+
+  private partitionAccounts(accounts: DiscoveredAccount[]) {
+    const actionableAccounts = accounts.filter((a) => a.tier === 'actionable');
+    const corroboratingAccounts = accounts.filter((a) => a.tier === 'corroborating');
+    const extendedAccounts = accounts.filter((a) => a.tier === 'extended');
+    return {
+      actionableAccounts,
+      corroboratingAccounts,
+      extendedAccounts,
+      relevantAccounts: [...actionableAccounts, ...corroboratingAccounts],
+    };
   }
 
   private normalizePlatform(siteName: string, url: string): string {

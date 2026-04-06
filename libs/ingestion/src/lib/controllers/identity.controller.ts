@@ -15,6 +15,15 @@ import { IdentityRecordRepository } from '../repositories/identity-record.reposi
 import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
 import type { IdentityRecord } from '../schemas/identity-record.schema';
 import type { AnalysisJobData } from '../queue/analysis.processor';
+import type { PsychologicalProfileMode } from '../schemas/analysis-job.schema';
+
+interface GenerateProfileBody {
+  mode?: PsychologicalProfileMode;
+  investigationId?: string | null;
+  scanId?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+}
 
 @Controller('identity')
 export class IdentityController {
@@ -111,19 +120,37 @@ export class IdentityController {
    * POST /identity/:id/generate-profile — Trigger MAGI psychological profile generation.
    */
   @Post(':id/generate-profile')
-  async generateProfile(@Param('id') id: string): Promise<{ status: string; jobId?: string; error?: string }> {
+  async generateProfile(
+    @Param('id') id: string,
+    @Body() body: GenerateProfileBody = {},
+  ): Promise<{ status: string; jobId?: string; error?: string }> {
     const record = await this.identityRepo.findById(id);
     if (!record) {
       throw new HttpException(`Identity not found: ${id}`, HttpStatus.NOT_FOUND);
     }
 
     try {
+      const profileMode = body.mode ?? 'current-state';
+      const scanId =
+        profileMode === 'current-state'
+          ? null
+          : typeof body.scanId === 'string' && body.scanId.trim().length > 0
+            ? body.scanId
+            : null;
+
+      if (profileMode === 'investigation-window' && !scanId) {
+        throw new HttpException(
+          'scanId is required for investigation-window MAGI profiles',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
       // Mark as queued
       await this.identityRepo.updateProfileStatus(id, 'queued');
 
       // Create analysis job for the profiler
       const analysisJob = await this.analysisJobRepo.createJob({
-        scanId: null,
+        scanId,
         type: 'psychological-profile' as any,
         narrativeIds: [id],
         input: {
@@ -132,6 +159,19 @@ export class IdentityController {
           narratives: [],
           userHandles: [record.primaryHandle],
           postCount: record.totalPostsAnalyzed,
+          profileMode,
+          investigationId:
+            typeof body.investigationId === 'string' && body.investigationId.trim().length > 0
+              ? body.investigationId
+              : null,
+          startDate:
+            typeof body.startDate === 'string' && body.startDate.trim().length > 0
+              ? body.startDate
+              : null,
+          endDate:
+            typeof body.endDate === 'string' && body.endDate.trim().length > 0
+              ? body.endDate
+              : null,
         },
       });
 
@@ -140,7 +180,7 @@ export class IdentityController {
       // Enqueue BullMQ job
       const jobData: AnalysisJobData = {
         analysisJobId: jobId,
-        scanId: null,
+        scanId,
         type: 'psychological-profile',
       };
 
@@ -151,7 +191,9 @@ export class IdentityController {
         removeOnFail: 50,
       });
 
-      this.logger.log(`MAGI profile generation queued for @${record.primaryHandle} (job: ${jobId})`);
+      this.logger.log(
+        `MAGI profile generation queued for @${record.primaryHandle} in ${profileMode} mode (job: ${jobId})`,
+      );
       return { status: 'queued', jobId };
     } catch (err) {
       const error = err as Error;

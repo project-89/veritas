@@ -33,6 +33,57 @@ class SnapshotSummaryEmbed {
   byPlatform!: Record<string, number>;
 }
 
+@Schema({ _id: false })
+class ExtractedEntityEmbed {
+  @Prop({ required: true, type: String })
+  type!: string;
+
+  @Prop({ required: true, type: String })
+  value!: string;
+}
+
+@Schema({ _id: false })
+class EvidenceSeedEmbed {
+  @Prop({ required: true, type: String })
+  id!: string;
+
+  @Prop({
+    required: true,
+    type: String,
+    enum: ['url', 'youtube', 'article', 'post', 'wallet', 'contract', 'domain', 'document', 'note'],
+  })
+  kind!: 'url' | 'youtube' | 'article' | 'post' | 'wallet' | 'contract' | 'domain' | 'document' | 'note';
+
+  @Prop({ required: true, type: String })
+  value!: string;
+
+  @Prop({ type: String, default: '' })
+  label!: string;
+
+  @Prop({
+    required: true,
+    type: String,
+    enum: ['pending', 'fetched', 'processed', 'error'],
+    default: 'pending',
+  })
+  status!: 'pending' | 'fetched' | 'processed' | 'error';
+
+  @Prop({ type: String, default: null })
+  notes!: string | null;
+
+  @Prop({ type: Object, default: {} })
+  metadata!: Record<string, unknown>;
+
+  @Prop({ type: [ExtractedEntityEmbed], default: [] })
+  extractedEntities!: ExtractedEntityEmbed[];
+
+  @Prop({ type: Date, default: () => new Date() })
+  createdAt!: Date;
+
+  @Prop({ type: Date, default: () => new Date() })
+  updatedAt!: Date;
+}
+
 // Investigation — top-level container for a topic analysis
 @Schema({
   collection: 'investigations',
@@ -67,6 +118,12 @@ export class InvestigationSchema extends Document {
   @Prop({ type: String, default: null })
   lastSnapshotId!: string | null;
 
+  @Prop({ type: String, default: null })
+  lastScanId!: string | null;
+
+  @Prop({ type: [EvidenceSeedEmbed], default: [] })
+  evidenceSeeds!: EvidenceSeedEmbed[];
+
   /** Persisted UI session state — restored when user returns to this investigation */
   @Prop({ type: Object, default: null })
   sessionState!: Record<string, unknown> | null;
@@ -94,6 +151,9 @@ InvestigationModel.index({ status: 1, updatedAt: -1 });
 export class SnapshotSchema extends Document {
   @Prop({ required: true, index: true })
   investigationId!: string;
+
+  @Prop({ type: String, default: null })
+  scanId!: string | null;
 
   @Prop({ required: true, type: Date, default: () => new Date() })
   timestamp!: Date;
@@ -136,7 +196,27 @@ export interface Investigation {
   status: 'active' | 'archived';
   settings: InvestigationSettings;
   lastSnapshotId: string | null;
+  lastScanId: string | null;
+  evidenceSeeds: EvidenceSeed[];
   sessionState: Record<string, unknown> | null;
+}
+
+export interface ExtractedEntity {
+  type: string;
+  value: string;
+}
+
+export interface EvidenceSeed {
+  id: string;
+  kind: 'url' | 'youtube' | 'article' | 'post' | 'wallet' | 'contract' | 'domain' | 'document' | 'note';
+  value: string;
+  label: string;
+  status: 'pending' | 'fetched' | 'processed' | 'error';
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  extractedEntities: ExtractedEntity[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface SnapshotSummary {
@@ -151,6 +231,7 @@ export interface Snapshot {
   _id: string;
   id: string;
   investigationId: string;
+  scanId: string | null;
   timestamp: Date;
   postCount: number;
   narrativeCount: number;

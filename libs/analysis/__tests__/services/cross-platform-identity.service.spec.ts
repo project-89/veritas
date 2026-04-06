@@ -44,7 +44,7 @@ describe('CrossPlatformIdentityService', () => {
         'username,name,url_main,url_user,exists,http_status,response_time_s',
         'testuser,Twitter,https://twitter.com,https://twitter.com/testuser,Claimed,200,0.5',
         'testuser,Reddit,https://reddit.com,https://www.reddit.com/user/testuser,Claimed,200,0.8',
-        'testuser,GitHub,https://github.com,https://www.github.com/testuser,Claimed,200,0.3',
+        'testuser,Instagram,https://instagram.com,https://www.instagram.com/testuser,Claimed,200,0.3',
         'testuser,SomeObscureSite,https://obscure.com,https://obscure.com/testuser,Claimed,200,0.2',
       ].join('\n');
 
@@ -55,6 +55,10 @@ describe('CrossPlatformIdentityService', () => {
       expect(result.queriedUsername).toBe('testuser');
       expect(result.totalFound).toBe(4);
       expect(result.accounts).toHaveLength(4);
+      expect(result.actionableAccounts.map((a) => a.platform)).toContain('twitter');
+      expect(result.actionableAccounts.map((a) => a.platform)).toContain('reddit');
+      expect(result.corroboratingAccounts.map((a) => a.platform)).toContain('instagram');
+      expect(result.extendedAccounts.map((a) => a.platform)).toContain('someobscuresite');
 
       // Twitter and Reddit should be in relevant accounts
       const relevantPlatforms = result.relevantAccounts.map((a) => a.platform);
@@ -81,6 +85,9 @@ describe('CrossPlatformIdentityService', () => {
 
       const result = await service.resolveIdentity('nonexistent_user_xyz');
       expect(result.accounts).toHaveLength(0);
+      expect(result.actionableAccounts).toHaveLength(0);
+      expect(result.corroboratingAccounts).toHaveLength(0);
+      expect(result.extendedAccounts).toHaveLength(0);
       expect(result.relevantAccounts).toHaveLength(0);
       expect(result.totalFound).toBe(0);
     });

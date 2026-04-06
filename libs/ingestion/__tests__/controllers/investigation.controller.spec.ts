@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { InvestigationController } from '../../src/lib/controllers/investigation.controller';
 import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
 
@@ -21,6 +21,8 @@ describe('InvestigationController', () => {
       limit: 50,
     },
     lastSnapshotId: 'snap-1',
+    lastScanId: null,
+    evidenceSeeds: [],
   };
 
   const mockSnapshot = {
@@ -54,6 +56,23 @@ describe('InvestigationController', () => {
       getSnapshots: jest.fn().mockResolvedValue([mockSnapshot]),
       getLatestSnapshot: jest.fn().mockResolvedValue(mockSnapshot),
       getSnapshotById: jest.fn().mockResolvedValue(mockSnapshot),
+      addEvidenceSeed: jest.fn().mockResolvedValue({
+        ...mockInvestigation,
+        evidenceSeeds: [
+          {
+            id: 'seed-1',
+            kind: 'youtube',
+            value: 'https://www.youtube.com/watch?v=abc',
+            label: 'Explainer',
+            status: 'pending',
+            notes: null,
+            metadata: {},
+            extractedEntities: [],
+            createdAt: new Date('2026-04-06'),
+            updatedAt: new Date('2026-04-06'),
+          },
+        ],
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -218,6 +237,37 @@ describe('InvestigationController', () => {
       await expect(
         controller.getSnapshot('inv-1', 'snap-1')
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('addEvidenceSeed', () => {
+    it('should append a typed evidence seed to the investigation', async () => {
+      const result = await controller.addEvidenceSeed('inv-1', {
+        kind: 'youtube',
+        value: 'https://www.youtube.com/watch?v=abc',
+        label: 'Explainer',
+      });
+
+      expect(mockRepository.addEvidenceSeed).toHaveBeenCalledWith(
+        'inv-1',
+        expect.objectContaining({
+          kind: 'youtube',
+          value: 'https://www.youtube.com/watch?v=abc',
+          label: 'Explainer',
+          status: 'pending',
+        }),
+      );
+      expect(result.success).toBe(true);
+      expect(result.investigation.evidenceSeeds).toHaveLength(1);
+    });
+
+    it('should reject empty evidence payloads', async () => {
+      await expect(
+        controller.addEvidenceSeed('inv-1', {
+          kind: 'youtube',
+          value: '',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

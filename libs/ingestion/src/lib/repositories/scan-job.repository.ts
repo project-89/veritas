@@ -363,6 +363,30 @@ export class ScanJobRepository implements OnModuleInit {
   }
 
   /**
+   * Get recent completed scan jobs for a set of queries.
+   */
+  async getCompletedJobsForQueries(queries: string[], limit = 50): Promise<ScanJob[]> {
+    this.ensureInitialized();
+    const uniqueQueries = Array.from(new Set(queries.map((query) => query.trim()).filter(Boolean)));
+    if (uniqueQueries.length === 0) return [];
+
+    try {
+      return await this.scanJobRepo.find(
+        {
+          query: { $in: uniqueQueries },
+          status: 'completed',
+          totalPosts: { $gt: 0 },
+        } as Record<string, unknown>,
+        { limit, sort: { createdAt: -1 } },
+      );
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error in getCompletedJobsForQueries: ${err.message}`, err.stack);
+      throw error;
+    }
+  }
+
+  /**
    * Reset a specific connector back to queued for retry.
    */
   async resetConnector(scanId: string, connector: string): Promise<void> {

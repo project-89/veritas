@@ -9,9 +9,11 @@ import {
   Body,
   Logger,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { InvestigationRepository } from '../repositories/investigation.repository';
-import { Investigation, Snapshot } from '../schemas/investigation.schema';
+import { EvidenceSeed, Investigation, Snapshot } from '../schemas/investigation.schema';
 
 /**
  * REST controller for managing investigations and their snapshots.
@@ -146,6 +148,48 @@ export class InvestigationController {
     }
     await this.investigationRepository.update(id, { name: body.name } as any);
     return { success: true };
+  }
+
+  /**
+   * PATCH /investigations/:id/evidence-seeds — append an evidence seed.
+   */
+  @Patch(':id/evidence-seeds')
+  async addEvidenceSeed(
+    @Param('id') id: string,
+    @Body()
+    body: {
+      kind: EvidenceSeed['kind'];
+      value: string;
+      label?: string;
+      notes?: string | null;
+      metadata?: Record<string, unknown>;
+      extractedEntities?: EvidenceSeed['extractedEntities'];
+    },
+  ): Promise<{ success: boolean; investigation: Investigation }> {
+    const existing = await this.investigationRepository.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Investigation not found: ${id}`);
+    }
+    if (!body.kind || !body.value?.trim()) {
+      throw new BadRequestException('Evidence seed kind and value are required');
+    }
+
+    const now = new Date();
+    const seed: EvidenceSeed = {
+      id: randomUUID(),
+      kind: body.kind,
+      value: body.value.trim(),
+      label: body.label?.trim() ?? '',
+      status: 'pending',
+      notes: body.notes ?? null,
+      metadata: body.metadata ?? {},
+      extractedEntities: body.extractedEntities ?? [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const investigation = await this.investigationRepository.addEvidenceSeed(id, seed);
+    return { success: true, investigation };
   }
 
   /**

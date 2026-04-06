@@ -426,11 +426,27 @@ export interface Investigation {
   status: 'active' | 'archived';
   settings: { platforms: string[]; timeRange: string; limit: number };
   lastSnapshotId: string | null;
+  lastScanId: string | null;
+  evidenceSeeds: InvestigationEvidenceSeed[];
+}
+
+export interface InvestigationEvidenceSeed {
+  id: string;
+  kind: 'url' | 'youtube' | 'article' | 'post' | 'wallet' | 'contract' | 'domain' | 'document' | 'note';
+  value: string;
+  label: string;
+  status: 'pending' | 'fetched' | 'processed' | 'error';
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  extractedEntities: Array<{ type: string; value: string }>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Snapshot {
   _id: string;
   investigationId: string;
+  scanId?: string | null;
   timestamp: string;
   postCount: number;
   narrativeCount: number;
@@ -512,6 +528,30 @@ export async function createOrGetInvestigation(
     method: 'PUT',
     body: JSON.stringify({ query, ...settings }),
   });
+}
+
+/**
+ * Append a typed evidence seed to an investigation.
+ */
+export async function addInvestigationEvidenceSeed(
+  id: string,
+  seed: {
+    kind: InvestigationEvidenceSeed['kind'];
+    value: string;
+    label?: string;
+    notes?: string | null;
+    metadata?: Record<string, unknown>;
+    extractedEntities?: InvestigationEvidenceSeed['extractedEntities'];
+  },
+): Promise<Investigation> {
+  const result = await request<{ success: boolean; investigation: Investigation }>(
+    `/api/investigations/${encodeURIComponent(id)}/evidence-seeds`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(seed),
+    },
+  );
+  return result.investigation;
 }
 
 // ---------------------------------------------------------------------------
@@ -1270,6 +1310,7 @@ export interface PlatformAccount {
   url: string;
   discoveredAt: string;
   discoveryMethod: 'sherlock' | 'investigation' | 'manual';
+  discoveryTier?: 'actionable' | 'corroborating' | 'extended';
   verified: boolean;
 }
 
@@ -1280,11 +1321,24 @@ export interface ProfileImage {
   isCurrent: boolean;
 }
 
+export type MagiProfileMode = 'investigation-window' | 'current-state' | 'historical';
+
 export interface PsychologicalProfile {
   version: number;
   generatedAt: string;
   modelUsed: string;
   postCountAnalyzed: number;
+  profileMode?: MagiProfileMode;
+  scopeLabel?: string;
+  scope?: {
+    investigationId: string | null;
+    scanId: string | null;
+    startDate: string | null;
+    endDate: string | null;
+    platforms: string[];
+    scanPostCount: number;
+    timelinePostCount: number;
+  };
   communicationStyle: {
     formality: string;
     tone: string;
@@ -1395,10 +1449,22 @@ export async function getIdentityById(id: string): Promise<IdentityRecord | null
   }
 }
 
-export async function generateMagiProfile(id: string): Promise<{ status: string }> {
+export async function generateMagiProfile(
+  id: string,
+  options?: {
+    mode?: MagiProfileMode;
+    investigationId?: string | null;
+    scanId?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+  },
+): Promise<{ status: string }> {
   return request<{ status: string }>(
     `/api/identity/${encodeURIComponent(id)}/generate-profile`,
-    { method: 'POST' },
+    {
+      method: 'POST',
+      body: JSON.stringify(options ?? {}),
+    },
   );
 }
 

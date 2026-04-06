@@ -15,6 +15,8 @@ import { NervBadge } from './nerv-badge';
 export interface EntityPanelProps {
   entities: EntityAnalysisResponse | null;
   narratives: AnalyzedNarrative[];
+  selectedActorHandle?: string | null;
+  onSelectActor?: (handle: string | null) => void;
 }
 
 type EntityTypeFilter = 'all' | 'person' | 'org' | 'topic' | 'entity';
@@ -53,7 +55,12 @@ const PLATFORM_COLORS: Record<string, string> = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function EntityPanel({ entities, narratives }: EntityPanelProps) {
+export function EntityPanel({
+  entities,
+  narratives,
+  selectedActorHandle,
+  onSelectActor,
+}: EntityPanelProps) {
   const [typeFilter, setTypeFilter] = useState<EntityTypeFilter>('all');
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
 
@@ -100,6 +107,8 @@ export function EntityPanel({ entities, narratives }: EntityPanelProps) {
   const maxPlatformCount = effectiveSelected
     ? Math.max(...Object.values(effectiveSelected.platformBreakdown), 1)
     : 1;
+
+  const normalizeHandle = (handle: string) => handle.trim().replace(/^@+/, '');
 
   return (
     <div className="flex h-full min-h-0">
@@ -331,12 +340,23 @@ export function EntityPanel({ entities, narratives }: EntityPanelProps) {
             <NervPanel title="TOP AUTHORS">
               <div className="divide-y divide-nerv-border/50">
                 {effectiveSelected.topAuthors.slice(0, 10).map((a) => (
-                  <div
+                  <button
                     key={`${a.handle}-${a.platform}`}
-                    className="px-3 py-1.5 flex items-center gap-3"
+                    type="button"
+                    onClick={() =>
+                      onSelectActor?.(
+                        normalizeHandle(a.handle) === selectedActorHandle ? null : normalizeHandle(a.handle),
+                      )
+                    }
+                    className={[
+                      'w-full px-3 py-1.5 flex items-center gap-3 text-left transition-colors',
+                      normalizeHandle(a.handle) === selectedActorHandle
+                        ? 'bg-nerv-orange/10'
+                        : 'hover:bg-nerv-bg-elevated/30',
+                    ].join(' ')}
                   >
                     <span className="text-[10px] font-mono text-nerv-blue flex-1 truncate">
-                      @{a.handle}
+                      @{normalizeHandle(a.handle)}
                     </span>
                     <NervBadge
                       label={a.platform === 'twitter' ? 'X' : a.platform.toUpperCase()}
@@ -346,7 +366,7 @@ export function EntityPanel({ entities, narratives }: EntityPanelProps) {
                     <span className="text-[10px] font-mono tabular-nums text-nerv-text-secondary">
                       {a.mentionCount}
                     </span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </NervPanel>

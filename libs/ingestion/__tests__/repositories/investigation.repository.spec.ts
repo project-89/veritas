@@ -22,12 +22,15 @@ describe('InvestigationRepository', () => {
       limit: 50,
     },
     lastSnapshotId: null,
+    lastScanId: null,
+    evidenceSeeds: [],
   };
 
   const mockSnapshot = {
     _id: 'snap-1',
     id: 'snap-1',
     investigationId: 'inv-1',
+    scanId: null,
     timestamp: new Date('2026-03-15'),
     postCount: 25,
     narrativeCount: 0,
@@ -144,6 +147,8 @@ describe('InvestigationRepository', () => {
             limit: 30,
           }),
           lastSnapshotId: null,
+          lastScanId: null,
+          evidenceSeeds: [],
         })
       );
       expect(result).toEqual(mockInvestigation);
@@ -248,6 +253,32 @@ describe('InvestigationRepository', () => {
       expect(mockInvestigationRepo.updateById).toHaveBeenCalledWith(
         'inv-1',
         expect.objectContaining({ status: 'archived' })
+      );
+    });
+  });
+
+  describe('addEvidenceSeed', () => {
+    it('should append a new evidence seed and persist the updated investigation', async () => {
+      const seed = {
+        id: 'seed-1',
+        kind: 'youtube' as const,
+        value: 'https://www.youtube.com/watch?v=abc',
+        label: 'Explainer',
+        status: 'pending' as const,
+        notes: null,
+        metadata: {},
+        extractedEntities: [],
+        createdAt: new Date('2026-04-06'),
+        updatedAt: new Date('2026-04-06'),
+      };
+
+      await repository.addEvidenceSeed('inv-1', seed as any);
+
+      expect(mockInvestigationRepo.updateById).toHaveBeenCalledWith(
+        'inv-1',
+        expect.objectContaining({
+          evidenceSeeds: [seed],
+        }),
       );
     });
   });

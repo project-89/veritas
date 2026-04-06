@@ -5,7 +5,7 @@ import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
 import { ScanJobRepository } from '../repositories/scan-job.repository';
 import { IdentityRecordRepository } from '../repositories/identity-record.repository';
 import { IngestionService } from '../services/ingestion.service';
-import type { AnalysisJobType } from '../schemas/analysis-job.schema';
+import type { AnalysisJobType, PsychologicalProfileMode } from '../schemas/analysis-job.schema';
 
 // Analysis service tokens — injected via forwardRef from app module
 export const PROPAGANDA_SERVICE = Symbol('PROPAGANDA_SERVICE');
@@ -30,6 +30,19 @@ interface UserPost {
   url?: string;
   engagement: { likes: number; comments: number; shares: number };
   sentiment: { score: number; label: string };
+}
+
+interface ProfileCorpus {
+  posts: UserPost[];
+  scanPostCount: number;
+  timelinePostCount: number;
+  platforms: string[];
+  startDate: Date | null;
+  endDate: Date | null;
+}
+
+interface HistoricalBackfillContext {
+  investigations: Array<{ query: string; timestamp: Date }>;
 }
 
 @Processor('analysis', { concurrency: 2 })
@@ -168,7 +181,8 @@ export class AnalysisProcessor extends WorkerHost {
       // Fetch historical timeline
       let historicalPosts: UserPost[] = [];
       try {
-        historicalPosts = await this.fetchTimeline(handle);
+        const timeline = await this.fetchTimeline(handle, userTopicPosts[0]?.platform ?? 'unknown');
+        historicalPosts = timeline.posts;
       } catch {
         this.logger.debug(`Timeline fetch failed for @${handle}`);
       }
@@ -252,6 +266,20 @@ export class AnalysisProcessor extends WorkerHost {
           credibilityScore: cred?.overallScore ?? null,
           botProbability: bot?.botProbability ?? null,
           flags: userResult.flags ?? [],
+          observedPosts: [
+            ...(userResult.user.topicPosts ?? []),
+            ...(userResult.user.historicalPosts ?? []),
+          ].map((post: any) => ({
+            text: post.text ?? '',
+            timestamp: post.timestamp ?? new Date().toISOString(),
+            platform: post.platform ?? userResult.user.platform ?? 'unknown',
+            url: post.url ?? null,
+            engagement: post.engagement ?? { likes: 0, comments: 0, shares: 0 },
+            sentiment: post.sentiment ?? { score: 0, label: 'neutral' },
+            investigationQuery: query,
+            sourceKind: 'investigation' as const,
+            capturedAt: new Date(),
+          })),
         });
       }
       this.logger.log(`Upserted ${investigationResult.users.length} identity records from queue`);
@@ -349,43 +377,51 @@ export class AnalysisProcessor extends WorkerHost {
     await this.identityRepo.updateProfileStatus(identityId, 'generating');
 
     try {
-      // Gather posts from all investigations for this user
-      const allPosts: UserPost[] = [];
+      const profileMode = analysisJob.input.profileMode ?? 'current-state';
+      const profileCorpus = await this.buildProfileCorpus(
+        identity.primaryHandle,
+        identity.primaryPlatform,
+        analysisJob.scanId,
+        identity.observedPosts ?? [],
+        { investigations: identity.investigations ?? [] },
+        {
+          profileMode,
+          startDate: analysisJob.input.startDate ?? null,
+          endDate: analysisJob.input.endDate ?? null,
+        },
+      );
 
-      // Try to get posts from the scan job (null for identity-scoped jobs)
-      if (analysisJob.scanId) {
-        const scanPosts = await this.scanJobRepo.getJobPosts(analysisJob.scanId);
-        const userPosts = scanPosts.filter((p: any) =>
-          (p.authorHandle ?? '').toLowerCase() === identity.primaryHandle.toLowerCase(),
-        );
-        for (const p of userPosts as any[]) {
-          allPosts.push({
-            text: p.text ?? '',
-            timestamp: p.timestamp ?? new Date().toISOString(),
-            platform: p.platform ?? 'unknown',
-            url: p.url,
-            engagement: p.engagement ?? { likes: 0, comments: 0, shares: 0 },
-            sentiment: p.sentiment ?? { score: 0, label: 'neutral' },
-          });
-        }
-      }
-
-      // Also fetch fresh timeline
-      const timelinePosts = await this.fetchTimeline(identity.primaryHandle);
-      allPosts.push(...timelinePosts);
-
-      if (allPosts.length === 0) {
+      if (profileCorpus.posts.length === 0) {
         await this.identityRepo.updateProfileStatus(identityId, 'failed');
-        throw new Error(`No posts available for profiling @${identity.primaryHandle} — need timeline data from at least one connector`);
+        throw new Error(
+          profileMode === 'investigation-window'
+            ? `No posts available for profiling @${identity.primaryHandle} inside the selected investigation window`
+            : `No posts available for profiling @${identity.primaryHandle} — need timeline data from at least one connector`,
+        );
       }
 
-      const profile = await this.profilerService.generateProfile({
+      const generatedProfile = await this.profilerService.generateProfile({
         handle: identity.primaryHandle,
         platform: identity.primaryPlatform,
-        posts: allPosts,
+        posts: profileCorpus.posts,
         authorProfile: identity.authorProfile,
         existingProfile: identity.psychologicalProfile,
       });
+
+      const profile = {
+        ...generatedProfile,
+        profileMode,
+        scopeLabel: this.buildScopeLabel(profileMode, profileCorpus.startDate, profileCorpus.endDate),
+        scope: {
+          investigationId: analysisJob.input.investigationId ?? null,
+          scanId: analysisJob.scanId ?? null,
+          startDate: profileCorpus.startDate,
+          endDate: profileCorpus.endDate,
+          platforms: profileCorpus.platforms,
+          scanPostCount: profileCorpus.scanPostCount,
+          timelinePostCount: profileCorpus.timelinePostCount,
+        },
+      };
 
       await this.identityRepo.updatePsychologicalProfile(identityId, profile);
       this.logger.log(
@@ -407,17 +443,20 @@ export class AnalysisProcessor extends WorkerHost {
   /** Max age for cached timelines: 6 hours */
   private static readonly TIMELINE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
-  private async fetchTimeline(handle: string): Promise<UserPost[]> {
+  private async fetchTimeline(handle: string, platform: string): Promise<{ posts: UserPost[]; platforms: string[] }> {
     // Check identity record for a cached timeline first
     try {
       const cached = await this.identityRepo.getCachedTimeline(
         handle,
-        'unknown', // platform not known here — getCachedTimeline does a handle lookup
+        platform,
         AnalysisProcessor.TIMELINE_CACHE_MAX_AGE_MS,
       );
       if (cached && cached.length > 0) {
         this.logger.debug(`Using cached timeline for @${handle}: ${cached.length} posts`);
-        return cached;
+        return {
+          posts: cached,
+          platforms: Array.from(new Set(cached.map((post) => post.platform).filter(Boolean))),
+        };
       }
     } catch {
       // Cache miss — fetch fresh
@@ -461,10 +500,274 @@ export class AnalysisProcessor extends WorkerHost {
     // Cache the results on the identity record (fire-and-forget)
     if (allPosts.length > 0) {
       this.identityRepo
-        .setCachedTimeline(handle, 'unknown', allPosts, platforms)
+        .setCachedTimeline(handle, platform, allPosts, platforms)
         .catch(() => {});
     }
 
-    return allPosts;
+    return { posts: allPosts, platforms };
+  }
+
+  private async buildProfileCorpus(
+    handle: string,
+    platform: string,
+    scanId: string | null,
+    observedPosts: Array<{
+      text: string;
+      timestamp: string;
+      platform: string;
+      url?: string | null;
+      engagement: { likes: number; comments: number; shares: number };
+      sentiment: { score: number; label: string };
+    }>,
+    history: HistoricalBackfillContext,
+    options: {
+      profileMode: PsychologicalProfileMode;
+      startDate?: Date | string | null;
+      endDate?: Date | string | null;
+    },
+  ): Promise<ProfileCorpus> {
+    const windowStart = this.coerceDate(options.startDate);
+    const windowEnd = this.coerceDate(options.endDate);
+
+    switch (options.profileMode) {
+      case 'investigation-window':
+        return this.getInvestigationWindowCorpus(handle, scanId, windowStart, windowEnd);
+      case 'historical':
+        return this.getHistoricalCorpus(handle, platform, scanId, observedPosts, history, windowStart, windowEnd);
+      case 'current-state':
+      default:
+        return this.getCurrentStateCorpus(handle, platform);
+    }
+  }
+
+  private async getInvestigationWindowCorpus(
+    handle: string,
+    scanId: string | null,
+    startDate: Date | null,
+    endDate: Date | null,
+  ): Promise<ProfileCorpus> {
+    if (!scanId) {
+      return {
+        posts: [],
+        scanPostCount: 0,
+        timelinePostCount: 0,
+        platforms: [],
+        startDate,
+        endDate,
+      };
+    }
+
+    const scanPosts = await this.scanJobRepo.getJobPosts(scanId);
+    const normalized = this.normalizeScanPostsForHandle(scanPosts, handle, startDate, endDate);
+
+    return {
+      posts: normalized,
+      scanPostCount: normalized.length,
+      timelinePostCount: 0,
+      platforms: Array.from(new Set(normalized.map((post) => post.platform).filter(Boolean))),
+      startDate: startDate ?? this.getMinTimestamp(normalized),
+      endDate: endDate ?? this.getMaxTimestamp(normalized),
+    };
+  }
+
+  private async getCurrentStateCorpus(handle: string, platform: string): Promise<ProfileCorpus> {
+    const timeline = await this.fetchTimeline(handle, platform);
+    const posts = this.dedupePosts(timeline.posts);
+
+    return {
+      posts,
+      scanPostCount: 0,
+      timelinePostCount: posts.length,
+      platforms: Array.from(new Set(timeline.platforms.concat(posts.map((post) => post.platform)).filter(Boolean))),
+      startDate: this.getMinTimestamp(posts),
+      endDate: this.getMaxTimestamp(posts),
+    };
+  }
+
+  private async getHistoricalCorpus(
+    handle: string,
+    platform: string,
+    scanId: string | null,
+    observedPosts: Array<{
+      text: string;
+      timestamp: string;
+      platform: string;
+      url?: string | null;
+      engagement: { likes: number; comments: number; shares: number };
+      sentiment: { score: number; label: string };
+    }>,
+    history: HistoricalBackfillContext,
+    startDate: Date | null,
+    endDate: Date | null,
+  ): Promise<ProfileCorpus> {
+    const scopedScan = await this.getInvestigationWindowCorpus(handle, scanId, startDate, endDate);
+    const timeline = await this.fetchTimeline(handle, platform);
+    const persisted = observedPosts
+      .map((post) => ({
+        text: post.text ?? '',
+        timestamp: post.timestamp ?? new Date().toISOString(),
+        platform: post.platform ?? 'unknown',
+        url: post.url ?? undefined,
+        engagement: post.engagement ?? { likes: 0, comments: 0, shares: 0 },
+        sentiment: post.sentiment ?? { score: 0, label: 'neutral' },
+      }))
+      .filter((post) => this.isWithinWindow(post.timestamp, startDate, endDate));
+    const backfilled = persisted.length >= 40
+      ? []
+      : await this.backfillHistoricalPostsFromScans(handle, history.investigations, startDate, endDate);
+    const posts = this.dedupePosts([...persisted, ...backfilled, ...scopedScan.posts, ...timeline.posts]);
+
+    return {
+      posts,
+      scanPostCount: scopedScan.scanPostCount + persisted.length + backfilled.length,
+      timelinePostCount: timeline.posts.length,
+      platforms: Array.from(
+        new Set([
+          ...scopedScan.platforms,
+          ...timeline.platforms,
+          ...persisted.map((post) => post.platform),
+          ...backfilled.map((post) => post.platform),
+          ...posts.map((post) => post.platform),
+        ].filter(Boolean)),
+      ),
+      startDate: this.getMinTimestamp(posts),
+      endDate: this.getMaxTimestamp(posts),
+    };
+  }
+
+  private async backfillHistoricalPostsFromScans(
+    handle: string,
+    investigations: Array<{ query: string; timestamp: Date }>,
+    startDate: Date | null,
+    endDate: Date | null,
+  ): Promise<UserPost[]> {
+    const recentQueries = Array.from(
+      new Set(
+        investigations
+          .slice()
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+          .map((investigation) => investigation.query)
+          .filter(Boolean)
+          .slice(0, 12),
+      ),
+    );
+
+    if (recentQueries.length === 0) return [];
+
+    try {
+      const scans = await this.scanJobRepo.getCompletedJobsForQueries(recentQueries, 24);
+      const posts: UserPost[] = [];
+      for (const scan of scans) {
+        const scanPosts = Array.isArray(scan.posts) ? scan.posts : [];
+        posts.push(...this.normalizeScanPostsForHandle(scanPosts, handle, startDate, endDate));
+      }
+      return this.dedupePosts(posts);
+    } catch (err) {
+      this.logger.debug(`Historical scan backfill failed for @${handle}: ${err}`);
+      return [];
+    }
+  }
+
+  private normalizeScanPostsForHandle(
+    scanPosts: unknown[],
+    handle: string,
+    startDate: Date | null,
+    endDate: Date | null,
+  ): UserPost[] {
+    const targetHandle = handle.toLowerCase();
+
+    return (Array.isArray(scanPosts) ? scanPosts : [])
+      .filter((post: any) => {
+        const authorHandle = typeof post?.authorHandle === 'string' ? post.authorHandle.toLowerCase() : '';
+        return authorHandle === targetHandle;
+      })
+      .map((post: any) => ({
+        text: typeof post?.text === 'string' ? post.text : '',
+        timestamp: typeof post?.timestamp === 'string' ? post.timestamp : new Date().toISOString(),
+        platform: typeof post?.platform === 'string' ? post.platform : 'unknown',
+        url: typeof post?.url === 'string' ? post.url : undefined,
+        engagement: post?.engagement ?? { likes: 0, comments: 0, shares: 0 },
+        sentiment: post?.sentiment ?? { score: 0, label: 'neutral' },
+      }))
+      .filter((post) => this.isWithinWindow(post.timestamp, startDate, endDate));
+  }
+
+  private dedupePosts(posts: UserPost[]): UserPost[] {
+    const seen = new Map<string, UserPost>();
+    for (const post of posts) {
+      const normalizedText = post.text.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 180);
+      const minuteBucket = this.coerceDate(post.timestamp)?.toISOString().slice(0, 16) ?? 'unknown';
+      const key = [
+        post.platform ?? 'unknown',
+        post.url ?? '',
+        minuteBucket,
+        normalizedText,
+      ].join('::');
+      if (!seen.has(key)) {
+        seen.set(key, post);
+      }
+    }
+    return Array.from(seen.values()).sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
+  }
+
+  private buildScopeLabel(
+    profileMode: PsychologicalProfileMode,
+    startDate: Date | null,
+    endDate: Date | null,
+  ): string {
+    switch (profileMode) {
+      case 'investigation-window':
+        return startDate || endDate
+          ? `Investigation window (${this.formatScopeDate(startDate)} to ${this.formatScopeDate(endDate)})`
+          : 'Investigation window';
+      case 'historical':
+        return 'Historical corpus';
+      case 'current-state':
+      default:
+        return 'Current state';
+    }
+  }
+
+  private formatScopeDate(value: Date | null): string {
+    if (!value) return 'unknown';
+    return value.toISOString().slice(0, 10);
+  }
+
+  private coerceDate(value: Date | string | null | undefined): Date | null {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  private isWithinWindow(
+    timestamp: string,
+    startDate: Date | null,
+    endDate: Date | null,
+  ): boolean {
+    const ts = this.coerceDate(timestamp);
+    if (!ts) return false;
+    if (startDate && ts.getTime() < startDate.getTime()) return false;
+    if (endDate && ts.getTime() > endDate.getTime()) return false;
+    return true;
+  }
+
+  private getMinTimestamp(posts: UserPost[]): Date | null {
+    if (posts.length === 0) return null;
+    const values = posts
+      .map((post) => this.coerceDate(post.timestamp)?.getTime() ?? null)
+      .filter((value): value is number => value != null);
+    if (values.length === 0) return null;
+    return new Date(Math.min(...values));
+  }
+
+  private getMaxTimestamp(posts: UserPost[]): Date | null {
+    if (posts.length === 0) return null;
+    const values = posts
+      .map((post) => this.coerceDate(post.timestamp)?.getTime() ?? null)
+      .filter((value): value is number => value != null);
+    if (values.length === 0) return null;
+    return new Date(Math.max(...values));
   }
 }

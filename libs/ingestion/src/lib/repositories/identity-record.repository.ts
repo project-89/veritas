@@ -5,6 +5,7 @@ import {
   IdentityRecordModel,
   type IdentityRecord,
   type InvestigationSnapshot,
+  type ObservedPost,
   type PlatformAccount,
   type ProfileImage,
   type PsychologicalProfile,
@@ -13,6 +14,7 @@ import {
 @Injectable()
 export class IdentityRecordRepository implements OnModuleInit {
   private readonly logger = new Logger(IdentityRecordRepository.name);
+  private static readonly MAX_OBSERVED_POSTS = 600;
   private repo!: Repository<IdentityRecord>;
   private initialized = false;
 
@@ -121,6 +123,7 @@ export class IdentityRecordRepository implements OnModuleInit {
     credibilityScore?: number | null;
     botProbability?: number | null;
     flags?: string[];
+    observedPosts?: ObservedPost[];
   }): Promise<IdentityRecord> {
     this.ensureInitialized();
 
@@ -146,6 +149,7 @@ export class IdentityRecordRepository implements OnModuleInit {
     credibilityScore?: number | null;
     botProbability?: number | null;
     flags?: string[];
+    observedPosts?: ObservedPost[];
   }): Promise<IdentityRecord> {
     const handle = params.handle.toLowerCase();
     const now = new Date();
@@ -157,6 +161,7 @@ export class IdentityRecordRepository implements OnModuleInit {
         url: '',
         discoveredAt: now,
         discoveryMethod: 'investigation',
+        discoveryTier: 'actionable',
         verified: true,
       },
       ...(params.sherlockAccounts ?? []),
@@ -196,6 +201,7 @@ export class IdentityRecordRepository implements OnModuleInit {
       lastInvestigatedAt: now,
       psychologicalProfile: null,
       profileGenerationStatus: 'none',
+      observedPosts: this.mergeObservedPostLists([], params.observedPosts ?? []),
       aggregatedFlags: params.flags ?? [],
       totalPostsAnalyzed: params.snapshot.postCount,
     } as Partial<IdentityRecord>);
@@ -218,6 +224,7 @@ export class IdentityRecordRepository implements OnModuleInit {
       credibilityScore?: number | null;
       botProbability?: number | null;
       flags?: string[];
+      observedPosts?: ObservedPost[];
     },
   ): Promise<IdentityRecord> {
     const id = existing._id?.toString() ?? existing.id;
@@ -270,6 +277,7 @@ export class IdentityRecordRepository implements OnModuleInit {
       investigations: [...existing.investigations, params.snapshot],
       totalInvestigations: existing.totalInvestigations + 1,
       lastInvestigatedAt: now,
+      observedPosts: this.mergeObservedPostLists(existing.observedPosts ?? [], params.observedPosts ?? []),
       aggregatedFlags: Array.from(allFlags),
       totalPostsAnalyzed: existing.totalPostsAnalyzed + params.snapshot.postCount,
     };
@@ -299,6 +307,25 @@ export class IdentityRecordRepository implements OnModuleInit {
     this.ensureInitialized();
     await this.repo.updateById(id, {
       profileGenerationStatus: status,
+    } as Partial<IdentityRecord>);
+  }
+
+  // -------------------------------------------------------------------------
+  // Historical post archive
+  // -------------------------------------------------------------------------
+
+  async mergeObservedPostsByHandle(
+    handle: string,
+    platform: string,
+    posts: ObservedPost[],
+  ): Promise<void> {
+    this.ensureInitialized();
+    const record = await this.findByHandle(handle.toLowerCase(), platform);
+    if (!record || posts.length === 0) return;
+
+    const id = record._id?.toString() ?? record.id;
+    await this.repo.updateById(id, {
+      observedPosts: this.mergeObservedPostLists(record.observedPosts ?? [], posts),
     } as Partial<IdentityRecord>);
   }
 
@@ -396,6 +423,14 @@ export class IdentityRecordRepository implements OnModuleInit {
           fetchedAt: new Date().toISOString(),
           platforms,
         },
+        observedPosts: this.mergeObservedPostLists(
+          record.observedPosts ?? [],
+          posts.map((post) => ({
+            ...post,
+            sourceKind: 'timeline',
+            capturedAt: new Date(),
+          })),
+        ),
       } as Partial<IdentityRecord>);
 
       this.logger.debug(`Cached ${posts.length} timeline posts for @${handle}`);
@@ -431,5 +466,63 @@ export class IdentityRecordRepository implements OnModuleInit {
 
     this.logger.log(`Linked identities ${idA} <-> ${idB} (cluster: ${clusterId})`);
     return clusterId;
+  }
+
+  private mergeObservedPostLists(
+    existingPosts: ObservedPost[],
+    incomingPosts: ObservedPost[],
+  ): ObservedPost[] {
+    const merged = new Map<string, ObservedPost>();
+
+    for (const post of [...existingPosts, ...incomingPosts]) {
+      const normalized = this.normalizeObservedPost(post);
+      const key = this.getObservedPostKey(normalized);
+      const prior = merged.get(key);
+      if (!prior) {
+        merged.set(key, normalized);
+        continue;
+      }
+
+      merged.set(key, {
+        ...prior,
+        ...normalized,
+        investigationQuery: normalized.investigationQuery ?? prior.investigationQuery ?? null,
+        url: normalized.url ?? prior.url ?? null,
+      });
+    }
+
+    return Array.from(merged.values())
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, IdentityRecordRepository.MAX_OBSERVED_POSTS);
+  }
+
+  private normalizeObservedPost(post: ObservedPost): ObservedPost {
+    return {
+      text: typeof post.text === 'string' ? post.text : '',
+      timestamp: typeof post.timestamp === 'string' ? post.timestamp : new Date().toISOString(),
+      platform: typeof post.platform === 'string' && post.platform.length > 0 ? post.platform : 'unknown',
+      url: typeof post.url === 'string' && post.url.length > 0 ? post.url : null,
+      engagement: {
+        likes: post.engagement?.likes ?? 0,
+        comments: post.engagement?.comments ?? 0,
+        shares: post.engagement?.shares ?? 0,
+      },
+      sentiment: {
+        score: post.sentiment?.score ?? 0,
+        label: typeof post.sentiment?.label === 'string' ? post.sentiment.label : 'neutral',
+      },
+      investigationQuery:
+        typeof post.investigationQuery === 'string' && post.investigationQuery.length > 0
+          ? post.investigationQuery
+          : null,
+      sourceKind: post.sourceKind === 'timeline' ? 'timeline' : 'investigation',
+      capturedAt: post.capturedAt instanceof Date ? post.capturedAt : new Date(),
+    };
+  }
+
+  private getObservedPostKey(post: ObservedPost): string {
+    const normalizedText = post.text.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 180);
+    const timeBucket = post.timestamp.slice(0, 16);
+    return [post.platform, post.url ?? '', timeBucket, normalizedText].join('::');
   }
 }

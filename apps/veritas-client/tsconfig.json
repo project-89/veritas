@@ -19,9 +19,11 @@
     "**/*.tsx",
     "**/*.js",
     "**/*.jsx",
-    "next-env.d.ts",
-    "../../libs/**/*.ts",
-    "../../libs/**/*.tsx"
+    "next-env.d.ts"
   ],
-  "exclude": ["node_modules", ".next", "out"]
+  "exclude": [
+    "node_modules",
+    ".next",
+    "out"
+  ]
 }

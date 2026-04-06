@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { IdentityRecord, PsychologicalProfile } from '../../lib/api';
+import type { IdentityRecord, MagiProfileMode, PlatformAccount, PsychologicalProfile } from '../../lib/api';
 import { NervBadge } from './nerv-badge';
 import { NervBar } from './nerv-bar';
 import { NervSparkline } from './nerv-sparkline';
@@ -9,7 +9,7 @@ import { NervSparkline } from './nerv-sparkline';
 interface IdentityDossierProps {
   identity: IdentityRecord;
   loading?: boolean;
-  onGenerateProfile?: (id: string) => void;
+  onGenerateProfile?: (id: string, mode: MagiProfileMode) => void;
 }
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -31,6 +31,26 @@ const ROLE_ICONS: Record<string, string> = {
   provocateur: '\u26A0', // warning
   analyst: '\u2318', // command
 };
+
+const DISCOVERY_TIER_LABELS: Record<'actionable' | 'corroborating' | 'extended', string> = {
+  actionable: 'Actionable',
+  corroborating: 'Corroborating',
+  extended: 'Extended',
+};
+
+const MAGI_MODE_LABELS: Record<MagiProfileMode, string> = {
+  'investigation-window': 'INV WINDOW',
+  'current-state': 'CURRENT',
+  historical: 'HISTORICAL',
+};
+
+function normalizeDiscoveryTier(account: PlatformAccount): 'actionable' | 'corroborating' | 'extended' {
+  if (account.discoveryTier === 'actionable' || account.discoveryTier === 'corroborating' || account.discoveryTier === 'extended') {
+    return account.discoveryTier;
+  }
+  if (account.verified) return 'actionable';
+  return account.discoveryMethod === 'sherlock' ? 'corroborating' : 'actionable';
+}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -130,34 +150,71 @@ function AuthorStats({ identity }: { identity: IdentityRecord }) {
 function CrossPlatformMap({ identity }: { identity: IdentityRecord }) {
   if (identity.platformAccounts.length <= 1) return null;
 
+  const grouped = {
+    actionable: identity.platformAccounts.filter((account) => normalizeDiscoveryTier(account) === 'actionable'),
+    corroborating: identity.platformAccounts.filter((account) => normalizeDiscoveryTier(account) === 'corroborating'),
+    extended: identity.platformAccounts.filter((account) => normalizeDiscoveryTier(account) === 'extended'),
+  };
+
+  const visibleGroups = [
+    ['actionable', grouped.actionable],
+    ['corroborating', grouped.corroborating],
+  ] as const;
+
+  const hasVisibleAccounts = visibleGroups.some(([, accounts]) => accounts.length > 0);
+  if (!hasVisibleAccounts) return null;
+
   return (
     <div className="space-y-1">
-      <div className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
-        Cross-Platform Presence
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
+          Cross-Platform Presence
+        </div>
+        {grouped.extended.length > 0 && (
+          <div className="text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted">
+            +{grouped.extended.length} extended match{grouped.extended.length === 1 ? '' : 'es'}
+          </div>
+        )}
       </div>
-      <div className="flex flex-wrap gap-1">
-        {identity.platformAccounts.map((account, i) => (
-          <a
-            key={`${account.platform}-${account.handle}-${i}`}
-            href={account.url || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 px-2 py-0.5 bg-nerv-bg-elevated/40 border border-nerv-border rounded-sm hover:border-nerv-orange/50 transition-colors"
-          >
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{
-                backgroundColor: PLATFORM_COLORS[account.platform] ?? '#888',
-              }}
-            />
-            <span className="text-[9px] font-mono text-nerv-text-secondary">
-              @{account.handle}
-            </span>
-            {account.verified && (
-              <span className="text-[8px] text-nerv-green">{'\u2713'}</span>
-            )}
-          </a>
-        ))}
+      <div className="space-y-2">
+        {visibleGroups.map(([tier, accounts]) => {
+          if (accounts.length === 0) return null;
+          return (
+            <div key={tier} className="space-y-1">
+              <div className="text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted">
+                {DISCOVERY_TIER_LABELS[tier]}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {accounts.map((account, i) => (
+                  <a
+                    key={`${account.platform}-${account.handle}-${i}`}
+                    href={account.url || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-nerv-bg-elevated/40 border border-nerv-border rounded-sm hover:border-nerv-orange/50 transition-colors"
+                    title={`${DISCOVERY_TIER_LABELS[tier]} match on ${account.platform}`}
+                  >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{
+                        backgroundColor: PLATFORM_COLORS[account.platform] ?? '#888',
+                      }}
+                    />
+                    <span className="text-[9px] font-mono text-nerv-text-secondary">
+                      @{account.handle}
+                    </span>
+                    <span className="text-[8px] font-mono uppercase text-nerv-text-muted">
+                      {account.platform}
+                    </span>
+                    {account.verified && (
+                      <span className="text-[8px] text-nerv-green">{'\u2713'}</span>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -231,6 +288,10 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
 
 function MagiProfile({ profile }: { profile: PsychologicalProfile }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const profileMode = profile.profileMode ?? 'current-state';
+  const scope = profile.scope;
+  const scanPostCount = scope?.scanPostCount ?? 0;
+  const timelinePostCount = scope?.timelinePostCount ?? profile.postCountAnalyzed;
 
   const toggle = (section: string) =>
     setExpanded(expanded === section ? null : section);
@@ -244,6 +305,14 @@ function MagiProfile({ profile }: { profile: PsychologicalProfile }) {
         </span>
         <span className="text-[9px] font-mono text-nerv-text-muted">
           {profile.postCountAnalyzed} posts analyzed
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-secondary">
+          {profile.scopeLabel || MAGI_MODE_LABELS[profileMode]}
+        </span>
+        <span className="text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted">
+          {scanPostCount > 0 ? `${scanPostCount} scan` : '0 scan'} / {timelinePostCount} timeline
         </span>
       </div>
 
@@ -594,6 +663,7 @@ export function IdentityDossier({
   const id = identity._id ?? identity.id;
   const hasProfile = identity.psychologicalProfile != null;
   const profileStatus = identity.profileGenerationStatus;
+  const canGenerate = profileStatus !== 'queued' && profileStatus !== 'generating';
 
   return (
     <div className="p-3 space-y-3">
@@ -625,35 +695,49 @@ export function IdentityDossier({
         </div>
       )}
 
-      {/* MAGI Profile or generate button */}
+      <div className="p-3 border border-nerv-orange/30 bg-nerv-orange/5 rounded-sm space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-orange">
+            MAGI PROFILE SCOPE
+          </span>
+          <span className="text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted">
+            {profileStatus === 'queued'
+              ? 'QUEUED'
+              : profileStatus === 'generating'
+                ? 'GENERATING'
+                : hasProfile
+                  ? 'READY'
+                  : 'IDLE'}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {(Object.keys(MAGI_MODE_LABELS) as MagiProfileMode[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => onGenerateProfile?.(id, mode)}
+              disabled={!canGenerate}
+              className={`px-2 py-2 font-mono uppercase tracking-wider text-[9px] border rounded-sm transition-colors ${
+                canGenerate
+                  ? 'bg-nerv-orange/15 text-nerv-orange hover:bg-nerv-orange/25 border-nerv-orange/40'
+                  : 'bg-nerv-amber/20 text-nerv-amber border-nerv-amber/50 cursor-wait animate-pulse'
+              }`}
+              title={`Generate ${MAGI_MODE_LABELS[mode].toLowerCase()} MAGI profile`}
+            >
+              {MAGI_MODE_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+        <p className="text-[9px] font-mono text-nerv-text-muted leading-relaxed">
+          Window mode uses the current investigation slice. Current mode uses the latest accessible timeline. Historical mode uses the widest locally available corpus.
+        </p>
+      </div>
+
       {hasProfile && identity.psychologicalProfile ? (
         <MagiProfile profile={identity.psychologicalProfile} />
       ) : (
-        <div className="p-3 border border-nerv-orange/30 bg-nerv-orange/5 rounded-sm">
-          <button
-            onClick={() => onGenerateProfile?.(id)}
-            disabled={profileStatus === 'generating'}
-            className={`w-full px-4 py-2.5 font-mono uppercase tracking-wider text-xs border rounded-sm transition-colors font-bold ${
-              profileStatus === 'queued' || profileStatus === 'generating'
-                ? 'bg-nerv-amber/20 text-nerv-amber border-nerv-amber/50 cursor-wait animate-pulse'
-                : 'bg-nerv-orange/20 text-nerv-orange hover:bg-nerv-orange/30 border-nerv-orange/50'
-            }`}
-          >
-            {profileStatus === 'queued'
-              ? '\u23F3 MAGI PROFILE QUEUED...'
-              : profileStatus === 'generating'
-              ? '\u23F3 GENERATING MAGI PROFILE...'
-              : profileStatus === 'failed'
-              ? '\u26A0 RETRY MAGI PROFILE'
-              : '\u25B6 GENERATE MAGI PROFILE'}
-          </button>
-          <p className="text-[9px] font-mono text-nerv-text-muted mt-2 leading-relaxed">
-            Deep psychological and behavioral analysis using{' '}
-            {identity.totalPostsAnalyzed}+ posts. Analyzes communication style,
-            beliefs, emotional triggers, influence patterns, and risk
-            indicators.
-          </p>
-        </div>
+        <p className="text-[9px] font-mono text-nerv-text-muted leading-relaxed">
+          Deep psychological and behavioral analysis using {identity.totalPostsAnalyzed}+ observed posts. Covers communication style, beliefs, emotional triggers, influence patterns, and risk indicators.
+        </p>
       )}
 
       {/* Investigation timeline */}

@@ -40,6 +40,7 @@ import {
   type StartAnalysisJobRequest,
   getIdentityByHandle,
   generateMagiProfile,
+  type MagiProfileMode,
   type DeviationResponse,
   type PropagandaAnalysisResult,
   type EntityAnalysisResponse,
@@ -373,6 +374,44 @@ function InvestigationWorkspace() {
     [dispatch],
   );
 
+  const findPersistedScan = useCallback(
+    async (
+      targetQuery: string,
+      investigationId?: string | null,
+      exactScanId?: string | null,
+    ): Promise<ScanJob | null> => {
+      if (exactScanId) {
+        try {
+          const exactScan = await getScanStatus(exactScanId);
+          if (exactScan.status === 'completed' && exactScan.totalPosts > 0) {
+            return exactScan;
+          }
+        } catch {
+          // Fall back to investigation/query lookup below.
+        }
+      }
+
+      try {
+        const recentScans = await getRecentScans(100);
+        const completedScans = recentScans.filter(
+          (scan) => scan.status === 'completed' && scan.totalPosts > 0,
+        );
+
+        if (investigationId) {
+          const byInvestigation = completedScans.find(
+            (scan) => scan.investigationId === investigationId,
+          );
+          if (byInvestigation) return byInvestigation;
+        }
+
+        return completedScans.find((scan) => scan.query === targetQuery) ?? null;
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
   // ---- Helper: run analysis stages 2-6 on collected posts ----
   const runAnalysisStages = useCallback(
     async (posts: RawPost[]) => {
@@ -469,6 +508,20 @@ function InvestigationWorkspace() {
         const insights = posts
           .map((p: any) => {
             const entityList = Array.isArray(p.entities) ? p.entities : [];
+            const authorEntity =
+              typeof p.authorHandle === 'string' && p.authorHandle.trim().length > 0
+                ? {
+                    name: p.authorHandle.trim().replace(/^@+/, ''),
+                    type: 'person',
+                    relevance: 0.9,
+                  }
+                : typeof p.authorName === 'string' && p.authorName.trim().length > 0
+                  ? {
+                      name: p.authorName.trim(),
+                      type: 'person',
+                      relevance: 0.7,
+                    }
+                  : null;
             const themeEntities = Array.isArray(p.themes)
               ? p.themes
                   .filter((theme: unknown): theme is string => typeof theme === 'string' && theme.trim().length > 0)
@@ -480,7 +533,7 @@ function InvestigationWorkspace() {
               : [];
 
             const deduped = new Map<string, { name: string; type: string; relevance: number }>();
-            for (const entity of [...entityList, ...themeEntities]) {
+            for (const entity of [...entityList, ...(authorEntity ? [authorEntity] : []), ...themeEntities]) {
               if (!entity || typeof entity.name !== 'string' || entity.name.trim().length === 0) continue;
               const key = `${entity.type ?? 'entity'}::${entity.name.trim().toLowerCase()}`;
               if (!deduped.has(key)) {
@@ -636,6 +689,9 @@ function InvestigationWorkspace() {
 
     const run = async () => {
       let posts: RawPost[] = [];
+      let resolvedPersistedScan: ScanJob | null = null;
+      let resolvedInvestigationId: string | null = invId;
+      let resolvedScanId: string | null = null;
 
       // --- Stage 1: Try cached snapshot first, then fresh search ---
       dispatch({ type: 'SET_PIPELINE', stage: 'search', status: 'running' });
@@ -654,7 +710,9 @@ function InvestigationWorkspace() {
           }
 
           if (targetInvId) {
-            const { snapshot } = await fetchInvestigation(targetInvId);
+            const { investigation, snapshot } = await fetchInvestigation(targetInvId);
+            resolvedInvestigationId = targetInvId;
+            resolvedScanId = snapshot?.scanId ?? investigation.lastScanId ?? null;
             if (snapshot && Array.isArray(snapshot.posts) && snapshot.posts.length > 0) {
               posts = snapshot.posts as RawPost[];
               dispatch({
@@ -663,6 +721,14 @@ function InvestigationWorkspace() {
                 insights: [],
                 summary: snapshot.summary ?? null,
               });
+              if (Array.isArray(snapshot.narratives) && snapshot.narratives.length > 0) {
+                dispatch({
+                  type: 'SET_NARRATIVES',
+                  narratives: snapshot.narratives as AnalyzedNarrative[],
+                  unclusteredCount: 0,
+                });
+                dispatch({ type: 'SET_PIPELINE', stage: 'analyze', status: 'done' });
+              }
               dispatch({ type: 'SET_PIPELINE', stage: 'search', status: 'done' });
               loadedFromCache = true;
             }
@@ -674,11 +740,9 @@ function InvestigationWorkspace() {
         // Try 2: Load from most recent completed scan job (scan queue stores posts too)
         if (!loadedFromCache) {
           try {
-            const recentScans = await getRecentScans(5);
-            const matchingScan = recentScans.find(
-              (s) => s.query === query && s.status === 'completed' && s.totalPosts > 0,
-            );
+            const matchingScan = await findPersistedScan(query, resolvedInvestigationId, resolvedScanId);
             if (matchingScan) {
+              resolvedPersistedScan = matchingScan;
               activeScanIdRef.current = matchingScan._id ?? matchingScan.id;
               setScanJob(matchingScan);
               const { posts: scanPosts } = await getScanPosts(activeScanIdRef.current);
@@ -710,17 +774,15 @@ function InvestigationWorkspace() {
         if (posts.length > 0) {
           // Try to restore from analysis cache (instant — no API calls)
           let restored = false;
-          const matchingScan = await getRecentScans(5).catch(() => [] as ScanJob[]);
-          const scanForQuery = matchingScan.find(
-            (s) => s.query === query && s.status === 'completed',
-          );
+          const scanForQuery =
+            resolvedPersistedScan ?? await findPersistedScan(query, resolvedInvestigationId, resolvedScanId);
           if (scanForQuery) {
             activeScanIdRef.current = scanForQuery._id ?? scanForQuery.id;
             setScanJob(scanForQuery);
             restored = await restoreFromCache(activeScanIdRef.current);
           }
 
-          // If no cache, re-run analysis
+          // If no cached analysis exists, fall back to re-analysis as a last resort.
           if (!restored) {
             await runAnalysisStages(posts);
           }
@@ -756,7 +818,7 @@ function InvestigationWorkspace() {
     };
 
     run();
-  }, [query, dispatch, runAnalysisStages]); // eslint-disable-line react-hooks/exhaustive-deps -- invId is read from searchParams, stable across renders
+  }, [query, dispatch, findPersistedScan, runAnalysisStages]); // eslint-disable-line react-hooks/exhaustive-deps -- invId is read from searchParams, stable across renders
 
   // ---- Fetch alerts ----
   useEffect(() => {
@@ -1047,9 +1109,32 @@ function InvestigationWorkspace() {
 
   const profilePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleGenerateProfile = useCallback(async (identityId: string) => {
+  const handleGenerateProfile = useCallback(async (identityId: string, mode: MagiProfileMode) => {
     try {
-      await generateMagiProfile(identityId);
+      const scanId = activeScanIdRef.current;
+      const validTimestamps = state.posts
+        .map((post) => new Date(post.timestamp).getTime())
+        .filter((value) => Number.isFinite(value));
+
+      if (mode === 'investigation-window' && (!scanId || validTimestamps.length === 0)) {
+        dispatch({ type: 'SET_ERROR', error: 'No active investigation window is available for a window-scoped MAGI profile' });
+        return;
+      }
+
+      const startDate = validTimestamps.length > 0
+        ? new Date(Math.min(...validTimestamps)).toISOString()
+        : null;
+      const endDate = validTimestamps.length > 0
+        ? new Date(Math.max(...validTimestamps)).toISOString()
+        : null;
+
+      await generateMagiProfile(identityId, {
+        mode,
+        investigationId: state.investigationId,
+        scanId: mode === 'current-state' ? null : scanId,
+        startDate: mode === 'current-state' ? null : startDate,
+        endDate: mode === 'current-state' ? null : endDate,
+      });
       // Immediately refresh to show "queued" status
       if (state.selectedActorHandle) {
         const updated = await getIdentityByHandle(state.selectedActorHandle);
@@ -1075,7 +1160,7 @@ function InvestigationWorkspace() {
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: `Profile generation failed: ${err}` });
     }
-  }, [state.selectedActorHandle, dispatch]);
+  }, [state.posts, state.investigationId, state.selectedActorHandle, dispatch]);
 
   const handleRunDownstream = useCallback(async () => {
     if (state.narratives.length === 0 || state.posts.length === 0) return;
@@ -1318,6 +1403,8 @@ function InvestigationWorkspace() {
           <EntityPanel
             entities={state.entities}
             narratives={state.narratives}
+            selectedActorHandle={state.selectedActorHandle}
+            onSelectActor={selectActor}
           />
         );
       case 'genealogy': {

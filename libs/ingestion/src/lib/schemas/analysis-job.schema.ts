@@ -25,6 +25,26 @@ class AnalysisJobInputEmbed {
   /** How many posts are in the scan job (for progress estimation) */
   @Prop({ type: Number, default: 0 })
   postCount!: number;
+
+  /** Scope mode for MAGI psychological profiles */
+  @Prop({
+    type: String,
+    enum: ['investigation-window', 'current-state', 'historical'],
+    default: 'current-state',
+  })
+  profileMode!: PsychologicalProfileMode;
+
+  /** Optional investigation context for identity-scoped jobs */
+  @Prop({ type: String, default: null })
+  investigationId!: string | null;
+
+  /** Optional scope window start */
+  @Prop({ type: Date, default: null })
+  startDate!: Date | null;
+
+  /** Optional scope window end */
+  @Prop({ type: Date, default: null })
+  endDate!: Date | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,12 +120,18 @@ AnalysisJobModel.index({ status: 1, createdAt: -1 });
 // TypeScript interfaces
 // ---------------------------------------------------------------------------
 
+export type PsychologicalProfileMode = 'investigation-window' | 'current-state' | 'historical';
+
 export interface AnalysisJobInput {
   query: string;
   narrativeSummaries: string[];
   narratives: Record<string, unknown>[];
   userHandles: string[];
   postCount: number;
+  profileMode?: PsychologicalProfileMode;
+  investigationId?: string | null;
+  startDate?: Date | string | null;
+  endDate?: Date | string | null;
 }
 
 export type AnalysisJobType = 'investigation' | 'propaganda' | 'claims' | 'downstream' | 'psychological-profile';

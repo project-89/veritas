@@ -13,8 +13,6 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
   // ---------------------------------------------------------------------------
   world_news: [
     { name: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml', category: 'world_news', tier: 1, language: 'en', region: 'global' },
-    { name: 'Reuters - World', url: 'https://www.reutersagency.com/feed/?best-topics=world&post_type=best', category: 'world_news', tier: 1, language: 'en', region: 'global' },
-    { name: 'AP News - Top Stories', url: 'https://rsshub.app/apnews/topics/apf-topnews', category: 'world_news', tier: 1, language: 'en', region: 'global' },
     { name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'world_news', tier: 1, language: 'en', region: 'global' },
     { name: 'France 24 - World', url: 'https://www.france24.com/en/rss', category: 'world_news', tier: 1, language: 'en', region: 'global' },
     { name: 'Guardian - World', url: 'https://www.theguardian.com/world/rss', category: 'world_news', tier: 1, language: 'en', region: 'global' },
@@ -25,8 +23,8 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
     { name: 'The Independent - World', url: 'https://www.independent.co.uk/news/world/rss', category: 'world_news', tier: 2, language: 'en', region: 'uk' },
     { name: 'UN News', url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml', category: 'world_news', tier: 2, language: 'en', region: 'global' },
     { name: 'Christian Science Monitor', url: 'https://rss.csmonitor.com/feeds/csm', category: 'world_news', tier: 2, language: 'en', region: 'global' },
-    { name: 'VOA News', url: 'https://www.voanews.com/api/zq_oremqvi', category: 'world_news', tier: 2, language: 'en', region: 'global' },
-    { name: 'GlobalPost via PRI', url: 'https://theworld.org/rss.xml', category: 'world_news', tier: 3, language: 'en', region: 'global' },
+    { name: 'VOA News', url: 'https://www.voanews.com/api/', category: 'world_news', tier: 2, language: 'en', region: 'global' },
+    { name: 'The World via PRI', url: 'https://latest-edition.feed.theworld.org/', category: 'world_news', tier: 3, language: 'en', region: 'global' },
   ],
 
   // ---------------------------------------------------------------------------
@@ -37,14 +35,12 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
     { name: 'PBS NewsHour', url: 'https://www.pbs.org/newshour/feeds/rss/headlines', category: 'us_politics', tier: 1, language: 'en', region: 'us' },
     { name: 'Politico', url: 'https://rss.politico.com/politics-news.xml', category: 'us_politics', tier: 1, language: 'en', region: 'us' },
     { name: 'The Hill', url: 'https://thehill.com/feed/', category: 'us_politics', tier: 1, language: 'en', region: 'us' },
-    { name: 'AP - Politics', url: 'https://rsshub.app/apnews/topics/apf-politics', category: 'us_politics', tier: 1, language: 'en', region: 'us' },
-    { name: 'Reuters - US Politics', url: 'https://www.reutersagency.com/feed/?best-topics=political-general&post_type=best', category: 'us_politics', tier: 1, language: 'en', region: 'us' },
     { name: 'Washington Post - Politics', url: 'https://feeds.washingtonpost.com/rss/politics', category: 'us_politics', tier: 1, language: 'en', region: 'us' },
     { name: 'Roll Call', url: 'https://www.rollcall.com/feed/', category: 'us_politics', tier: 2, language: 'en', region: 'us' },
     { name: 'Axios', url: 'https://api.axios.com/feed/', category: 'us_politics', tier: 2, language: 'en', region: 'us' },
     { name: 'ProPublica', url: 'https://feeds.propublica.org/propublica/main', category: 'us_politics', tier: 2, language: 'en', region: 'us' },
     { name: 'FiveThirtyEight', url: 'https://fivethirtyeight.com/features/feed/', category: 'us_politics', tier: 2, language: 'en', region: 'us' },
-    { name: 'Lawfare', url: 'https://www.lawfaremedia.org/rss.xml', category: 'us_politics', tier: 2, language: 'en', region: 'us' },
+    { name: 'Lawfare', url: 'https://www.lawfaremedia.org/feeds/articles', category: 'us_politics', tier: 2, language: 'en', region: 'us' },
   ],
 
   // ---------------------------------------------------------------------------
@@ -52,14 +48,14 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
   // ---------------------------------------------------------------------------
   europe: [
     { name: 'EuroNews', url: 'https://www.euronews.com/rss', category: 'europe', tier: 1, language: 'en', region: 'europe' },
-    { name: 'Le Monde English (via RSSHub)', url: 'https://rsshub.app/lemonde/en', category: 'europe', tier: 1, language: 'en', region: 'france' },
+    { name: 'Le Monde English', url: 'https://www.lemonde.fr/en/international/rss_full.xml', category: 'europe', tier: 1, language: 'en', region: 'france' },
     { name: 'DW - Europe', url: 'https://rss.dw.com/rdf/rss-en-eu', category: 'europe', tier: 1, language: 'en', region: 'europe' },
     { name: 'BBC - Europe', url: 'https://feeds.bbci.co.uk/news/world/europe/rss.xml', category: 'europe', tier: 1, language: 'en', region: 'europe' },
     { name: 'Guardian - Europe', url: 'https://www.theguardian.com/world/europe-news/rss', category: 'europe', tier: 2, language: 'en', region: 'europe' },
     { name: 'Politico EU', url: 'https://www.politico.eu/feed/', category: 'europe', tier: 1, language: 'en', region: 'europe' },
-    { name: 'EU Observer', url: 'https://euobserver.com/rss.xml', category: 'europe', tier: 2, language: 'en', region: 'europe' },
+    { name: 'EU Observer', url: 'https://euobserver.com/feed/', category: 'europe', tier: 2, language: 'en', region: 'europe' },
     { name: 'The Local - Europe', url: 'https://www.thelocal.com/feeds/rss.php', category: 'europe', tier: 3, language: 'en', region: 'europe' },
-    { name: 'RFERL - Europe', url: 'https://www.rferl.org/api/zrqiteuuij', category: 'europe', tier: 2, language: 'en', region: 'europe' },
+    { name: 'RFERL - Europe', url: 'https://www.rferl.org/api/', category: 'europe', tier: 2, language: 'en', region: 'europe' },
     { name: 'Balkan Insight', url: 'https://balkaninsight.com/feed/', category: 'europe', tier: 3, language: 'en', region: 'balkans' },
     { name: 'France 24 - Europe', url: 'https://www.france24.com/en/europe/rss', category: 'europe', tier: 2, language: 'en', region: 'europe' },
   ],
@@ -71,20 +67,18 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
     { name: 'Al Jazeera - Middle East', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'middle_east', tier: 1, language: 'en', region: 'middle_east' },
     { name: 'BBC - Middle East', url: 'https://feeds.bbci.co.uk/news/world/middle_east/rss.xml', category: 'middle_east', tier: 1, language: 'en', region: 'middle_east' },
     { name: 'Al-Monitor', url: 'https://www.al-monitor.com/rss', category: 'middle_east', tier: 1, language: 'en', region: 'middle_east' },
-    { name: 'Arab News', url: 'https://www.arabnews.com/rss.xml', category: 'middle_east', tier: 1, language: 'en', region: 'middle_east' },
     { name: 'Middle East Eye', url: 'https://www.middleeasteye.net/rss', category: 'middle_east', tier: 2, language: 'en', region: 'middle_east' },
     { name: 'The New Arab', url: 'https://www.newarab.com/rss', category: 'middle_east', tier: 2, language: 'en', region: 'middle_east' },
     { name: 'Iran International', url: 'https://www.iranintl.com/en/feed', category: 'middle_east', tier: 2, language: 'en', region: 'iran' },
     { name: 'Times of Israel', url: 'https://www.timesofisrael.com/feed/', category: 'middle_east', tier: 2, language: 'en', region: 'israel' },
     { name: 'Daily Sabah', url: 'https://www.dailysabah.com/rssFeed/homepage', category: 'middle_east', tier: 2, language: 'en', region: 'turkey' },
-    { name: 'Gulf News', url: 'https://gulfnews.com/rss', category: 'middle_east', tier: 3, language: 'en', region: 'gulf' },
   ],
 
   // ---------------------------------------------------------------------------
   // ASIA PACIFIC
   // ---------------------------------------------------------------------------
   asia_pacific: [
-    { name: 'Nikkei Asia', url: 'https://asia.nikkei.com/rss', category: 'asia_pacific', tier: 1, language: 'en', region: 'asia' },
+    { name: 'Nikkei Asia', url: 'https://asia.nikkei.com/rss/feed/nar', category: 'asia_pacific', tier: 1, language: 'en', region: 'asia' },
     { name: 'The Diplomat', url: 'https://thediplomat.com/feed/', category: 'asia_pacific', tier: 1, language: 'en', region: 'asia' },
     { name: 'South China Morning Post', url: 'https://www.scmp.com/rss/91/feed', category: 'asia_pacific', tier: 1, language: 'en', region: 'china' },
     { name: 'BBC - Asia', url: 'https://feeds.bbci.co.uk/news/world/asia/rss.xml', category: 'asia_pacific', tier: 1, language: 'en', region: 'asia' },
@@ -95,7 +89,6 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
     { name: 'ABC Australia', url: 'https://www.abc.net.au/news/feed/2942460/rss.xml', category: 'asia_pacific', tier: 2, language: 'en', region: 'australia' },
     { name: 'NHK World', url: 'https://www3.nhk.or.jp/rss/news/cat0.xml', category: 'asia_pacific', tier: 2, language: 'en', region: 'japan' },
     { name: 'Rappler', url: 'https://www.rappler.com/feed/', category: 'asia_pacific', tier: 3, language: 'en', region: 'philippines' },
-    { name: 'Korea Herald', url: 'http://www.koreaherald.com/common/rss_xml.php?ct=102', category: 'asia_pacific', tier: 3, language: 'en', region: 'south_korea' },
   ],
 
   // ---------------------------------------------------------------------------
@@ -104,12 +97,10 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
   africa: [
     { name: 'BBC - Africa', url: 'https://feeds.bbci.co.uk/news/world/africa/rss.xml', category: 'africa', tier: 1, language: 'en', region: 'africa' },
     { name: 'AllAfrica', url: 'https://allafrica.com/tools/headlines/rdf/latest/headlines.rdf', category: 'africa', tier: 1, language: 'en', region: 'africa' },
-    { name: 'The East African', url: 'https://www.theeastafrican.co.ke/tea/rss', category: 'africa', tier: 1, language: 'en', region: 'east_africa' },
     { name: 'Mail & Guardian', url: 'https://mg.co.za/feed/', category: 'africa', tier: 2, language: 'en', region: 'south_africa' },
-    { name: 'Daily Maverick', url: 'https://www.dailymaverick.co.za/feed/', category: 'africa', tier: 2, language: 'en', region: 'south_africa' },
     { name: 'Al Jazeera - Africa', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'africa', tier: 2, language: 'en', region: 'africa' },
     { name: 'The Africa Report', url: 'https://www.theafricareport.com/feed/', category: 'africa', tier: 2, language: 'en', region: 'africa' },
-    { name: 'Nation Africa', url: 'https://nation.africa/rss.xml', category: 'africa', tier: 3, language: 'en', region: 'kenya' },
+    { name: 'Nation Africa', url: 'https://nation.africa/kenya/rss.xml', category: 'africa', tier: 3, language: 'en', region: 'kenya' },
     { name: 'RFI Africa', url: 'https://www.rfi.fr/en/africa/rss', category: 'africa', tier: 3, language: 'en', region: 'africa' },
   ],
 
@@ -117,7 +108,6 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
   // LATIN AMERICA
   // ---------------------------------------------------------------------------
   latin_america: [
-    { name: 'Reuters - Latin America', url: 'https://www.reutersagency.com/feed/?best-topics=latin-america&post_type=best', category: 'latin_america', tier: 1, language: 'en', region: 'latin_america' },
     { name: 'BBC - Latin America', url: 'https://feeds.bbci.co.uk/news/world/latin_america/rss.xml', category: 'latin_america', tier: 1, language: 'en', region: 'latin_america' },
     { name: 'InSight Crime', url: 'https://insightcrime.org/feed/', category: 'latin_america', tier: 1, language: 'en', region: 'latin_america' },
     { name: 'Americas Quarterly', url: 'https://americasquarterly.org/feed/', category: 'latin_america', tier: 2, language: 'en', region: 'latin_america' },
@@ -142,7 +132,6 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
     { name: 'Gizmodo', url: 'https://gizmodo.com/feed', category: 'technology', tier: 2, language: 'en' },
     { name: 'The Register', url: 'https://www.theregister.com/headlines.atom', category: 'technology', tier: 2, language: 'en' },
     { name: 'Slashdot', url: 'https://rss.slashdot.org/Slashdot/slashdotMain', category: 'technology', tier: 2, language: 'en' },
-    { name: 'AnandTech', url: 'https://www.anandtech.com/rss/', category: 'technology', tier: 3, language: 'en' },
     { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/feeds/feed.rss', category: 'technology', tier: 2, language: 'en' },
     { name: 'Krebs on Security', url: 'https://krebsonsecurity.com/feed/', category: 'technology', tier: 2, language: 'en' },
     { name: 'Schneier on Security', url: 'https://www.schneier.com/feed/', category: 'technology', tier: 2, language: 'en' },
@@ -157,14 +146,10 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
     { name: 'MarketWatch - Top Stories', url: 'https://feeds.marketwatch.com/marketwatch/topstories/', category: 'finance', tier: 1, language: 'en' },
     { name: 'MarketWatch - Markets', url: 'https://feeds.marketwatch.com/marketwatch/marketpulse/', category: 'finance', tier: 2, language: 'en' },
     { name: 'Financial Times', url: 'https://www.ft.com/rss/home', category: 'finance', tier: 1, language: 'en' },
-    { name: 'Reuters - Business', url: 'https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best', category: 'finance', tier: 1, language: 'en' },
-    { name: 'Bloomberg (via RSSHub)', url: 'https://rsshub.app/bloomberg', category: 'finance', tier: 1, language: 'en' },
     { name: 'Yahoo Finance', url: 'https://finance.yahoo.com/news/rssindex', category: 'finance', tier: 2, language: 'en' },
     { name: 'Economist', url: 'https://www.economist.com/finance-and-economics/rss.xml', category: 'finance', tier: 1, language: 'en' },
-    { name: 'Investopedia', url: 'https://www.investopedia.com/feedbuilder/feed/getfeed?feedName=rss_headline', category: 'finance', tier: 2, language: 'en' },
     { name: 'Wall Street Journal - Markets', url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml', category: 'finance', tier: 1, language: 'en' },
     { name: 'Wall Street Journal - Business', url: 'https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml', category: 'finance', tier: 1, language: 'en' },
-    { name: 'Barrons', url: 'https://feeds.barrons.com/barrons/feeds', category: 'finance', tier: 2, language: 'en' },
     { name: 'Seeking Alpha', url: 'https://seekingalpha.com/market_currents.xml', category: 'finance', tier: 2, language: 'en' },
   ],
 
@@ -176,29 +161,25 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
     { name: 'The Block', url: 'https://www.theblock.co/rss.xml', category: 'crypto', tier: 1, language: 'en' },
     { name: 'Decrypt', url: 'https://decrypt.co/feed', category: 'crypto', tier: 1, language: 'en' },
     { name: 'CoinTelegraph', url: 'https://cointelegraph.com/rss', category: 'crypto', tier: 1, language: 'en' },
-    { name: 'Bitcoin Magazine', url: 'https://bitcoinmagazine.com/.rss/full/', category: 'crypto', tier: 1, language: 'en' },
-    { name: 'DeFi Pulse', url: 'https://defipulse.com/blog/feed/', category: 'crypto', tier: 2, language: 'en' },
+    { name: 'Bitcoin Magazine', url: 'https://bitcoinmagazine.com/feed', category: 'crypto', tier: 1, language: 'en' },
     { name: 'CryptoSlate', url: 'https://cryptoslate.com/feed/', category: 'crypto', tier: 2, language: 'en' },
     { name: 'The Defiant', url: 'https://thedefiant.io/feed', category: 'crypto', tier: 2, language: 'en' },
     { name: 'Blockworks', url: 'https://blockworks.co/feed/', category: 'crypto', tier: 2, language: 'en' },
-    { name: 'CoinGecko Blog', url: 'https://www.coingecko.com/en/news/feed', category: 'crypto', tier: 3, language: 'en' },
-    { name: 'Messari', url: 'https://messari.io/rss', category: 'crypto', tier: 2, language: 'en' },
   ],
 
   // ---------------------------------------------------------------------------
   // DEFENSE & INTELLIGENCE
   // ---------------------------------------------------------------------------
   defense_intel: [
-    { name: 'Defense One', url: 'https://www.defenseone.com/rss/', category: 'defense_intel', tier: 1, language: 'en', region: 'us' },
+    { name: 'Defense One', url: 'https://www.defenseone.com/rss/all/', category: 'defense_intel', tier: 1, language: 'en', region: 'us' },
     { name: 'The War Zone', url: 'https://www.thedrive.com/the-war-zone/rss', category: 'defense_intel', tier: 1, language: 'en' },
     { name: 'Bellingcat', url: 'https://www.bellingcat.com/feed/', category: 'defense_intel', tier: 1, language: 'en' },
     { name: 'Military Times', url: 'https://www.militarytimes.com/arc/outboundfeeds/rss/category/news/?outputType=xml', category: 'defense_intel', tier: 1, language: 'en', region: 'us' },
     { name: 'Breaking Defense', url: 'https://breakingdefense.com/feed/', category: 'defense_intel', tier: 1, language: 'en' },
     { name: 'Defense News', url: 'https://www.defensenews.com/arc/outboundfeeds/rss/category/news/?outputType=xml', category: 'defense_intel', tier: 1, language: 'en' },
-    { name: 'CSIS - Defense', url: 'https://www.csis.org/analysis/feed', category: 'defense_intel', tier: 2, language: 'en' },
+    { name: 'CSIS - Defense', url: 'https://www.csis.org/rss.xml', category: 'defense_intel', tier: 2, language: 'en' },
     { name: 'War on the Rocks', url: 'https://warontherocks.com/feed/', category: 'defense_intel', tier: 2, language: 'en' },
     { name: 'The Intercept', url: 'https://theintercept.com/feed/?rss', category: 'defense_intel', tier: 2, language: 'en' },
-    { name: 'Stars and Stripes', url: 'https://www.stripes.com/rss', category: 'defense_intel', tier: 2, language: 'en' },
     { name: 'Just Security', url: 'https://www.justsecurity.org/feed/', category: 'defense_intel', tier: 2, language: 'en' },
     { name: 'Small Wars Journal', url: 'https://smallwarsjournal.com/feed', category: 'defense_intel', tier: 3, language: 'en' },
   ],
@@ -215,10 +196,9 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
     { name: 'The Lancet', url: 'https://www.thelancet.com/rssfeed/lancet_current.xml', category: 'science_health', tier: 1, language: 'en' },
     { name: 'STAT News', url: 'https://www.statnews.com/feed/', category: 'science_health', tier: 1, language: 'en' },
     { name: 'Phys.org', url: 'https://phys.org/rss-feed/', category: 'science_health', tier: 2, language: 'en' },
-    { name: 'Scientific American', url: 'https://www.scientificamerican.com/feed/', category: 'science_health', tier: 2, language: 'en' },
+    { name: 'Scientific American', url: 'https://www.scientificamerican.com/platform/syndication/rss/', category: 'science_health', tier: 2, language: 'en' },
     { name: 'Live Science', url: 'https://www.livescience.com/feeds/all', category: 'science_health', tier: 2, language: 'en' },
-    { name: 'Medical News Today', url: 'https://www.medicalnewstoday.com/newsfeeds/rss', category: 'science_health', tier: 2, language: 'en' },
-    { name: 'NIH News', url: 'https://www.nih.gov/news-events/news-releases/feed', category: 'science_health', tier: 2, language: 'en', region: 'us' },
+    { name: 'NIH News', url: 'https://www.nih.gov/news-releases/feed.xml', category: 'science_health', tier: 2, language: 'en', region: 'us' },
     { name: 'Science Magazine', url: 'https://www.science.org/action/showFeed?type=etoc&feed=rss&jc=science', category: 'science_health', tier: 1, language: 'en' },
   ],
 
@@ -227,17 +207,10 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
   // ---------------------------------------------------------------------------
   think_tanks: [
     { name: 'Foreign Policy', url: 'https://foreignpolicy.com/feed/', category: 'think_tanks', tier: 1, language: 'en' },
-    { name: 'Brookings', url: 'https://www.brookings.edu/feed/', category: 'think_tanks', tier: 1, language: 'en' },
-    { name: 'CSIS', url: 'https://www.csis.org/analysis/feed', category: 'think_tanks', tier: 1, language: 'en' },
+    { name: 'CSIS', url: 'https://www.csis.org/rss.xml', category: 'think_tanks', tier: 1, language: 'en' },
     { name: 'RAND', url: 'https://www.rand.org/news.xml', category: 'think_tanks', tier: 1, language: 'en' },
-    { name: 'Carnegie Endowment', url: 'https://carnegieendowment.org/rss/solr/?lang=en', category: 'think_tanks', tier: 1, language: 'en' },
-    { name: 'Council on Foreign Relations', url: 'https://www.cfr.org/rss.xml', category: 'think_tanks', tier: 1, language: 'en' },
-    { name: 'Chatham House', url: 'https://www.chathamhouse.org/rss.xml', category: 'think_tanks', tier: 2, language: 'en', region: 'uk' },
     { name: 'Atlantic Council', url: 'https://www.atlanticcouncil.org/feed/', category: 'think_tanks', tier: 2, language: 'en' },
-    { name: 'Heritage Foundation', url: 'https://www.heritage.org/rss/all-research.xml', category: 'think_tanks', tier: 2, language: 'en' },
-    { name: 'Cato Institute', url: 'https://www.cato.org/rss/recent-opeds.xml', category: 'think_tanks', tier: 2, language: 'en' },
     { name: 'Stimson Center', url: 'https://www.stimson.org/feed/', category: 'think_tanks', tier: 3, language: 'en' },
-    { name: 'Wilson Center', url: 'https://www.wilsoncenter.org/rss.xml', category: 'think_tanks', tier: 3, language: 'en' },
     { name: 'International Crisis Group', url: 'https://www.crisisgroup.org/rss.xml', category: 'think_tanks', tier: 1, language: 'en' },
   ],
 
@@ -249,10 +222,8 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
     { name: 'World Nuclear News', url: 'https://world-nuclear-news.org/rss', category: 'energy', tier: 1, language: 'en' },
     { name: 'Renewable Energy World', url: 'https://www.renewableenergyworld.com/feed/', category: 'energy', tier: 1, language: 'en' },
     { name: 'Utility Dive', url: 'https://www.utilitydive.com/feeds/news/', category: 'energy', tier: 2, language: 'en' },
-    { name: 'Energy Intelligence', url: 'https://www.energyintel.com/rss', category: 'energy', tier: 2, language: 'en' },
-    { name: 'S&P Global Commodity Insights', url: 'https://www.spglobal.com/commodityinsights/en/rss-feed', category: 'energy', tier: 2, language: 'en' },
+    { name: 'Energy Intelligence', url: 'https://www.energyintel.com/index.rss', category: 'energy', tier: 2, language: 'en' },
     { name: 'CleanTechnica', url: 'https://cleantechnica.com/feed/', category: 'energy', tier: 2, language: 'en' },
-    { name: 'GreenTech Media', url: 'https://www.greentechmedia.com/feed/rss', category: 'energy', tier: 3, language: 'en' },
     { name: 'Carbon Brief', url: 'https://www.carbonbrief.org/feed/', category: 'energy', tier: 2, language: 'en' },
     { name: 'Electrek', url: 'https://electrek.co/feed/', category: 'energy', tier: 2, language: 'en' },
   ],
@@ -261,18 +232,13 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
   // GOVERNMENT
   // ---------------------------------------------------------------------------
   government: [
-    { name: 'White House - Briefing Room', url: 'https://www.whitehouse.gov/feed/', category: 'government', tier: 1, language: 'en', region: 'us' },
     { name: 'US State Department', url: 'https://www.state.gov/rss-feed/press-releases/feed/', category: 'government', tier: 1, language: 'en', region: 'us' },
     { name: 'Federal Reserve - Press Releases', url: 'https://www.federalreserve.gov/feeds/press_all.xml', category: 'government', tier: 1, language: 'en', region: 'us' },
     { name: 'SEC - Press Releases', url: 'https://www.sec.gov/rss/news/press.xml', category: 'government', tier: 1, language: 'en', region: 'us' },
     { name: 'EU Newsroom', url: 'https://ec.europa.eu/commission/presscorner/api/rss', category: 'government', tier: 1, language: 'en', region: 'europe' },
-    { name: 'US Treasury', url: 'https://home.treasury.gov/system/files/136/RSS-Feed-Press-Releases.xml', category: 'government', tier: 1, language: 'en', region: 'us' },
     { name: 'US Department of Defense', url: 'https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=945&max=10', category: 'government', tier: 1, language: 'en', region: 'us' },
-    { name: 'Congressional Research Service (via FAS)', url: 'https://sgp.fas.org/crs/rss.xml', category: 'government', tier: 2, language: 'en', region: 'us' },
-    { name: 'UK Government', url: 'https://www.gov.uk/government/announcements.atom', category: 'government', tier: 2, language: 'en', region: 'uk' },
-    { name: 'NATO News', url: 'https://www.nato.int/cps/en/natolive/news.xml', category: 'government', tier: 2, language: 'en', region: 'global' },
+    { name: 'UK Government', url: 'https://www.gov.uk/search/news-and-communications.atom', category: 'government', tier: 2, language: 'en', region: 'uk' },
     { name: 'GAO Reports', url: 'https://www.gao.gov/rss/reports.xml', category: 'government', tier: 2, language: 'en', region: 'us' },
-    { name: 'USAID', url: 'https://www.usaid.gov/rss.xml', category: 'government', tier: 3, language: 'en', region: 'us' },
   ],
 };
 

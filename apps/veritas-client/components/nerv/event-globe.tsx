@@ -31,6 +31,13 @@ const LABEL_UPDATE_MS_MOVING = 180;
 
 type LabelSideState = { side: 'left' | 'right'; missingUpdates: number };
 type LabelVisibilityState = { visible: boolean; missingUpdates: number };
+type LabelOverlayNode = {
+  wrapper: HTMLDivElement;
+  inner: HTMLDivElement;
+  text: HTMLDivElement;
+  path: SVGPathElement;
+  dot: SVGCircleElement;
+};
 
 interface GlobePointData {
   lat: number; lng: number; color: string; size: number; eventId: string; title: string;
@@ -38,15 +45,6 @@ interface GlobePointData {
 
 function getPointAltitude(point: GlobePointData, pulsePhase: number) {
   return point.size >= 1.5 ? 0.007 + 0.006 * Math.sin(pulsePhase) : 0.007;
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
@@ -72,6 +70,7 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   const displayedLabelIdsRef = useRef<string[]>([]);
   const labelSideRef = useRef<Record<string, LabelSideState | 'left' | 'right'>>({});
   const labelVisibilityRef = useRef<Record<string, LabelVisibilityState>>({});
+  const overlayNodesRef = useRef<Record<string, LabelOverlayNode>>({});
   const pointsRef = useRef<GlobePointData[]>([]);
   pointsRef.current = events.flatMap(ev => {
     if (!Number.isFinite(ev.location?.lat) || !Number.isFinite(ev.location?.lng)) {
@@ -166,6 +165,83 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
       let pulsePhase = 0;
       let lastLabelRenderAt = 0;
       let lastLabelSignature = '';
+      const getOverlayNode = (eventId: string) => {
+        const existing = overlayNodesRef.current[eventId];
+        if (existing || !svgRef.current || !labelsRef.current) return existing;
+
+        const wrapper = document.createElement('div');
+        wrapper.dataset.eid = eventId;
+        wrapper.style.position = 'absolute';
+        wrapper.style.pointerEvents = 'auto';
+        wrapper.style.cursor = 'pointer';
+
+        const inner = document.createElement('div');
+        inner.style.display = 'flex';
+        inner.style.alignItems = 'center';
+        inner.style.width = '100%';
+        inner.style.height = '100%';
+        inner.style.boxSizing = 'border-box';
+        inner.style.padding = '0 10px';
+        inner.style.background = 'rgba(10,10,15,0.92)';
+
+        const text = document.createElement('div');
+        text.style.width = '100%';
+        text.style.fontFamily = 'monospace';
+        text.style.fontSize = '9.5px';
+        text.style.lineHeight = '1.15';
+        text.style.textAlign = 'left';
+        text.style.whiteSpace = 'normal';
+        text.style.overflow = 'hidden';
+        text.style.overflowWrap = 'anywhere';
+        text.style.wordBreak = 'break-word';
+        text.style.letterSpacing = '0.02em';
+
+        inner.appendChild(text);
+        wrapper.appendChild(inner);
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke-width', '0.8');
+        path.setAttribute('opacity', '0.45');
+
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('r', '3');
+        dot.setAttribute('opacity', '0.7');
+
+        wrapper.addEventListener('click', () => {
+          const ev = eventsRef.current.find(e => e.id === eventId);
+          if (!ev) return;
+          autoRotate.current = false;
+          targetRotationX.current = ev.location.lat * (Math.PI / 180);
+          targetRotationY.current = -ev.location.lng * (Math.PI / 180);
+          if (resumeAutoRotateTimeoutRef.current !== null) {
+            window.clearTimeout(resumeAutoRotateTimeoutRef.current);
+          }
+          resumeAutoRotateTimeoutRef.current = window.setTimeout(() => {
+            autoRotate.current = true;
+            resumeAutoRotateTimeoutRef.current = null;
+          }, 10000);
+          onClickRef.current?.(ev);
+        });
+
+        labelsRef.current.appendChild(wrapper);
+        svgRef.current.appendChild(path);
+        svgRef.current.appendChild(dot);
+
+        const created = { wrapper, inner, text, path, dot };
+        overlayNodesRef.current[eventId] = created;
+        return created;
+      };
+
+      const removeOverlayNode = (eventId: string) => {
+        const node = overlayNodesRef.current[eventId];
+        if (!node) return;
+        node.wrapper.remove();
+        node.path.remove();
+        node.dot.remove();
+        delete overlayNodesRef.current[eventId];
+      };
+
       const animate = () => {
         frameRef.current = requestAnimationFrame(animate);
         pulsePhase += 0.03;
@@ -367,12 +443,16 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
           const rightStacked = stackLabels(rightLabels, cw - SIDE_WIDTH - SIDE_MARGIN);
 
           const allStacked = [...leftStacked, ...rightStacked];
+          const overlaySignature = allStacked.map(l => {
+            const isLeft = l.labelX < cw / 2;
+            return `${l.eventId}:${l.sx},${l.sy},${l.labelX},${l.labelY},${isLeft ? 'L' : 'R'}:${l.title}`;
+          }).join('|');
+          if (overlaySignature === lastLabelSignature) return;
+          lastLabelSignature = overlaySignature;
+          const activeNodeIds = new Set(allStacked.map(l => l.eventId));
 
-          // Build SVG leader lines (L-shape from globe point → elbow → label)
-          let svgPaths = '';
           for (const l of allStacked) {
             const isLeft = l.labelX < cw / 2;
-            // Label connection point: right edge for left labels, left edge for right labels
             const labelConnectX = isLeft ? l.labelX + SIDE_WIDTH : l.labelX;
             const labelMidY = l.labelY + LABEL_HEIGHT / 2;
             const towardLabel = labelConnectX >= l.sx ? 1 : -1;
@@ -382,47 +462,36 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
             const diagonalStartMax = Math.max(l.sx, labelConnectX) - 24;
             const diagonalStartX = Math.max(diagonalStartMin, Math.min(diagonalStartMax, diagonalStartRaw));
             const horizontalEntryX = labelConnectX - towardLabel * 18;
-            svgPaths += `<path d="M${l.sx},${l.sy} L${diagonalStartX},${l.sy} L${horizontalEntryX},${labelMidY} L${labelConnectX},${labelMidY}" fill="none" stroke="${l.color}" stroke-width="0.8" opacity="0.45"/>`;
-            svgPaths += `<circle cx="${l.sx}" cy="${l.sy}" r="3" fill="${l.color}" opacity="0.7"/>`;
+            const node = getOverlayNode(l.eventId);
+            if (!node) continue;
+
+            node.wrapper.style.display = 'block';
+            node.wrapper.style.left = `${l.labelX}px`;
+            node.wrapper.style.top = `${l.labelY}px`;
+            node.wrapper.style.width = `${SIDE_WIDTH}px`;
+            node.wrapper.style.height = `${LABEL_HEIGHT}px`;
+
+            node.inner.style.color = l.color;
+            node.inner.style.borderLeft = isLeft ? 'none' : `2px solid ${l.color}`;
+            node.inner.style.borderRight = isLeft ? `2px solid ${l.color}` : 'none';
+            if (node.text.textContent !== l.title) {
+              node.text.textContent = l.title;
+            }
+
+            node.path.setAttribute(
+              'd',
+              `M${l.sx},${l.sy} L${diagonalStartX},${l.sy} L${horizontalEntryX},${labelMidY} L${labelConnectX},${labelMidY}`,
+            );
+            node.path.setAttribute('stroke', l.color);
+            node.dot.setAttribute('cx', `${l.sx}`);
+            node.dot.setAttribute('cy', `${l.sy}`);
+            node.dot.setAttribute('fill', l.color);
           }
 
-          // Build label DOM
-          let html = '';
-          for (const l of allStacked) {
-            const isLeft = l.labelX < cw / 2;
-            const border = isLeft ? `border-right:2px solid ${l.color}` : `border-left:2px solid ${l.color}`;
-            html += `<div data-eid="${escapeHtml(l.eventId)}" style="position:absolute;left:${l.labelX}px;top:${l.labelY}px;width:${SIDE_WIDTH}px;height:${LABEL_HEIGHT}px;pointer-events:auto;cursor:pointer;">`;
-            html += `<div style="display:flex;align-items:center;width:100%;height:100%;box-sizing:border-box;padding:0 10px;color:${l.color};background:rgba(10,10,15,0.92);${border};">`;
-            html += `<div style="width:100%;font-family:monospace;font-size:9.5px;line-height:1.15;text-align:left;white-space:normal;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;letter-spacing:0.02em;">${escapeHtml(l.title)}</div>`;
-            html += `</div>`;
-            html += '</div>';
-          }
-
-          const signature = `${svgPaths}__${html}`;
-          if (signature === lastLabelSignature) return;
-          lastLabelSignature = signature;
-
-          svg.innerHTML = svgPaths;
-          labelContainer.innerHTML = html;
-
-          // Click handlers
-          for (const el of Array.from(labelContainer.querySelectorAll('[data-eid]'))) {
-            el.addEventListener('click', () => {
-              const eid = el.getAttribute('data-eid');
-              const ev = eventsRef.current.find(e => e.id === eid);
-              if (!ev) return;
-              autoRotate.current = false;
-              targetRotationX.current = ev.location.lat * (Math.PI / 180);
-              targetRotationY.current = -ev.location.lng * (Math.PI / 180);
-              if (resumeAutoRotateTimeoutRef.current !== null) {
-                window.clearTimeout(resumeAutoRotateTimeoutRef.current);
-              }
-              resumeAutoRotateTimeoutRef.current = window.setTimeout(() => {
-                autoRotate.current = true;
-                resumeAutoRotateTimeoutRef.current = null;
-              }, 10000);
-              onClickRef.current?.(ev);
-            });
+          for (const eventId of Object.keys(overlayNodesRef.current)) {
+            if (!activeNodeIds.has(eventId)) {
+              removeOverlayNode(eventId);
+            }
           }
         }
       };
@@ -453,6 +522,9 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         renderer.dispose();
         controls.dispose();
         sg.dispose();
+        for (const eventId of Object.keys(overlayNodesRef.current)) {
+          removeOverlayNode(eventId);
+        }
       };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initialize globe');
