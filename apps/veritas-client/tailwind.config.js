@@ -2,6 +2,7 @@ const { join } = require('path');
 const { createGlobPatternsForDependencies } = require('@nx/react/tailwind');
 
 module.exports = {
+  darkMode: ['class', '[data-theme="dark"]'],
   content: [
     join(__dirname, 'app/**/*.{ts,tsx,js,jsx}'),
     join(__dirname, 'components/**/*.{ts,tsx,js,jsx}'),
@@ -11,21 +12,21 @@ module.exports = {
     extend: {
       colors: {
         nerv: {
-          'bg-deep': '#0a0a0f',
-          bg: '#0f0f1a',
-          'bg-panel': '#1a1a2e',
-          'bg-elevated': '#252540',
-          border: '#2a2a45',
-          'border-active': '#3a3a5f',
-          text: '#e0e0e8',
-          'text-secondary': '#8888a0',
-          'text-muted': '#555570',
-          orange: '#FF6B2B',
-          green: '#00FF41',
-          red: '#e94560',
-          blue: '#0ea5e9',
-          amber: '#f59e0b',
-          purple: '#a855f7',
+          'bg-deep': 'var(--nerv-bg-deep)',
+          bg: 'var(--nerv-bg)',
+          'bg-panel': 'var(--nerv-bg-panel)',
+          'bg-elevated': 'var(--nerv-bg-elevated)',
+          border: 'var(--nerv-border)',
+          'border-active': 'var(--nerv-border-active)',
+          text: 'var(--nerv-text)',
+          'text-secondary': 'var(--nerv-text-secondary)',
+          'text-muted': 'var(--nerv-text-muted)',
+          orange: 'var(--nerv-orange)',
+          green: 'var(--nerv-green)',
+          red: 'var(--nerv-red)',
+          blue: 'var(--nerv-blue)',
+          amber: 'var(--nerv-amber)',
+          purple: 'var(--nerv-purple)',
         },
       },
       fontFamily: {

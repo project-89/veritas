@@ -26,6 +26,12 @@ const TIME_RANGE_MS: Record<string, number> = {
 const ALL_CATEGORIES = new Set<EventCategory>(['environmental', 'political', 'economic', 'media']);
 const ALL_SEVERITIES = new Set<EventSeverity>(['low', 'medium', 'high', 'critical']);
 
+function isWorldMapEvent(event: GlobalEvent): boolean {
+  if (event.source === 'CoinGecko') return false;
+  if (event.metadata['feedCategory'] === 'crypto') return false;
+  return true;
+}
+
 export default function WorldMapPage() {
   const { events, connected, error } = useEventStream();
   const [selectedEvent, setSelectedEvent] = useState<GlobalEvent | null>(null);
@@ -42,6 +48,7 @@ export default function WorldMapPage() {
     const cutoff = now - rangeMs;
 
     return events.filter(ev => {
+      if (!isWorldMapEvent(ev)) return false;
       if (!filters.categories.has(ev.category)) return false;
       if (!filters.severities.has(ev.severity)) return false;
       const ts = new Date(ev.timestamp).getTime();

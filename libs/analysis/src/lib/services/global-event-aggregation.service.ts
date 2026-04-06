@@ -279,7 +279,12 @@ export class GlobalEventAggregationService
               category,
               severity: feed.tier === 1 ? 'medium' : 'low',
               title,
-              description: item.contentSnippet?.slice(0, 300) ?? item.content?.slice(0, 300) ?? '',
+              description: this.getEventDescription(
+                item.contentSnippet?.slice(0, 300)
+                  ?? item.content?.replace(/<[^>]+>/g, ' ').slice(0, 300),
+                title,
+                `RSS:${feed.name}`,
+              ),
               timestamp: item.pubDate ?? now.toISOString(),
               location: {
                 lat: centroid.lat + jitterLat,
@@ -320,17 +325,28 @@ export class GlobalEventAggregationService
       const events: GlobalEvent[] = signals
         .filter((s) => s.magnitude >= 0.3) // Only significant moves
         .map((s) => {
-          const priceChange = (s.metadata?.['price_change_percentage_24h'] as number) ?? 0;
+          const priceChange =
+            (s.metadata?.['price_change_percentage_24h'] as number)
+            ?? (s.metadata?.['price_change_24h'] as number)
+            ?? 0;
           const direction = priceChange >= 0 ? 'up' : 'down';
           const symbol = (s.metadata?.['symbol'] as string)?.toUpperCase() ?? '???';
+          const isTrending = Number((s.metadata?.['trending_score'] as number) ?? 0) > 0;
+          const title = isTrending && priceChange === 0
+            ? `[Trending] ${symbol}`
+            : `${symbol} ${direction} ${Math.abs(priceChange).toFixed(1)}% in 24h`;
 
           return {
             id: `coingecko-${s.id}`,
             source: 'CoinGecko',
             category: 'economic' as EventCategory,
             severity: (s.magnitude >= 0.7 ? 'high' : s.magnitude >= 0.5 ? 'medium' : 'low') as EventSeverity,
-            title: `${symbol} ${direction} ${Math.abs(priceChange).toFixed(1)}% in 24h`,
-            description: s.description,
+            title,
+            description: this.getEventDescription(
+              s.description,
+              title,
+              'CoinGecko',
+            ),
             timestamp: s.timestamp,
             location: { lat: 20, lng: 0, label: 'Global', region: 'global' }, // Crypto is global
             magnitude: s.magnitude,
@@ -394,17 +410,19 @@ export class GlobalEventAggregationService
     this.pruneDedup();
 
     for (const event of events) {
-      if (this.isDuplicate(event.id)) continue;
+      const normalizedEvent = this.sanitizeEvent(event);
 
-      this.seen.set(event.id, Date.now());
-      this.subject.next(event);
+      if (this.isDuplicate(normalizedEvent.id)) continue;
+
+      this.seen.set(normalizedEvent.id, Date.now());
+      this.subject.next(normalizedEvent);
 
       // Persist if repository is available
       if (this.eventRepo) {
         try {
-          await this.eventRepo.upsertEvent(event);
+          await this.eventRepo.upsertEvent(normalizedEvent);
         } catch (err) {
-          this.logger.warn(`Failed to persist event ${event.id}: ${err}`);
+          this.logger.warn(`Failed to persist event ${normalizedEvent.id}: ${err}`);
         }
       }
     }
@@ -426,6 +444,43 @@ export class GlobalEventAggregationService
         this.seen.delete(id);
       }
     }
+  }
+
+  private sanitizeEvent(event: GlobalEvent): GlobalEvent {
+    return {
+      ...event,
+      title: event.title?.trim() || `${event.source} event`,
+      description: this.getEventDescription(event.description, event.title, event.source),
+      location: this.sanitizeLocation(event.location),
+    };
+  }
+
+  private getEventDescription(
+    description: string | null | undefined,
+    title: string,
+    source: string,
+  ): string {
+    const trimmed = description?.trim();
+    if (trimmed) return trimmed;
+
+    const cleanTitle = title?.trim() || 'Untitled event';
+    return `${source}: ${cleanTitle}`;
+  }
+
+  private sanitizeLocation(location: GeoLocation): GeoLocation {
+    const lat = Number.isFinite(location.lat)
+      ? Math.max(-90, Math.min(90, location.lat))
+      : 0;
+    const lng = Number.isFinite(location.lng)
+      ? ((((location.lng + 180) % 360) + 360) % 360) - 180
+      : 0;
+
+    return {
+      ...location,
+      lat,
+      lng,
+      label: location.label?.trim() || location.region?.trim() || 'Unknown',
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -453,7 +508,7 @@ export class GlobalEventAggregationService
       category: 'environmental' as EventCategory,
       severity: this.usgsSevseverity(mag),
       title: signal.title,
-      description: signal.description,
+      description: this.getEventDescription(signal.description, signal.title, 'USGS'),
       timestamp: signal.timestamp,
       location,
       magnitude: signal.magnitude,
@@ -500,7 +555,7 @@ export class GlobalEventAggregationService
       category: 'political' as EventCategory,
       severity: this.acledSeverity(fatalities),
       title: signal.title,
-      description: signal.description,
+      description: this.getEventDescription(signal.description, signal.title, 'ACLED'),
       timestamp: signal.timestamp,
       location,
       magnitude: signal.magnitude,
@@ -545,7 +600,7 @@ export class GlobalEventAggregationService
       category: 'media' as EventCategory,
       severity: this.gdeltSeverity(tone),
       title: signal.title,
-      description: signal.description,
+      description: this.getEventDescription(signal.description, signal.title, 'GDELT'),
       timestamp: signal.timestamp,
       location,
       magnitude: signal.magnitude,
@@ -585,7 +640,7 @@ export class GlobalEventAggregationService
       category: 'environmental' as EventCategory,
       severity: this.gdacsSeverity(signal.magnitude),
       title: signal.title,
-      description: signal.description,
+      description: this.getEventDescription(signal.description, signal.title, 'GDACS'),
       timestamp: signal.timestamp,
       location,
       magnitude: signal.magnitude,
@@ -628,7 +683,7 @@ export class GlobalEventAggregationService
       category: 'political' as EventCategory,
       severity: this.reliefwebSeverity(signal.magnitude),
       title: signal.title,
-      description: signal.description,
+      description: this.getEventDescription(signal.description, signal.title, 'ReliefWeb'),
       timestamp: signal.timestamp,
       location,
       magnitude: signal.magnitude,

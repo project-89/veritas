@@ -20,6 +20,13 @@ export interface EntityPanelProps {
 type EntityTypeFilter = 'all' | 'person' | 'org' | 'topic' | 'entity';
 
 const ENTITY_TYPES: EntityTypeFilter[] = ['all', 'person', 'org', 'topic', 'entity'];
+const ENTITY_TYPE_LABELS: Record<EntityTypeFilter, string> = {
+  all: 'All',
+  person: 'People',
+  org: 'Organizations',
+  topic: 'Topics',
+  entity: 'Other Entities',
+};
 
 const TYPE_BADGE_VARIANT: Record<string, 'orange' | 'green' | 'red' | 'blue' | 'amber' | 'purple' | 'muted'> = {
   person: 'blue',
@@ -64,8 +71,8 @@ export function EntityPanel({ entities, narratives }: EntityPanelProps) {
 
   const selected: EntityDossier | null = useMemo(() => {
     if (!selectedEntity) return filtered[0] ?? null;
-    return dossiers.find((d) => d.name === selectedEntity) ?? null;
-  }, [selectedEntity, filtered, dossiers]);
+    return filtered.find((d) => d.name === selectedEntity) ?? null;
+  }, [selectedEntity, filtered]);
 
   // Auto-select first when filter changes
   const effectiveSelected = selected ?? filtered[0] ?? null;
@@ -105,19 +112,24 @@ export function EntityPanel({ entities, narratives }: EntityPanelProps) {
               key={t}
               onClick={() => setTypeFilter(t)}
               className={[
-                'px-1.5 py-0.5 text-[8px] font-mono uppercase tracking-wider rounded-sm transition-colors',
+                'px-2 py-0.5 text-[8px] font-mono uppercase tracking-wider rounded-sm transition-colors',
                 typeFilter === t
                   ? 'bg-nerv-orange text-nerv-bg-deep font-bold'
                   : 'text-nerv-text-muted hover:text-nerv-text-secondary hover:bg-nerv-bg-elevated/40',
               ].join(' ')}
             >
-              {t}
+              {ENTITY_TYPE_LABELS[t]}
             </button>
           ))}
         </div>
 
         {/* Entity list */}
         <div className="flex-1 overflow-y-auto nerv-scrollbar">
+          {filtered.length === 0 && (
+            <div className="px-3 py-4 text-[10px] font-mono leading-relaxed text-nerv-text-muted">
+              No {ENTITY_TYPE_LABELS[typeFilter].toLowerCase()} were extracted for this investigation.
+            </div>
+          )}
           {filtered.map((d) => (
             <button
               key={d.name}

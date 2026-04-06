@@ -12,11 +12,25 @@ export interface EventGlobeProps {
 const SEVERITY_SIZE: Record<string, number> = { critical: 1.5, high: 1.0, medium: 0.7, low: 0.4 };
 const NERV_COLORS = { bgDeep: 0x0a0a0f, orange: 0xff6b2b };
 const COUNTRIES_URL = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson';
-const LABEL_HEIGHT = 28;
-const LABEL_SPACING = 4;
-const SIDE_WIDTH = 260;
+const LABEL_HEIGHT = 34;
+const LABEL_SPACING = 8;
+const SIDE_WIDTH = 340;
 const SIDE_MARGIN = 10;
+const LABEL_TOP_MARGIN = 52;
 const MAX_LABELS = 14;
+const LABEL_UPDATE_MS = 120;
+const LABEL_ANCHOR_ALTITUDE = 0.007;
+const LABEL_SIDE_HYSTERESIS = 48;
+const LABEL_SIDE_SWITCH_HYSTERESIS = 96;
+const LABEL_SIDE_MEMORY_UPDATES = 12;
+const LABEL_VISIBLE_ENTER_DOT = 0.05;
+const LABEL_VISIBLE_EXIT_DOT = -0.02;
+const LABEL_OFFSCREEN_MARGIN = 24;
+const LABEL_INTERACTION_SETTLE_MS = 220;
+const LABEL_UPDATE_MS_MOVING = 180;
+
+type LabelSideState = { side: 'left' | 'right'; missingUpdates: number };
+type LabelVisibilityState = { visible: boolean; missingUpdates: number };
 
 interface GlobePointData {
   lat: number; lng: number; color: string; size: number; eventId: string; title: string;
@@ -26,6 +40,15 @@ function getPointAltitude(point: GlobePointData, pulsePhase: number) {
   return point.size >= 1.5 ? 0.007 + 0.006 * Math.sin(pulsePhase) : 0.007;
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -33,8 +56,11 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   const globeRef = useRef<unknown>(null);
   const frameRef = useRef<number>(0);
   const mouseDown = useRef(false);
+  const lastInteractionAtRef = useRef(0);
   const autoRotate = useRef(true);
+  const targetRotationX = useRef<number | null>(null);
   const targetRotationY = useRef<number | null>(null);
+  const resumeAutoRotateTimeoutRef = useRef<number | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,13 +69,24 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   eventsRef.current = events;
   const onClickRef = useRef(onEventClick);
   onClickRef.current = onEventClick;
+  const displayedLabelIdsRef = useRef<string[]>([]);
+  const labelSideRef = useRef<Record<string, LabelSideState | 'left' | 'right'>>({});
+  const labelVisibilityRef = useRef<Record<string, LabelVisibilityState>>({});
   const pointsRef = useRef<GlobePointData[]>([]);
-  pointsRef.current = events.map(ev => ({
-    lat: ev.location.lat, lng: ev.location.lng,
-    color: EVENT_COLORS[ev.category] ?? '#ffffff',
-    size: SEVERITY_SIZE[ev.severity] ?? 0.4,
-    eventId: ev.id, title: ev.title.slice(0, 42),
-  }));
+  pointsRef.current = events.flatMap(ev => {
+    if (!Number.isFinite(ev.location?.lat) || !Number.isFinite(ev.location?.lng)) {
+      return [];
+    }
+
+    return [{
+      lat: Math.max(-90, Math.min(90, ev.location.lat)),
+      lng: ((((ev.location.lng + 180) % 360) + 360) % 360) - 180,
+      color: EVENT_COLORS[ev.category] ?? '#ffffff',
+      size: SEVERITY_SIZE[ev.severity] ?? 0.4,
+      eventId: ev.id,
+      title: ev.title,
+    }];
+  });
 
   // Store Three.js objects for render loop
   const threeRef = useRef<{ camera: unknown; globe: unknown; Vector3: unknown } | null>(null);
@@ -116,21 +153,45 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true; controls.dampingFactor = 0.05; controls.enablePan = false;
       controls.minDistance = 150; controls.maxDistance = 600; controls.rotateSpeed = 0.5; controls.zoomSpeed = 0.8;
-      renderer.domElement.addEventListener('mousedown', () => { mouseDown.current = true; });
-      renderer.domElement.addEventListener('mouseup', () => { mouseDown.current = false; });
+      const markInteraction = () => { lastInteractionAtRef.current = performance.now(); };
+      const handleMouseDown = () => { mouseDown.current = true; markInteraction(); };
+      const handleMouseUp = () => { mouseDown.current = false; markInteraction(); };
+      renderer.domElement.addEventListener('mousedown', handleMouseDown);
+      renderer.domElement.addEventListener('mouseup', handleMouseUp);
+      controls.addEventListener('start', markInteraction);
+      controls.addEventListener('change', markInteraction);
+      controls.addEventListener('end', markInteraction);
 
       // --- RENDER LOOP ---
       let pulsePhase = 0;
+      let lastLabelRenderAt = 0;
+      let lastLabelSignature = '';
       const animate = () => {
         frameRef.current = requestAnimationFrame(animate);
         pulsePhase += 0.03;
 
         // Globe rotation
-        if (targetRotationY.current !== null) {
+        if (targetRotationX.current !== null || targetRotationY.current !== null) {
+          if (targetRotationX.current !== null) {
+            const diffX = targetRotationX.current - globe.rotation.x;
+            if (Math.abs(diffX) < 0.003) {
+              globe.rotation.x = targetRotationX.current;
+              targetRotationX.current = null;
+            } else {
+              globe.rotation.x += diffX * 0.08;
+            }
+          }
+
+          if (targetRotationY.current !== null) {
           const diff = targetRotationY.current - globe.rotation.y;
           const short = ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
-          if (Math.abs(short) < 0.005) { globe.rotation.y = targetRotationY.current; targetRotationY.current = null; }
-          else { globe.rotation.y += short * 0.05; }
+            if (Math.abs(short) < 0.005) {
+              globe.rotation.y = targetRotationY.current;
+              targetRotationY.current = null;
+            } else {
+              globe.rotation.y += short * 0.08;
+            }
+          }
         } else if (autoRotate.current && !mouseDown.current) {
           globe.rotation.y += 0.0004;
         }
@@ -141,22 +202,25 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         controls.update();
         renderer.render(scene, camera);
 
-        // --- SCREEN-SPACE LABEL UPDATE (every 3rd frame) ---
-        if (pulsePhase % 0.09 < 0.031 && svgRef.current && labelsRef.current) {
+        // --- SCREEN-SPACE LABEL UPDATE ---
+        if (svgRef.current && labelsRef.current) {
+          const now = performance.now();
+          const interactionActive = mouseDown.current || now - lastInteractionAtRef.current < LABEL_INTERACTION_SETTLE_MS;
+          const labelUpdateMs = interactionActive ? LABEL_UPDATE_MS_MOVING : LABEL_UPDATE_MS;
+          if (now - lastLabelRenderAt < labelUpdateMs) return;
+          lastLabelRenderAt = now;
+
           const cw = container.clientWidth;
           const ch = container.clientHeight;
           const svg = svgRef.current;
           const labelContainer = labelsRef.current;
 
-          // Sort by severity for priority
-          const sorted = [...pointsRef.current].sort((a, b) => b.size - a.size).slice(0, MAX_LABELS);
-
           // Project each point to screen space + front-facing check
-          type ScreenLabel = { sx: number; sy: number; color: string; title: string; eventId: string; visible: boolean };
+          type ScreenLabel = { sx: number; sy: number; color: string; title: string; eventId: string; size: number };
           const screenLabels: ScreenLabel[] = [];
 
-          for (const pt of sorted) {
-            const local = globe.getCoords(pt.lat, pt.lng, getPointAltitude(pt, pulsePhase));
+          for (const pt of pointsRef.current) {
+            const local = globe.getCoords(pt.lat, pt.lng, LABEL_ANCHOR_ALTITUDE);
             const v = new THREE.Vector3(local.x, local.y, local.z);
             // Transform to world space through globe's matrix
             globe.localToWorld(v);
@@ -166,31 +230,136 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
             const globeCenter = new THREE.Vector3();
             globe.getWorldPosition(globeCenter);
             const normal = v.clone().sub(globeCenter).normalize();
-            const isFront = toCamera.dot(normal) > 0.05;
-
-            if (!isFront) continue;
+            const facingDot = toCamera.dot(normal);
+            const previousVisibility = labelVisibilityRef.current[pt.eventId];
+            const wasVisible = previousVisibility?.visible ?? false;
+            const requiredDot = wasVisible ? LABEL_VISIBLE_EXIT_DOT : LABEL_VISIBLE_ENTER_DOT;
 
             // Project to screen
             const projected = v.clone().project(camera);
-            const sx = (projected.x * 0.5 + 0.5) * cw;
-            const sy = (-projected.y * 0.5 + 0.5) * ch;
+            const projectedInDepth = projected.z >= -1 && projected.z <= 1;
 
-            if (sx < 0 || sx > cw || sy < 0 || sy > ch) continue;
+            const sx = Math.round(((projected.x * 0.5 + 0.5) * cw) / 2) * 2;
+            const sy = Math.round(((-projected.y * 0.5 + 0.5) * ch) / 2) * 2;
+            const withinBounds = wasVisible
+              ? sx >= -LABEL_OFFSCREEN_MARGIN && sx <= cw + LABEL_OFFSCREEN_MARGIN && sy >= -LABEL_OFFSCREEN_MARGIN && sy <= ch + LABEL_OFFSCREEN_MARGIN
+              : sx >= 0 && sx <= cw && sy >= 0 && sy <= ch;
+            const isVisible = facingDot > requiredDot && projectedInDepth && withinBounds;
 
-            screenLabels.push({ sx, sy, color: pt.color, title: pt.title, eventId: pt.eventId, visible: true });
+            if (!isVisible) {
+              labelVisibilityRef.current[pt.eventId] = {
+                visible: false,
+                missingUpdates: (previousVisibility?.missingUpdates ?? 0) + 1,
+              };
+              continue;
+            }
+
+            labelVisibilityRef.current[pt.eventId] = { visible: true, missingUpdates: 0 };
+
+            screenLabels.push({ sx, sy, color: pt.color, title: pt.title, eventId: pt.eventId, size: pt.size });
+          }
+
+          for (const [eventId, visibility] of Object.entries(labelVisibilityRef.current)) {
+            if (!screenLabels.some(label => label.eventId === eventId) && visibility.missingUpdates > LABEL_SIDE_MEMORY_UPDATES) {
+              delete labelVisibilityRef.current[eventId];
+            }
+          }
+
+          const rankedLabels = screenLabels
+            .sort((a, b) => (b.size - a.size) || a.eventId.localeCompare(b.eventId));
+          const visibleById = new Map(rankedLabels.map(label => [label.eventId, label]));
+
+          let nextLabels: ScreenLabel[];
+          if (interactionActive) {
+            const frozenLabels = displayedLabelIdsRef.current
+              .map(eventId => visibleById.get(eventId))
+              .filter((label): label is ScreenLabel => Boolean(label));
+            nextLabels = frozenLabels.length > 0 ? frozenLabels : rankedLabels.slice(0, MAX_LABELS);
+          } else {
+            const persistentLabels = displayedLabelIdsRef.current
+              .map(eventId => visibleById.get(eventId))
+              .filter((label): label is ScreenLabel => Boolean(label));
+            nextLabels = [...persistentLabels];
+
+            for (const label of rankedLabels) {
+              if (nextLabels.length >= MAX_LABELS) break;
+              if (visibleById.has(label.eventId) && !nextLabels.some(existing => existing.eventId === label.eventId)) {
+                nextLabels.push(label);
+              }
+            }
+
+            displayedLabelIdsRef.current = nextLabels.map(label => label.eventId);
+          }
+
+          if (interactionActive && displayedLabelIdsRef.current.length === 0) {
+            displayedLabelIdsRef.current = nextLabels.map(label => label.eventId);
+          }
+
+          const centerX = cw / 2;
+          const maxLabelsPerSide = Math.max(
+            1,
+            Math.floor((ch - LABEL_TOP_MARGIN - SIDE_MARGIN + LABEL_SPACING) / (LABEL_HEIGHT + LABEL_SPACING)),
+          );
+          const assignedSideById = new Map<string, 'left' | 'right'>();
+
+          for (const label of nextLabels) {
+            const previousState = labelSideRef.current[label.eventId];
+            const previousSide = typeof previousState === 'string' ? previousState : previousState?.side;
+            const side = interactionActive && previousSide
+              ? previousSide
+              : previousSide
+              ? previousSide === 'left'
+                ? label.sx > centerX + LABEL_SIDE_SWITCH_HYSTERESIS
+                  ? 'right'
+                  : 'left'
+                : label.sx < centerX - LABEL_SIDE_SWITCH_HYSTERESIS
+                  ? 'left'
+                  : 'right'
+              : label.sx <= centerX - LABEL_SIDE_HYSTERESIS
+                ? 'left'
+                : label.sx >= centerX + LABEL_SIDE_HYSTERESIS
+                  ? 'right'
+                  : label.sx < centerX
+                    ? 'left'
+                    : 'right';
+
+            assignedSideById.set(label.eventId, side);
+            labelSideRef.current[label.eventId] = { side, missingUpdates: 0 };
+          }
+
+          if (!interactionActive) {
+            for (const [eventId, state] of Object.entries(labelSideRef.current)) {
+              if (!assignedSideById.has(eventId)) {
+                if (typeof state === 'string') {
+                  delete labelSideRef.current[eventId];
+                  continue;
+                }
+
+                state.missingUpdates += 1;
+                if (state.missingUpdates > LABEL_SIDE_MEMORY_UPDATES) {
+                  delete labelSideRef.current[eventId];
+                }
+              }
+            }
           }
 
           // Split into left and right based on screen X
-          const leftLabels = screenLabels.filter(l => l.sx < cw / 2).sort((a, b) => a.sy - b.sy);
-          const rightLabels = screenLabels.filter(l => l.sx >= cw / 2).sort((a, b) => a.sy - b.sy);
+          const leftLabels = nextLabels
+            .filter(l => assignedSideById.get(l.eventId) === 'left')
+            .sort((a, b) => a.sy - b.sy)
+            .slice(0, maxLabelsPerSide);
+          const rightLabels = nextLabels
+            .filter(l => assignedSideById.get(l.eventId) === 'right')
+            .sort((a, b) => a.sy - b.sy)
+            .slice(0, maxLabelsPerSide);
 
           // Stack labels vertically on each side (no overlap)
           const stackLabels = (labels: ScreenLabel[], startX: number) => {
-            let nextY = SIDE_MARGIN;
-            return labels.map(l => {
-              const labelY = Math.max(nextY, l.sy - LABEL_HEIGHT / 2);
+            let nextY = LABEL_TOP_MARGIN;
+            return labels.map((l, index) => {
+              const labelY = nextY;
               nextY = labelY + LABEL_HEIGHT + LABEL_SPACING;
-              return { ...l, labelX: startX, labelY };
+              return { ...l, labelX: startX, labelY, routeIndex: index };
             });
           };
 
@@ -206,26 +375,34 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
             // Label connection point: right edge for left labels, left edge for right labels
             const labelConnectX = isLeft ? l.labelX + SIDE_WIDTH : l.labelX;
             const labelMidY = l.labelY + LABEL_HEIGHT / 2;
-            // Elbow: horizontal step from the globe point toward the label side
-            const elbowX = isLeft
-              ? Math.min(l.sx, labelConnectX) - 15  // step left of whichever is more left
-              : Math.max(l.sx, labelConnectX) + 15;  // step right of whichever is more right
-            svgPaths += `<path d="M${l.sx},${l.sy} L${elbowX},${l.sy} L${elbowX},${labelMidY} L${labelConnectX},${labelMidY}" fill="none" stroke="${l.color}" stroke-width="0.8" opacity="0.45"/>`;
+            const towardLabel = labelConnectX >= l.sx ? 1 : -1;
+            const diagonalSpread = 56 + Math.min(72, l.routeIndex * 12);
+            const diagonalStartRaw = labelConnectX - towardLabel * diagonalSpread;
+            const diagonalStartMin = Math.min(l.sx, labelConnectX) + 12;
+            const diagonalStartMax = Math.max(l.sx, labelConnectX) - 24;
+            const diagonalStartX = Math.max(diagonalStartMin, Math.min(diagonalStartMax, diagonalStartRaw));
+            const horizontalEntryX = labelConnectX - towardLabel * 18;
+            svgPaths += `<path d="M${l.sx},${l.sy} L${diagonalStartX},${l.sy} L${horizontalEntryX},${labelMidY} L${labelConnectX},${labelMidY}" fill="none" stroke="${l.color}" stroke-width="0.8" opacity="0.45"/>`;
             svgPaths += `<circle cx="${l.sx}" cy="${l.sy}" r="3" fill="${l.color}" opacity="0.7"/>`;
           }
-          svg.innerHTML = svgPaths;
 
           // Build label DOM
           let html = '';
           for (const l of allStacked) {
             const isLeft = l.labelX < cw / 2;
             const border = isLeft ? `border-right:2px solid ${l.color}` : `border-left:2px solid ${l.color}`;
-            const textAlign = isLeft ? 'text-align:right' : 'text-align:left';
-            const justify = isLeft ? 'justify-content:flex-end' : 'justify-content:flex-start';
-            html += `<div data-eid="${l.eventId}" style="position:absolute;left:${l.labelX}px;top:${l.labelY}px;width:${SIDE_WIDTH}px;height:${LABEL_HEIGHT}px;display:flex;align-items:center;${justify};pointer-events:auto;cursor:pointer;">`;
-            html += `<span style="font-family:monospace;font-size:10px;line-height:1.2;padding:2px 8px;color:${l.color};background:rgba(10,10,15,0.92);${border};${textAlign};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;letter-spacing:0.02em;">${l.title}</span>`;
+            html += `<div data-eid="${escapeHtml(l.eventId)}" style="position:absolute;left:${l.labelX}px;top:${l.labelY}px;width:${SIDE_WIDTH}px;height:${LABEL_HEIGHT}px;pointer-events:auto;cursor:pointer;">`;
+            html += `<div style="display:flex;align-items:center;width:100%;height:100%;box-sizing:border-box;padding:0 10px;color:${l.color};background:rgba(10,10,15,0.92);${border};">`;
+            html += `<div style="width:100%;font-family:monospace;font-size:9.5px;line-height:1.15;text-align:left;white-space:normal;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;letter-spacing:0.02em;">${escapeHtml(l.title)}</div>`;
+            html += `</div>`;
             html += '</div>';
           }
+
+          const signature = `${svgPaths}__${html}`;
+          if (signature === lastLabelSignature) return;
+          lastLabelSignature = signature;
+
+          svg.innerHTML = svgPaths;
           labelContainer.innerHTML = html;
 
           // Click handlers
@@ -235,8 +412,15 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
               const ev = eventsRef.current.find(e => e.id === eid);
               if (!ev) return;
               autoRotate.current = false;
+              targetRotationX.current = ev.location.lat * (Math.PI / 180);
               targetRotationY.current = -ev.location.lng * (Math.PI / 180);
-              setTimeout(() => { autoRotate.current = true; }, 10000);
+              if (resumeAutoRotateTimeoutRef.current !== null) {
+                window.clearTimeout(resumeAutoRotateTimeoutRef.current);
+              }
+              resumeAutoRotateTimeoutRef.current = window.setTimeout(() => {
+                autoRotate.current = true;
+                resumeAutoRotateTimeoutRef.current = null;
+              }, 10000);
               onClickRef.current?.(ev);
             });
           }
@@ -254,7 +438,22 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
       ro.observe(container);
       setLoaded(true);
 
-      return () => { ro.disconnect(); cancelAnimationFrame(frameRef.current); renderer.dispose(); controls.dispose(); sg.dispose(); };
+      return () => {
+        ro.disconnect();
+        cancelAnimationFrame(frameRef.current);
+        if (resumeAutoRotateTimeoutRef.current !== null) {
+          window.clearTimeout(resumeAutoRotateTimeoutRef.current);
+          resumeAutoRotateTimeoutRef.current = null;
+        }
+        controls.removeEventListener('start', markInteraction);
+        controls.removeEventListener('change', markInteraction);
+        controls.removeEventListener('end', markInteraction);
+        renderer.domElement.removeEventListener('mousedown', handleMouseDown);
+        renderer.domElement.removeEventListener('mouseup', handleMouseUp);
+        renderer.dispose();
+        controls.dispose();
+        sg.dispose();
+      };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initialize globe');
       return undefined;

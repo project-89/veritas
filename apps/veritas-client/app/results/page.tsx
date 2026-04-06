@@ -464,16 +464,46 @@ function InvestigationWorkspace() {
       // Stage 5: Entities
       try {
         dispatch({ type: 'SET_PIPELINE', stage: 'entities', status: 'running' });
-        // Build insights from posts that have entity/sentiment data from the scan processor
+        // Build insights from posts that have entity/sentiment data from the scan processor.
+        // Themes are promoted into topic entities so the topic tab has real content.
         const insights = posts
-          .filter((p: any) => p.entities?.length > 0 || p.themes?.length > 0)
+          .map((p: any) => {
+            const entityList = Array.isArray(p.entities) ? p.entities : [];
+            const themeEntities = Array.isArray(p.themes)
+              ? p.themes
+                  .filter((theme: unknown): theme is string => typeof theme === 'string' && theme.trim().length > 0)
+                  .map((theme: string) => ({
+                    name: theme.trim(),
+                    type: 'topic',
+                    relevance: 0.55,
+                  }))
+              : [];
+
+            const deduped = new Map<string, { name: string; type: string; relevance: number }>();
+            for (const entity of [...entityList, ...themeEntities]) {
+              if (!entity || typeof entity.name !== 'string' || entity.name.trim().length === 0) continue;
+              const key = `${entity.type ?? 'entity'}::${entity.name.trim().toLowerCase()}`;
+              if (!deduped.has(key)) {
+                deduped.set(key, {
+                  name: entity.name.trim(),
+                  type: typeof entity.type === 'string' && entity.type.trim().length > 0 ? entity.type : 'entity',
+                  relevance: typeof entity.relevance === 'number' ? entity.relevance : 0.5,
+                });
+              }
+            }
+
+            return {
+              id: p.id,
+              platform: p.platform,
+              timestamp: p.timestamp,
+              entities: Array.from(deduped.values()),
+              sentiment: p.sentiment ?? { score: 0, label: 'neutral', confidence: 0 },
+            };
+          })
           .map((p: any) => ({
-            id: p.id,
-            platform: p.platform,
-            timestamp: p.timestamp,
-            entities: p.entities ?? [],
-            sentiment: p.sentiment ?? { score: 0, label: 'neutral', confidence: 0 },
-          }));
+            ...p,
+          }))
+          .filter((p: any) => p.entities.length > 0);
         const entityResult = await analyzeEntities(posts, insights as any[], narratives);
         dispatch({ type: 'SET_ENTITIES', data: entityResult });
         dispatch({ type: 'SET_PIPELINE', stage: 'entities', status: 'done' });

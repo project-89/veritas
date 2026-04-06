@@ -29,6 +29,32 @@ interface GlobalEventDoc {
   createdAt: Date;
 }
 
+function normalizeTitle(title: string): string {
+  return title.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function roundCoord(value: number): string {
+  return Number.isFinite(value) ? value.toFixed(1) : '0.0';
+}
+
+function bucketTimestamp(timestamp: Date): string {
+  const time = timestamp.getTime();
+  if (!Number.isFinite(time)) return 'invalid';
+  const bucketMs = 15 * 60 * 1000;
+  return String(Math.floor(time / bucketMs));
+}
+
+function eventSignature(doc: GlobalEventDoc): string {
+  return [
+    doc.source,
+    doc.category,
+    normalizeTitle(doc.title),
+    roundCoord(doc.location.lat),
+    roundCoord(doc.location.lng),
+    bucketTimestamp(doc.timestamp),
+  ].join('|');
+}
+
 // ---------------------------------------------------------------------------
 // Query options
 // ---------------------------------------------------------------------------
@@ -95,20 +121,7 @@ export class GlobalEventRepository implements OnModuleInit {
     this.ensureInitialized();
     try {
       const existing = await this.repo.findOne({ eventId: event.id } as Partial<GlobalEventDoc> & Record<string, unknown>);
-
-      const doc: Partial<GlobalEventDoc> = {
-        eventId: event.id,
-        source: event.source,
-        category: event.category,
-        severity: event.severity,
-        title: event.title,
-        description: event.description,
-        timestamp: new Date(event.timestamp),
-        location: event.location,
-        magnitude: event.magnitude,
-        metadata: event.metadata,
-        expiresAt: new Date(event.expiresAt),
-      };
+      const doc = this.toDocument(event);
 
       if (existing) {
         const id =
@@ -123,6 +136,27 @@ export class GlobalEventRepository implements OnModuleInit {
       this.logger.error(`Error in upsertEvent: ${err.message}`, err.stack);
       throw error;
     }
+  }
+
+  private toDocument(event: GlobalEvent): Partial<GlobalEventDoc> {
+    return {
+      eventId: event.id,
+      source: event.source,
+      category: event.category,
+      severity: event.severity,
+      title: event.title?.trim() || `${event.source} event`,
+      description: event.description?.trim() || `${event.source}: ${event.title?.trim() || 'Untitled event'}`,
+      timestamp: new Date(event.timestamp),
+      location: {
+        ...event.location,
+        lat: Number.isFinite(event.location.lat) ? event.location.lat : 0,
+        lng: Number.isFinite(event.location.lng) ? event.location.lng : 0,
+        label: event.location.label?.trim() || event.location.region?.trim() || 'Unknown',
+      },
+      magnitude: event.magnitude,
+      metadata: event.metadata,
+      expiresAt: new Date(event.expiresAt),
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -155,7 +189,8 @@ export class GlobalEventRepository implements OnModuleInit {
         sort: { timestamp: -1 },
       });
 
-      return docs.map((d) => this.toGlobalEvent(d));
+      const dedupedDocs = this.dedupeDocs(docs);
+      return dedupedDocs.map((d) => this.toGlobalEvent(d));
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error in getRecentEvents: ${err.message}`, err.stack);
@@ -196,5 +231,33 @@ export class GlobalEventRepository implements OnModuleInit {
       metadata: doc.metadata,
       expiresAt: doc.expiresAt.toISOString(),
     };
+  }
+
+  private dedupeDocs(docs: GlobalEventDoc[]): GlobalEventDoc[] {
+    const byId = new Map<string, GlobalEventDoc>();
+    const signatureToId = new Map<string, string>();
+
+    for (const doc of docs) {
+      const signature = eventSignature(doc);
+      const existingBySignatureId = signatureToId.get(signature);
+
+      if (existingBySignatureId && existingBySignatureId !== doc.eventId) {
+        const current = byId.get(existingBySignatureId);
+        if (!current || doc.timestamp >= current.timestamp) {
+          if (current) byId.delete(existingBySignatureId);
+          byId.set(doc.eventId, doc);
+          signatureToId.set(signature, doc.eventId);
+        }
+        continue;
+      }
+
+      const existingById = byId.get(doc.eventId);
+      if (!existingById || doc.timestamp >= existingById.timestamp) {
+        byId.set(doc.eventId, doc);
+        signatureToId.set(signature, doc.eventId);
+      }
+    }
+
+    return Array.from(byId.values()).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }
 }

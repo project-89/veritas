@@ -1,10 +1,8 @@
 import {
   Controller,
   Get,
-  Logger,
   MessageEvent,
   NotFoundException,
-  OnModuleInit,
   Param,
   Query,
   Sse,
@@ -14,28 +12,11 @@ import { GlobalEventRepository } from '@veritas/ingestion';
 import { filter, interval, map, merge, Observable } from 'rxjs';
 
 @Controller('events')
-export class EventsController implements OnModuleInit {
-  private readonly logger = new Logger(EventsController.name);
-
+export class EventsController {
   constructor(
     private readonly aggregation: GlobalEventAggregationService,
     private readonly eventRepo: GlobalEventRepository,
   ) {}
-
-  /**
-   * Subscribe to the aggregation stream and persist every event to MongoDB.
-   * This ensures /events/recent always has data even on page refresh.
-   */
-  onModuleInit() {
-    this.aggregation.events$.subscribe(async (event) => {
-      try {
-        await this.eventRepo.upsertEvent(event);
-      } catch (err) {
-        this.logger.debug(`Failed to persist event ${event.id}: ${err}`);
-      }
-    });
-    this.logger.log('Event persistence subscriber active — events will be stored to MongoDB');
-  }
 
   /**
    * SSE endpoint — streams real-time GlobalEvents to connected clients.

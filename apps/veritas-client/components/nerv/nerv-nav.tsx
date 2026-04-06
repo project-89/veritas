@@ -35,9 +35,29 @@ function UtcClock() {
   );
 }
 
+function useTheme() {
+  const [theme, setThemeState] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('nerv-theme') as 'dark' | 'light' | null;
+    const initial = stored ?? 'dark';
+    setThemeState(initial);
+    document.documentElement.setAttribute('data-theme', initial);
+  }, []);
+
+  const setTheme = (t: 'dark' | 'light') => {
+    setThemeState(t);
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem('nerv-theme', t);
+  };
+
+  return { theme, setTheme, toggle: () => setTheme(theme === 'dark' ? 'light' : 'dark') };
+}
+
 export function NervNav() {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
+  const { theme, toggle: toggleTheme } = useTheme();
 
   useEffect(() => {
     let mounted = true;
@@ -129,8 +149,16 @@ export function NervNav() {
           }) : null}
         </div>
 
-        {/* Right: System status + time */}
+        {/* Right: Theme toggle + System status + time */}
         <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={toggleTheme}
+            className="text-[9px] font-mono uppercase tracking-wider px-2 py-1 rounded-sm transition-all text-nerv-text-muted hover:text-nerv-orange hover:bg-nerv-bg-panel/50"
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          >
+            {theme === 'dark' ? '\u2600' : '\u263E'}
+          </button>
+          <div className="w-px h-4 bg-nerv-border hidden sm:block" />
           <div className="hidden sm:flex items-center gap-1.5">
             <NervStatus status="online" size="sm" />
             <span className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">

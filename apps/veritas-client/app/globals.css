@@ -7,23 +7,56 @@
    ═══════════════════════════════════════════════════ */
 
 @layer base {
-  :root {
+  /* ── DARK THEME (default — classic NERV) ── */
+  :root,
+  [data-theme='dark'] {
     --nerv-bg-deep: #0a0a0f;
     --nerv-bg: #0f0f1a;
     --nerv-bg-panel: #1a1a2e;
     --nerv-bg-elevated: #252540;
     --nerv-border: #2a2a45;
     --nerv-border-active: #3a3a5f;
+    --nerv-text: #e0e0e8;
+    --nerv-text-secondary: #8888a0;
+    --nerv-text-muted: #555570;
     --nerv-orange: #ff6b2b;
     --nerv-green: #00ff41;
     --nerv-red: #e94560;
     --nerv-blue: #0ea5e9;
     --nerv-amber: #f59e0b;
     --nerv-purple: #a855f7;
+    --nerv-scanline-color: rgba(0, 255, 65, 0.012);
+    --nerv-scrollbar-track: #0a0a0f;
+    --nerv-scrollbar-thumb: #2a2a45;
+    --nerv-scrollbar-thumb-hover: #3a3a5f;
+  }
+
+  /* ── LIGHT THEME (NERV — clean white command center) ── */
+  [data-theme='light'] {
+    --nerv-bg-deep: #ffffff;
+    --nerv-bg: #fafafa;
+    --nerv-bg-panel: #f3f3f5;
+    --nerv-bg-elevated: #eaeaee;
+    --nerv-border: #d8d8e0;
+    --nerv-border-active: #c0c0cc;
+    --nerv-text: #1a1a2e;
+    --nerv-text-secondary: #50506a;
+    --nerv-text-muted: #9090a8;
+    --nerv-orange: #ff6b2b;
+    --nerv-green: #0a8a2e;
+    --nerv-red: #d03545;
+    --nerv-blue: #0b7ec0;
+    --nerv-amber: #c07d08;
+    --nerv-purple: #7c3aed;
+    --nerv-scanline-color: rgba(255, 107, 43, 0.015);
+    --nerv-scrollbar-track: #fafafa;
+    --nerv-scrollbar-thumb: #d8d8e0;
+    --nerv-scrollbar-thumb-hover: #c0c0cc;
   }
 
   body {
-    @apply bg-nerv-bg-deep text-nerv-text antialiased;
+    @apply bg-nerv-bg-deep antialiased;
+    color: var(--nerv-text);
     font-size: 14px;
   }
 
@@ -42,14 +75,14 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #0a0a0f;
+    background: var(--nerv-scrollbar-track);
   }
   ::-webkit-scrollbar-thumb {
-    background: #2a2a45;
+    background: var(--nerv-scrollbar-thumb);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3a3a5f;
+    background: var(--nerv-scrollbar-thumb-hover);
   }
 }
 
@@ -66,8 +99,8 @@
       0deg,
       transparent,
       transparent 2px,
-      rgba(0, 255, 65, 0.012) 2px,
-      rgba(0, 255, 65, 0.012) 4px
+      var(--nerv-scanline-color) 2px,
+      var(--nerv-scanline-color) 4px
     );
     pointer-events: none;
     z-index: 50;

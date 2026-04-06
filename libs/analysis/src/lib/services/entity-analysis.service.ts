@@ -97,8 +97,10 @@ export class EntityAnalysisService {
     insights: InsightInput[],
     narratives: AnalyzedNarrative[],
   ): EntityDossier[] {
-    // If no insights provided, extract entities from raw post text
-    if (insights.length === 0 && posts.length > 0) {
+    const hasUsableEntities = insights.some((insight) => (insight.entities?.length ?? 0) > 0);
+
+    // If no usable entities are provided, extract entities from raw post text
+    if (!hasUsableEntities && posts.length > 0) {
       insights = this.extractInsightsFromPosts(posts);
     }
     if (insights.length === 0) return [];
