@@ -244,5 +244,84 @@ describe('PsychologicalProfilerService', () => {
         }),
       ).rejects.toThrow();
     });
+
+    it('retries transient Gemini failures before succeeding', async () => {
+      const service = createService('fake-key');
+      const generateContent = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('fetch failed'))
+        .mockRejectedValueOnce(new Error('429 rate limit'))
+        .mockResolvedValue({
+          response: {
+            text: () => JSON.stringify({
+              communicationStyle: { formality: 'mixed', tone: 'analytical', complexity: 'moderate', evidence: [] },
+              coreBeliefs: [],
+              interestDomains: [],
+              emotionalTriggers: { anger: [], excitement: [], fear: [], evidence: {} },
+              engagementPatterns: { likelyToEngageWith: [], likelyToShare: [], likelyToCreate: [], contentPreferences: [] },
+              influenceSusceptibility: { vulnerableTo: [], resistantTo: [], echoChamberDepth: 'none', evidence: [] },
+              persuasionStyle: { primaryTechniques: [], targetAudience: '', effectiveness: 'low', evidence: [] },
+              riskIndicators: { radicalizationSignals: [], manipulationVulnerability: 'low', echoChamberDepth: 'none', flags: [], evidence: [] },
+              socialRole: { primary: 'analyst', confidence: 0.7, evidence: [] },
+              summary: 'Recovered after transient failures.',
+            }),
+          },
+        });
+
+      jest.spyOn(global, 'setTimeout').mockImplementation(((fn: (...args: any[]) => void) => {
+        fn();
+        return 0 as any;
+      }) as typeof setTimeout);
+
+      (service as any).genAI = {
+        getGenerativeModel: jest.fn().mockReturnValue({
+          generateContent,
+        }),
+      };
+
+      const profile = await service.generateProfile({
+        handle: 'testuser',
+        platform: 'twitter',
+        posts: makePosts(20),
+      });
+
+      expect(generateContent).toHaveBeenCalledTimes(3);
+      expect(profile.summary).toContain('Recovered');
+
+      jest.restoreAllMocks();
+    });
+
+    it('caps the analyzed post sample to keep prompt size bounded', async () => {
+      const service = createService('fake-key');
+
+      (service as any).genAI = {
+        getGenerativeModel: jest.fn().mockReturnValue({
+          generateContent: jest.fn().mockResolvedValue({
+            response: {
+              text: () => JSON.stringify({
+                communicationStyle: { formality: 'mixed', tone: 'mixed', complexity: 'moderate', evidence: [] },
+                coreBeliefs: [],
+                interestDomains: [],
+                emotionalTriggers: { anger: [], excitement: [], fear: [], evidence: {} },
+                engagementPatterns: { likelyToEngageWith: [], likelyToShare: [], likelyToCreate: [], contentPreferences: [] },
+                influenceSusceptibility: { vulnerableTo: [], resistantTo: [], echoChamberDepth: 'none', evidence: [] },
+                persuasionStyle: { primaryTechniques: [], targetAudience: '', effectiveness: 'low', evidence: [] },
+                riskIndicators: { radicalizationSignals: [], manipulationVulnerability: 'low', echoChamberDepth: 'none', flags: [], evidence: [] },
+                socialRole: { primary: 'follower', confidence: 0.5, evidence: [] },
+                summary: 'Bounded prompt sample.',
+              }),
+            },
+          }),
+        }),
+      };
+
+      const profile = await service.generateProfile({
+        handle: 'testuser',
+        platform: 'twitter',
+        posts: makePosts(300),
+      });
+
+      expect(profile.postCountAnalyzed).toBeLessThanOrEqual(120);
+    });
   });
 });

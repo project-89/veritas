@@ -93,7 +93,7 @@ function TypeProgressRow({
           </span>
         )}
         {allDone && !hasFailures && (
-          <span className="text-[8px] font-mono text-green-400 w-16 text-right shrink-0">
+          <span className="text-[8px] font-mono text-nerv-green w-16 text-right shrink-0">
             DONE
           </span>
         )}
@@ -158,11 +158,11 @@ function StatusDot({ status }: { status: string }) {
   const colors: Record<string, string> = {
     pending: 'bg-nerv-text-muted',
     running: 'bg-nerv-orange animate-pulse',
-    completed: 'bg-green-400',
+    completed: 'bg-nerv-green',
     failed: 'bg-nerv-red',
     cancelled: 'bg-yellow-500',
   };
-  return <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors[status] ?? 'bg-gray-500'}`} />;
+  return <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors[status] ?? 'bg-nerv-text-muted'}`} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +225,7 @@ export function AnalysisQueuePanel({ jobs, onCancel, onRetry }: AnalysisQueuePan
           )}
         </div>
         {allDone && (
-          <span className="text-[8px] font-mono text-green-400 uppercase tracking-wider">
+          <span className="text-[8px] font-mono text-nerv-green uppercase tracking-wider">
             COMPLETE
           </span>
         )}

@@ -105,6 +105,8 @@ export class AnalysisProcessor extends WorkerHost {
     } catch (err) {
       const error = err as Error;
       const duration = Date.now() - startTime;
+      const maxAttempts = typeof job.opts.attempts === 'number' ? job.opts.attempts : 1;
+      const isFinalAttempt = job.attemptsMade + 1 >= maxAttempts;
       await this.analysisJobRepo.updateStatus(analysisJobId, {
         status: 'failed',
         completedAt: new Date(),
@@ -114,7 +116,7 @@ export class AnalysisProcessor extends WorkerHost {
       this.logger.error(`Analysis job ${analysisJobId} [${type}] failed: ${error.message}`);
 
       // For psychological-profile jobs, also update the identity record status
-      if (type === 'psychological-profile') {
+      if (type === 'psychological-profile' && isFinalAttempt) {
         try {
           const job = await this.analysisJobRepo.getJob(analysisJobId);
           const identityId = job?.narrativeIds?.[0];

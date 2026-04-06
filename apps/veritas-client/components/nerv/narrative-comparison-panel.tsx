@@ -11,9 +11,9 @@ export interface NarrativeComparisonPanelProps {
 }
 
 function sentimentColor(v: number): string {
-  if (v > 0.15) return '#00FF41';
-  if (v < -0.15) return '#FF3366';
-  return '#FF6B2B';
+  if (v > 0.15) return 'var(--nerv-green)';
+  if (v < -0.15) return 'var(--nerv-red)';
+  return 'var(--nerv-orange)';
 }
 
 export function NarrativeComparisonPanel({
@@ -23,7 +23,7 @@ export function NarrativeComparisonPanel({
 }: NarrativeComparisonPanelProps) {
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-nerv-bg-deep/70 backdrop-blur-sm">
         <div className="bg-nerv-bg-panel border border-nerv-border rounded-sm p-8 text-center">
           <div className="text-nerv-orange text-2xl mb-3 animate-pulse">{'\u25C9'}</div>
           <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
@@ -42,7 +42,7 @@ export function NarrativeComparisonPanel({
   const fasterLabel = faster === 'a' ? 'A faster' : faster === 'b' ? 'B faster' : 'Equal';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-nerv-bg-deep/70 backdrop-blur-sm">
       <div className="bg-nerv-bg border border-nerv-border rounded-sm w-full max-w-2xl max-h-[85vh] overflow-auto shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-nerv-border">
@@ -65,8 +65,7 @@ export function NarrativeComparisonPanel({
             <div className="bg-nerv-bg-panel border border-nerv-border rounded-sm p-3">
               <div className="flex items-center gap-2 mb-2">
                 <span
-                  className="inline-block w-3 h-1 rounded-sm shrink-0"
-                  style={{ backgroundColor: '#FF6B2B' }}
+                  className="inline-block w-3 h-1 rounded-sm shrink-0 bg-nerv-orange"
                 />
                 <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
                   NARRATIVE A
@@ -79,8 +78,7 @@ export function NarrativeComparisonPanel({
             <div className="bg-nerv-bg-panel border border-nerv-border rounded-sm p-3">
               <div className="flex items-center gap-2 mb-2">
                 <span
-                  className="inline-block w-3 h-1 rounded-sm shrink-0"
-                  style={{ backgroundColor: '#0ea5e9' }}
+                  className="inline-block w-3 h-1 rounded-sm shrink-0 bg-nerv-blue"
                 />
                 <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
                   NARRATIVE B
@@ -102,7 +100,7 @@ export function NarrativeComparisonPanel({
                 {Math.round(similarity * 100)}%
               </span>
             </div>
-            <NervBar value={similarity} color="#FF6B2B" showLabel={false} />
+            <NervBar value={similarity} color="var(--nerv-orange)" showLabel={false} />
           </div>
 
           {/* Sentiment delta */}
@@ -130,14 +128,14 @@ export function NarrativeComparisonPanel({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <span className="text-[9px] font-mono text-nerv-text-muted">A</span>
-                <div className="text-[11px] font-mono font-bold tabular-nums" style={{ color: '#FF6B2B' }}>
+                <div className="text-[11px] font-mono font-bold tabular-nums text-nerv-orange">
                   {velocityComparison.aPostsPerHour.toFixed(2)}
                   <span className="text-[8px] text-nerv-text-muted font-normal ml-1">posts/hr</span>
                 </div>
               </div>
               <div className="space-y-1">
                 <span className="text-[9px] font-mono text-nerv-text-muted">B</span>
-                <div className="text-[11px] font-mono font-bold tabular-nums" style={{ color: '#0ea5e9' }}>
+                <div className="text-[11px] font-mono font-bold tabular-nums text-nerv-blue">
                   {velocityComparison.bPostsPerHour.toFixed(2)}
                   <span className="text-[8px] text-nerv-text-muted font-normal ml-1">posts/hr</span>
                 </div>

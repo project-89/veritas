@@ -7,7 +7,7 @@ export interface NervBarProps {
 
 export function NervBar({
   value,
-  color = '#FF6B2B',
+  color = 'var(--nerv-orange)',
   showLabel = false,
   height = 6,
 }: NervBarProps) {
@@ -25,7 +25,7 @@ export function NervBar({
           style={{
             width: `${pct}%`,
             backgroundColor: color,
-            boxShadow: `0 0 4px ${color}40`,
+            boxShadow: `0 0 4px color-mix(in srgb, ${color} 25%, transparent)`,
           }}
         />
       </div>

@@ -27,7 +27,7 @@ export interface IntelligenceReportPanelProps {
 
 function ConfidenceBar({ value, label }: { value: number; label?: string }) {
   const color =
-    value > 0.7 ? '#FF3366' : value > 0.4 ? '#FF6B2B' : '#00FF41';
+    value > 0.7 ? 'var(--nerv-red)' : value > 0.4 ? 'var(--nerv-orange)' : 'var(--nerv-green)';
   return (
     <div className="space-y-1">
       {label && (
@@ -65,11 +65,11 @@ const ASSESSMENT_TYPES: {
   borderColor: string;
   icon: string;
 }[] = [
-  { type: 'campaign', label: 'DETECT COORDINATED CAMPAIGN', color: 'text-red-400', hoverBg: 'hover:bg-red-500/10', borderColor: 'border-red-500/50', icon: '\u25C9' },
-  { type: 'manipulation', label: 'CHECK MARKET MANIPULATION', color: 'text-amber-400', hoverBg: 'hover:bg-amber-500/10', borderColor: 'border-amber-500/50', icon: '\u25B2' },
-  { type: 'crisis', label: 'CRISIS EARLY WARNING', color: 'text-orange-400', hoverBg: 'hover:bg-orange-500/10', borderColor: 'border-orange-500/50', icon: '\u26A0' },
-  { type: 'influence', label: 'ATTRIBUTE INFLUENCE OPS', color: 'text-purple-400', hoverBg: 'hover:bg-purple-500/10', borderColor: 'border-purple-500/50', icon: '\u2B21' },
-  { type: 'legitimacy', label: 'SCORE NARRATIVE LEGITIMACY', color: 'text-blue-400', hoverBg: 'hover:bg-blue-500/10', borderColor: 'border-blue-500/50', icon: '\u2714' },
+  { type: 'campaign', label: 'DETECT COORDINATED CAMPAIGN', color: 'text-nerv-red', hoverBg: 'hover:bg-nerv-red/10', borderColor: 'border-nerv-red/50', icon: '\u25C9' },
+  { type: 'manipulation', label: 'CHECK MARKET MANIPULATION', color: 'text-nerv-amber', hoverBg: 'hover:bg-nerv-amber/10', borderColor: 'border-nerv-amber/50', icon: '\u25B2' },
+  { type: 'crisis', label: 'CRISIS EARLY WARNING', color: 'text-nerv-orange', hoverBg: 'hover:bg-nerv-orange/10', borderColor: 'border-nerv-orange/50', icon: '\u26A0' },
+  { type: 'influence', label: 'ATTRIBUTE INFLUENCE OPS', color: 'text-nerv-purple', hoverBg: 'hover:bg-nerv-purple/10', borderColor: 'border-nerv-purple/50', icon: '\u2B21' },
+  { type: 'legitimacy', label: 'SCORE NARRATIVE LEGITIMACY', color: 'text-nerv-blue', hoverBg: 'hover:bg-nerv-blue/10', borderColor: 'border-nerv-blue/50', icon: '\u2714' },
 ];
 
 function EmptyState({ onRunAssessment }: { onRunAssessment?: (type: string) => void }) {
@@ -106,10 +106,10 @@ function EmptyState({ onRunAssessment }: { onRunAssessment?: (type: string) => v
 // ---------------------------------------------------------------------------
 
 const ROLE_COLORS: Record<string, string> = {
-  orchestrator: 'text-red-400',
-  amplifier: 'text-amber-400',
-  bot: 'text-purple-400',
-  organic: 'text-green-400',
+  orchestrator: 'text-nerv-red',
+  amplifier: 'text-nerv-amber',
+  bot: 'text-nerv-purple',
+  organic: 'text-nerv-green',
 };
 
 const ROLE_VARIANTS: Record<string, 'red' | 'amber' | 'purple' | 'green' | 'muted'> = {
@@ -316,9 +316,9 @@ function ManipulationReportView({ report }: { report: MarketManipulationReport }
 // ---------------------------------------------------------------------------
 
 const SEVERITY_COLORS: Record<string, string> = {
-  emergency: 'border-red-500 bg-red-500/5',
-  warning: 'border-amber-500 bg-amber-500/5',
-  watch: 'border-blue-500 bg-blue-500/5',
+  emergency: 'border-nerv-red bg-nerv-red/5',
+  warning: 'border-nerv-amber bg-nerv-amber/5',
+  watch: 'border-nerv-blue bg-nerv-blue/5',
 };
 
 const SEVERITY_VARIANTS: Record<string, 'red' | 'amber' | 'blue' | 'muted'> = {
@@ -398,10 +398,10 @@ function CrisisReportView({ report }: { report: CrisisWarningReport }) {
 // ---------------------------------------------------------------------------
 
 const ATTR_ROLE_COLORS: Record<string, string> = {
-  originator: 'text-red-400',
-  amplifier: 'text-amber-400',
-  target: 'text-blue-400',
-  beneficiary: 'text-purple-400',
+  originator: 'text-nerv-red',
+  amplifier: 'text-nerv-amber',
+  target: 'text-nerv-blue',
+  beneficiary: 'text-nerv-purple',
 };
 
 function InfluenceReportView({ report }: { report: InfluenceOperationReport }) {
@@ -458,10 +458,10 @@ function InfluenceReportView({ report }: { report: InfluenceOperationReport }) {
             {report.beneficiaries.map((b, i) => (
               <div
                 key={i}
-                className="bg-nerv-bg-panel border border-purple-500/30 rounded-sm p-2 space-y-1"
+                className="bg-nerv-bg-panel border border-nerv-purple/30 rounded-sm p-2 space-y-1"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono font-bold text-purple-400">
+                  <span className="text-[10px] font-mono font-bold text-nerv-purple">
                     {b.entity}
                   </span>
                   <span className="text-[8px] font-mono tabular-nums text-nerv-text-muted">
@@ -516,11 +516,11 @@ function InfluenceReportView({ report }: { report: InfluenceOperationReport }) {
 // ---------------------------------------------------------------------------
 
 const VERDICT_CONFIG: Record<string, { color: string; bg: string; borderColor: string }> = {
-  legitimate: { color: 'text-green-400', bg: 'bg-green-500/10', borderColor: 'border-green-500/50' },
-  likely_legitimate: { color: 'text-green-300', bg: 'bg-green-500/5', borderColor: 'border-green-500/30' },
-  uncertain: { color: 'text-amber-400', bg: 'bg-amber-500/10', borderColor: 'border-amber-500/50' },
-  likely_false: { color: 'text-red-300', bg: 'bg-red-500/5', borderColor: 'border-red-500/30' },
-  false: { color: 'text-red-400', bg: 'bg-red-500/10', borderColor: 'border-red-500/50' },
+  legitimate: { color: 'text-nerv-green', bg: 'bg-nerv-green/10', borderColor: 'border-nerv-green/50' },
+  likely_legitimate: { color: 'text-nerv-green/80', bg: 'bg-nerv-green/5', borderColor: 'border-nerv-green/30' },
+  uncertain: { color: 'text-nerv-amber', bg: 'bg-nerv-amber/10', borderColor: 'border-nerv-amber/50' },
+  likely_false: { color: 'text-nerv-red/80', bg: 'bg-nerv-red/5', borderColor: 'border-nerv-red/30' },
+  false: { color: 'text-nerv-red', bg: 'bg-nerv-red/10', borderColor: 'border-nerv-red/50' },
 };
 
 const VERDICT_VARIANTS: Record<string, 'green' | 'amber' | 'red' | 'muted'> = {
@@ -566,13 +566,13 @@ function LegitimacyReportView({ report }: { report: NarrativeLegitimacyReport })
         <SectionHeader>EVIDENCE BALANCE</SectionHeader>
         <div className="flex gap-4 text-[10px] font-mono">
           <div className="flex items-center gap-1">
-            <span className="text-green-400">{'\u25B2'}</span>
+            <span className="text-nerv-green">{'\u25B2'}</span>
             <span className="text-nerv-text-secondary">
               {report.verifiedClaimCount} verified
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-red-400">{'\u25BC'}</span>
+            <span className="text-nerv-red">{'\u25BC'}</span>
             <span className="text-nerv-text-secondary">
               {report.disputedClaimCount} disputed
             </span>
@@ -587,7 +587,7 @@ function LegitimacyReportView({ report }: { report: NarrativeLegitimacyReport })
         <div className="mt-2">
           <NervBar
             value={(report.evidenceBalance + 1) / 2}
-            color={report.evidenceBalance > 0.2 ? '#00FF41' : report.evidenceBalance < -0.2 ? '#FF3366' : '#FF6B2B'}
+            color={report.evidenceBalance > 0.2 ? 'var(--nerv-green)' : report.evidenceBalance < -0.2 ? 'var(--nerv-red)' : 'var(--nerv-orange)'}
           />
         </div>
       </div>

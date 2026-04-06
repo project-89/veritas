@@ -28,7 +28,7 @@ function StatusBadge({ status }: { status: ConnectorStatus['status'] }) {
   const config: Record<string, { bg: string; text: string; label: string; animate?: boolean }> = {
     queued: { bg: 'bg-nerv-text-muted/20', text: 'text-nerv-text-muted', label: 'QUEUED' },
     running: { bg: 'bg-nerv-orange/20', text: 'text-nerv-orange', label: 'RUNNING', animate: true },
-    done: { bg: 'bg-green-500/20', text: 'text-green-400', label: 'DONE' },
+    done: { bg: 'bg-nerv-green/20', text: 'text-nerv-green', label: 'DONE' },
     failed: { bg: 'bg-nerv-red/20', text: 'text-nerv-red', label: 'FAILED' },
     cancelled: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', label: 'CANCELLED' },
   };
@@ -206,7 +206,7 @@ export function ScanProgress({ scanJob, onCancel, onRetry }: ScanProgressProps) 
             </span>
           )}
           {scanJob.status === 'completed' && (
-            <span className="text-[8px] font-mono text-green-400 uppercase tracking-wider">
+            <span className="text-[8px] font-mono text-nerv-green uppercase tracking-wider">
               COMPLETE
             </span>
           )}

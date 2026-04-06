@@ -4,12 +4,12 @@ import { useMemo, useState, useRef, useCallback } from 'react';
 import type { DownstreamEffectsResult, NarrativeCorrelation, TransmissionChain } from '../../lib/api';
 
 const DOMAIN_COLORS: Record<string, string> = {
-  economic: '#f59e0b',
-  political: '#e94560',
-  social: '#a855f7',
-  market: '#00FF41',
-  media: '#0ea5e9',
-  narrative: '#FF6B2B',
+  economic: 'var(--nerv-amber)',
+  political: 'var(--nerv-red)',
+  social: 'var(--nerv-purple)',
+  market: 'var(--nerv-green)',
+  media: 'var(--nerv-blue)',
+  narrative: 'var(--nerv-orange)',
 };
 
 const DOMAIN_ICONS: Record<string, string> = {
@@ -187,7 +187,7 @@ export function EffectsChain({
           fromId: prevNodeId,
           toId: nodeKey,
           strength,
-          color: DOMAIN_COLORS[step.type] ?? '#555570',
+          color: DOMAIN_COLORS[step.type] ?? 'var(--nerv-text-muted)',
         });
 
         prevNodeId = nodeKey;
@@ -369,15 +369,15 @@ export function EffectsChain({
         >
           {/* Column headers */}
           <text x={COL_POSITIONS[0]! + NODE_WIDTH / 2} y={16} textAnchor="middle"
-            className="text-[9px] font-mono uppercase tracking-widest" fill="#555570">
+            className="text-[9px] font-mono uppercase tracking-widest" fill="var(--nerv-text-muted)">
             NARRATIVES
           </text>
           <text x={COL_POSITIONS[1]! + NODE_WIDTH / 2} y={16} textAnchor="middle"
-            className="text-[9px] font-mono uppercase tracking-widest" fill="#555570">
+            className="text-[9px] font-mono uppercase tracking-widest" fill="var(--nerv-text-muted)">
             CAUSAL MECHANISM
           </text>
           <text x={COL_POSITIONS[2]! + NODE_WIDTH / 2} y={16} textAnchor="middle"
-            className="text-[9px] font-mono uppercase tracking-widest" fill="#555570">
+            className="text-[9px] font-mono uppercase tracking-widest" fill="var(--nerv-text-muted)">
             REAL-WORLD EFFECT
           </text>
 
@@ -406,7 +406,7 @@ export function EffectsChain({
           {/* Nodes */}
           {nodes.map((node) => {
             const y = 30 + node.row * ROW_HEIGHT;
-            const color = DOMAIN_COLORS[node.domain] ?? '#555570';
+            const color = DOMAIN_COLORS[node.domain] ?? 'var(--nerv-text-muted)';
             const highlighted = isHighlighted(node.id);
             const isNarrative = node.col === 0;
             const isSelected = node.id === `nar-${selectedNarrativeId}`;
@@ -439,11 +439,11 @@ export function EffectsChain({
                 >
                   <div
                     className="text-[9px] font-mono leading-tight"
-                    style={{ color: highlighted ? '#e0e0e8' : '#555570' }}
+                    style={{ color: highlighted ? 'var(--nerv-text)' : 'var(--nerv-text-muted)' }}
                   >
                     <span style={{ color }}>{DOMAIN_ICONS[node.domain] ?? '\u25CB'}</span>{' '}
                     {node.label}
-                    <div className="text-[8px] mt-0.5" style={{ color: '#555570' }}>
+                    <div className="text-[8px] mt-0.5" style={{ color: 'var(--nerv-text-muted)' }}>
                       {node.domain.toUpperCase()}
                     </div>
                   </div>
@@ -476,7 +476,7 @@ export function EffectsChain({
                 </div>
                 <div className="flex items-stretch gap-0 overflow-x-auto pb-1">
                   {chain.steps.map((step, si) => {
-                    const color = DOMAIN_COLORS[step.domain] ?? '#555570';
+                    const color = DOMAIN_COLORS[step.domain] ?? 'var(--nerv-text-muted)';
                     const isLast = si === chain.steps.length - 1;
                     return (
                       <div key={si} className="flex items-stretch shrink-0">
@@ -485,7 +485,7 @@ export function EffectsChain({
                           style={{
                             borderColor: color,
                             borderLeftWidth: 3,
-                            backgroundColor: `${color}08`,
+                            backgroundColor: `color-mix(in srgb, ${color} 3%, transparent)`,
                           }}
                         >
                           <div className="text-[8px] font-mono uppercase tracking-wider mb-0.5" style={{ color }}>

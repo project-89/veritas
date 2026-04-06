@@ -77,6 +77,13 @@ export class PsychologicalProfilerService {
   private readonly logger = new Logger(PsychologicalProfilerService.name);
   private readonly genAI: GoogleGenerativeAI | null = null;
   private readonly deepModel = 'gemini-3.1-pro-preview';
+  private static readonly MAX_PROFILE_POSTS = 120;
+  private static readonly MAX_RECENT_POSTS = 50;
+  private static readonly MAX_TOP_ENGAGEMENT_POSTS = 30;
+  private static readonly MAX_POST_TEXT_CHARS = 280;
+  private static readonly MAX_TOTAL_POST_TEXT_CHARS = 24000;
+  private static readonly GENERATION_RETRIES = 3;
+  private static readonly BASE_RETRY_DELAY_MS = 1500;
 
   constructor(private readonly configService: ConfigService) {
     const geminiKey =
@@ -114,8 +121,15 @@ export class PsychologicalProfilerService {
       throw new Error('No posts available for profiling');
     }
 
-    // Sample posts strategically: recent + random older + high-engagement
-    const sampledPosts = this.samplePosts(posts, 200);
+    const normalizedPosts = this.dedupePosts(posts);
+
+    // Sample posts strategically: recent + random older + high-engagement.
+    // The original 200 x 500-char payload was too large and made the profile
+    // generation path fragile under load.
+    const sampledPosts = this.samplePosts(
+      normalizedPosts,
+      PsychologicalProfilerService.MAX_PROFILE_POSTS,
+    );
 
     this.logger.log(
       `Generating MAGI profile for @${handle} [${platform}] — ${sampledPosts.length} posts`,
@@ -133,10 +147,7 @@ export class PsychologicalProfilerService {
     );
 
     try {
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-        systemInstruction: systemPrompt,
-      });
+      const result = await this.generateWithRetry(model, systemPrompt, userMessage, handle);
 
       const text = result.response.text();
       const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -222,12 +233,10 @@ ${JSON_SCHEMA}`;
       ? `\nAccount: ${authorProfile['followersCount'] ?? '?'} followers, ${authorProfile['followingCount'] ?? '?'} following, verified: ${authorProfile['isVerified'] ?? false}\nBio: ${authorProfile['bio'] ?? 'N/A'}`
       : '';
 
-    const postSection = posts.map((p, i) =>
-      `[${i}] [${p.platform}] [${p.timestamp}] [engagement: ${p.engagement.likes}L ${p.engagement.comments}C ${p.engagement.shares}S]${p.sentiment ? ` [sentiment: ${p.sentiment.label}]` : ''}\n${p.text.slice(0, 500)}`,
-    ).join('\n\n');
+    const postSection = this.buildPostSection(posts);
 
     const existingSection = existingProfile
-      ? `\n\n## Previous Profile (v${existingProfile.version})\nUpdate based on new evidence. Note changes.\n${existingProfile.summary}`
+      ? `\n\n## Previous Profile (v${existingProfile.version})\nUpdate based on new evidence. Note changes.\n${existingProfile.summary.slice(0, 1200)}`
       : '';
 
     return `## Subject\nHandle: @${handle}\nPlatform: ${platform}\nPost corpus: ${posts.length} posts spanning ${dateRange}${authorSection}${existingSection}\n\n## Posts\n${postSection}`;
@@ -244,21 +253,30 @@ ${JSON_SCHEMA}`;
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
 
-    // Most recent 100
-    const recent = sorted.slice(0, 100);
+    // Most recent posts
+    const recent = sorted.slice(0, Math.min(PsychologicalProfilerService.MAX_RECENT_POSTS, maxPosts));
 
-    // Highest engagement 50
+    // Highest engagement posts
     const byEngagement = [...posts].sort(
       (a, b) =>
         (b.engagement.likes + b.engagement.comments + b.engagement.shares) -
         (a.engagement.likes + a.engagement.comments + a.engagement.shares),
     );
-    const topEngagement = byEngagement.slice(0, 50);
+    const topEngagement = byEngagement.slice(
+      0,
+      Math.min(
+        PsychologicalProfilerService.MAX_TOP_ENGAGEMENT_POSTS,
+        Math.max(maxPosts - recent.length, 0),
+      ),
+    );
 
     // Random sample from the rest
     const usedIds = new Set([...recent, ...topEngagement].map((p) => p.text.slice(0, 50)));
     const remaining = posts.filter((p) => !usedIds.has(p.text.slice(0, 50)));
-    const randomSample = this.randomSample(remaining, maxPosts - 150);
+    const randomSample = this.randomSample(
+      remaining,
+      Math.max(maxPosts - recent.length - topEngagement.length, 0),
+    );
 
     // Deduplicate
     const seen = new Set<string>();
@@ -273,6 +291,95 @@ ${JSON_SCHEMA}`;
     }
 
     return result;
+  }
+
+  private buildPostSection(posts: UserPost[]): string {
+    let totalChars = 0;
+    const lines: string[] = [];
+
+    for (const [index, post] of posts.entries()) {
+      const text = post.text.replace(/\s+/g, ' ').trim().slice(0, PsychologicalProfilerService.MAX_POST_TEXT_CHARS);
+      const entry =
+        `[${index}] [${post.platform}] [${post.timestamp}] ` +
+        `[engagement: ${post.engagement.likes}L ${post.engagement.comments}C ${post.engagement.shares}S]` +
+        `${post.sentiment ? ` [sentiment: ${post.sentiment.label}]` : ''}\n${text}`;
+
+      if (lines.length > 0 && totalChars + entry.length > PsychologicalProfilerService.MAX_TOTAL_POST_TEXT_CHARS) {
+        break;
+      }
+
+      lines.push(entry);
+      totalChars += entry.length;
+    }
+
+    return lines.join('\n\n');
+  }
+
+  private dedupePosts(posts: UserPost[]): UserPost[] {
+    const seen = new Set<string>();
+    const result: UserPost[] = [];
+
+    for (const post of posts) {
+      const normalizedText = post.text.replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 180);
+      const dayBucket = post.timestamp.slice(0, 10);
+      const key = `${post.platform}|${dayBucket}|${normalizedText}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(post);
+    }
+
+    return result;
+  }
+
+  private async generateWithRetry(
+    model: ReturnType<GoogleGenerativeAI['getGenerativeModel']>,
+    systemPrompt: string,
+    userMessage: string,
+    handle: string,
+  ) {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= PsychologicalProfilerService.GENERATION_RETRIES; attempt++) {
+      try {
+        return await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+          systemInstruction: systemPrompt,
+          generationConfig: { responseMimeType: 'application/json' },
+        });
+      } catch (err) {
+        lastError = err;
+        if (attempt >= PsychologicalProfilerService.GENERATION_RETRIES || !this.isTransientGeminiError(err)) {
+          throw err;
+        }
+
+        const delayMs = PsychologicalProfilerService.BASE_RETRY_DELAY_MS * 2 ** (attempt - 1);
+        this.logger.warn(
+          `Transient MAGI generation failure for @${handle}; retrying attempt ${attempt + 1}/${PsychologicalProfilerService.GENERATION_RETRIES} in ${delayMs}ms`,
+        );
+        await this.sleep(delayMs);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Unknown MAGI generation failure');
+  }
+
+  private isTransientGeminiError(err: unknown): boolean {
+    const message = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+    return (
+      message.includes('fetch failed') ||
+      message.includes('429') ||
+      message.includes('quota') ||
+      message.includes('rate limit') ||
+      message.includes('deadline') ||
+      message.includes('timeout') ||
+      message.includes('temporar') ||
+      message.includes('overloaded') ||
+      message.includes('unavailable')
+    );
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private randomSample<T>(arr: T[], n: number): T[] {

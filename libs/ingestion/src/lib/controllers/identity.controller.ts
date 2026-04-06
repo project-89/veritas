@@ -145,8 +145,8 @@ export class IdentityController {
       };
 
       await this.analysisQueue.add('analysis-psychological-profile', jobData, {
-        attempts: 1,
-        backoff: { type: 'exponential', delay: 10000 },
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 30000 },
         removeOnComplete: 100,
         removeOnFail: 50,
       });

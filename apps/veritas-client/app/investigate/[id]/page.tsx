@@ -51,7 +51,7 @@ function InvestigatePageInner() {
     return (
       <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
         <div className="text-center space-y-3">
-          <span className="text-sm font-mono text-red-400">{error}</span>
+          <span className="text-sm font-mono text-nerv-red">{error}</span>
           <button
             onClick={() => router.push('/monitor')}
             className="block text-[10px] font-mono text-nerv-orange uppercase tracking-widest hover:underline mx-auto"
