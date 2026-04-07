@@ -61,6 +61,38 @@ describe('InvestigationController', () => {
           { type: 'youtube_video', value: 'abc' },
         ],
       })),
+      buildDossier: jest.fn().mockReturnValue({
+        generatedAt: '2026-04-06T00:00:00.000Z',
+        totalSeeds: 1,
+        processedSeeds: 1,
+        entityCounts: { youtube_video: 1 },
+        groupedEntities: {
+          youtube_video: [
+            {
+              type: 'youtube_video',
+              value: 'abc',
+              displayValue: 'abc',
+              sourceCount: 1,
+              occurrenceCount: 1,
+              sources: [
+                { seedId: 'seed-1', kind: 'youtube', label: 'Explainer', status: 'processed' },
+              ],
+            },
+          ],
+        },
+        topEntities: [
+          {
+            type: 'youtube_video',
+            value: 'abc',
+            displayValue: 'abc',
+            sourceCount: 1,
+            occurrenceCount: 1,
+            sources: [
+              { seedId: 'seed-1', kind: 'youtube', label: 'Explainer', status: 'processed' },
+            ],
+          },
+        ],
+      }),
     };
 
     mockRepository = {
@@ -146,7 +178,8 @@ describe('InvestigationController', () => {
     it('should return investigation with latest snapshot', async () => {
       const result = await controller.getInvestigation('inv-1');
 
-      expect(result.investigation).toEqual(mockInvestigation);
+      expect(result.investigation).toMatchObject(mockInvestigation);
+      expect(result.investigation.evidenceDossier).toBeDefined();
       expect(result.latestSnapshot).toEqual(mockSnapshot);
       expect(mockRepository.findById).toHaveBeenCalledWith('inv-1');
       expect(mockRepository.getLatestSnapshot).toHaveBeenCalledWith('inv-1');
@@ -282,6 +315,7 @@ describe('InvestigationController', () => {
       expect(mockEvidenceService.prepareSeed).toHaveBeenCalled();
       expect(result.success).toBe(true);
       expect(result.investigation.evidenceSeeds).toHaveLength(1);
+      expect(result.investigation.evidenceDossier).toBeDefined();
     });
 
     it('should reject empty evidence payloads', async () => {

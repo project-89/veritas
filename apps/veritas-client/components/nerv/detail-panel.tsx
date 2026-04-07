@@ -14,6 +14,7 @@ import type {
   IdentityRecord,
   MagiProfileMode,
   Investigation as InvestigationRecord,
+  InvestigationEvidenceEntity,
   InvestigationEvidenceSeed,
 } from '../../lib/api';
 import { IdentityDossier } from './identity-dossier';
@@ -97,6 +98,17 @@ const EVIDENCE_SEED_OPTIONS: Array<{
   { value: 'document', label: 'Document', placeholder: 'https://source.example/file.pdf' },
   { value: 'note', label: 'Note', placeholder: 'Analyst note or lead...' },
 ];
+
+const DOSSIER_GROUP_LABELS: Record<string, string> = {
+  domain: 'Domains',
+  wallet: 'Wallets',
+  contract: 'Contracts',
+  address: 'Addresses',
+  handle: 'Handles',
+  telegram: 'Telegram',
+  youtube_video: 'Videos',
+  url: 'URLs',
+};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -782,6 +794,8 @@ function InvestigationSummary({
     processed: 'green',
     error: 'red',
   };
+  const groupedEntityEntries = Object.entries(investigationRecord?.evidenceDossier?.groupedEntities ?? {})
+    .sort((a, b) => (b[1]?.length ?? 0) - (a[1]?.length ?? 0));
 
   return (
     <div className="space-y-3 p-3">
@@ -978,6 +992,62 @@ function InvestigationSummary({
             </div>
           )}
         </div>
+      </div>
+
+      <div className="pt-2 border-t border-nerv-border space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+            DOSSIER SNAPSHOT
+          </div>
+          <div className="flex items-center gap-1">
+            <NervBadge
+              label={`${investigationRecord?.evidenceDossier?.processedSeeds ?? 0}/${investigationRecord?.evidenceDossier?.totalSeeds ?? 0} PROCESSED`}
+              variant="blue"
+              size="sm"
+            />
+            <NervBadge
+              label={`${investigationRecord?.evidenceDossier?.topEntities?.length ?? 0} ENTITIES`}
+              variant="orange"
+              size="sm"
+            />
+          </div>
+        </div>
+
+        {groupedEntityEntries.length > 0 ? (
+          <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+            {groupedEntityEntries.map(([group, entities]) => (
+              <div key={group} className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+                    {DOSSIER_GROUP_LABELS[group] ?? group}
+                  </div>
+                  <NervBadge label={String(entities.length)} variant="muted" size="sm" />
+                </div>
+                <div className="space-y-1">
+                  {entities.slice(0, 6).map((entity: InvestigationEvidenceEntity) => (
+                    <div key={`${entity.type}:${entity.value}`} className="flex items-start justify-between gap-2 text-[9px] font-mono">
+                      <div className="min-w-0">
+                        <div className="text-nerv-text break-all">{entity.displayValue}</div>
+                        <div className="text-nerv-text-muted break-words">
+                          {entity.sources.slice(0, 2).map((source) => source.label).join(' · ')}
+                          {entity.sources.length > 2 ? ` +${entity.sources.length - 2} more` : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <NervBadge label={`${entity.sourceCount} SRC`} variant="blue" size="sm" />
+                        <NervBadge label={`${entity.occurrenceCount} HIT`} variant="orange" size="sm" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
+            Attach evidence seeds to start building the investigation dossier.
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-nerv-border">

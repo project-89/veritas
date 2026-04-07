@@ -6,17 +6,33 @@ import { JinaReaderService } from './utils/jina-reader.service';
 type EvidenceSeedKind = EvidenceSeed['kind'];
 type EvidenceSeedStatus = EvidenceSeed['status'];
 
-interface SeedDraft {
+export interface InvestigationEvidenceEntitySource {
+  seedId: string;
   kind: EvidenceSeedKind;
-  value: string;
-  label?: string;
-  notes?: string | null;
-  metadata?: Record<string, unknown>;
-  extractedEntities?: ExtractedEntity[];
+  label: string;
+  status: EvidenceSeedStatus;
 }
 
 interface YouTubeTranscriptConnector {
   getVideoTranscript?(videoId: string): Promise<string>;
+}
+
+export interface InvestigationEvidenceEntity {
+  type: string;
+  value: string;
+  displayValue: string;
+  sourceCount: number;
+  occurrenceCount: number;
+  sources: InvestigationEvidenceEntitySource[];
+}
+
+export interface InvestigationEvidenceDossier {
+  generatedAt: string;
+  totalSeeds: number;
+  processedSeeds: number;
+  entityCounts: Record<string, number>;
+  groupedEntities: Record<string, InvestigationEvidenceEntity[]>;
+  topEntities: InvestigationEvidenceEntity[];
 }
 
 @Injectable()
@@ -78,6 +94,83 @@ export class InvestigationEvidenceService {
       extractedEntities,
       status,
       updatedAt: new Date(),
+    };
+  }
+
+  buildDossier(seeds: EvidenceSeed[]): InvestigationEvidenceDossier {
+    const grouped = new Map<
+      string,
+      {
+        type: string;
+        value: string;
+        displayValue: string;
+        sources: InvestigationEvidenceEntitySource[];
+        occurrenceCount: number;
+      }
+    >();
+
+    for (const seed of seeds ?? []) {
+      for (const entity of seed.extractedEntities ?? []) {
+        const normalized = this.normalizeEntityValue(entity.type, entity.value);
+        const key = `${entity.type}:${normalized.toLowerCase()}`;
+        const existing = grouped.get(key) ?? {
+          type: entity.type,
+          value: normalized,
+          displayValue: entity.value,
+          sources: [],
+          occurrenceCount: 0,
+        };
+
+        existing.occurrenceCount += 1;
+        existing.displayValue = existing.displayValue.length >= entity.value.length
+          ? existing.displayValue
+          : entity.value;
+
+        if (!existing.sources.some((source) => source.seedId === seed.id)) {
+          existing.sources.push({
+            seedId: seed.id,
+            kind: seed.kind,
+            label: seed.label || seed.value,
+            status: seed.status,
+          });
+        }
+
+        grouped.set(key, existing);
+      }
+    }
+
+    const groupedEntities: Record<string, InvestigationEvidenceEntity[]> = {};
+    const entityCounts: Record<string, number> = {};
+
+    const allEntities = Array.from(grouped.values())
+      .map<InvestigationEvidenceEntity>((entry) => ({
+        type: entry.type,
+        value: entry.value,
+        displayValue: entry.displayValue,
+        sourceCount: entry.sources.length,
+        occurrenceCount: entry.occurrenceCount,
+        sources: [...entry.sources].sort((a, b) => a.label.localeCompare(b.label)),
+      }))
+      .sort((a, b) => {
+        if (b.sourceCount !== a.sourceCount) return b.sourceCount - a.sourceCount;
+        if (b.occurrenceCount !== a.occurrenceCount) return b.occurrenceCount - a.occurrenceCount;
+        return a.displayValue.localeCompare(b.displayValue);
+      });
+
+    for (const entity of allEntities) {
+      const bucket = groupedEntities[entity.type] ?? [];
+      bucket.push(entity);
+      groupedEntities[entity.type] = bucket;
+      entityCounts[entity.type] = (entityCounts[entity.type] ?? 0) + 1;
+    }
+
+    return {
+      generatedAt: new Date().toISOString(),
+      totalSeeds: seeds.length,
+      processedSeeds: seeds.filter((seed) => seed.status === 'processed').length,
+      entityCounts,
+      groupedEntities,
+      topEntities: allEntities.slice(0, 20),
     };
   }
 
@@ -249,6 +342,16 @@ export class InvestigationEvidenceService {
 
   private mergeEntities(existing: ExtractedEntity[], incoming: ExtractedEntity[]): ExtractedEntity[] {
     return this.dedupeEntities([...(existing ?? []), ...(incoming ?? [])]);
+  }
+
+  private normalizeEntityValue(type: string, value: string): string {
+    const trimmed = value.trim();
+    if (!trimmed) return trimmed;
+    if (type === 'domain') return trimmed.toLowerCase();
+    if (type === 'handle') return `@${trimmed.replace(/^@/, '').toLowerCase()}`;
+    if (type === 'telegram') return trimmed.replace(/^@/, '').toLowerCase();
+    if (type === 'url') return trimmed;
+    return trimmed;
   }
 
   private buildLabel(

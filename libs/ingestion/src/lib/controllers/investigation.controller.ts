@@ -14,7 +14,14 @@ import {
 import { randomUUID } from 'crypto';
 import { InvestigationRepository } from '../repositories/investigation.repository';
 import { EvidenceSeed, Investigation, Snapshot } from '../schemas/investigation.schema';
-import { InvestigationEvidenceService } from '../services/investigation-evidence.service';
+import {
+  InvestigationEvidenceDossier,
+  InvestigationEvidenceService,
+} from '../services/investigation-evidence.service';
+
+type InvestigationWithDossier = Investigation & {
+  evidenceDossier: InvestigationEvidenceDossier;
+};
 
 /**
  * REST controller for managing investigations and their snapshots.
@@ -70,7 +77,7 @@ export class InvestigationController {
   @Get(':id')
   async getInvestigation(
     @Param('id') id: string
-  ): Promise<{ investigation: Investigation; latestSnapshot: Snapshot | null }> {
+  ): Promise<{ investigation: InvestigationWithDossier; latestSnapshot: Snapshot | null }> {
     this.logger.log(`Getting investigation: ${id}`);
 
     const investigation = await this.investigationRepository.findById(id);
@@ -81,7 +88,7 @@ export class InvestigationController {
     const latestSnapshot =
       await this.investigationRepository.getLatestSnapshot(id);
 
-    return { investigation, latestSnapshot };
+    return { investigation: this.withEvidenceDossier(investigation), latestSnapshot };
   }
 
   /**
@@ -91,7 +98,7 @@ export class InvestigationController {
   async updateInvestigation(
     @Param('id') id: string,
     @Body() body: Partial<Pick<Investigation, 'name' | 'status' | 'settings'>>
-  ): Promise<Investigation> {
+  ): Promise<InvestigationWithDossier> {
     this.logger.log(`Updating investigation: ${id}`);
 
     const existing = await this.investigationRepository.findById(id);
@@ -99,7 +106,8 @@ export class InvestigationController {
       throw new NotFoundException(`Investigation not found: ${id}`);
     }
 
-    return this.investigationRepository.update(id, body);
+    const updated = await this.investigationRepository.update(id, body);
+    return this.withEvidenceDossier(updated);
   }
 
   /**
@@ -167,7 +175,7 @@ export class InvestigationController {
       metadata?: Record<string, unknown>;
       extractedEntities?: EvidenceSeed['extractedEntities'];
     },
-  ): Promise<{ success: boolean; investigation: Investigation }> {
+  ): Promise<{ success: boolean; investigation: InvestigationWithDossier }> {
     const existing = await this.investigationRepository.findById(id);
     if (!existing) {
       throw new NotFoundException(`Investigation not found: ${id}`);
@@ -191,7 +199,7 @@ export class InvestigationController {
     } satisfies EvidenceSeed);
 
     const investigation = await this.investigationRepository.addEvidenceSeed(id, seed);
-    return { success: true, investigation };
+    return { success: true, investigation: this.withEvidenceDossier(investigation) };
   }
 
   /**
@@ -235,5 +243,12 @@ export class InvestigationController {
     }
 
     return snapshot;
+  }
+
+  private withEvidenceDossier(investigation: Investigation): InvestigationWithDossier {
+    return {
+      ...investigation,
+      evidenceDossier: this.investigationEvidenceService.buildDossier(investigation.evidenceSeeds ?? []),
+    };
   }
 }

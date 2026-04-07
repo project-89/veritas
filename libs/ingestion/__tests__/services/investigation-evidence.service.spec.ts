@@ -112,4 +112,58 @@ describe('InvestigationEvidenceService', () => {
       ]),
     );
   });
+
+  it('builds a grouped dossier view from processed seeds', async () => {
+    const service = buildService();
+    const dossier = service.buildDossier([
+      {
+        id: 'seed-1',
+        kind: 'youtube',
+        value: 'https://www.youtube.com/watch?v=abc',
+        label: 'Video 1',
+        status: 'processed',
+        notes: null,
+        metadata: {},
+        extractedEntities: [
+          { type: 'domain', value: 'rexas.example' },
+          { type: 'handle', value: '@NetCrypto' },
+        ],
+        createdAt: new Date('2026-04-06T00:00:00Z'),
+        updatedAt: new Date('2026-04-06T00:00:00Z'),
+      },
+      {
+        id: 'seed-2',
+        kind: 'article',
+        value: 'https://example.com/rexas',
+        label: 'Article 1',
+        status: 'processed',
+        notes: null,
+        metadata: {},
+        extractedEntities: [
+          { type: 'domain', value: 'rexas.example' },
+          { type: 'handle', value: '@netcrypto' },
+          { type: 'wallet', value: '0x1234567890abcdef1234567890abcdef12345678' },
+        ],
+        createdAt: new Date('2026-04-06T00:00:00Z'),
+        updatedAt: new Date('2026-04-06T00:00:00Z'),
+      },
+    ]);
+
+    expect(dossier.totalSeeds).toBe(2);
+    expect(dossier.processedSeeds).toBe(2);
+    expect(dossier.entityCounts['domain']).toBe(1);
+    expect(dossier.entityCounts['handle']).toBe(1);
+    const domains = dossier.groupedEntities['domain'] ?? [];
+    const handles = dossier.groupedEntities['handle'] ?? [];
+    expect(domains[0]).toMatchObject({
+      value: 'rexas.example',
+      sourceCount: 2,
+      occurrenceCount: 2,
+    });
+    expect(handles[0]).toMatchObject({
+      value: '@netcrypto',
+      sourceCount: 2,
+      occurrenceCount: 2,
+    });
+  });
 });

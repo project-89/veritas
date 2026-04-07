@@ -428,6 +428,7 @@ export interface Investigation {
   lastSnapshotId: string | null;
   lastScanId: string | null;
   evidenceSeeds: InvestigationEvidenceSeed[];
+  evidenceDossier?: InvestigationEvidenceDossier;
 }
 
 export interface InvestigationEvidenceSeed {
@@ -441,6 +442,31 @@ export interface InvestigationEvidenceSeed {
   extractedEntities: Array<{ type: string; value: string }>;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InvestigationEvidenceEntitySource {
+  seedId: string;
+  kind: InvestigationEvidenceSeed['kind'];
+  label: string;
+  status: InvestigationEvidenceSeed['status'];
+}
+
+export interface InvestigationEvidenceEntity {
+  type: string;
+  value: string;
+  displayValue: string;
+  sourceCount: number;
+  occurrenceCount: number;
+  sources: InvestigationEvidenceEntitySource[];
+}
+
+export interface InvestigationEvidenceDossier {
+  generatedAt: string;
+  totalSeeds: number;
+  processedSeeds: number;
+  entityCounts: Record<string, number>;
+  groupedEntities: Record<string, InvestigationEvidenceEntity[]>;
+  topEntities: InvestigationEvidenceEntity[];
 }
 
 export interface Snapshot {

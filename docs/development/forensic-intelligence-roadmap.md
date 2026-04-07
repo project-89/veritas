@@ -363,11 +363,11 @@ Success criteria:
 
 ### Phase 2
 
-- [ ] Add normalized wallet extraction
-- [ ] Add normalized contract extraction
-- [ ] Add normalized domain extraction
-- [ ] Add normalized handle extraction
-- [ ] Link extracted entities back to evidence sources
+- [x] Add normalized wallet extraction
+- [x] Add normalized contract extraction
+- [x] Add normalized domain extraction
+- [x] Add normalized handle extraction
+- [x] Link extracted entities back to evidence sources
 
 ### Phase 3
 
