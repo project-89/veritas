@@ -526,6 +526,37 @@ export interface ProjectDossierOverlap {
   }>;
 }
 
+export interface MentalModel {
+  _id: string;
+  id: string;
+  investigationId: string;
+  name: string;
+  domain: string;
+  sourceSummary: {
+    totalSeeds: number;
+    processedSeeds: number;
+    seedKinds: string[];
+    evidenceLabels: string[];
+  };
+  theses: string[];
+  heuristics: Array<{
+    title: string;
+    description: string;
+    evidence: string[];
+  }>;
+  decisionRules: string[];
+  workflowSteps: string[];
+  evidencePreferences: string[];
+  blindSpots: string[];
+  signaturePhrases: string[];
+  summary: string;
+  status: 'generated' | 'fallback';
+  modelUsed: string;
+  generatedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Snapshot {
   _id: string;
   investigationId: string;
@@ -564,6 +595,7 @@ export async function fetchInvestigation(
   investigation: Investigation;
   snapshot: Snapshot | null;
   projectDossier: ProjectDossier | null;
+  mentalModel: MentalModel | null;
   dossierOverlaps: ProjectDossierOverlap[];
 }> {
   const result = await request<{
@@ -571,6 +603,7 @@ export async function fetchInvestigation(
     latestSnapshot?: Snapshot | null;
     snapshot?: Snapshot | null;
     projectDossier?: ProjectDossier | null;
+    mentalModel?: MentalModel | null;
     dossierOverlaps?: ProjectDossierOverlap[];
   }>(
     `/api/investigations/${encodeURIComponent(id)}`,
@@ -580,6 +613,7 @@ export async function fetchInvestigation(
     investigation: result.investigation,
     snapshot: result.latestSnapshot ?? result.snapshot ?? null,
     projectDossier: result.projectDossier ?? null,
+    mentalModel: result.mentalModel ?? null,
     dossierOverlaps: result.dossierOverlaps ?? [],
   };
 }
@@ -678,6 +712,34 @@ export async function fetchProjectDossier(
 ): Promise<{ projectDossier: ProjectDossier | null; dossierOverlaps: ProjectDossierOverlap[] }> {
   return request<{ projectDossier: ProjectDossier | null; dossierOverlaps: ProjectDossierOverlap[] }>(
     `/api/investigations/${encodeURIComponent(id)}/project-dossier`,
+  );
+}
+
+export async function buildMentalModel(
+  id: string,
+): Promise<{
+  investigation: Investigation;
+  mentalModel: MentalModel;
+}> {
+  const result = await request<{
+    success: boolean;
+    investigation: Investigation;
+    mentalModel: MentalModel;
+  }>(`/api/investigations/${encodeURIComponent(id)}/mental-model`, {
+    method: 'POST',
+  });
+
+  return {
+    investigation: result.investigation,
+    mentalModel: result.mentalModel,
+  };
+}
+
+export async function fetchMentalModel(
+  id: string,
+): Promise<{ mentalModel: MentalModel | null }> {
+  return request<{ mentalModel: MentalModel | null }>(
+    `/api/investigations/${encodeURIComponent(id)}/mental-model`,
   );
 }
 

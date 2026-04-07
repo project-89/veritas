@@ -14,6 +14,7 @@ import { AnalysisJobRepository } from './repositories/analysis-job.repository';
 import { IdentityRecordRepository } from './repositories/identity-record.repository';
 import { GlobalEventRepository } from './repositories/global-event.repository';
 import { ProjectDossierRepository } from './repositories/project-dossier.repository';
+import { MentalModelRepository } from './repositories/mental-model.repository';
 import { EmbeddingCacheRepository } from './repositories/embedding-cache.repository';
 import { RssCacheRepository } from './repositories/rss-cache.repository';
 import { IdentityController } from './controllers/identity.controller';
@@ -35,6 +36,7 @@ import { FourChanFreeConnector } from './services/4chan-free.connector';
 import { InvestigationEvidenceService } from './services/investigation-evidence.service';
 import { ProjectDossierService } from './services/project-dossier.service';
 import { OnChainCorrelationService } from './services/onchain-correlation.service';
+import { MentalModelService } from './services/mental-model.service';
 import { IngestionService } from './services/ingestion.service';
 import { SubprocessUtil } from './services/utils/subprocess.util';
 import { JinaReaderService } from './services/utils/jina-reader.service';
@@ -200,9 +202,11 @@ export class IngestionModule {
       IdentityRecordRepository,
       GlobalEventRepository,
       ProjectDossierRepository,
+      MentalModelRepository,
       InvestigationEvidenceService,
       ProjectDossierService,
       OnChainCorrelationService,
+      MentalModelService,
       EmbeddingCacheRepository,
       RssCacheRepository,
     ];

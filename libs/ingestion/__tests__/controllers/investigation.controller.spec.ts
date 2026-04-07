@@ -4,16 +4,20 @@ import { InvestigationController } from '../../src/lib/controllers/investigation
 import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
 import { InvestigationEvidenceService } from '../../src/lib/services/investigation-evidence.service';
 import { ProjectDossierRepository } from '../../src/lib/repositories/project-dossier.repository';
+import { MentalModelRepository } from '../../src/lib/repositories/mental-model.repository';
 import { ProjectDossierService } from '../../src/lib/services/project-dossier.service';
 import { OnChainCorrelationService } from '../../src/lib/services/onchain-correlation.service';
+import { MentalModelService } from '../../src/lib/services/mental-model.service';
 
 describe('InvestigationController', () => {
   let controller: InvestigationController;
   let mockRepository: any;
   let mockEvidenceService: any;
   let mockProjectDossierRepository: any;
+  let mockMentalModelRepository: any;
   let mockProjectDossierService: any;
   let mockOnChainCorrelationService: any;
+  let mockMentalModelService: any;
 
   const mockInvestigation = {
     _id: 'inv-1',
@@ -72,6 +76,39 @@ describe('InvestigationController', () => {
         ],
       },
     ],
+    generatedAt: new Date('2026-04-06T00:00:00Z'),
+    createdAt: new Date('2026-04-06T00:00:00Z'),
+    updatedAt: new Date('2026-04-06T00:00:00Z'),
+  };
+
+  const mockMentalModel = {
+    _id: 'model-1',
+    id: 'model-1',
+    investigationId: 'inv-1',
+    name: 'bitcoin regulation Mental Model',
+    domain: 'Open-source infrastructure and account correlation',
+    sourceSummary: {
+      totalSeeds: 1,
+      processedSeeds: 1,
+      seedKinds: ['youtube'],
+      evidenceLabels: ['Explainer'],
+    },
+    theses: ['Anchor judgments to explicit source material before escalating a claim.'],
+    heuristics: [
+      {
+        title: 'Start from pinned evidence',
+        description: 'Begin with attached source material before broadening the case.',
+        evidence: ['Explainer'],
+      },
+    ],
+    decisionRules: ['Prefer claims supported by multiple processed seeds over single-source assertions.'],
+    workflowSteps: ['Review attached evidence and notes for explicit claims or hypotheses.'],
+    evidencePreferences: ['Long-form transcript evidence and source walkthroughs'],
+    blindSpots: ['This model is only as strong as the attached evidence bundle.'],
+    signaturePhrases: ['Follow the wallets before trusting the story.'],
+    summary: 'A compact investigative model centered on pinned evidence and reusable entity comparison.',
+    status: 'generated' as const,
+    modelUsed: 'gemini-2.0-flash',
     generatedAt: new Date('2026-04-06T00:00:00Z'),
     createdAt: new Date('2026-04-06T00:00:00Z'),
     updatedAt: new Date('2026-04-06T00:00:00Z'),
@@ -151,6 +188,11 @@ describe('InvestigationController', () => {
       save: jest.fn().mockResolvedValue(mockProjectDossier),
     };
 
+    mockMentalModelRepository = {
+      findByInvestigationId: jest.fn().mockResolvedValue(null),
+      save: jest.fn().mockResolvedValue(mockMentalModel),
+    };
+
     mockProjectDossierService = {
       extractAddressCandidates: jest.fn().mockReturnValue(['0x123']),
       buildFromInvestigation: jest.fn().mockReturnValue({
@@ -185,6 +227,26 @@ describe('InvestigationController', () => {
         commonCounterparties: [],
         tokenContracts: [],
         note: null,
+      }),
+    };
+
+    mockMentalModelService = {
+      buildFromInvestigation: jest.fn().mockResolvedValue({
+        investigationId: 'inv-1',
+        name: 'bitcoin regulation Mental Model',
+        domain: mockMentalModel.domain,
+        sourceSummary: mockMentalModel.sourceSummary,
+        theses: mockMentalModel.theses,
+        heuristics: mockMentalModel.heuristics,
+        decisionRules: mockMentalModel.decisionRules,
+        workflowSteps: mockMentalModel.workflowSteps,
+        evidencePreferences: mockMentalModel.evidencePreferences,
+        blindSpots: mockMentalModel.blindSpots,
+        signaturePhrases: mockMentalModel.signaturePhrases,
+        summary: mockMentalModel.summary,
+        status: mockMentalModel.status,
+        modelUsed: mockMentalModel.modelUsed,
+        generatedAt: mockMentalModel.generatedAt,
       }),
     };
 
@@ -233,12 +295,20 @@ describe('InvestigationController', () => {
           useValue: mockProjectDossierRepository,
         },
         {
+          provide: MentalModelRepository,
+          useValue: mockMentalModelRepository,
+        },
+        {
           provide: ProjectDossierService,
           useValue: mockProjectDossierService,
         },
         {
           provide: OnChainCorrelationService,
           useValue: mockOnChainCorrelationService,
+        },
+        {
+          provide: MentalModelService,
+          useValue: mockMentalModelService,
         },
       ],
     }).compile();
@@ -287,6 +357,7 @@ describe('InvestigationController', () => {
       expect(result.investigation.evidenceDossier).toBeDefined();
       expect(result.latestSnapshot).toEqual(mockSnapshot);
       expect(result.projectDossier).toBeNull();
+      expect(result.mentalModel).toBeNull();
       expect(result.dossierOverlaps).toEqual([]);
       expect(mockRepository.findById).toHaveBeenCalledWith('inv-1');
       expect(mockRepository.getLatestSnapshot).toHaveBeenCalledWith('inv-1');
@@ -462,6 +533,27 @@ describe('InvestigationController', () => {
 
       expect(result.projectDossier?.id).toBe('dossier-1');
       expect(result.dossierOverlaps).toHaveLength(1);
+    });
+  });
+
+  describe('mental model endpoints', () => {
+    it('should build a mental model and return it', async () => {
+      const result = await controller.buildMentalModel('inv-1');
+
+      expect(mockMentalModelService.buildFromInvestigation).toHaveBeenCalled();
+      expect(mockMentalModelRepository.save).toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      expect(result.mentalModel.id).toBe('model-1');
+      expect(result.mentalModel.heuristics).toHaveLength(1);
+    });
+
+    it('should return the existing mental model for an investigation', async () => {
+      mockMentalModelRepository.findByInvestigationId.mockResolvedValueOnce(mockMentalModel);
+
+      const result = await controller.getMentalModel('inv-1');
+
+      expect(result.mentalModel?.id).toBe('model-1');
+      expect(result.mentalModel?.domain).toBe(mockMentalModel.domain);
     });
   });
 });

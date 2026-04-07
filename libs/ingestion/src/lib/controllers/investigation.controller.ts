@@ -20,12 +20,15 @@ import {
   InvestigationEvidenceService,
 } from '../services/investigation-evidence.service';
 import { ProjectDossierRepository } from '../repositories/project-dossier.repository';
+import { MentalModelRepository } from '../repositories/mental-model.repository';
 import {
   ProjectDossier,
   ProjectDossierOverlap,
 } from '../schemas/project-dossier.schema';
+import { MentalModel } from '../schemas/mental-model.schema';
 import { ProjectDossierService } from '../services/project-dossier.service';
 import { OnChainCorrelationService } from '../services/onchain-correlation.service';
+import { MentalModelService } from '../services/mental-model.service';
 
 type InvestigationWithDossier = Investigation & {
   evidenceDossier: InvestigationEvidenceDossier;
@@ -42,8 +45,10 @@ export class InvestigationController {
     private readonly investigationRepository: InvestigationRepository,
     private readonly investigationEvidenceService: InvestigationEvidenceService,
     private readonly projectDossierRepository: ProjectDossierRepository,
+    private readonly mentalModelRepository: MentalModelRepository,
     private readonly projectDossierService: ProjectDossierService,
     private readonly onChainCorrelationService: OnChainCorrelationService,
+    private readonly mentalModelService: MentalModelService,
   ) {}
 
   /**
@@ -92,6 +97,7 @@ export class InvestigationController {
     investigation: InvestigationWithDossier;
     latestSnapshot: Snapshot | null;
     projectDossier: ProjectDossier | null;
+    mentalModel: MentalModel | null;
     dossierOverlaps: ProjectDossierOverlap[];
   }> {
     this.logger.log(`Getting investigation: ${id}`);
@@ -105,6 +111,7 @@ export class InvestigationController {
       await this.investigationRepository.getLatestSnapshot(id);
 
     const projectDossier = await this.projectDossierRepository.findByInvestigationId(id);
+    const mentalModel = await this.mentalModelRepository.findByInvestigationId(id);
     const dossierOverlaps = projectDossier
       ? await this.getDossierOverlaps(projectDossier)
       : [];
@@ -113,6 +120,7 @@ export class InvestigationController {
       investigation: this.withEvidenceDossier(investigation, projectDossier),
       latestSnapshot,
       projectDossier,
+      mentalModel,
       dossierOverlaps,
     };
   }
@@ -296,6 +304,55 @@ export class InvestigationController {
     return {
       projectDossier,
       dossierOverlaps: await this.getDossierOverlaps(projectDossier),
+    };
+  }
+
+  /**
+   * POST /investigations/:id/mental-model — create or refresh a mental model dossier.
+   */
+  @Post(':id/mental-model')
+  async buildMentalModel(
+    @Param('id') id: string,
+  ): Promise<{
+    success: boolean;
+    investigation: InvestigationWithDossier;
+    mentalModel: MentalModel;
+  }> {
+    const investigation = await this.investigationRepository.findById(id);
+    if (!investigation) {
+      throw new NotFoundException(`Investigation not found: ${id}`);
+    }
+
+    const projectDossier = await this.projectDossierRepository.findByInvestigationId(id);
+    const evidenceDossier = this.investigationEvidenceService.buildDossier(investigation.evidenceSeeds ?? []);
+    const mentalModelData = await this.mentalModelService.buildFromInvestigation({
+      investigation,
+      evidenceDossier,
+      projectDossier,
+    });
+    const mentalModel = await this.mentalModelRepository.save(mentalModelData);
+
+    return {
+      success: true,
+      investigation: this.withEvidenceDossier(investigation, projectDossier),
+      mentalModel,
+    };
+  }
+
+  /**
+   * GET /investigations/:id/mental-model — fetch the current mental model dossier.
+   */
+  @Get(':id/mental-model')
+  async getMentalModel(
+    @Param('id') id: string,
+  ): Promise<{ mentalModel: MentalModel | null }> {
+    const investigation = await this.investigationRepository.findById(id);
+    if (!investigation) {
+      throw new NotFoundException(`Investigation not found: ${id}`);
+    }
+
+    return {
+      mentalModel: await this.mentalModelRepository.findByInvestigationId(id),
     };
   }
 

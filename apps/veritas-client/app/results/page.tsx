@@ -17,11 +17,13 @@ import {
   analyzePropaganda,
   analyzeEntities,
   buildProjectDossier,
+  buildMentalModel,
   fetchDownstreamEffects,
   createOrGetInvestigation,
   fetchInvestigation,
   fetchInvestigations,
   fetchProjectDossier,
+  fetchMentalModel,
   verifyClaims,
   saveAnalysisCache,
   getAnalysisCache,
@@ -37,6 +39,7 @@ import {
   type Investigation,
   type ProjectDossier,
   type ProjectDossierOverlap,
+  type MentalModel,
   type AnalyzedNarrative,
   type ExtractedClaim,
   type ScanJob,
@@ -253,8 +256,10 @@ function InvestigationWorkspace() {
   const [investigationRecord, setInvestigationRecord] = useState<Investigation | null>(null);
   const [projectDossier, setProjectDossier] = useState<ProjectDossier | null>(null);
   const [projectDossierOverlaps, setProjectDossierOverlaps] = useState<ProjectDossierOverlap[]>([]);
+  const [mentalModel, setMentalModel] = useState<MentalModel | null>(null);
   const [evidenceSeedSaving, setEvidenceSeedSaving] = useState(false);
   const [projectDossierSaving, setProjectDossierSaving] = useState(false);
+  const [mentalModelSaving, setMentalModelSaving] = useState(false);
   const [scanJob, setScanJob] = useState<ScanJob | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanJob[]>([]);
   const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -268,20 +273,22 @@ function InvestigationWorkspace() {
         let resolved: Investigation | null = null;
 
         if (invId) {
-          const { investigation, projectDossier, dossierOverlaps } = await fetchInvestigation(invId);
+          const { investigation, projectDossier, mentalModel, dossierOverlaps } = await fetchInvestigation(invId);
           resolved = investigation;
           if (!cancelled) {
             setProjectDossier(projectDossier);
+            setMentalModel(mentalModel);
             setProjectDossierOverlaps(dossierOverlaps);
           }
         } else if (query) {
           const allInvestigations = await fetchInvestigations();
           const match = allInvestigations.find((item) => item.query === query) ?? null;
           if (match?._id) {
-            const { investigation, projectDossier, dossierOverlaps } = await fetchInvestigation(match._id);
+            const { investigation, projectDossier, mentalModel, dossierOverlaps } = await fetchInvestigation(match._id);
             resolved = investigation;
             if (!cancelled) {
               setProjectDossier(projectDossier);
+              setMentalModel(mentalModel);
               setProjectDossierOverlaps(dossierOverlaps);
             }
           }
@@ -295,6 +302,7 @@ function InvestigationWorkspace() {
         if (!cancelled) {
           setInvestigationRecord(null);
           setProjectDossier(null);
+          setMentalModel(null);
           setProjectDossierOverlaps([]);
           dispatch({ type: 'SET_INVESTIGATION_ID', id: null });
         }
@@ -769,11 +777,12 @@ function InvestigationWorkspace() {
           }
 
           if (targetInvId) {
-            const { investigation, snapshot, projectDossier, dossierOverlaps } = await fetchInvestigation(targetInvId);
+            const { investigation, snapshot, projectDossier, mentalModel, dossierOverlaps } = await fetchInvestigation(targetInvId);
             resolvedInvestigationId = targetInvId;
             resolvedScanId = snapshot?.scanId ?? investigation.lastScanId ?? null;
             setInvestigationRecord(investigation);
             setProjectDossier(projectDossier);
+            setMentalModel(mentalModel);
             setProjectDossierOverlaps(dossierOverlaps);
             dispatch({ type: 'SET_INVESTIGATION_ID', id: investigation._id });
             if (snapshot && Array.isArray(snapshot.posts) && snapshot.posts.length > 0) {
@@ -1329,6 +1338,34 @@ function InvestigationWorkspace() {
     }
   }, [investigationRecord]);
 
+  const handleBuildMentalModel = useCallback(async () => {
+    if (!investigationRecord?._id) return;
+    setMentalModelSaving(true);
+    try {
+      const result = await buildMentalModel(investigationRecord._id);
+      setInvestigationRecord(result.investigation);
+      setMentalModel(result.mentalModel);
+      dispatch({ type: 'SET_INVESTIGATION_ID', id: result.investigation._id });
+    } catch (err) {
+      dispatch({
+        type: 'SET_ERROR',
+        error: `Failed to build mental model: ${err instanceof Error ? err.message : 'unknown error'}`,
+      });
+    } finally {
+      setMentalModelSaving(false);
+    }
+  }, [investigationRecord, dispatch]);
+
+  const handleRefreshMentalModel = useCallback(async () => {
+    if (!investigationRecord?._id) return;
+    try {
+      const result = await fetchMentalModel(investigationRecord._id);
+      setMentalModel(result.mentalModel);
+    } catch {
+      // silent
+    }
+  }, [investigationRecord]);
+
   const handleRefresh = useCallback(async () => {
     // Reset all state
     scanPostsFetchedRef.current = false;
@@ -1840,6 +1877,7 @@ function InvestigationWorkspace() {
             investigationRecord={investigationRecord}
             projectDossier={projectDossier}
             projectDossierOverlaps={projectDossierOverlaps}
+            mentalModel={mentalModel}
             deviations={state.deviations}
             propaganda={state.propaganda}
             claims={state.claims}
@@ -1849,9 +1887,12 @@ function InvestigationWorkspace() {
             identityLoading={state.identityLoading}
             evidenceSeedSaving={evidenceSeedSaving}
             projectDossierSaving={projectDossierSaving}
+            mentalModelSaving={mentalModelSaving}
             onAddEvidenceSeed={handleAddEvidenceSeed}
             onBuildProjectDossier={handleBuildProjectDossier}
             onRefreshProjectDossier={handleRefreshProjectDossier}
+            onBuildMentalModel={handleBuildMentalModel}
+            onRefreshMentalModel={handleRefreshMentalModel}
             onGenerateProfile={handleGenerateProfile}
             onInvestigate={handleInvestigate}
             onRunPropaganda={handleRunPropaganda}

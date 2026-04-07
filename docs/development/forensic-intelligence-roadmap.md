@@ -396,10 +396,15 @@ Current phase note:
 
 ### Phase 6
 
-- [ ] Create mental model schema
-- [ ] Extract recurring heuristics from source content
+- [x] Create mental model schema
+- [x] Extract recurring heuristics from source content
 - [ ] Add "apply model to dossier" scoring
 - [ ] Add model comparison support
+
+Current phase note:
+
+- investigations can now build a persisted mental-model dossier from attached evidence seeds, with Gemini extraction when available and a deterministic fallback when it is not
+- the next step is to operationalize those models against live dossiers rather than only displaying them
 
 ### Phase 7
 
