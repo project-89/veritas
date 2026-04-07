@@ -14,14 +14,16 @@ export class OnChainCorrelationService {
   private readonly logger = new Logger(OnChainCorrelationService.name);
   private readonly apiKey: string | undefined;
   private readonly baseUrl = 'https://api.etherscan.io/api';
+  private fetchImpl: FetchLike = fetch;
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly fetchImpl: FetchLike = fetch,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     this.apiKey =
       this.configService.get<string>('ETHERSCAN_API_KEY') ||
       process.env['ETHERSCAN_API_KEY'];
+  }
+
+  setFetchImplementation(fetchImpl: FetchLike): void {
+    this.fetchImpl = fetchImpl;
   }
 
   async buildSummary(addresses: string[]): Promise<ProjectDossierOnChainSummary> {

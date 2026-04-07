@@ -17,6 +17,7 @@ import { InvestigationRepository } from '../repositories/investigation.repositor
 import { IngestionService } from '../services/ingestion.service';
 import type { ScanJob } from '../schemas/scan-job.schema';
 import type { ScanJobData } from '../queue/scan.processor';
+import type { Investigation } from '../schemas/investigation.schema';
 
 @Controller('scan')
 export class ScanController {
@@ -39,12 +40,13 @@ export class ScanController {
     @Body()
     body: {
       query: string;
+      investigationId?: string;
       platforms?: string[];
       limit?: number;
       timeRange?: string;
     },
   ): Promise<{ scanId: string }> {
-    const { query, platforms, limit, timeRange } = body;
+    const { query, investigationId: requestedInvestigationId, platforms, limit, timeRange } = body;
 
     if (!query || query.trim().length === 0) {
       throw new HttpException('Query is required', HttpStatus.BAD_REQUEST);
@@ -67,14 +69,32 @@ export class ScanController {
       );
     }
 
-    // Find or create the investigation for this query
+    // Use the requested investigation when present; otherwise fall back to the
+    // historical query-based investigation creation path.
     let investigationId = '';
     try {
-      const investigation = await this.investigationRepository.findOrCreateByQuery(
-        query,
-        { platforms: targetPlatforms, limit, timeRange },
-      );
-      investigationId = investigation._id?.toString() ?? investigation.id ?? '';
+      if (requestedInvestigationId?.trim()) {
+        const investigation = await this.investigationRepository.findById(requestedInvestigationId.trim());
+        if (!investigation) {
+          throw new Error(`Investigation not found: ${requestedInvestigationId}`);
+        }
+
+        investigationId = investigation._id?.toString() ?? investigation.id ?? '';
+        const updatePayload: Partial<Investigation> = {
+          settings: {
+            platforms: targetPlatforms,
+            timeRange: timeRange ?? investigation.settings?.timeRange ?? '7d',
+            limit: limit ?? investigation.settings?.limit ?? 50,
+          },
+        };
+        await this.investigationRepository.update(investigationId, updatePayload);
+      } else {
+        const investigation = await this.investigationRepository.findOrCreateByQuery(
+          query,
+          { platforms: targetPlatforms, limit, timeRange },
+        );
+        investigationId = investigation._id?.toString() ?? investigation.id ?? '';
+      }
     } catch (error) {
       const err = error as Error;
       this.logger.warn(`Failed to persist investigation: ${err.message}`);

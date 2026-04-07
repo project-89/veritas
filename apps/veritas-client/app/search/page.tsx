@@ -71,6 +71,8 @@ export default function SearchPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [caseMode, setCaseMode] = useState<'new' | 'existing'>('new');
+  const [caseTitle, setCaseTitle] = useState('');
   const [query, setQuery] = useState('');
   const [platforms, setPlatforms] = useState<string[]>(['twitter', 'reddit', 'youtube', 'rss', 'farcaster']);
   const [timeRange, setTimeRange] = useState('7d');
@@ -85,6 +87,7 @@ export default function SearchPage() {
   const limit = DEPTH_PRESETS.find((p) => p.id === depthPreset)?.limit ?? 100;
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
   const [loadingInv, setLoadingInv] = useState(true);
+  const [selectedInvestigationId, setSelectedInvestigationId] = useState<string>('');
 
   // Auto-focus input
   useEffect(() => {
@@ -110,6 +113,8 @@ export default function SearchPage() {
   const handleScan = useCallback(async () => {
     const q = query.trim();
     if (!q) return;
+    const trimmedCaseTitle = caseTitle.trim();
+    const resolvedInvestigationId = selectedInvestigationId.trim();
 
     // Build URL params for the investigation workspace
     const params = new URLSearchParams({ q });
@@ -130,19 +135,27 @@ export default function SearchPage() {
     if (trimmedSubreddits) params.set('subreddits', trimmedSubreddits);
     params.set('fresh', '1');
 
-    // Create or find investigation, then navigate to it
+    // Start from an existing case or create a new one with an explicit title
     try {
+      if (caseMode === 'existing' && resolvedInvestigationId) {
+        params.set('inv', resolvedInvestigationId);
+        router.push(`/investigate/${resolvedInvestigationId}?${params.toString()}`);
+        return;
+      }
+
       const inv = await createOrGetInvestigation(q, {
+        name: trimmedCaseTitle || undefined,
         platforms: platforms.length > 0 ? platforms : undefined,
         timeRange: timeRange === 'custom' ? `${customStart}_${customEnd}` : timeRange,
         limit,
       });
-      router.push(`/investigate/${inv._id}?${params.toString()}`);
+      const investigationId = inv._id ?? inv.id;
+      router.push(`/investigate/${investigationId}?${params.toString()}`);
     } catch {
       // Fallback to results page if investigation creation fails
       router.push(`/results?${params.toString()}`);
     }
-  }, [query, platforms, limit, timeRange, customStart, customEnd, usernames, hashtags, wallets, subreddits, router]);
+  }, [query, caseTitle, caseMode, selectedInvestigationId, platforms, limit, timeRange, customStart, customEnd, usernames, hashtags, wallets, subreddits, router]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleScan();
@@ -154,10 +167,91 @@ export default function SearchPage() {
       <div className="w-full max-w-3xl">
         <NervPanel title="Initiate Scan" accent="orange" status="online">
           <div className="p-4 space-y-4">
+            <div className="space-y-3 border border-nerv-border/50 rounded-sm p-3 bg-nerv-bg-panel/30">
+              <div className="flex items-center gap-2">
+                {[
+                  { id: 'new', label: 'New Case' },
+                  { id: 'existing', label: 'Existing Case' },
+                ].map((mode) => {
+                  const selected = caseMode === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      onClick={() => setCaseMode(mode.id as 'new' | 'existing')}
+                      className={[
+                        'px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest border rounded-sm transition-all',
+                        selected
+                          ? 'border-nerv-orange/60 text-nerv-orange bg-nerv-orange/10'
+                          : 'border-nerv-border text-nerv-text-muted hover:text-nerv-text hover:border-nerv-text-muted',
+                      ].join(' ')}
+                    >
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {caseMode === 'new' ? (
+                <div>
+                  <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5">
+                    Case Title
+                  </label>
+                  <input
+                    type="text"
+                    value={caseTitle}
+                    onChange={(e) => setCaseTitle(e.target.value)}
+                    placeholder="Rexas Finance Scam Investigation"
+                    className="w-full px-3 py-2.5 font-mono text-sm bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-orange/50 transition-all"
+                  />
+                  <span className="block mt-1 text-[8px] font-mono text-nerv-text-muted">
+                    Case title for the investigation container. The query below is just the first scan inside that case.
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5">
+                      Target Case
+                    </label>
+                    <select
+                      value={selectedInvestigationId}
+                      onChange={(e) => setSelectedInvestigationId(e.target.value)}
+                      className="w-full px-3 py-2.5 font-mono text-sm bg-nerv-bg border border-nerv-border text-nerv-text focus:outline-none focus:border-nerv-blue/50 transition-all"
+                    >
+                      <option value="">Select investigation...</option>
+                      {investigations.map((inv) => {
+                        const investigationId = inv._id ?? inv.id ?? '';
+                        return (
+                          <option key={investigationId || inv.query} value={investigationId}>
+                            {inv.name || inv.query}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                  {selectedInvestigationId && (
+                    <div className="flex flex-wrap gap-1">
+                      {investigations
+                        .filter((inv) => (inv._id ?? inv.id) === selectedInvestigationId)
+                        .slice(0, 1)
+                        .map((inv) => (
+                          <NervBadge
+                            key={selectedInvestigationId}
+                            label={`APPEND TO ${(inv.name || inv.query).toUpperCase().slice(0, 28)}`}
+                            variant="blue"
+                            size="sm"
+                          />
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Query row */}
             <div>
               <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5">
-                Query
+                Scan Query
               </label>
               <div className="flex gap-2">
                 <input
@@ -171,10 +265,10 @@ export default function SearchPage() {
                 />
                 <button
                   onClick={handleScan}
-                  disabled={!query.trim()}
+                  disabled={!query.trim() || (caseMode === 'existing' && !selectedInvestigationId)}
                   className="px-6 py-2.5 bg-nerv-orange/20 border border-nerv-orange/50 text-nerv-orange text-[11px] font-mono uppercase tracking-widest hover:bg-nerv-orange/30 hover:border-nerv-orange disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 >
-                  Scan
+                  {caseMode === 'existing' ? 'Append Scan' : 'Create Case'}
                 </button>
               </div>
             </div>
@@ -443,12 +537,13 @@ export default function SearchPage() {
               ) : (
                 investigations.map((inv) => (
                   <button
-                    key={inv._id}
-                    onClick={() =>
-                      router.push(
-                        `/results?q=${encodeURIComponent(inv.query)}`,
-                      )
-                    }
+                    key={inv._id ?? inv.id ?? inv.query}
+                    onClick={() => {
+                      const investigationId = inv._id ?? inv.id;
+                      if (!investigationId) return;
+                      setCaseMode('existing');
+                      setSelectedInvestigationId(investigationId);
+                    }}
                     className="w-full flex items-center justify-between px-3 py-2 hover:bg-nerv-bg-elevated/30 transition-colors group"
                   >
                     <span className="text-xs font-mono text-nerv-text truncate mr-3">
@@ -459,7 +554,7 @@ export default function SearchPage() {
                         {formatDate(inv.updatedAt)}
                       </span>
                       <span className="text-[10px] font-mono text-nerv-orange opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-widest">
-                        Open
+                        Use
                       </span>
                     </div>
                   </button>

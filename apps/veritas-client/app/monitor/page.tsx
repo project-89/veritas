@@ -122,6 +122,7 @@ export default function MonitorPage() {
 
   const criticalCount = alerts.filter((a) => a.severity === 'critical' && !a.read).length;
   const warningCount = alerts.filter((a) => a.severity === 'warning' && !a.read).length;
+  const getInvestigationId = (inv: Investigation): string => inv._id ?? inv.id ?? '';
 
   return (
     <div className="h-[calc(100vh-3.5rem)] flex flex-col">
@@ -153,11 +154,15 @@ export default function MonitorPage() {
             ) : (
               <div className="space-y-1">
                 {investigations.map((inv) => {
-                  const isSelected = selectedInvId === inv._id;
+                  const investigationId = getInvestigationId(inv);
+                  const isSelected = selectedInvId === investigationId;
                   return (
                     <button
-                      key={inv._id}
-                      onClick={() => setSelectedInvId(isSelected ? null : inv._id)}
+                      key={investigationId || inv.query}
+                      onClick={() => {
+                        if (!investigationId) return;
+                        setSelectedInvId(isSelected ? null : investigationId);
+                      }}
                       className={`w-full text-left px-2 py-2 rounded-sm border transition-all ${
                         isSelected
                           ? 'border-nerv-orange/50 bg-nerv-orange/5'
@@ -224,7 +229,7 @@ export default function MonitorPage() {
                 <div className="divide-y divide-nerv-border">
                   {investigations.filter((i) => i.status === 'active').map((inv) => (
                     <div
-                      key={inv._id}
+                      key={getInvestigationId(inv) || inv.query}
                       className="flex items-center justify-between px-3 py-2 hover:bg-nerv-bg-elevated/20 transition-colors"
                     >
                       <div>
@@ -234,7 +239,11 @@ export default function MonitorPage() {
                         </span>
                       </div>
                       <button
-                        onClick={() => router.push(`/investigate/${inv._id}`)}
+                        onClick={() => {
+                          const investigationId = getInvestigationId(inv);
+                          if (!investigationId) return;
+                          router.push(`/investigate/${investigationId}`);
+                        }}
                         className="text-[9px] font-mono uppercase text-nerv-orange hover:underline tracking-widest"
                       >
                         Investigate

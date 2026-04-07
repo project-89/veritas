@@ -8,6 +8,13 @@ import { IngestionService } from '../../src/lib/services/ingestion.service';
 describe('ScanController', () => {
   let controller: ScanController;
   let scanJobRepo: ScanJobRepository;
+  let investigationRepo: {
+    findOrCreateByQuery: jest.Mock;
+    findById: jest.Mock;
+    update: jest.Mock;
+    setLastScanId: jest.Mock;
+  };
+  let scanQueue: { add: jest.Mock; getJobs: jest.Mock };
 
   const mockScanJob = {
     _id: 'scan-123',
@@ -28,6 +35,27 @@ describe('ScanController', () => {
   };
 
   beforeEach(async () => {
+    investigationRepo = {
+      findOrCreateByQuery: jest.fn().mockResolvedValue({ _id: 'inv-456', id: 'inv-456', query: 'test query' }),
+      findById: jest.fn().mockResolvedValue({
+        _id: 'inv-existing',
+        id: 'inv-existing',
+        query: 'rexas finance',
+        settings: {
+          platforms: ['reddit'],
+          timeRange: '30d',
+          limit: 25,
+        },
+      }),
+      update: jest.fn().mockResolvedValue(undefined),
+      setLastScanId: jest.fn().mockResolvedValue(undefined),
+    };
+
+    scanQueue = {
+      add: jest.fn().mockResolvedValue({ id: 'job-1' }),
+      getJobs: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ScanController],
       providers: [
@@ -45,9 +73,7 @@ describe('ScanController', () => {
         },
         {
           provide: InvestigationRepository,
-          useValue: {
-            findOrCreateByQuery: jest.fn().mockResolvedValue({ _id: 'inv-456', id: 'inv-456', query: 'test query' }),
-          },
+          useValue: investigationRepo,
         },
         {
           provide: IngestionService,
@@ -60,10 +86,7 @@ describe('ScanController', () => {
         },
         {
           provide: getQueueToken('scan'),
-          useValue: {
-            add: jest.fn().mockResolvedValue({ id: 'job-1' }),
-            getJobs: jest.fn().mockResolvedValue([]),
-          },
+          useValue: scanQueue,
         },
       ],
     }).compile();
@@ -81,6 +104,40 @@ describe('ScanController', () => {
       const result = await controller.startScan({ query: 'test query' });
       expect(result).toHaveProperty('scanId');
       expect(scanJobRepo.createJob).toHaveBeenCalled();
+      expect(investigationRepo.findOrCreateByQuery).toHaveBeenCalledWith('test query', {
+        platforms: ['reddit', 'twitter'],
+        limit: undefined,
+        timeRange: undefined,
+      });
+      expect(investigationRepo.findById).not.toHaveBeenCalled();
+    });
+
+    it('should append a scan to an existing investigation when investigationId is provided', async () => {
+      const result = await controller.startScan({
+        query: 'rexas finance team',
+        investigationId: 'inv-existing',
+        platforms: ['twitter'],
+        limit: 250,
+        timeRange: '90d',
+      });
+
+      expect(result).toHaveProperty('scanId');
+      expect(investigationRepo.findById).toHaveBeenCalledWith('inv-existing');
+      expect(investigationRepo.update).toHaveBeenCalledWith('inv-existing', {
+        settings: {
+          platforms: ['twitter'],
+          timeRange: '90d',
+          limit: 250,
+        },
+      });
+      expect(investigationRepo.findOrCreateByQuery).not.toHaveBeenCalled();
+      expect(scanJobRepo.createJob).toHaveBeenCalledWith(
+        'rexas finance team',
+        'inv-existing',
+        ['twitter'],
+        { timeRange: '90d', limit: 250 },
+      );
+      expect(investigationRepo.setLastScanId).toHaveBeenCalledWith('inv-existing', 'scan-123');
     });
   });
 

@@ -122,6 +122,46 @@ export class InvestigationRepository implements OnModuleInit {
   }
 
   /**
+   * Create a new investigation container with an explicit case title.
+   */
+  async createInvestigation(params: {
+    query: string;
+    name?: string;
+    settings?: Partial<InvestigationSettings>;
+  }): Promise<Investigation> {
+    this.ensureInitialized();
+    const query = params.query.trim();
+    const name = params.name?.trim() || query;
+
+    try {
+      const investigation = await this.investigationRepo.create({
+        query,
+        name,
+        status: 'active',
+        settings: {
+          platforms: params.settings?.platforms ?? [],
+          timeRange: params.settings?.timeRange ?? '7d',
+          limit: params.settings?.limit ?? 50,
+        },
+        lastSnapshotId: null,
+        lastScanId: null,
+        linkedProjectDossierId: null,
+        evidenceSeeds: [],
+      } as Partial<Investigation>);
+
+      this.logger.log(`Created new investigation "${name}" for query: "${query}"`);
+      return investigation;
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(
+        `Error in createInvestigation: ${err.message}`,
+        err.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * List all investigations, sorted by most recently updated.
    */
   async findAll(options?: {

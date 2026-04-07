@@ -867,13 +867,30 @@ function InvestigationWorkspace() {
       // ---- FRESH SEARCH: Use scan queue ----
       if (freshSearch) {
         try {
-          const { scanId } = await startScan(enhancedQuery, urlPlatforms, undefined, urlTimeRange);
+          const activeInvestigationId =
+            investigationRecord?._id ??
+            investigationRecord?.id ??
+            invId ??
+            state.investigationId ??
+            undefined;
+          const { scanId } = await startScan(
+            enhancedQuery,
+            urlPlatforms,
+            undefined,
+            urlTimeRange,
+            activeInvestigationId,
+          );
           const initialStatus = await getScanStatus(scanId);
           setScanJob(initialStatus);
           scanPostsFetchedRef.current = false;
 
           // Remove fresh=1 from URL so page refresh doesn't re-trigger scan
-          router.replace(`/results?q=${encodeURIComponent(query)}`, { scroll: false });
+          const nextParams = new URLSearchParams();
+          nextParams.set('q', query);
+          if (activeInvestigationId) {
+            nextParams.set('inv', activeInvestigationId);
+          }
+          router.replace(`/results?${nextParams.toString()}`, { scroll: false });
         } catch (err) {
           dispatch({ type: 'SET_PIPELINE', stage: 'search', status: 'error' });
           dispatch({
@@ -890,7 +907,7 @@ function InvestigationWorkspace() {
     };
 
     run();
-  }, [query, dispatch, findPersistedScan, runAnalysisStages]); // eslint-disable-line react-hooks/exhaustive-deps -- invId is read from searchParams, stable across renders
+  }, [query, dispatch, findPersistedScan, runAnalysisStages, investigationRecord, invId, state.investigationId]); // eslint-disable-line react-hooks/exhaustive-deps -- search boot flow is intentionally centralized
 
   // ---- Fetch alerts ----
   useEffect(() => {
@@ -1381,7 +1398,13 @@ function InvestigationWorkspace() {
 
     // Start a new scan directly — don't navigate, don't rely on useEffect
     try {
-      const { scanId } = await startScan(enhancedQuery, urlPlatforms, undefined, urlTimeRange);
+      const { scanId } = await startScan(
+        enhancedQuery,
+        urlPlatforms,
+        undefined,
+        urlTimeRange,
+        investigationRecord?._id ?? investigationRecord?.id ?? state.investigationId ?? undefined,
+      );
       const initialStatus = await getScanStatus(scanId);
       setScanJob(initialStatus);
     } catch (err) {

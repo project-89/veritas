@@ -254,6 +254,11 @@ describe('InvestigationController', () => {
       findAll: jest.fn().mockResolvedValue([mockInvestigation]),
       findById: jest.fn().mockResolvedValue(mockInvestigation),
       findOrCreateByQuery: jest.fn().mockResolvedValue(mockInvestigation),
+      createInvestigation: jest.fn().mockResolvedValue({
+        ...mockInvestigation,
+        query: 'rexas finance',
+        name: 'Rexas Finance Scam Investigation',
+      }),
       update: jest.fn().mockResolvedValue(mockInvestigation),
       archive: jest.fn().mockResolvedValue(undefined),
       addSnapshot: jest.fn().mockResolvedValue(mockSnapshot),
@@ -346,6 +351,46 @@ describe('InvestigationController', () => {
       expect(mockRepository.findAll).toHaveBeenCalledWith(
         expect.objectContaining({ limit: 10, skip: 20 })
       );
+    });
+  });
+
+  describe('createOrGet', () => {
+    it('should create a titled investigation when name is provided', async () => {
+      const result = await controller.createOrGet({
+        query: 'rexas finance',
+        name: 'Rexas Finance Scam Investigation',
+        platforms: ['twitter', 'youtube'],
+        timeRange: '30d',
+        limit: 250,
+      });
+
+      expect(mockRepository.createInvestigation).toHaveBeenCalledWith({
+        query: 'rexas finance',
+        name: 'Rexas Finance Scam Investigation',
+        settings: {
+          platforms: ['twitter', 'youtube'],
+          timeRange: '30d',
+          limit: 250,
+        },
+      });
+      expect(mockRepository.findOrCreateByQuery).not.toHaveBeenCalled();
+      expect(result.name).toBe('Rexas Finance Scam Investigation');
+    });
+
+    it('should use query lookup when no title is provided', async () => {
+      await controller.createOrGet({
+        query: 'rexas finance',
+        platforms: ['rss'],
+        timeRange: '7d',
+        limit: 100,
+      });
+
+      expect(mockRepository.findOrCreateByQuery).toHaveBeenCalledWith('rexas finance', {
+        platforms: ['rss'],
+        timeRange: '7d',
+        limit: 100,
+      });
+      expect(mockRepository.createInvestigation).not.toHaveBeenCalled();
     });
   });
 

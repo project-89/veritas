@@ -419,6 +419,7 @@ export interface MonitorConfig {
 
 export interface Investigation {
   _id: string;
+  id?: string;
   query: string;
   name: string;
   createdAt: string;
@@ -652,7 +653,7 @@ export async function saveSessionState(id: string, sessionState: Record<string, 
  */
 export async function createOrGetInvestigation(
   query: string,
-  settings?: { platforms?: string[]; timeRange?: string; limit?: number },
+  settings?: { name?: string; platforms?: string[]; timeRange?: string; limit?: number },
 ): Promise<Investigation> {
   return request<Investigation>('/api/investigations', {
     method: 'PUT',
@@ -1322,10 +1323,11 @@ export async function startScan(
   platforms?: string[],
   limit?: number,
   timeRange?: string,
+  investigationId?: string,
 ): Promise<{ scanId: string }> {
   return request<{ scanId: string }>('/api/scan', {
     method: 'POST',
-    body: JSON.stringify({ query, platforms, limit, timeRange }),
+    body: JSON.stringify({ query, platforms, limit, timeRange, investigationId }),
   });
 }
 

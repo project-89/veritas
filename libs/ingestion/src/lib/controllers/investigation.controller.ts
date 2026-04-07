@@ -74,11 +74,22 @@ export class InvestigationController {
    */
   @Put()
   async createOrGet(
-    @Body() body: { query: string; platforms?: string[]; timeRange?: string; limit?: number },
+    @Body() body: { query: string; name?: string; platforms?: string[]; timeRange?: string; limit?: number },
   ): Promise<Investigation> {
-    const { query, platforms, timeRange, limit } = body;
+    const { query, name, platforms, timeRange, limit } = body;
     if (!query?.trim()) {
       throw new NotFoundException('Query is required');
+    }
+    if (name?.trim()) {
+      return this.investigationRepository.createInvestigation({
+        query: query.trim(),
+        name: name.trim(),
+        settings: {
+          platforms: platforms ?? [],
+          timeRange: timeRange ?? '7d',
+          limit: limit ?? 100,
+        },
+      });
     }
     return this.investigationRepository.findOrCreateByQuery(query.trim(), {
       platforms: platforms ?? [],

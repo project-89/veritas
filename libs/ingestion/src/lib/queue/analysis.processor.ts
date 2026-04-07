@@ -381,6 +381,7 @@ export class AnalysisProcessor extends WorkerHost {
       const profileCorpus = await this.buildProfileCorpus(
         identity.primaryHandle,
         identity.primaryPlatform,
+        identity.platformAccounts ?? [],
         analysisJob.scanId,
         identity.observedPosts ?? [],
         { investigations: identity.investigations ?? [] },
@@ -507,9 +508,92 @@ export class AnalysisProcessor extends WorkerHost {
     return { posts: allPosts, platforms };
   }
 
+  private async fetchTimelineForAccounts(
+    primaryHandle: string,
+    primaryPlatform: string,
+    platformAccounts: Array<{ platform: string; handle: string }> = [],
+  ): Promise<{ posts: UserPost[]; platforms: string[] }> {
+    const normalizedPrimaryHandle = this.normalizeHandleForConnector(primaryHandle);
+
+    // Check identity record cache keyed to the primary platform first.
+    try {
+      const cached = await this.identityRepo.getCachedTimeline(
+        normalizedPrimaryHandle,
+        primaryPlatform,
+        AnalysisProcessor.TIMELINE_CACHE_MAX_AGE_MS,
+      );
+      if (cached && cached.length > 0) {
+        this.logger.debug(`Using cached timeline for @${normalizedPrimaryHandle}: ${cached.length} posts`);
+        return {
+          posts: cached,
+          platforms: Array.from(new Set(cached.map((post) => post.platform).filter(Boolean))),
+        };
+      }
+    } catch {
+      // Cache miss — fetch fresh
+    }
+
+    const targets = this.buildTimelineTargets(primaryHandle, primaryPlatform, platformAccounts);
+    const connectorMap = new Map<string, any>();
+    for (const connector of this.ingestionService.getAllConnectors() as any[]) {
+      if (typeof connector?.getUserTimeline !== 'function') continue;
+      const connectorPlatform = typeof connector?.platform === 'string' ? connector.platform : null;
+      if (connectorPlatform) {
+        connectorMap.set(connectorPlatform, connector);
+      }
+    }
+
+    const allPosts: UserPost[] = [];
+    const platforms: string[] = [];
+
+    for (const target of targets) {
+      const connector = connectorMap.get(target.platform);
+      if (!connector) continue;
+
+      try {
+        const timelinePosts = await connector.getUserTimeline(target.handle, { limit: 50 });
+        if (timelinePosts?.length > 0) {
+          platforms.push(target.platform);
+          this.logger.debug(
+            `Fetched ${timelinePosts.length} timeline posts for @${target.handle} from ${target.platform}`,
+          );
+          for (const post of timelinePosts as any[]) {
+            allPosts.push({
+              text: post.text ?? '',
+              timestamp: post.timestamp instanceof Date ? post.timestamp.toISOString() : String(post.timestamp),
+              platform: post.platform ?? target.platform,
+              url: post.url,
+              engagement: {
+                likes: post.engagementMetrics?.likes ?? 0,
+                comments: post.engagementMetrics?.comments ?? 0,
+                shares: post.engagementMetrics?.shares ?? 0,
+              },
+              sentiment: { score: 0, label: 'neutral' },
+            });
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    this.logger.debug(
+      `Timeline fetch for @${normalizedPrimaryHandle}: ${allPosts.length} total posts from ${targets.length} targeted accounts`,
+    );
+
+    if (allPosts.length > 0) {
+      this.identityRepo
+        .setCachedTimeline(normalizedPrimaryHandle, primaryPlatform, allPosts, platforms)
+        .catch(() => {});
+    }
+
+    return { posts: allPosts, platforms };
+  }
+
   private async buildProfileCorpus(
     handle: string,
     platform: string,
+    platformAccounts: Array<{ platform: string; handle: string }>,
     scanId: string | null,
     observedPosts: Array<{
       text: string;
@@ -533,10 +617,10 @@ export class AnalysisProcessor extends WorkerHost {
       case 'investigation-window':
         return this.getInvestigationWindowCorpus(handle, scanId, windowStart, windowEnd);
       case 'historical':
-        return this.getHistoricalCorpus(handle, platform, scanId, observedPosts, history, windowStart, windowEnd);
+        return this.getHistoricalCorpus(handle, platform, platformAccounts, scanId, observedPosts, history, windowStart, windowEnd);
       case 'current-state':
       default:
-        return this.getCurrentStateCorpus(handle, platform);
+        return this.getCurrentStateCorpus(handle, platform, platformAccounts);
     }
   }
 
@@ -570,8 +654,12 @@ export class AnalysisProcessor extends WorkerHost {
     };
   }
 
-  private async getCurrentStateCorpus(handle: string, platform: string): Promise<ProfileCorpus> {
-    const timeline = await this.fetchTimeline(handle, platform);
+  private async getCurrentStateCorpus(
+    handle: string,
+    platform: string,
+    platformAccounts: Array<{ platform: string; handle: string }> = [],
+  ): Promise<ProfileCorpus> {
+    const timeline = await this.fetchTimelineForAccounts(handle, platform, platformAccounts);
     const posts = this.dedupePosts(timeline.posts);
 
     return {
@@ -587,6 +675,7 @@ export class AnalysisProcessor extends WorkerHost {
   private async getHistoricalCorpus(
     handle: string,
     platform: string,
+    platformAccounts: Array<{ platform: string; handle: string }> = [],
     scanId: string | null,
     observedPosts: Array<{
       text: string;
@@ -601,7 +690,7 @@ export class AnalysisProcessor extends WorkerHost {
     endDate: Date | null,
   ): Promise<ProfileCorpus> {
     const scopedScan = await this.getInvestigationWindowCorpus(handle, scanId, startDate, endDate);
-    const timeline = await this.fetchTimeline(handle, platform);
+    const timeline = await this.fetchTimelineForAccounts(handle, platform, platformAccounts);
     const persisted = observedPosts
       .map((post) => ({
         text: post.text ?? '',
@@ -710,6 +799,37 @@ export class AnalysisProcessor extends WorkerHost {
     return Array.from(seen.values()).sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
+  }
+
+  private buildTimelineTargets(
+    primaryHandle: string,
+    primaryPlatform: string,
+    platformAccounts: Array<{ platform: string; handle: string }> = [],
+  ): Array<{ platform: string; handle: string }> {
+    const targets = [
+      { platform: primaryPlatform, handle: primaryHandle },
+      ...platformAccounts,
+    ];
+
+    const seen = new Set<string>();
+    const normalizedTargets: Array<{ platform: string; handle: string }> = [];
+
+    for (const target of targets) {
+      const platform = typeof target.platform === 'string' ? target.platform.trim().toLowerCase() : '';
+      const handle = this.normalizeHandleForConnector(target.handle);
+      if (!platform || !handle) continue;
+
+      const key = `${platform}:${handle.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      normalizedTargets.push({ platform, handle });
+    }
+
+    return normalizedTargets;
+  }
+
+  private normalizeHandleForConnector(handle: string): string {
+    return typeof handle === 'string' ? handle.trim().replace(/^@+/, '') : '';
   }
 
   private buildScopeLabel(
