@@ -16,6 +16,8 @@ import type {
   Investigation as InvestigationRecord,
   InvestigationEvidenceEntity,
   InvestigationEvidenceSeed,
+  ProjectDossier,
+  ProjectDossierOverlap,
 } from '../../lib/api';
 import { IdentityDossier } from './identity-dossier';
 import type { SearchSummary } from '../../lib/investigation-context';
@@ -37,6 +39,8 @@ interface DetailPanelProps {
   summary: SearchSummary | null;
   investigation: InvestigationResult | null;
   investigationRecord?: InvestigationRecord | null;
+  projectDossier?: ProjectDossier | null;
+  projectDossierOverlaps?: ProjectDossierOverlap[];
   deviations: DeviationResponse | null;
   propaganda: PropagandaAnalysisResult | null;
   claims: ClaimVerificationBatchResult | null;
@@ -49,12 +53,15 @@ interface DetailPanelProps {
   selectedIdentity?: IdentityRecord | null;
   identityLoading?: boolean;
   evidenceSeedSaving?: boolean;
+  projectDossierSaving?: boolean;
   onGenerateProfile?: (id: string, mode: MagiProfileMode) => void;
   onAddEvidenceSeed?: (seed: {
     kind: InvestigationEvidenceSeed['kind'];
     value: string;
     notes?: string | null;
   }) => Promise<void>;
+  onBuildProjectDossier?: () => Promise<void>;
+  onRefreshProjectDossier?: () => Promise<void>;
 
   // Actions
   onInvestigate?: (narrativeId: string) => void;
@@ -734,15 +741,23 @@ function InvestigationSummary({
   summary,
   investigationRecord,
   evidenceSeedSaving,
+  projectDossier,
+  projectDossierOverlaps,
+  projectDossierSaving,
   onAddEvidenceSeed,
   onRunPropaganda,
   onGenerateReport,
+  onBuildProjectDossier,
+  onRefreshProjectDossier,
 }: {
   posts: RawPost[];
   narratives: AnalyzedNarrative[];
   summary: SearchSummary | null;
   investigationRecord?: InvestigationRecord | null;
   evidenceSeedSaving?: boolean;
+  projectDossier?: ProjectDossier | null;
+  projectDossierOverlaps?: ProjectDossierOverlap[];
+  projectDossierSaving?: boolean;
   onAddEvidenceSeed?: (seed: {
     kind: InvestigationEvidenceSeed['kind'];
     value: string;
@@ -750,6 +765,8 @@ function InvestigationSummary({
   }) => Promise<void>;
   onRunPropaganda?: () => void;
   onGenerateReport?: () => void;
+  onBuildProjectDossier?: () => Promise<void>;
+  onRefreshProjectDossier?: () => Promise<void>;
 }) {
   const [seedKind, setSeedKind] = useState<InvestigationEvidenceSeed['kind']>('youtube');
   const [seedValue, setSeedValue] = useState('');
@@ -1050,6 +1067,88 @@ function InvestigationSummary({
         )}
       </div>
 
+      <div className="pt-2 border-t border-nerv-border space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+            PROJECT DOSSIER
+          </div>
+          <div className="flex items-center gap-1">
+            {projectDossier && (
+              <NervBadge label={projectDossier.slug.toUpperCase().slice(0, 18)} variant="blue" size="sm" />
+            )}
+            <button
+              onClick={() => {
+                void onBuildProjectDossier?.();
+              }}
+              disabled={projectDossierSaving || !onBuildProjectDossier}
+              className="px-2 py-1 text-[8px] font-mono uppercase tracking-wider border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors disabled:opacity-40 disabled:cursor-wait"
+            >
+              {projectDossierSaving ? 'BUILDING...' : projectDossier ? 'REFRESH DOSSIER' : 'BUILD DOSSIER'}
+            </button>
+          </div>
+        </div>
+
+        {projectDossier ? (
+          <div className="space-y-2">
+            <div className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-1.5">
+              <div className="text-[10px] font-mono text-nerv-text">{projectDossier.name}</div>
+              <div className="flex flex-wrap gap-1">
+                <NervBadge label={`${projectDossier.summary.totalSeeds} SEEDS`} variant="muted" size="sm" />
+                <NervBadge label={`${projectDossier.summary.processedSeeds} PROCESSED`} variant="blue" size="sm" />
+                <NervBadge label={`${projectDossier.topEntities.length} TOP ENTITIES`} variant="orange" size="sm" />
+              </div>
+              {projectDossier.aliases.length > 1 && (
+                <div className="text-[9px] font-mono text-nerv-text-muted">
+                  Aliases: {projectDossier.aliases.join(' · ')}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1 max-h-[240px] overflow-y-auto pr-1">
+              {projectDossierOverlaps && projectDossierOverlaps.length > 0 ? (
+                projectDossierOverlaps.slice(0, 5).map((overlap) => (
+                  <div key={overlap.dossierId} className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[10px] font-mono text-nerv-text">{overlap.name}</div>
+                      <NervBadge label={`SCORE ${overlap.score}`} variant="red" size="sm" />
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {overlap.matchedTypes.map((type) => (
+                        <NervBadge key={`${overlap.dossierId}-${type}`} label={type} variant="orange" size="sm" />
+                      ))}
+                    </div>
+                    <div className="text-[9px] font-mono text-nerv-text-muted break-words">
+                      {overlap.sharedEntities
+                        .slice(0, 4)
+                        .map((entity) => `${entity.type}:${entity.value}`)
+                        .join(' · ')}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
+                  No dossier overlaps yet. Build another project dossier to compare against.
+                </div>
+              )}
+            </div>
+            {projectDossier && onRefreshProjectDossier && (
+              <button
+                onClick={() => {
+                  void onRefreshProjectDossier();
+                }}
+                className="w-full px-3 py-2 text-[8px] font-mono uppercase tracking-wider border border-nerv-border text-nerv-text-secondary hover:bg-nerv-bg-elevated rounded-sm transition-colors"
+              >
+                Refresh Overlaps
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
+            Build a dossier from this investigation to compare it against other cases.
+          </div>
+        )}
+      </div>
+
       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-nerv-border">
         {onGenerateReport && (
           <button
@@ -1085,6 +1184,8 @@ export function DetailPanel({
   summary,
   investigation,
   investigationRecord,
+  projectDossier,
+  projectDossierOverlaps,
   deviations,
   propaganda,
   claims,
@@ -1093,8 +1194,11 @@ export function DetailPanel({
   selectedIdentity,
   identityLoading,
   evidenceSeedSaving,
+  projectDossierSaving,
   onGenerateProfile,
   onAddEvidenceSeed,
+  onBuildProjectDossier,
+  onRefreshProjectDossier,
   onInvestigate,
   onRunPropaganda,
   onVerifyClaims,
@@ -1160,9 +1264,14 @@ export function DetailPanel({
         summary={summary}
         investigationRecord={investigationRecord}
         evidenceSeedSaving={evidenceSeedSaving}
+        projectDossier={projectDossier}
+        projectDossierOverlaps={projectDossierOverlaps}
+        projectDossierSaving={projectDossierSaving}
         onAddEvidenceSeed={onAddEvidenceSeed}
         onRunPropaganda={onRunPropaganda}
         onGenerateReport={onGenerateReport}
+        onBuildProjectDossier={onBuildProjectDossier}
+        onRefreshProjectDossier={onRefreshProjectDossier}
       />
     );
   }

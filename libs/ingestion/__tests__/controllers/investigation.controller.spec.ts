@@ -3,11 +3,15 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { InvestigationController } from '../../src/lib/controllers/investigation.controller';
 import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
 import { InvestigationEvidenceService } from '../../src/lib/services/investigation-evidence.service';
+import { ProjectDossierRepository } from '../../src/lib/repositories/project-dossier.repository';
+import { ProjectDossierService } from '../../src/lib/services/project-dossier.service';
 
 describe('InvestigationController', () => {
   let controller: InvestigationController;
   let mockRepository: any;
   let mockEvidenceService: any;
+  let mockProjectDossierRepository: any;
+  let mockProjectDossierService: any;
 
   const mockInvestigation = {
     _id: 'inv-1',
@@ -24,7 +28,51 @@ describe('InvestigationController', () => {
     },
     lastSnapshotId: 'snap-1',
     lastScanId: null,
+    linkedProjectDossierId: null,
     evidenceSeeds: [],
+  };
+
+  const mockProjectDossier = {
+    _id: 'dossier-1',
+    id: 'dossier-1',
+    investigationId: 'inv-1',
+    name: 'bitcoin regulation',
+    slug: 'bitcoin-regulation',
+    aliases: ['bitcoin regulation'],
+    summary: {
+      totalSeeds: 1,
+      processedSeeds: 1,
+      entityCounts: { youtube_video: 1 },
+    },
+    groupedEntities: {
+      youtube_video: [
+        {
+          type: 'youtube_video',
+          value: 'abc',
+          displayValue: 'abc',
+          sourceCount: 1,
+          occurrenceCount: 1,
+          sources: [
+            { seedId: 'seed-1', kind: 'youtube', label: 'Explainer', status: 'processed' },
+          ],
+        },
+      ],
+    },
+    topEntities: [
+      {
+        type: 'youtube_video',
+        value: 'abc',
+        displayValue: 'abc',
+        sourceCount: 1,
+        occurrenceCount: 1,
+        sources: [
+          { seedId: 'seed-1', kind: 'youtube', label: 'Explainer', status: 'processed' },
+        ],
+      },
+    ],
+    generatedAt: new Date('2026-04-06T00:00:00Z'),
+    createdAt: new Date('2026-04-06T00:00:00Z'),
+    updatedAt: new Date('2026-04-06T00:00:00Z'),
   };
 
   const mockSnapshot = {
@@ -95,6 +143,37 @@ describe('InvestigationController', () => {
       }),
     };
 
+    mockProjectDossierRepository = {
+      findByInvestigationId: jest.fn().mockResolvedValue(null),
+      findAll: jest.fn().mockResolvedValue([]),
+      save: jest.fn().mockResolvedValue(mockProjectDossier),
+    };
+
+    mockProjectDossierService = {
+      buildFromInvestigation: jest.fn().mockReturnValue({
+        investigationId: 'inv-1',
+        name: 'bitcoin regulation',
+        slug: 'bitcoin-regulation',
+        aliases: ['bitcoin regulation'],
+        summary: mockProjectDossier.summary,
+        groupedEntities: mockProjectDossier.groupedEntities,
+        topEntities: mockProjectDossier.topEntities,
+        generatedAt: new Date('2026-04-06T00:00:00Z'),
+      }),
+      compareAgainstMany: jest.fn().mockReturnValue([
+        {
+          dossierId: 'dossier-2',
+          investigationId: 'inv-2',
+          name: 'rexas finance',
+          score: 9,
+          matchedTypes: ['domain'],
+          sharedEntities: [
+            { type: 'domain', value: 'rexas.example', sourceCount: 1, weight: 5 },
+          ],
+        },
+      ]),
+    };
+
     mockRepository = {
       findAll: jest.fn().mockResolvedValue([mockInvestigation]),
       findById: jest.fn().mockResolvedValue(mockInvestigation),
@@ -134,6 +213,14 @@ describe('InvestigationController', () => {
         {
           provide: InvestigationEvidenceService,
           useValue: mockEvidenceService,
+        },
+        {
+          provide: ProjectDossierRepository,
+          useValue: mockProjectDossierRepository,
+        },
+        {
+          provide: ProjectDossierService,
+          useValue: mockProjectDossierService,
         },
       ],
     }).compile();
@@ -181,6 +268,8 @@ describe('InvestigationController', () => {
       expect(result.investigation).toMatchObject(mockInvestigation);
       expect(result.investigation.evidenceDossier).toBeDefined();
       expect(result.latestSnapshot).toEqual(mockSnapshot);
+      expect(result.projectDossier).toBeNull();
+      expect(result.dossierOverlaps).toEqual([]);
       expect(mockRepository.findById).toHaveBeenCalledWith('inv-1');
       expect(mockRepository.getLatestSnapshot).toHaveBeenCalledWith('inv-1');
     });
@@ -325,6 +414,35 @@ describe('InvestigationController', () => {
           value: '',
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('project dossier endpoints', () => {
+    it('should build a project dossier and return overlaps', async () => {
+      mockRepository.update.mockResolvedValueOnce({
+        ...mockInvestigation,
+        linkedProjectDossierId: 'dossier-1',
+      });
+      mockProjectDossierRepository.findAll.mockResolvedValue([mockProjectDossier]);
+
+      const result = await controller.buildProjectDossier('inv-1');
+
+      expect(mockProjectDossierService.buildFromInvestigation).toHaveBeenCalled();
+      expect(mockProjectDossierRepository.save).toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      expect(result.projectDossier.id).toBe('dossier-1');
+      expect(result.dossierOverlaps).toHaveLength(1);
+      expect(result.investigation.linkedProjectDossierId).toBe('dossier-1');
+    });
+
+    it('should return the existing project dossier for an investigation', async () => {
+      mockProjectDossierRepository.findByInvestigationId.mockResolvedValueOnce(mockProjectDossier);
+      mockProjectDossierRepository.findAll.mockResolvedValueOnce([mockProjectDossier]);
+
+      const result = await controller.getProjectDossier('inv-1');
+
+      expect(result.projectDossier?.id).toBe('dossier-1');
+      expect(result.dossierOverlaps).toHaveLength(1);
     });
   });
 });

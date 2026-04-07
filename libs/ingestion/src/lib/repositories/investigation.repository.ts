@@ -105,6 +105,7 @@ export class InvestigationRepository implements OnModuleInit {
         },
         lastSnapshotId: null,
         lastScanId: null,
+        linkedProjectDossierId: null,
         evidenceSeeds: [],
       } as Partial<Investigation>);
 

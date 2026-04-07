@@ -16,10 +16,12 @@ import {
   fetchDeviations,
   analyzePropaganda,
   analyzeEntities,
+  buildProjectDossier,
   fetchDownstreamEffects,
   createOrGetInvestigation,
   fetchInvestigation,
   fetchInvestigations,
+  fetchProjectDossier,
   verifyClaims,
   saveAnalysisCache,
   getAnalysisCache,
@@ -33,6 +35,8 @@ import {
   getRecentScans,
   type RawPost,
   type Investigation,
+  type ProjectDossier,
+  type ProjectDossierOverlap,
   type AnalyzedNarrative,
   type ExtractedClaim,
   type ScanJob,
@@ -247,7 +251,10 @@ function InvestigationWorkspace() {
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(380);
   const [investigationRecord, setInvestigationRecord] = useState<Investigation | null>(null);
+  const [projectDossier, setProjectDossier] = useState<ProjectDossier | null>(null);
+  const [projectDossierOverlaps, setProjectDossierOverlaps] = useState<ProjectDossierOverlap[]>([]);
   const [evidenceSeedSaving, setEvidenceSeedSaving] = useState(false);
+  const [projectDossierSaving, setProjectDossierSaving] = useState(false);
   const [scanJob, setScanJob] = useState<ScanJob | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanJob[]>([]);
   const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -261,14 +268,22 @@ function InvestigationWorkspace() {
         let resolved: Investigation | null = null;
 
         if (invId) {
-          const { investigation } = await fetchInvestigation(invId);
+          const { investigation, projectDossier, dossierOverlaps } = await fetchInvestigation(invId);
           resolved = investigation;
+          if (!cancelled) {
+            setProjectDossier(projectDossier);
+            setProjectDossierOverlaps(dossierOverlaps);
+          }
         } else if (query) {
           const allInvestigations = await fetchInvestigations();
           const match = allInvestigations.find((item) => item.query === query) ?? null;
           if (match?._id) {
-            const { investigation } = await fetchInvestigation(match._id);
+            const { investigation, projectDossier, dossierOverlaps } = await fetchInvestigation(match._id);
             resolved = investigation;
+            if (!cancelled) {
+              setProjectDossier(projectDossier);
+              setProjectDossierOverlaps(dossierOverlaps);
+            }
           }
         }
 
@@ -279,6 +294,8 @@ function InvestigationWorkspace() {
       } catch {
         if (!cancelled) {
           setInvestigationRecord(null);
+          setProjectDossier(null);
+          setProjectDossierOverlaps([]);
           dispatch({ type: 'SET_INVESTIGATION_ID', id: null });
         }
       }
@@ -752,9 +769,13 @@ function InvestigationWorkspace() {
           }
 
           if (targetInvId) {
-            const { investigation, snapshot } = await fetchInvestigation(targetInvId);
+            const { investigation, snapshot, projectDossier, dossierOverlaps } = await fetchInvestigation(targetInvId);
             resolvedInvestigationId = targetInvId;
             resolvedScanId = snapshot?.scanId ?? investigation.lastScanId ?? null;
+            setInvestigationRecord(investigation);
+            setProjectDossier(projectDossier);
+            setProjectDossierOverlaps(dossierOverlaps);
+            dispatch({ type: 'SET_INVESTIGATION_ID', id: investigation._id });
             if (snapshot && Array.isArray(snapshot.posts) && snapshot.posts.length > 0) {
               posts = snapshot.posts as RawPost[];
               dispatch({
@@ -1278,6 +1299,36 @@ function InvestigationWorkspace() {
     }
   }, [investigationRecord, query, urlPlatforms, urlTimeRange, searchParams, router, dispatch]);
 
+  const handleBuildProjectDossier = useCallback(async () => {
+    if (!investigationRecord?._id) return;
+    setProjectDossierSaving(true);
+    try {
+      const result = await buildProjectDossier(investigationRecord._id);
+      setInvestigationRecord(result.investigation);
+      setProjectDossier(result.projectDossier);
+      setProjectDossierOverlaps(result.dossierOverlaps);
+      dispatch({ type: 'SET_INVESTIGATION_ID', id: result.investigation._id });
+    } catch (err) {
+      dispatch({
+        type: 'SET_ERROR',
+        error: `Failed to build project dossier: ${err instanceof Error ? err.message : 'unknown error'}`,
+      });
+    } finally {
+      setProjectDossierSaving(false);
+    }
+  }, [investigationRecord, dispatch]);
+
+  const handleRefreshProjectDossier = useCallback(async () => {
+    if (!investigationRecord?._id || !investigationRecord.linkedProjectDossierId) return;
+    try {
+      const result = await fetchProjectDossier(investigationRecord._id);
+      setProjectDossier(result.projectDossier);
+      setProjectDossierOverlaps(result.dossierOverlaps);
+    } catch {
+      // silent
+    }
+  }, [investigationRecord]);
+
   const handleRefresh = useCallback(async () => {
     // Reset all state
     scanPostsFetchedRef.current = false;
@@ -1787,6 +1838,8 @@ function InvestigationWorkspace() {
             summary={state.summary}
             investigation={state.investigation}
             investigationRecord={investigationRecord}
+            projectDossier={projectDossier}
+            projectDossierOverlaps={projectDossierOverlaps}
             deviations={state.deviations}
             propaganda={state.propaganda}
             claims={state.claims}
@@ -1795,7 +1848,10 @@ function InvestigationWorkspace() {
             selectedIdentity={state.selectedIdentity}
             identityLoading={state.identityLoading}
             evidenceSeedSaving={evidenceSeedSaving}
+            projectDossierSaving={projectDossierSaving}
             onAddEvidenceSeed={handleAddEvidenceSeed}
+            onBuildProjectDossier={handleBuildProjectDossier}
+            onRefreshProjectDossier={handleRefreshProjectDossier}
             onGenerateProfile={handleGenerateProfile}
             onInvestigate={handleInvestigate}
             onRunPropaganda={handleRunPropaganda}

@@ -427,6 +427,7 @@ export interface Investigation {
   settings: { platforms: string[]; timeRange: string; limit: number };
   lastSnapshotId: string | null;
   lastScanId: string | null;
+  linkedProjectDossierId: string | null;
   evidenceSeeds: InvestigationEvidenceSeed[];
   evidenceDossier?: InvestigationEvidenceDossier;
 }
@@ -469,6 +470,38 @@ export interface InvestigationEvidenceDossier {
   topEntities: InvestigationEvidenceEntity[];
 }
 
+export interface ProjectDossier {
+  _id: string;
+  investigationId: string;
+  name: string;
+  slug: string;
+  aliases: string[];
+  summary: {
+    totalSeeds: number;
+    processedSeeds: number;
+    entityCounts: Record<string, number>;
+  };
+  groupedEntities: Record<string, InvestigationEvidenceEntity[]>;
+  topEntities: InvestigationEvidenceEntity[];
+  generatedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectDossierOverlap {
+  dossierId: string;
+  investigationId: string;
+  name: string;
+  score: number;
+  matchedTypes: string[];
+  sharedEntities: Array<{
+    type: string;
+    value: string;
+    sourceCount: number;
+    weight: number;
+  }>;
+}
+
 export interface Snapshot {
   _id: string;
   investigationId: string;
@@ -503,14 +536,27 @@ export async function fetchInvestigations(): Promise<Investigation[]> {
  */
 export async function fetchInvestigation(
   id: string,
-): Promise<{ investigation: Investigation; snapshot: Snapshot | null }> {
-  const result = await request<{ investigation: Investigation; latestSnapshot?: Snapshot | null; snapshot?: Snapshot | null }>(
+): Promise<{
+  investigation: Investigation;
+  snapshot: Snapshot | null;
+  projectDossier: ProjectDossier | null;
+  dossierOverlaps: ProjectDossierOverlap[];
+}> {
+  const result = await request<{
+    investigation: Investigation;
+    latestSnapshot?: Snapshot | null;
+    snapshot?: Snapshot | null;
+    projectDossier?: ProjectDossier | null;
+    dossierOverlaps?: ProjectDossierOverlap[];
+  }>(
     `/api/investigations/${encodeURIComponent(id)}`,
   );
   // Backend returns "latestSnapshot", normalize to "snapshot"
   return {
     investigation: result.investigation,
     snapshot: result.latestSnapshot ?? result.snapshot ?? null,
+    projectDossier: result.projectDossier ?? null,
+    dossierOverlaps: result.dossierOverlaps ?? [],
   };
 }
 
@@ -578,6 +624,37 @@ export async function addInvestigationEvidenceSeed(
     },
   );
   return result.investigation;
+}
+
+export async function buildProjectDossier(
+  id: string,
+): Promise<{
+  investigation: Investigation;
+  projectDossier: ProjectDossier;
+  dossierOverlaps: ProjectDossierOverlap[];
+}> {
+  const result = await request<{
+    success: boolean;
+    investigation: Investigation;
+    projectDossier: ProjectDossier;
+    dossierOverlaps: ProjectDossierOverlap[];
+  }>(`/api/investigations/${encodeURIComponent(id)}/project-dossier`, {
+    method: 'POST',
+  });
+
+  return {
+    investigation: result.investigation,
+    projectDossier: result.projectDossier,
+    dossierOverlaps: result.dossierOverlaps,
+  };
+}
+
+export async function fetchProjectDossier(
+  id: string,
+): Promise<{ projectDossier: ProjectDossier | null; dossierOverlaps: ProjectDossierOverlap[] }> {
+  return request<{ projectDossier: ProjectDossier | null; dossierOverlaps: ProjectDossierOverlap[] }>(
+    `/api/investigations/${encodeURIComponent(id)}/project-dossier`,
+  );
 }
 
 // ---------------------------------------------------------------------------

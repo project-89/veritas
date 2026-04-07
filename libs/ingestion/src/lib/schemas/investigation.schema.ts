@@ -121,6 +121,9 @@ export class InvestigationSchema extends Document {
   @Prop({ type: String, default: null })
   lastScanId!: string | null;
 
+  @Prop({ type: String, default: null })
+  linkedProjectDossierId!: string | null;
+
   @Prop({ type: [EvidenceSeedEmbed], default: [] })
   evidenceSeeds!: EvidenceSeedEmbed[];
 
@@ -197,6 +200,7 @@ export interface Investigation {
   settings: InvestigationSettings;
   lastSnapshotId: string | null;
   lastScanId: string | null;
+  linkedProjectDossierId: string | null;
   evidenceSeeds: EvidenceSeed[];
   sessionState: Record<string, unknown> | null;
 }

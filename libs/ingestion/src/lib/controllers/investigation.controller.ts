@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Put,
   Patch,
   Delete,
@@ -18,6 +19,12 @@ import {
   InvestigationEvidenceDossier,
   InvestigationEvidenceService,
 } from '../services/investigation-evidence.service';
+import { ProjectDossierRepository } from '../repositories/project-dossier.repository';
+import {
+  ProjectDossier,
+  ProjectDossierOverlap,
+} from '../schemas/project-dossier.schema';
+import { ProjectDossierService } from '../services/project-dossier.service';
 
 type InvestigationWithDossier = Investigation & {
   evidenceDossier: InvestigationEvidenceDossier;
@@ -33,6 +40,8 @@ export class InvestigationController {
   constructor(
     private readonly investigationRepository: InvestigationRepository,
     private readonly investigationEvidenceService: InvestigationEvidenceService,
+    private readonly projectDossierRepository: ProjectDossierRepository,
+    private readonly projectDossierService: ProjectDossierService,
   ) {}
 
   /**
@@ -77,7 +86,12 @@ export class InvestigationController {
   @Get(':id')
   async getInvestigation(
     @Param('id') id: string
-  ): Promise<{ investigation: InvestigationWithDossier; latestSnapshot: Snapshot | null }> {
+  ): Promise<{
+    investigation: InvestigationWithDossier;
+    latestSnapshot: Snapshot | null;
+    projectDossier: ProjectDossier | null;
+    dossierOverlaps: ProjectDossierOverlap[];
+  }> {
     this.logger.log(`Getting investigation: ${id}`);
 
     const investigation = await this.investigationRepository.findById(id);
@@ -88,7 +102,17 @@ export class InvestigationController {
     const latestSnapshot =
       await this.investigationRepository.getLatestSnapshot(id);
 
-    return { investigation: this.withEvidenceDossier(investigation), latestSnapshot };
+    const projectDossier = await this.projectDossierRepository.findByInvestigationId(id);
+    const dossierOverlaps = projectDossier
+      ? await this.getDossierOverlaps(projectDossier)
+      : [];
+
+    return {
+      investigation: this.withEvidenceDossier(investigation, projectDossier),
+      latestSnapshot,
+      projectDossier,
+      dossierOverlaps,
+    };
   }
 
   /**
@@ -107,7 +131,8 @@ export class InvestigationController {
     }
 
     const updated = await this.investigationRepository.update(id, body);
-    return this.withEvidenceDossier(updated);
+    const projectDossier = await this.projectDossierRepository.findByInvestigationId(id);
+    return this.withEvidenceDossier(updated, projectDossier);
   }
 
   /**
@@ -199,7 +224,70 @@ export class InvestigationController {
     } satisfies EvidenceSeed);
 
     const investigation = await this.investigationRepository.addEvidenceSeed(id, seed);
-    return { success: true, investigation: this.withEvidenceDossier(investigation) };
+    const projectDossier = await this.projectDossierRepository.findByInvestigationId(id);
+    return { success: true, investigation: this.withEvidenceDossier(investigation, projectDossier) };
+  }
+
+  /**
+   * POST /investigations/:id/project-dossier — create or refresh a durable project dossier.
+   */
+  @Post(':id/project-dossier')
+  async buildProjectDossier(
+    @Param('id') id: string,
+  ): Promise<{
+    success: boolean;
+    investigation: InvestigationWithDossier;
+    projectDossier: ProjectDossier;
+    dossierOverlaps: ProjectDossierOverlap[];
+  }> {
+    const investigation = await this.investigationRepository.findById(id);
+    if (!investigation) {
+      throw new NotFoundException(`Investigation not found: ${id}`);
+    }
+
+    const evidenceDossier = this.investigationEvidenceService.buildDossier(investigation.evidenceSeeds ?? []);
+    const dossierData = this.projectDossierService.buildFromInvestigation(investigation, evidenceDossier);
+    const projectDossier = await this.projectDossierRepository.save(dossierData);
+    const projectDossierId = projectDossier._id?.toString() ?? projectDossier.id;
+
+    let updatedInvestigation = investigation;
+    if (investigation.linkedProjectDossierId !== projectDossierId) {
+      updatedInvestigation = await this.investigationRepository.update(id, {
+        linkedProjectDossierId: projectDossierId,
+      } as Partial<Investigation>);
+    }
+
+    const dossierOverlaps = await this.getDossierOverlaps(projectDossier);
+
+    return {
+      success: true,
+      investigation: this.withEvidenceDossier(updatedInvestigation, projectDossier),
+      projectDossier,
+      dossierOverlaps,
+    };
+  }
+
+  /**
+   * GET /investigations/:id/project-dossier — fetch the current linked dossier and overlaps.
+   */
+  @Get(':id/project-dossier')
+  async getProjectDossier(
+    @Param('id') id: string,
+  ): Promise<{ projectDossier: ProjectDossier | null; dossierOverlaps: ProjectDossierOverlap[] }> {
+    const investigation = await this.investigationRepository.findById(id);
+    if (!investigation) {
+      throw new NotFoundException(`Investigation not found: ${id}`);
+    }
+
+    const projectDossier = await this.projectDossierRepository.findByInvestigationId(id);
+    if (!projectDossier) {
+      return { projectDossier: null, dossierOverlaps: [] };
+    }
+
+    return {
+      projectDossier,
+      dossierOverlaps: await this.getDossierOverlaps(projectDossier),
+    };
   }
 
   /**
@@ -245,10 +333,23 @@ export class InvestigationController {
     return snapshot;
   }
 
-  private withEvidenceDossier(investigation: Investigation): InvestigationWithDossier {
+  private withEvidenceDossier(
+    investigation: Investigation,
+    projectDossier?: ProjectDossier | null,
+  ): InvestigationWithDossier {
     return {
       ...investigation,
+      linkedProjectDossierId:
+        investigation.linkedProjectDossierId ??
+        projectDossier?._id?.toString() ??
+        projectDossier?.id ??
+        null,
       evidenceDossier: this.investigationEvidenceService.buildDossier(investigation.evidenceSeeds ?? []),
     };
+  }
+
+  private async getDossierOverlaps(projectDossier: ProjectDossier): Promise<ProjectDossierOverlap[]> {
+    const allDossiers = await this.projectDossierRepository.findAll(100);
+    return this.projectDossierService.compareAgainstMany(projectDossier, allDossiers).slice(0, 10);
   }
 }

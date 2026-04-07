@@ -371,16 +371,16 @@ Success criteria:
 
 ### Phase 3
 
-- [ ] Create project dossier schema
-- [ ] Build dossier assembly service
-- [ ] Attach evidence bundles to dossiers
+- [x] Create project dossier schema
+- [x] Build dossier assembly service
+- [x] Attach evidence bundles to dossiers
 
 ### Phase 4
 
-- [ ] Build overlap scoring engine
-- [ ] Compare shared promoters
-- [ ] Compare shared wallets / contracts / domains
-- [ ] Generate overlap explanation blocks
+- [x] Build overlap scoring engine
+- [x] Compare shared promoters
+- [x] Compare shared wallets / contracts / domains
+- [x] Generate overlap explanation blocks
 
 ### Phase 5
 
