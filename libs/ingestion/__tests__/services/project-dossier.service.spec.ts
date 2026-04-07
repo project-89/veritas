@@ -48,11 +48,20 @@ describe('ProjectDossierService', () => {
           },
         ],
       },
+      {
+        status: 'ready',
+        analyzedAddresses: ['0x123'],
+        addressSummaries: [],
+        commonCounterparties: [],
+        tokenContracts: [],
+        note: null,
+      },
     );
 
     expect(result.slug).toBe('rexas-finance');
     expect(result.summary?.totalSeeds).toBe(3);
     expect(result.aliases).toContain('Rexas Finance');
+    expect(result.onChainSummary?.status).toBe('ready');
   });
 
   it('scores overlaps based on shared canonical entities', () => {
@@ -84,6 +93,26 @@ describe('ProjectDossierService', () => {
             sources: [],
           },
         ],
+        onChainSummary: {
+          status: 'ready',
+          analyzedAddresses: ['0x123'],
+          addressSummaries: [],
+          commonCounterparties: [
+            {
+              address: '0x999',
+              addressCount: 2,
+              addresses: ['0x123', '0x789'],
+            },
+          ],
+          tokenContracts: [
+            {
+              address: '0xeeee',
+              symbol: 'RXS',
+              occurrenceCount: 1,
+            },
+          ],
+          note: null,
+        },
         generatedAt: new Date('2026-04-06T00:00:00Z'),
         createdAt: new Date('2026-04-06T00:00:00Z'),
         updatedAt: new Date('2026-04-06T00:00:00Z'),
@@ -116,6 +145,26 @@ describe('ProjectDossierService', () => {
               sources: [],
             },
           ],
+          onChainSummary: {
+            status: 'ready',
+            analyzedAddresses: ['0x123'],
+            addressSummaries: [],
+            commonCounterparties: [
+              {
+                address: '0x999',
+                addressCount: 2,
+                addresses: ['0x123', '0x456'],
+              },
+            ],
+            tokenContracts: [
+              {
+                address: '0xeeee',
+                symbol: 'RXS',
+                occurrenceCount: 2,
+              },
+            ],
+            note: null,
+          },
           generatedAt: new Date('2026-04-06T00:00:00Z'),
           createdAt: new Date('2026-04-06T00:00:00Z'),
           updatedAt: new Date('2026-04-06T00:00:00Z'),
@@ -124,7 +173,7 @@ describe('ProjectDossierService', () => {
     );
 
     expect(overlaps).toHaveLength(1);
-    expect(overlaps[0]?.matchedTypes).toEqual(expect.arrayContaining(['domain', 'wallet']));
+    expect(overlaps[0]?.matchedTypes).toEqual(expect.arrayContaining(['domain', 'wallet', 'counterparty', 'token_contract']));
     expect(overlaps[0]?.score).toBeGreaterThan(0);
   });
 });

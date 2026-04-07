@@ -25,6 +25,7 @@ import {
   ProjectDossierOverlap,
 } from '../schemas/project-dossier.schema';
 import { ProjectDossierService } from '../services/project-dossier.service';
+import { OnChainCorrelationService } from '../services/onchain-correlation.service';
 
 type InvestigationWithDossier = Investigation & {
   evidenceDossier: InvestigationEvidenceDossier;
@@ -42,6 +43,7 @@ export class InvestigationController {
     private readonly investigationEvidenceService: InvestigationEvidenceService,
     private readonly projectDossierRepository: ProjectDossierRepository,
     private readonly projectDossierService: ProjectDossierService,
+    private readonly onChainCorrelationService: OnChainCorrelationService,
   ) {}
 
   /**
@@ -246,7 +248,14 @@ export class InvestigationController {
     }
 
     const evidenceDossier = this.investigationEvidenceService.buildDossier(investigation.evidenceSeeds ?? []);
-    const dossierData = this.projectDossierService.buildFromInvestigation(investigation, evidenceDossier);
+    const onChainSummary = await this.onChainCorrelationService.buildSummary(
+      this.projectDossierService.extractAddressCandidates(evidenceDossier),
+    );
+    const dossierData = this.projectDossierService.buildFromInvestigation(
+      investigation,
+      evidenceDossier,
+      onChainSummary,
+    );
     const projectDossier = await this.projectDossierRepository.save(dossierData);
     const projectDossierId = projectDossier._id?.toString() ?? projectDossier.id;
 

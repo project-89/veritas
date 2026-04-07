@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Investigation } from '../schemas/investigation.schema';
 import {
   ProjectDossier,
+  ProjectDossierOnChainSummary,
   ProjectEntity,
   ProjectDossierOverlap,
 } from '../schemas/project-dossier.schema';
@@ -23,6 +24,7 @@ export class ProjectDossierService {
   buildFromInvestigation(
     investigation: Investigation,
     evidenceDossier: InvestigationEvidenceDossier,
+    onChainSummary: ProjectDossierOnChainSummary | null = null,
   ): Partial<ProjectDossier> {
     const name = investigation.name?.trim() || investigation.query.trim();
     const aliases = Array.from(new Set([investigation.name, investigation.query].map((value) => value.trim()).filter(Boolean)));
@@ -39,6 +41,7 @@ export class ProjectDossierService {
       },
       groupedEntities: evidenceDossier.groupedEntities,
       topEntities: evidenceDossier.topEntities,
+      onChainSummary,
       generatedAt: new Date(evidenceDossier.generatedAt),
     };
   }
@@ -75,6 +78,30 @@ export class ProjectDossierService {
       });
     }
 
+    for (const sharedCounterparty of this.intersectValues(
+      source.onChainSummary?.commonCounterparties.map((entry) => entry.address) ?? [],
+      candidate.onChainSummary?.commonCounterparties.map((entry) => entry.address) ?? [],
+    )) {
+      sharedEntities.push({
+        type: 'counterparty',
+        value: sharedCounterparty,
+        sourceCount: 1,
+        weight: 9,
+      });
+    }
+
+    for (const sharedTokenContract of this.intersectValues(
+      source.onChainSummary?.tokenContracts.map((entry) => entry.address) ?? [],
+      candidate.onChainSummary?.tokenContracts.map((entry) => entry.address) ?? [],
+    )) {
+      sharedEntities.push({
+        type: 'token_contract',
+        value: sharedTokenContract,
+        sourceCount: 1,
+        weight: 6,
+      });
+    }
+
     if (sharedEntities.length === 0) {
       return null;
     }
@@ -102,11 +129,26 @@ export class ProjectDossierService {
     return map;
   }
 
+  extractAddressCandidates(evidenceDossier: InvestigationEvidenceDossier): string[] {
+    const candidates = [
+      ...(evidenceDossier.groupedEntities['wallet'] ?? []),
+      ...(evidenceDossier.groupedEntities['contract'] ?? []),
+      ...(evidenceDossier.groupedEntities['address'] ?? []),
+    ];
+
+    return [...new Set(candidates.map((entity) => entity.value.toLowerCase()))].slice(0, 6);
+  }
+
   private slugify(value: string): string {
     return value
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 120);
+  }
+
+  private intersectValues(a: string[], b: string[]): string[] {
+    const right = new Set(b.map((value) => value.toLowerCase()));
+    return [...new Set(a.filter((value) => right.has(value.toLowerCase())).map((value) => value.toLowerCase()))];
   }
 }

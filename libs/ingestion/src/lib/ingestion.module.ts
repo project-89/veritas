@@ -34,6 +34,7 @@ import { BlueskyFreeConnector } from './services/bluesky-free.connector';
 import { FourChanFreeConnector } from './services/4chan-free.connector';
 import { InvestigationEvidenceService } from './services/investigation-evidence.service';
 import { ProjectDossierService } from './services/project-dossier.service';
+import { OnChainCorrelationService } from './services/onchain-correlation.service';
 import { IngestionService } from './services/ingestion.service';
 import { SubprocessUtil } from './services/utils/subprocess.util';
 import { JinaReaderService } from './services/utils/jina-reader.service';
@@ -201,6 +202,7 @@ export class IngestionModule {
       ProjectDossierRepository,
       InvestigationEvidenceService,
       ProjectDossierService,
+      OnChainCorrelationService,
       EmbeddingCacheRepository,
       RssCacheRepository,
     ];

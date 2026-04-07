@@ -472,6 +472,7 @@ export interface InvestigationEvidenceDossier {
 
 export interface ProjectDossier {
   _id: string;
+  id: string;
   investigationId: string;
   name: string;
   slug: string;
@@ -483,6 +484,29 @@ export interface ProjectDossier {
   };
   groupedEntities: Record<string, InvestigationEvidenceEntity[]>;
   topEntities: InvestigationEvidenceEntity[];
+  onChainSummary: {
+    status: 'unavailable' | 'partial' | 'ready';
+    analyzedAddresses: string[];
+    addressSummaries: Array<{
+      address: string;
+      txCount: number;
+      uniqueCounterparties: number;
+      topCounterparties: string[];
+      tokenContracts: string[];
+      tokenSymbols: string[];
+    }>;
+    commonCounterparties: Array<{
+      address: string;
+      addressCount: number;
+      addresses: string[];
+    }>;
+    tokenContracts: Array<{
+      address: string;
+      symbol: string | null;
+      occurrenceCount: number;
+    }>;
+    note: string | null;
+  } | null;
   generatedAt: string;
   createdAt: string;
   updatedAt: string;

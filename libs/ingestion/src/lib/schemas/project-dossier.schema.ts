@@ -50,6 +50,77 @@ class ProjectDossierSummaryEmbed {
   entityCounts!: Record<string, number>;
 }
 
+@Schema({ _id: false })
+class OnChainCounterpartyEmbed {
+  @Prop({ required: true, type: String })
+  address!: string;
+
+  @Prop({ required: true, type: Number })
+  addressCount!: number;
+
+  @Prop({ type: [String], default: [] })
+  addresses!: string[];
+}
+
+@Schema({ _id: false })
+class OnChainTokenContractEmbed {
+  @Prop({ required: true, type: String })
+  address!: string;
+
+  @Prop({ type: String, default: null })
+  symbol!: string | null;
+
+  @Prop({ required: true, type: Number })
+  occurrenceCount!: number;
+}
+
+@Schema({ _id: false })
+class OnChainAddressSummaryEmbed {
+  @Prop({ required: true, type: String })
+  address!: string;
+
+  @Prop({ required: true, type: Number })
+  txCount!: number;
+
+  @Prop({ required: true, type: Number })
+  uniqueCounterparties!: number;
+
+  @Prop({ type: [String], default: [] })
+  topCounterparties!: string[];
+
+  @Prop({ type: [String], default: [] })
+  tokenContracts!: string[];
+
+  @Prop({ type: [String], default: [] })
+  tokenSymbols!: string[];
+}
+
+@Schema({ _id: false })
+class ProjectDossierOnChainSummaryEmbed {
+  @Prop({
+    required: true,
+    type: String,
+    enum: ['unavailable', 'partial', 'ready'],
+    default: 'unavailable',
+  })
+  status!: 'unavailable' | 'partial' | 'ready';
+
+  @Prop({ type: [String], default: [] })
+  analyzedAddresses!: string[];
+
+  @Prop({ type: [OnChainAddressSummaryEmbed], default: [] })
+  addressSummaries!: OnChainAddressSummaryEmbed[];
+
+  @Prop({ type: [OnChainCounterpartyEmbed], default: [] })
+  commonCounterparties!: OnChainCounterpartyEmbed[];
+
+  @Prop({ type: [OnChainTokenContractEmbed], default: [] })
+  tokenContracts!: OnChainTokenContractEmbed[];
+
+  @Prop({ type: String, default: null })
+  note!: string | null;
+}
+
 @Schema({
   collection: 'project_dossiers',
   timestamps: true,
@@ -83,6 +154,9 @@ export class ProjectDossierSchema extends Document {
   @Prop({ type: [ProjectEntityEmbed], default: [] })
   topEntities!: ProjectEntityEmbed[];
 
+  @Prop({ type: ProjectDossierOnChainSummaryEmbed, default: null })
+  onChainSummary!: ProjectDossierOnChainSummaryEmbed | null;
+
   @Prop({ required: true, type: Date, default: () => new Date() })
   generatedAt!: Date;
 }
@@ -114,6 +188,36 @@ export interface ProjectDossierSummary {
   entityCounts: Record<string, number>;
 }
 
+export interface ProjectDossierOnChainCounterparty {
+  address: string;
+  addressCount: number;
+  addresses: string[];
+}
+
+export interface ProjectDossierOnChainTokenContract {
+  address: string;
+  symbol: string | null;
+  occurrenceCount: number;
+}
+
+export interface ProjectDossierOnChainAddressSummary {
+  address: string;
+  txCount: number;
+  uniqueCounterparties: number;
+  topCounterparties: string[];
+  tokenContracts: string[];
+  tokenSymbols: string[];
+}
+
+export interface ProjectDossierOnChainSummary {
+  status: 'unavailable' | 'partial' | 'ready';
+  analyzedAddresses: string[];
+  addressSummaries: ProjectDossierOnChainAddressSummary[];
+  commonCounterparties: ProjectDossierOnChainCounterparty[];
+  tokenContracts: ProjectDossierOnChainTokenContract[];
+  note: string | null;
+}
+
 export interface ProjectDossier {
   _id: string;
   id: string;
@@ -124,6 +228,7 @@ export interface ProjectDossier {
   summary: ProjectDossierSummary;
   groupedEntities: Record<string, ProjectEntity[]>;
   topEntities: ProjectEntity[];
+  onChainSummary: ProjectDossierOnChainSummary | null;
   generatedAt: Date;
   createdAt: Date;
   updatedAt: Date;

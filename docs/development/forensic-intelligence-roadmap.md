@@ -385,9 +385,14 @@ Success criteria:
 ### Phase 5
 
 - [ ] Build wallet graph expansion service
-- [ ] Add common recipient / fund path heuristics
+- [x] Add common recipient / fund path heuristics
 - [ ] Add cluster confidence scoring
-- [ ] Add operator-facing on-chain summary
+- [x] Add operator-facing on-chain summary
+
+Current phase note:
+
+- first-pass dossier-level on-chain correlation now summarizes analyzed addresses, shared counterparties, and token contract touchpoints via Etherscan-backed enrichment
+- deeper wallet graph expansion and stronger clustering confidence are still outstanding
 
 ### Phase 6
 

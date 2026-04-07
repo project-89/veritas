@@ -117,6 +117,12 @@ const DOSSIER_GROUP_LABELS: Record<string, string> = {
   url: 'URLs',
 };
 
+const ONCHAIN_STATUS_VARIANT: Record<'unavailable' | 'partial' | 'ready', 'muted' | 'amber' | 'green'> = {
+  unavailable: 'muted',
+  partial: 'amber',
+  ready: 'green',
+};
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -1096,6 +1102,13 @@ function InvestigationSummary({
                 <NervBadge label={`${projectDossier.summary.totalSeeds} SEEDS`} variant="muted" size="sm" />
                 <NervBadge label={`${projectDossier.summary.processedSeeds} PROCESSED`} variant="blue" size="sm" />
                 <NervBadge label={`${projectDossier.topEntities.length} TOP ENTITIES`} variant="orange" size="sm" />
+                {projectDossier.onChainSummary && (
+                  <NervBadge
+                    label={`ONCHAIN ${projectDossier.onChainSummary.status.toUpperCase()}`}
+                    variant={ONCHAIN_STATUS_VARIANT[projectDossier.onChainSummary.status]}
+                    size="sm"
+                  />
+                )}
               </div>
               {projectDossier.aliases.length > 1 && (
                 <div className="text-[9px] font-mono text-nerv-text-muted">
@@ -1103,6 +1116,98 @@ function InvestigationSummary({
                 </div>
               )}
             </div>
+
+            {projectDossier.onChainSummary && (
+              <div className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+                    ON-CHAIN CORRELATION
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <NervBadge
+                      label={projectDossier.onChainSummary.status.toUpperCase()}
+                      variant={ONCHAIN_STATUS_VARIANT[projectDossier.onChainSummary.status]}
+                      size="sm"
+                    />
+                    <NervBadge
+                      label={`${projectDossier.onChainSummary.analyzedAddresses.length} ADDR`}
+                      variant="blue"
+                      size="sm"
+                    />
+                  </div>
+                </div>
+
+                {projectDossier.onChainSummary.note && (
+                  <div className="text-[9px] font-mono text-nerv-text-muted leading-relaxed">
+                    {projectDossier.onChainSummary.note}
+                  </div>
+                )}
+
+                {projectDossier.onChainSummary.addressSummaries.length > 0 && (
+                  <div className="space-y-1">
+                    {projectDossier.onChainSummary.addressSummaries.slice(0, 4).map((addressSummary) => (
+                      <div
+                        key={addressSummary.address}
+                        className="flex items-start justify-between gap-2 text-[9px] font-mono"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-nerv-text break-all">{addressSummary.address}</div>
+                          <div className="text-nerv-text-muted break-words">
+                            {addressSummary.tokenSymbols.length > 0
+                              ? addressSummary.tokenSymbols.join(' · ')
+                              : 'No token touches extracted'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <NervBadge label={`${addressSummary.txCount} TX`} variant="orange" size="sm" />
+                          <NervBadge label={`${addressSummary.uniqueCounterparties} CP`} variant="muted" size="sm" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {(projectDossier.onChainSummary.commonCounterparties.length > 0 ||
+                  projectDossier.onChainSummary.tokenContracts.length > 0) && (
+                  <div className="space-y-1">
+                    {projectDossier.onChainSummary.commonCounterparties.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="text-[8px] font-mono uppercase tracking-widest text-nerv-text-muted">
+                          COMMON COUNTERPARTIES
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {projectDossier.onChainSummary.commonCounterparties.slice(0, 4).map((entry) => (
+                            <NervBadge
+                              key={entry.address}
+                              label={`${entry.address.slice(0, 10)}... (${entry.addressCount})`}
+                              variant="red"
+                              size="sm"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {projectDossier.onChainSummary.tokenContracts.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="text-[8px] font-mono uppercase tracking-widest text-nerv-text-muted">
+                          TOKEN CONTRACTS
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {projectDossier.onChainSummary.tokenContracts.slice(0, 4).map((entry) => (
+                            <NervBadge
+                              key={entry.address}
+                              label={entry.symbol ? `${entry.symbol} · ${entry.address.slice(0, 10)}...` : `${entry.address.slice(0, 10)}...`}
+                              variant="orange"
+                              size="sm"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="space-y-1 max-h-[240px] overflow-y-auto pr-1">
               {projectDossierOverlaps && projectDossierOverlaps.length > 0 ? (

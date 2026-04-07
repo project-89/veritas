@@ -5,6 +5,7 @@ import { InvestigationRepository } from '../../src/lib/repositories/investigatio
 import { InvestigationEvidenceService } from '../../src/lib/services/investigation-evidence.service';
 import { ProjectDossierRepository } from '../../src/lib/repositories/project-dossier.repository';
 import { ProjectDossierService } from '../../src/lib/services/project-dossier.service';
+import { OnChainCorrelationService } from '../../src/lib/services/onchain-correlation.service';
 
 describe('InvestigationController', () => {
   let controller: InvestigationController;
@@ -12,6 +13,7 @@ describe('InvestigationController', () => {
   let mockEvidenceService: any;
   let mockProjectDossierRepository: any;
   let mockProjectDossierService: any;
+  let mockOnChainCorrelationService: any;
 
   const mockInvestigation = {
     _id: 'inv-1',
@@ -150,6 +152,7 @@ describe('InvestigationController', () => {
     };
 
     mockProjectDossierService = {
+      extractAddressCandidates: jest.fn().mockReturnValue(['0x123']),
       buildFromInvestigation: jest.fn().mockReturnValue({
         investigationId: 'inv-1',
         name: 'bitcoin regulation',
@@ -172,6 +175,17 @@ describe('InvestigationController', () => {
           ],
         },
       ]),
+    };
+
+    mockOnChainCorrelationService = {
+      buildSummary: jest.fn().mockResolvedValue({
+        status: 'ready',
+        analyzedAddresses: ['0x123'],
+        addressSummaries: [],
+        commonCounterparties: [],
+        tokenContracts: [],
+        note: null,
+      }),
     };
 
     mockRepository = {
@@ -221,6 +235,10 @@ describe('InvestigationController', () => {
         {
           provide: ProjectDossierService,
           useValue: mockProjectDossierService,
+        },
+        {
+          provide: OnChainCorrelationService,
+          useValue: mockOnChainCorrelationService,
         },
       ],
     }).compile();
@@ -428,6 +446,7 @@ describe('InvestigationController', () => {
       const result = await controller.buildProjectDossier('inv-1');
 
       expect(mockProjectDossierService.buildFromInvestigation).toHaveBeenCalled();
+      expect(mockOnChainCorrelationService.buildSummary).toHaveBeenCalled();
       expect(mockProjectDossierRepository.save).toHaveBeenCalled();
       expect(result.success).toBe(true);
       expect(result.projectDossier.id).toBe('dossier-1');
