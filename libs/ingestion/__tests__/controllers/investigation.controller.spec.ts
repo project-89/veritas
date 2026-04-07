@@ -5,6 +5,8 @@ import { InvestigationRepository } from '../../src/lib/repositories/investigatio
 import { InvestigationEvidenceService } from '../../src/lib/services/investigation-evidence.service';
 import { ProjectDossierRepository } from '../../src/lib/repositories/project-dossier.repository';
 import { MentalModelRepository } from '../../src/lib/repositories/mental-model.repository';
+import { ScanJobRepository } from '../../src/lib/repositories/scan-job.repository';
+import { AlertRepository } from '../../src/lib/repositories/alert.repository';
 import { ProjectDossierService } from '../../src/lib/services/project-dossier.service';
 import { OnChainCorrelationService } from '../../src/lib/services/onchain-correlation.service';
 import { MentalModelService } from '../../src/lib/services/mental-model.service';
@@ -18,6 +20,8 @@ describe('InvestigationController', () => {
   let mockProjectDossierService: any;
   let mockOnChainCorrelationService: any;
   let mockMentalModelService: any;
+  let mockScanJobRepository: any;
+  let mockAlertRepository: any;
 
   const mockInvestigation = {
     _id: 'inv-1',
@@ -186,11 +190,21 @@ describe('InvestigationController', () => {
       findByInvestigationId: jest.fn().mockResolvedValue(null),
       findAll: jest.fn().mockResolvedValue([]),
       save: jest.fn().mockResolvedValue(mockProjectDossier),
+      deleteByInvestigationId: jest.fn().mockResolvedValue(undefined),
     };
 
     mockMentalModelRepository = {
       findByInvestigationId: jest.fn().mockResolvedValue(null),
       save: jest.fn().mockResolvedValue(mockMentalModel),
+      deleteByInvestigationId: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockScanJobRepository = {
+      deleteByInvestigationId: jest.fn().mockResolvedValue(1),
+    };
+
+    mockAlertRepository = {
+      deleteByInvestigationId: jest.fn().mockResolvedValue(undefined),
     };
 
     mockProjectDossierService = {
@@ -261,6 +275,7 @@ describe('InvestigationController', () => {
       }),
       update: jest.fn().mockResolvedValue(mockInvestigation),
       archive: jest.fn().mockResolvedValue(undefined),
+      deletePermanent: jest.fn().mockResolvedValue(undefined),
       addSnapshot: jest.fn().mockResolvedValue(mockSnapshot),
       getSnapshots: jest.fn().mockResolvedValue([mockSnapshot]),
       getLatestSnapshot: jest.fn().mockResolvedValue(mockSnapshot),
@@ -302,6 +317,14 @@ describe('InvestigationController', () => {
         {
           provide: MentalModelRepository,
           useValue: mockMentalModelRepository,
+        },
+        {
+          provide: ScanJobRepository,
+          useValue: mockScanJobRepository,
+        },
+        {
+          provide: AlertRepository,
+          useValue: mockAlertRepository,
         },
         {
           provide: ProjectDossierService,
@@ -458,6 +481,25 @@ describe('InvestigationController', () => {
       await expect(
         controller.archiveInvestigation('nonexistent')
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('deleteInvestigationPermanent', () => {
+    it('should delete related records and the investigation', async () => {
+      const result = await controller.deleteInvestigationPermanent('inv-1');
+
+      expect(mockProjectDossierRepository.deleteByInvestigationId).toHaveBeenCalledWith('inv-1');
+      expect(mockMentalModelRepository.deleteByInvestigationId).toHaveBeenCalledWith('inv-1');
+      expect(mockScanJobRepository.deleteByInvestigationId).toHaveBeenCalledWith('inv-1');
+      expect(mockAlertRepository.deleteByInvestigationId).toHaveBeenCalledWith('inv-1');
+      expect(mockRepository.deletePermanent).toHaveBeenCalledWith('inv-1');
+      expect(result).toEqual({ success: true });
+    });
+
+    it('should throw NotFoundException when the investigation does not exist', async () => {
+      mockRepository.findById.mockResolvedValueOnce(null);
+
+      await expect(controller.deleteInvestigationPermanent('missing')).rejects.toThrow(NotFoundException);
     });
   });
 

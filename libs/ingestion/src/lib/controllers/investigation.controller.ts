@@ -21,6 +21,8 @@ import {
 } from '../services/investigation-evidence.service';
 import { ProjectDossierRepository } from '../repositories/project-dossier.repository';
 import { MentalModelRepository } from '../repositories/mental-model.repository';
+import { ScanJobRepository } from '../repositories/scan-job.repository';
+import { AlertRepository } from '../repositories/alert.repository';
 import {
   ProjectDossier,
   ProjectDossierOverlap,
@@ -46,6 +48,8 @@ export class InvestigationController {
     private readonly investigationEvidenceService: InvestigationEvidenceService,
     private readonly projectDossierRepository: ProjectDossierRepository,
     private readonly mentalModelRepository: MentalModelRepository,
+    private readonly scanJobRepository: ScanJobRepository,
+    private readonly alertRepository: AlertRepository,
     private readonly projectDossierService: ProjectDossierService,
     private readonly onChainCorrelationService: OnChainCorrelationService,
     private readonly mentalModelService: MentalModelService,
@@ -157,9 +161,9 @@ export class InvestigationController {
   }
 
   /**
-   * DELETE /investigations/:id — archive (soft delete) an investigation.
+   * PATCH /investigations/:id/archive — archive (soft delete) an investigation.
    */
-  @Delete(':id')
+  @Patch(':id/archive')
   async archiveInvestigation(
     @Param('id') id: string
   ): Promise<{ success: boolean }> {
@@ -171,6 +175,28 @@ export class InvestigationController {
     }
 
     await this.investigationRepository.archive(id);
+    return { success: true };
+  }
+
+  /**
+   * DELETE /investigations/:id/permanent — permanently delete an investigation and related records.
+   */
+  @Delete(':id/permanent')
+  async deleteInvestigationPermanent(
+    @Param('id') id: string,
+  ): Promise<{ success: boolean }> {
+    this.logger.log(`Deleting investigation permanently: ${id}`);
+
+    const existing = await this.investigationRepository.findById(id);
+    if (!existing) {
+      throw new NotFoundException(`Investigation not found: ${id}`);
+    }
+
+    await this.projectDossierRepository.deleteByInvestigationId(id);
+    await this.mentalModelRepository.deleteByInvestigationId(id);
+    await this.scanJobRepository.deleteByInvestigationId(id);
+    await this.alertRepository.deleteByInvestigationId(id);
+    await this.investigationRepository.deletePermanent(id);
     return { success: true };
   }
 

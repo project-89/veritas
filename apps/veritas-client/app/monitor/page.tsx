@@ -9,6 +9,9 @@ import {
   markAlertRead,
   markAllAlertsRead,
   fetchUnreadAlertCount,
+  archiveInvestigation,
+  renameInvestigation,
+  deleteInvestigation,
   type Investigation,
   type Alert,
 } from '../../lib/api';
@@ -52,6 +55,7 @@ export default function MonitorPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedInvId, setSelectedInvId] = useState<string | null>(null);
+  const [menuOpenInvId, setMenuOpenInvId] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ investigation: Investigation; snapshot: any } | null>(null);
   const [alertFilter, setAlertFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
@@ -105,6 +109,58 @@ export default function MonitorPage() {
     setAlerts((prev) => prev.map((a) => ({ ...a, read: true })));
     setUnreadCount(0);
   }, []);
+
+  const refreshInvestigations = useCallback(async () => {
+    const invs = await fetchInvestigations().catch(() => []);
+    setInvestigations(invs);
+    return invs;
+  }, []);
+
+  const handleRenameInvestigation = useCallback(async (inv: Investigation) => {
+    const investigationId = getInvestigationId(inv);
+    if (!investigationId) return;
+    const nextName = window.prompt('Rename investigation', inv.name || inv.query);
+    if (!nextName || !nextName.trim()) return;
+
+    await renameInvestigation(investigationId, nextName.trim());
+    const invs = await refreshInvestigations();
+    setMenuOpenInvId(null);
+    if (selectedInvId === investigationId) {
+      const next = invs.find((item) => getInvestigationId(item) === investigationId) ?? null;
+      if (next) {
+        setPreview((prev) => prev ? { ...prev, investigation: next } : prev);
+      }
+    }
+  }, [refreshInvestigations, selectedInvId]);
+
+  const handleArchiveInvestigation = useCallback(async (inv: Investigation) => {
+    const investigationId = getInvestigationId(inv);
+    if (!investigationId) return;
+    const confirmed = window.confirm(`Archive "${inv.name || inv.query}"?`);
+    if (!confirmed) return;
+
+    await archiveInvestigation(investigationId);
+    setMenuOpenInvId(null);
+    await refreshInvestigations();
+    if (selectedInvId === investigationId) {
+      setSelectedInvId(null);
+    }
+  }, [refreshInvestigations, selectedInvId]);
+
+  const handleDeleteInvestigation = useCallback(async (inv: Investigation) => {
+    const investigationId = getInvestigationId(inv);
+    if (!investigationId) return;
+    const label = inv.name || inv.query;
+    const confirmed = window.confirm(`Delete "${label}" permanently?\n\nThis removes snapshots, scan history, dossiers, and monitor records.`);
+    if (!confirmed) return;
+
+    await deleteInvestigation(investigationId);
+    setMenuOpenInvId(null);
+    await refreshInvestigations();
+    if (selectedInvId === investigationId) {
+      setSelectedInvId(null);
+    }
+  }, [refreshInvestigations, selectedInvId]);
 
   const filteredAlerts = alertFilter === 'all'
     ? alerts
@@ -230,7 +286,7 @@ export default function MonitorPage() {
                   {investigations.filter((i) => i.status === 'active').map((inv) => (
                     <div
                       key={getInvestigationId(inv) || inv.query}
-                      className="flex items-center justify-between px-3 py-2 hover:bg-nerv-bg-elevated/20 transition-colors"
+                      className="flex items-center justify-between px-3 py-2 hover:bg-nerv-bg-elevated/20 transition-colors relative"
                     >
                       <div>
                         <span className="text-xs font-mono text-nerv-text">{inv.name || inv.query}</span>
@@ -238,16 +294,64 @@ export default function MonitorPage() {
                           {timeAgo(inv.updatedAt as unknown as string)}
                         </span>
                       </div>
-                      <button
-                        onClick={() => {
-                          const investigationId = getInvestigationId(inv);
-                          if (!investigationId) return;
-                          router.push(`/investigate/${investigationId}`);
-                        }}
-                        className="text-[9px] font-mono uppercase text-nerv-orange hover:underline tracking-widest"
-                      >
-                        Investigate
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const investigationId = getInvestigationId(inv);
+                            if (!investigationId) return;
+                            router.push(`/investigate/${investigationId}`);
+                          }}
+                          className="text-[9px] font-mono uppercase text-nerv-orange hover:underline tracking-widest"
+                        >
+                          Investigate
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const investigationId = getInvestigationId(inv);
+                            if (!investigationId) return;
+                            setMenuOpenInvId((current) => current === investigationId ? null : investigationId);
+                          }}
+                          className="w-6 h-6 flex items-center justify-center border border-nerv-border text-nerv-text-muted hover:text-nerv-text hover:border-nerv-text-muted rounded-sm text-[12px] font-mono"
+                          aria-label={`Actions for ${inv.name || inv.query}`}
+                        >
+                          ...
+                        </button>
+                      </div>
+
+                      {menuOpenInvId === getInvestigationId(inv) && (
+                        <div className="absolute right-3 top-10 z-20 w-44 border border-nerv-border bg-nerv-bg-panel shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+                          <button
+                            onClick={() => {
+                              const investigationId = getInvestigationId(inv);
+                              if (!investigationId) return;
+                              setMenuOpenInvId(null);
+                              router.push(`/investigate/${investigationId}`);
+                            }}
+                            className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
+                          >
+                            Open
+                          </button>
+                          <button
+                            onClick={() => void handleRenameInvestigation(inv)}
+                            className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            onClick={() => void handleArchiveInvestigation(inv)}
+                            className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
+                          >
+                            Archive
+                          </button>
+                          <button
+                            onClick={() => void handleDeleteInvestigation(inv)}
+                            className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-red hover:bg-nerv-red/10"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

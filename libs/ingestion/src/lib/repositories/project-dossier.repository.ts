@@ -79,4 +79,9 @@ export class ProjectDossierRepository implements OnModuleInit {
 
     return this.repo.create(data);
   }
+
+  async deleteByInvestigationId(investigationId: string): Promise<void> {
+    this.ensureInitialized();
+    await this.repo.deleteMany({ investigationId } as Record<string, unknown>);
+  }
 }

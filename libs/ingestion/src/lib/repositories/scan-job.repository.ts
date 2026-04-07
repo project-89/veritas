@@ -379,6 +379,17 @@ export class ScanJobRepository implements OnModuleInit {
     }
   }
 
+  async deleteByInvestigationId(investigationId: string): Promise<number> {
+    this.ensureInitialized();
+    try {
+      return await this.scanJobRepo.deleteMany({ investigationId } as Record<string, unknown>);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error in deleteByInvestigationId: ${err.message}`, err.stack);
+      throw error;
+    }
+  }
+
   /**
    * Get recent completed scan jobs for a set of queries.
    */

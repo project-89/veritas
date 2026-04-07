@@ -242,4 +242,16 @@ export class AlertRepository implements OnModuleInit {
       throw error;
     }
   }
+
+  async deleteByInvestigationId(investigationId: string): Promise<void> {
+    this.ensureInitialized();
+    try {
+      await this.alertRepo.deleteMany({ investigationId } as Record<string, unknown>);
+      await this.configRepo.deleteMany({ investigationId } as Record<string, unknown>);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error in deleteByInvestigationId: ${err.message}`, err.stack);
+      throw error;
+    }
+  }
 }

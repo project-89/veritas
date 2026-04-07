@@ -257,6 +257,15 @@ describe('InvestigationRepository', () => {
     });
   });
 
+  describe('deletePermanent', () => {
+    it('should delete snapshots and the investigation', async () => {
+      await repository.deletePermanent('inv-1');
+
+      expect(mockSnapshotRepo.deleteMany).toHaveBeenCalledWith({ investigationId: 'inv-1' });
+      expect(mockInvestigationRepo.deleteById).toHaveBeenCalledWith('inv-1');
+    });
+  });
+
   describe('addEvidenceSeed', () => {
     it('should append a new evidence seed and persist the updated investigation', async () => {
       const seed = {

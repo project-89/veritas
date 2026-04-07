@@ -300,6 +300,22 @@ export class InvestigationRepository implements OnModuleInit {
   }
 
   /**
+   * Permanently delete an investigation and its snapshots.
+   */
+  async deletePermanent(id: string): Promise<void> {
+    this.ensureInitialized();
+    try {
+      await this.snapshotRepo.deleteMany({ investigationId: id } as Record<string, unknown>);
+      await this.investigationRepo.deleteById(id);
+      this.logger.log(`Deleted investigation permanently: ${id}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error in deletePermanent: ${err.message}`, err.stack);
+      throw error;
+    }
+  }
+
+  /**
    * Add a snapshot to an investigation and update the investigation's lastSnapshotId.
    */
   async addSnapshot(

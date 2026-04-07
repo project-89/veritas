@@ -629,6 +629,15 @@ export async function archiveInvestigation(id: string): Promise<void> {
 }
 
 /**
+ * Permanently delete an investigation and its related records.
+ */
+export async function deleteInvestigation(id: string): Promise<void> {
+  await request<void>(`/api/investigations/${encodeURIComponent(id)}/permanent`, {
+    method: 'DELETE',
+  });
+}
+
+/**
  * Rename an investigation.
  */
 export async function renameInvestigation(id: string, name: string): Promise<void> {
