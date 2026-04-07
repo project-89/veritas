@@ -14,6 +14,16 @@ describe('ScanController', () => {
     update: jest.Mock;
     setLastScanId: jest.Mock;
   };
+  let scanJobRepositoryMock: {
+    createJob: jest.Mock;
+    getJob: jest.Mock;
+    getJobPosts: jest.Mock;
+    cancelJob: jest.Mock;
+    resetConnector: jest.Mock;
+    getActiveJobs: jest.Mock;
+    getRecentJobs: jest.Mock;
+    getJobsByInvestigation: jest.Mock;
+  };
   let scanQueue: { add: jest.Mock; getJobs: jest.Mock };
 
   const mockScanJob = {
@@ -56,20 +66,23 @@ describe('ScanController', () => {
       getJobs: jest.fn().mockResolvedValue([]),
     };
 
+    scanJobRepositoryMock = {
+      createJob: jest.fn().mockResolvedValue(mockScanJob),
+      getJob: jest.fn().mockResolvedValue(mockScanJob),
+      getJobPosts: jest.fn().mockResolvedValue([]),
+      cancelJob: jest.fn().mockResolvedValue(undefined),
+      resetConnector: jest.fn().mockResolvedValue(undefined),
+      getActiveJobs: jest.fn().mockResolvedValue([mockScanJob]),
+      getRecentJobs: jest.fn().mockResolvedValue([mockScanJob]),
+      getJobsByInvestigation: jest.fn().mockResolvedValue([mockScanJob]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ScanController],
       providers: [
         {
           provide: ScanJobRepository,
-          useValue: {
-            createJob: jest.fn().mockResolvedValue(mockScanJob),
-            getJob: jest.fn().mockResolvedValue(mockScanJob),
-            getJobPosts: jest.fn().mockResolvedValue([]),
-            cancelJob: jest.fn().mockResolvedValue(undefined),
-            resetConnector: jest.fn().mockResolvedValue(undefined),
-            getActiveJobs: jest.fn().mockResolvedValue([mockScanJob]),
-            getRecentJobs: jest.fn().mockResolvedValue([mockScanJob]),
-          },
+          useValue: scanJobRepositoryMock,
         },
         {
           provide: InvestigationRepository,
@@ -191,6 +204,14 @@ describe('ScanController', () => {
     it('should return recent scans', async () => {
       const result = await controller.getRecentScans();
       expect(result).toHaveLength(1);
+    });
+  });
+
+  describe('GET /scan/investigation/:id', () => {
+    it('should return scans for a specific investigation', async () => {
+      const result = await controller.getInvestigationScans('inv-existing', '25');
+      expect(result).toHaveLength(1);
+      expect(scanJobRepositoryMock.getJobsByInvestigation).toHaveBeenCalledWith('inv-existing', 25);
     });
   });
 });

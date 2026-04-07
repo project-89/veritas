@@ -1380,6 +1380,18 @@ export async function getRecentScans(limit = 5): Promise<ScanJob[]> {
 }
 
 /**
+ * Get recent scan jobs for a specific investigation.
+ */
+export async function getInvestigationScans(
+  investigationId: string,
+  limit = 50,
+): Promise<ScanJob[]> {
+  return request<ScanJob[]>(
+    `/api/scan/investigation/${encodeURIComponent(investigationId)}?limit=${limit}`,
+  );
+}
+
+/**
  * Save analysis results to a scan job's cache.
  */
 export async function saveAnalysisCache(

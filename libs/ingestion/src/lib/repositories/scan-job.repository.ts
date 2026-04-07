@@ -363,6 +363,23 @@ export class ScanJobRepository implements OnModuleInit {
   }
 
   /**
+   * Get recent scan jobs for a specific investigation.
+   */
+  async getJobsByInvestigation(investigationId: string, limit = 50): Promise<ScanJob[]> {
+    this.ensureInitialized();
+    try {
+      return await this.scanJobRepo.find(
+        { investigationId } as Record<string, unknown>,
+        { limit, sort: { createdAt: -1 } },
+      );
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error in getJobsByInvestigation: ${err.message}`, err.stack);
+      throw error;
+    }
+  }
+
+  /**
    * Get recent completed scan jobs for a set of queries.
    */
   async getCompletedJobsForQueries(queries: string[], limit = 50): Promise<ScanJob[]> {

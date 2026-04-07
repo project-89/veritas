@@ -35,6 +35,7 @@ import {
   cancelScan,
   retryScanConnector,
   getRecentScans,
+  getInvestigationScans,
   type RawPost,
   type Investigation,
   type ProjectDossier,
@@ -227,6 +228,7 @@ function InvestigationWorkspace() {
   const router = useRouter();
   const query = searchParams.get('q') ?? '';
   const invId = searchParams.get('inv');
+  const requestedScanId = searchParams.get('scan');
   const freshSearch = searchParams.get('fresh') === '1';
   const urlPlatforms = searchParams.get('platforms')?.split(',').filter(Boolean) ?? undefined;
   const urlTimeRange = searchParams.get('timeRange') ?? '7d';
@@ -264,6 +266,10 @@ function InvestigationWorkspace() {
   const [scanHistory, setScanHistory] = useState<ScanJob[]>([]);
   const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scanPostsFetchedRef = useRef(false);
+
+  useEffect(() => {
+    pipelineRan.current = false;
+  }, [query, invId, requestedScanId, freshSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -387,13 +393,26 @@ function InvestigationWorkspace() {
     }
   }, [state.narratives, state.posts, state.investigation, state.claims, dispatch]);
 
-  // Load scan history for the current query
+  // Load scan history for the current investigation when available.
   useEffect(() => {
-    if (!query) return;
+    const targetInvestigationId = investigationRecord?._id ?? investigationRecord?.id ?? invId ?? null;
+
+    if (targetInvestigationId) {
+      getInvestigationScans(targetInvestigationId, 50)
+        .then((scans) => setScanHistory(scans))
+        .catch(() => setScanHistory([]));
+      return;
+    }
+
+    if (!query) {
+      setScanHistory([]);
+      return;
+    }
+
     getRecentScans(20)
       .then((scans) => setScanHistory(scans.filter((s) => s.query === query)))
-      .catch(() => {});
-  }, [query]);
+      .catch(() => setScanHistory([]));
+  }, [query, invId, investigationRecord]);
 
   // Track the active scan ID for caching
   const activeScanIdRef = useRef<string | null>(null);
@@ -478,6 +497,41 @@ function InvestigationWorkspace() {
     },
     [],
   );
+
+  const queryTabs = useMemo(() => {
+    const latestByQuery = new Map<string, ScanJob>();
+    for (const scan of scanHistory) {
+      const existing = latestByQuery.get(scan.query);
+      if (!existing || new Date(scan.createdAt).getTime() > new Date(existing.createdAt).getTime()) {
+        latestByQuery.set(scan.query, scan);
+      }
+    }
+
+    return Array.from(latestByQuery.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [scanHistory]);
+
+  const activeHistoryScanId = requestedScanId ?? scanJob?._id ?? scanJob?.id ?? null;
+
+  const activeQueryTabKey = useMemo(() => {
+    if (activeHistoryScanId) {
+      const activeScan = scanHistory.find((scan) => (scan._id ?? scan.id) === activeHistoryScanId);
+      if (activeScan?.query) return activeScan.query;
+    }
+    return query;
+  }, [activeHistoryScanId, scanHistory, query]);
+
+  const buildPostSummary = useCallback((posts: RawPost[]) => ({
+    total: posts.length,
+    positive: posts.filter((p) => p.sentiment?.label === 'positive').length,
+    negative: posts.filter((p) => p.sentiment?.label === 'negative').length,
+    neutral: posts.filter((p) => p.sentiment?.label === 'neutral').length,
+    byPlatform: posts.reduce<Record<string, number>>((acc, p) => {
+      acc[p.platform] = (acc[p.platform] || 0) + 1;
+      return acc;
+    }, {}),
+  }), []);
 
   // ---- Helper: run analysis stages 2-6 on collected posts ----
   const runAnalysisStages = useCallback(
@@ -680,6 +734,29 @@ function InvestigationWorkspace() {
     [dispatch],
   );
 
+  const handleSelectHistoricalScan = useCallback(async (selectedScan: ScanJob) => {
+    const selectedScanId = selectedScan._id ?? selectedScan.id;
+    if (!selectedScanId) return;
+
+    dispatch({ type: 'RESET' });
+    dispatch({ type: 'SET_QUERY', query: selectedScan.query });
+    dispatch({ type: 'SET_ERROR', error: null });
+    dispatch({ type: 'SET_LOADING', loading: true });
+
+    activeScanIdRef.current = selectedScanId;
+    setScanJob(selectedScan);
+    scanPostsFetchedRef.current = false;
+
+    const nextParams = new URLSearchParams();
+    nextParams.set('q', selectedScan.query);
+    const activeInvestigationId = investigationRecord?._id ?? investigationRecord?.id ?? invId ?? null;
+    if (activeInvestigationId) {
+      nextParams.set('inv', activeInvestigationId);
+    }
+    nextParams.set('scan', selectedScanId);
+    router.replace(`/results?${nextParams.toString()}`, { scroll: false });
+  }, [dispatch, investigationRecord, invId, router]);
+
   // ---- Scan polling: when a scan is active, poll status every 2s ----
   useEffect(() => {
     if (!scanJob) return undefined;
@@ -758,7 +835,7 @@ function InvestigationWorkspace() {
       let posts: RawPost[] = [];
       let resolvedPersistedScan: ScanJob | null = null;
       let resolvedInvestigationId: string | null = invId;
-      let resolvedScanId: string | null = null;
+      let resolvedScanId: string | null = requestedScanId;
 
       // --- Stage 1: Try cached snapshot first, then fresh search ---
       dispatch({ type: 'SET_PIPELINE', stage: 'search', status: 'running' });
@@ -779,7 +856,7 @@ function InvestigationWorkspace() {
           if (targetInvId) {
             const { investigation, snapshot, projectDossier, mentalModel, dossierOverlaps } = await fetchInvestigation(targetInvId);
             resolvedInvestigationId = targetInvId;
-            resolvedScanId = snapshot?.scanId ?? investigation.lastScanId ?? null;
+            resolvedScanId = requestedScanId ?? snapshot?.scanId ?? investigation.lastScanId ?? null;
             setInvestigationRecord(investigation);
             setProjectDossier(projectDossier);
             setMentalModel(mentalModel);
@@ -820,17 +897,7 @@ function InvestigationWorkspace() {
               const { posts: scanPosts } = await getScanPosts(activeScanIdRef.current);
               if (scanPosts.length > 0) {
                 posts = scanPosts;
-                const summary = {
-                  total: scanPosts.length,
-                  positive: scanPosts.filter((p) => p.sentiment?.label === 'positive').length,
-                  negative: scanPosts.filter((p) => p.sentiment?.label === 'negative').length,
-                  neutral: scanPosts.filter((p) => p.sentiment?.label === 'neutral').length,
-                  byPlatform: scanPosts.reduce<Record<string, number>>((acc, p) => {
-                    acc[p.platform] = (acc[p.platform] || 0) + 1;
-                    return acc;
-                  }, {}),
-                };
-                dispatch({ type: 'SET_SEARCH_DATA', posts, insights: [], summary });
+                dispatch({ type: 'SET_SEARCH_DATA', posts, insights: [], summary: buildPostSummary(scanPosts) });
                 dispatch({ type: 'SET_PIPELINE', stage: 'search', status: 'done' });
                 loadedFromCache = true;
               }
@@ -907,7 +974,7 @@ function InvestigationWorkspace() {
     };
 
     run();
-  }, [query, dispatch, findPersistedScan, runAnalysisStages, investigationRecord, invId, state.investigationId]); // eslint-disable-line react-hooks/exhaustive-deps -- search boot flow is intentionally centralized
+  }, [query, dispatch, findPersistedScan, runAnalysisStages, investigationRecord, invId, requestedScanId, state.investigationId, buildPostSummary]); // eslint-disable-line react-hooks/exhaustive-deps -- search boot flow is intentionally centralized
 
   // ---- Fetch alerts ----
   useEffect(() => {
@@ -1698,6 +1765,17 @@ function InvestigationWorkspace() {
             <span className="text-[9px] font-mono text-nerv-text-muted uppercase tracking-wider shrink-0">
               NERV {'\u25B8'}
             </span>
+            {investigationRecord?.name && (
+              <span
+                className="text-[10px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted truncate max-w-[260px]"
+                title={investigationRecord.name}
+              >
+                {investigationRecord.name}
+              </span>
+            )}
+            {investigationRecord?.name && (
+              <span className="text-[9px] font-mono text-nerv-text-muted/50 shrink-0">{'\u2192'}</span>
+            )}
             <span className="text-[11px] font-mono font-bold text-nerv-orange truncate max-w-[300px]" title={query}>
               &quot;{query}&quot;
             </span>
@@ -1738,6 +1816,40 @@ function InvestigationWorkspace() {
             REFRESH
           </button>
         </div>
+
+        {queryTabs.length > 1 && (
+          <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 border-t border-nerv-border/40 bg-nerv-bg-panel/20">
+            <span className="text-[8px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted shrink-0">
+              Case Scans
+            </span>
+            <div className="flex items-center gap-1.5">
+              {queryTabs.map((tab) => {
+                const tabScanId = tab._id ?? tab.id;
+                const active = activeQueryTabKey === tab.query;
+                return (
+                  <button
+                    key={tabScanId}
+                    onClick={() => handleSelectHistoricalScan(tab)}
+                    className={[
+                      'shrink-0 px-3 py-1.5 border rounded-sm text-left transition-all',
+                      active
+                        ? 'border-nerv-orange/60 bg-nerv-orange/10 text-nerv-orange'
+                        : 'border-nerv-border text-nerv-text-muted hover:text-nerv-text hover:border-nerv-blue/50 hover:bg-nerv-bg-elevated/30',
+                    ].join(' ')}
+                    title={`${tab.query} • ${new Date(tab.createdAt).toLocaleString()}`}
+                  >
+                    <div className="text-[9px] font-mono uppercase tracking-[0.14em] max-w-[220px] truncate">
+                      {tab.query}
+                    </div>
+                    <div className="text-[8px] font-mono opacity-80 mt-0.5">
+                      {tab.totalPosts} posts • {tab.settings?.timeRange ?? '7d'}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Row 2: Grouped mode tabs */}
         <div className="flex items-center gap-1 overflow-x-auto px-4 py-1 border-t border-nerv-border/50">
@@ -1801,20 +1913,9 @@ function InvestigationWorkspace() {
             scans={scanHistory}
             currentScanId={scanJob?._id ?? scanJob?.id}
             onSelectScan={async (scanId) => {
-              try {
-                const cached = await getAnalysisCache(scanId);
-                if (cached) {
-                  if (cached.narratives) {
-                    dispatch({ type: 'SET_NARRATIVES', narratives: cached.narratives as AnalyzedNarrative[], unclusteredCount: (cached.unclusteredCount as number) ?? 0 });
-                  }
-                  if (cached.propaganda) dispatch({ type: 'SET_PROPAGANDA', data: cached.propaganda as PropagandaAnalysisResult });
-                  if (cached.downstream) dispatch({ type: 'SET_DOWNSTREAM', data: cached.downstream as DownstreamEffectsResult });
-                  if (cached.investigation) dispatch({ type: 'SET_INVESTIGATION', data: cached.investigation as any, narrativeId: (cached.investigationNarrativeId as string) ?? '' });
-                  const scanStatus = await getScanStatus(scanId);
-                  setScanJob(scanStatus);
-                }
-              } catch {
-                dispatch({ type: 'SET_ERROR', error: 'Failed to load historical scan data' });
+              const selectedScan = scanHistory.find((scan) => (scan._id ?? scan.id) === scanId);
+              if (selectedScan) {
+                await handleSelectHistoricalScan(selectedScan);
               }
             }}
           />

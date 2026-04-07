@@ -173,6 +173,18 @@ export class ScanController {
   }
 
   /**
+   * GET /scan/investigation/:id — List recent scans for an investigation.
+   */
+  @Get('investigation/:id')
+  async getInvestigationScans(
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ): Promise<ScanJob[]> {
+    const parsedLimit = limit ? parseInt(limit, 10) : 50;
+    return this.scanJobRepository.getJobsByInvestigation(id, parsedLimit);
+  }
+
+  /**
    * GET /scan/:id — Get scan status + connector progress.
    */
   @Get(':id')
