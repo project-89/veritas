@@ -223,15 +223,23 @@ describe('RedditFreeConnector', () => {
       expect(posts).toHaveLength(0);
     });
 
+    it('should return an empty result when Reddit returns an unexpected payload shape', async () => {
+      mockAxiosInstance.get.mockResolvedValue({ data: { unexpected: true } });
+
+      const posts = await connector.searchContent('https://rexas.com/');
+
+      expect(posts).toEqual([]);
+    });
+
     it('should apply time filter based on startDate', async () => {
       mockAxiosInstance.get.mockResolvedValue({ data: mockRedditResponse });
 
-      // startDate within the last day
+      // startDate within the last day maps to Reddit's "day" filter
       const recentDate = new Date(Date.now() - 12 * 60 * 60 * 1000);
       await connector.searchContent('test', { startDate: recentDate });
 
       const url = mockAxiosInstance.get.mock.calls[0][0] as string;
-      expect(url).toContain('t=hour');
+      expect(url).toContain('t=day');
     });
 
     it('should throw on API errors', async () => {

@@ -1590,6 +1590,8 @@ function InvestigationWorkspace() {
           <TemporalHeatmap
             narratives={state.narratives}
             posts={state.posts}
+            timeRange={scanJob?.settings?.timeRange ?? urlTimeRange}
+            scanCreatedAt={scanJob?.createdAt ?? null}
             selectedNarrativeId={state.selectedNarrativeId}
             onSelectNarrative={selectNarrative}
           />

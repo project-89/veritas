@@ -6,6 +6,8 @@ import type { AnalyzedNarrative, RawPost } from '../../lib/api';
 interface TemporalHeatmapProps {
   narratives: AnalyzedNarrative[];
   posts: RawPost[];
+  timeRange?: string | null;
+  scanCreatedAt?: string | null;
   selectedNarrativeId: string | null;
   onSelectNarrative: (id: string | null) => void;
 }
@@ -37,6 +39,8 @@ function sentimentToColor(sentiment: number): string {
 export function TemporalHeatmap({
   narratives,
   posts,
+  timeRange,
+  scanCreatedAt,
   selectedNarrativeId,
   onSelectNarrative,
 }: TemporalHeatmapProps) {
@@ -60,19 +64,40 @@ export function TemporalHeatmap({
     }
 
     const allTimestamps = posts.map((p) => new Date(p.timestamp).getTime()).sort((a, b) => a - b);
+    const relMatch = typeof timeRange === 'string' ? timeRange.match(/^(\d+)([dhm])$/) : null;
+    const absMatch = typeof timeRange === 'string'
+      ? timeRange.match(/^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/)
+      : null;
 
-    // Use the interquartile range of timestamps to determine the natural window,
-    // filtering out outlier posts that are way outside the scan period.
-    // This auto-adapts to any scan window (7d, 30d, 90d, etc.)
-    const q1Idx = Math.floor(allTimestamps.length * 0.05);
-    const q3Idx = Math.floor(allTimestamps.length * 0.95);
-    const q1 = allTimestamps[q1Idx]!;
-    const q3 = allTimestamps[q3Idx]!;
-    const iqr = q3 - q1;
+    let minTime: number;
+    let maxTime: number;
 
-    // Extend slightly beyond the IQR to capture edge posts, but not wild outliers
-    const minTime = Math.max(allTimestamps[0]!, q1 - iqr * 1.5);
-    const maxTime = Math.min(allTimestamps[allTimestamps.length - 1]!, q3 + iqr * 1.5);
+    if (absMatch) {
+      minTime = new Date(`${absMatch[1]}T00:00:00Z`).getTime();
+      maxTime = new Date(`${absMatch[2]}T23:59:59Z`).getTime();
+    } else if (relMatch) {
+      const value = parseInt(relMatch[1]!, 10);
+      const unit = relMatch[2]!;
+      const durationMs =
+        unit === 'd' ? value * 86400000 :
+        unit === 'h' ? value * 3600000 :
+        value * 60000;
+      const endTime = scanCreatedAt
+        ? new Date(scanCreatedAt).getTime()
+        : allTimestamps[allTimestamps.length - 1]!;
+      minTime = endTime - durationMs;
+      maxTime = endTime;
+    } else {
+      // Fall back to the natural post range when no explicit scan window exists.
+      const q1Idx = Math.floor(allTimestamps.length * 0.05);
+      const q3Idx = Math.floor(allTimestamps.length * 0.95);
+      const q1 = allTimestamps[q1Idx]!;
+      const q3 = allTimestamps[q3Idx]!;
+      const iqr = q3 - q1;
+      minTime = Math.max(allTimestamps[0]!, q1 - iqr * 1.5);
+      maxTime = Math.min(allTimestamps[allTimestamps.length - 1]!, q3 + iqr * 1.5);
+    }
+
     const range = Math.max(maxTime - minTime, 3600000); // at least 1 hour
 
     // Choose bucket count based on range
@@ -147,7 +172,7 @@ export function TemporalHeatmap({
       grid: gridData,
       postsByNarrativeBucket: byNB,
     };
-  }, [narratives, posts]);
+  }, [narratives, posts, timeRange, scanCreatedAt]);
 
   // Resize observer
   useEffect(() => {

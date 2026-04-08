@@ -47,6 +47,15 @@ interface RedditJsonResponse {
   };
 }
 
+function isRedditListingResponse(
+  response: unknown,
+): response is RedditJsonResponse {
+  if (!response || typeof response !== 'object') return false;
+  const data = (response as { data?: unknown }).data;
+  if (!data || typeof data !== 'object') return false;
+  return Array.isArray((data as { children?: unknown }).children);
+}
+
 /**
  * API-free Reddit connector using Reddit's public JSON API.
  * No API keys required — just a descriptive User-Agent header.
@@ -140,6 +149,13 @@ export class RedditFreeConnector
         const response = await this.rateLimitedRequest<RedditJsonResponse>(
           `/search.json?${params.toString()}`
         );
+
+        if (!isRedditListingResponse(response)) {
+          this.logger.debug(
+            `Reddit search returned unexpected payload shape for query "${query}" on page ${page + 1}`
+          );
+          break;
+        }
 
         const children = response.data.children;
         if (!children || children.length === 0) break;

@@ -61,6 +61,12 @@ interface BlueskyFeedResponse {
   cursor?: string;
 }
 
+function getErrorStatus(error: unknown): number | null {
+  if (!error || typeof error !== 'object') return null;
+  const candidate = error as { status?: unknown };
+  return typeof candidate.status === 'number' ? candidate.status : null;
+}
+
 const BSKY_PUBLIC_API = 'https://public.api.bsky.app/xrpc';
 
 /**
@@ -245,6 +251,11 @@ export class BlueskyFreeConnector
 
       return posts.slice(0, limit).map((p) => this.transformToSocialMediaPost(p));
     } catch (error) {
+      const status = getErrorStatus(error);
+      if (status === 400) {
+        this.logger.debug(`Bluesky rejected query "${query}" with HTTP 400`);
+        return [];
+      }
       this.logger.error('Error searching Bluesky:', error);
       return [];
     }
@@ -285,12 +296,16 @@ export class BlueskyFreeConnector
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          const error = new Error(`HTTP ${response.status}: ${response.statusText}`) as Error & { status?: number };
+          error.status = response.status;
+          throw error;
         }
 
         return (await response.json()) as T;
       } catch (err) {
-        if (attempt === 0) {
+        const status = getErrorStatus(err);
+        const retryable = status === null || status >= 500 || status === 429;
+        if (attempt === 0 && retryable) {
           this.logger.debug(`Bluesky fetch attempt 1 failed, retrying: ${err}`);
           continue;
         }
