@@ -57,6 +57,7 @@ describe('ScanProcessor', () => {
     });
 
     scanJobRepo = {
+      getExistingPostKeys: jest.fn().mockResolvedValue([]),
       updateConnectorStatus: jest.fn().mockResolvedValue(undefined),
       addConnectorResults: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<ScanJobRepository>;
@@ -149,5 +150,54 @@ describe('ScanProcessor', () => {
     expect(addedPosts[0]).toHaveProperty('platform', 'reddit');
     expect(addedPosts[0]).toHaveProperty('text', 'test post');
     expect(addedPosts[0]).toHaveProperty('engagement');
+  });
+
+  it('should preserve distinct posts that share text prefixes but have different urls', async () => {
+    mockConnector.searchWithRawData.mockResolvedValue({
+      posts: [
+        {
+          id: 'v1',
+          text: 'Rexas Finance scam investigation transcript opening repeated across videos but video one has unique details',
+          platform: 'youtube',
+          authorName: 'channel-a',
+          authorHandle: 'channel-a',
+          timestamp: new Date('2026-01-01T00:00:00Z'),
+          url: 'https://youtube.com/watch?v=video-one',
+          engagementMetrics: { likes: 10, shares: 2, comments: 3, reach: 100, viralityScore: 0.5 },
+        },
+        {
+          id: 'v2',
+          text: 'Rexas Finance scam investigation transcript opening repeated across videos but video two has other evidence',
+          platform: 'youtube',
+          authorName: 'channel-b',
+          authorHandle: 'channel-b',
+          timestamp: new Date('2026-01-02T00:00:00Z'),
+          url: 'https://youtube.com/watch?v=video-two',
+          engagementMetrics: { likes: 7, shares: 1, comments: 1, reach: 80, viralityScore: 0.3 },
+        },
+      ],
+      insights: [
+        {
+          id: 'i1',
+          sentiment: { score: -0.6, label: 'negative', confidence: 0.8 },
+          themes: ['scam'],
+        },
+        {
+          id: 'i2',
+          sentiment: { score: -0.5, label: 'negative', confidence: 0.8 },
+          themes: ['investigation'],
+        },
+      ],
+    });
+
+    const job = {
+      data: { scanId: 'scan-1', connector: 'youtube', query: 'rexas', options: {} },
+    } as any;
+
+    const result = await processor.process(job);
+
+    const addedPosts = (scanJobRepo.addConnectorResults as jest.Mock).mock.calls[0][2];
+    expect(result.postCount).toBe(2);
+    expect(addedPosts).toHaveLength(2);
   });
 });

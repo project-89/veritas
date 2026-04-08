@@ -48,6 +48,18 @@ export class MentalModelRepository implements OnModuleInit {
     return this.repo.findOne({ investigationId } as Record<string, unknown>);
   }
 
+  async findAll(options?: { limit?: number; skip?: number }): Promise<MentalModel[]> {
+    this.ensureInitialized();
+    return this.repo.find(
+      {},
+      {
+        limit: options?.limit,
+        skip: options?.skip,
+        sort: { updatedAt: -1 },
+      },
+    );
+  }
+
   async save(data: Partial<MentalModel>): Promise<MentalModel> {
     this.ensureInitialized();
 

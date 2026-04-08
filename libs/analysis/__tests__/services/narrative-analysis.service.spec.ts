@@ -100,6 +100,21 @@ describe('NarrativeAnalysisService', () => {
       expect(result.unclustered[0]).toBe(0);
     });
 
+    it('should promote a high-signal singleton into an emerging narrative', async () => {
+      const result = await service.analyze([
+        makePost({
+          platform: 'youtube',
+          text:
+            'Rexas Finance scam investigation deep dive with wallet tracing, on-chain evidence, and proof of suspicious fund movement across addresses',
+          engagement: { likes: 45, comments: 12, shares: 8 },
+        }),
+      ]);
+
+      expect(result.narratives).toHaveLength(1);
+      expect(result.narratives[0]!.supportLevel).toBe('emerging');
+      expect(result.unclustered).toHaveLength(0);
+    });
+
     it('should cluster similar posts together', async () => {
       const posts = [
         ...makeCluster('climate change', 5),
@@ -114,6 +129,32 @@ describe('NarrativeAnalysisService', () => {
         result.narratives.reduce((sum, n) => sum + n.postIndices.length, 0) +
         result.unclustered.length;
       expect(totalAccountedFor).toBe(posts.length);
+    });
+
+    it('should keep promotion and scam narratives separate when claims conflict', async () => {
+      const posts = [
+        makePost({
+          text: 'Rexas Finance presale launch is bullish and the token sale could moon after launch',
+          authorHandle: 'promo1',
+        }),
+        makePost({
+          text: 'Rexas Finance token sale momentum is strong and the presale looks bullish to buyers',
+          authorHandle: 'promo2',
+        }),
+        makePost({
+          text: 'Rexas Finance scam investigation shows wallet tracing evidence and warning signs of fraud',
+          authorHandle: 'sleuth1',
+          sentiment: { score: -0.8, label: 'negative' },
+        }),
+        makePost({
+          text: 'Rexas Finance fraud warning with on-chain evidence and traced funds suggests a rug pull',
+          authorHandle: 'sleuth2',
+          sentiment: { score: -0.9, label: 'negative' },
+        }),
+      ];
+
+      const result = await service.analyze(posts);
+      expect(result.narratives.length).toBeGreaterThanOrEqual(2);
     });
 
     it('should produce valid narrative objects', async () => {

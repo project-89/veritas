@@ -6,6 +6,7 @@ import { ScanJobRepository } from '../repositories/scan-job.repository';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { ConnectorSearchOptions } from '../interfaces/data-connector.interface';
+import { buildPostDedupKey } from '../utils/post-dedup.util';
 
 export interface ScanJobData {
   scanId: string;
@@ -93,7 +94,9 @@ export class ScanProcessor extends WorkerHost {
         `[scan:${scanId}] ${connector}: fetched ${result.posts.length} posts, ${result.insights.length} insights`,
       );
 
-      // Deduplicate posts by normalized text — including cross-scan dedup
+      // Deduplicate posts by a stable fingerprint — including cross-scan dedup.
+      // URL-aware fingerprints avoid collapsing distinct videos/articles that
+      // happen to share similar openings.
       // Load existing post text keys from previous scans for the same query
       const seenTexts = new Set<string>();
       try {
@@ -111,7 +114,7 @@ export class ScanProcessor extends WorkerHost {
       const dedupedInsights: NarrativeInsight[] = [];
       for (let i = 0; i < result.posts.length; i++) {
         const post = result.posts[i]!;
-        const textKey = post.text.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 100);
+        const textKey = buildPostDedupKey(post);
         if (!seenTexts.has(textKey)) {
           seenTexts.add(textKey);
           dedupedPosts.push(post);

@@ -231,6 +231,18 @@ describe('RedditFreeConnector', () => {
       expect(posts).toEqual([]);
     });
 
+    it('should tolerate nested listing payloads without crashing', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          data: mockRedditResponse.data,
+        },
+      });
+
+      const posts = await connector.searchContent('rexas finance');
+
+      expect(posts).toHaveLength(2);
+    });
+
     it('should apply time filter based on startDate', async () => {
       mockAxiosInstance.get.mockResolvedValue({ data: mockRedditResponse });
 

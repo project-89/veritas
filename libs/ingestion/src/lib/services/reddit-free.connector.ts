@@ -56,6 +56,32 @@ function isRedditListingResponse(
   return Array.isArray((data as { children?: unknown }).children);
 }
 
+function extractRedditListing(
+  response: unknown,
+): RedditJsonResponse['data'] | null {
+  if (!response || typeof response !== 'object') return null;
+
+  const direct = (response as { data?: unknown }).data;
+  if (
+    direct &&
+    typeof direct === 'object' &&
+    Array.isArray((direct as { children?: unknown }).children)
+  ) {
+    return direct as RedditJsonResponse['data'];
+  }
+
+  const nested = (direct as { data?: unknown } | undefined)?.data;
+  if (
+    nested &&
+    typeof nested === 'object' &&
+    Array.isArray((nested as { children?: unknown }).children)
+  ) {
+    return nested as RedditJsonResponse['data'];
+  }
+
+  return null;
+}
+
 /**
  * API-free Reddit connector using Reddit's public JSON API.
  * No API keys required — just a descriptive User-Agent header.
@@ -150,18 +176,19 @@ export class RedditFreeConnector
           `/search.json?${params.toString()}`
         );
 
-        if (!isRedditListingResponse(response)) {
+        const listing = extractRedditListing(response);
+        if (!listing) {
           this.logger.debug(
             `Reddit search returned unexpected payload shape for query "${query}" on page ${page + 1}`
           );
           break;
         }
 
-        const children = response.data.children;
+        const children = listing.children;
         if (!children || children.length === 0) break;
 
         allPosts.push(...children.map((child) => child.data));
-        after = response.data.after;
+        after = listing.after;
 
         if (!after || allPosts.length >= limit) break;
       }

@@ -5,6 +5,7 @@ import {
   ScanJob,
   ConnectorStatus,
 } from '../schemas/scan-job.schema';
+import { buildPostDedupKey } from '../utils/post-dedup.util';
 
 /**
  * Repository for managing scan jobs.
@@ -279,8 +280,8 @@ export class ScanJobRepository implements OnModuleInit {
       for (const scan of scans) {
         const posts = (scan as any).posts ?? [];
         for (const post of posts) {
-          const text = (post.text ?? '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 100);
-          if (text) keys.push(text);
+          const key = buildPostDedupKey(post);
+          if (key) keys.push(key);
         }
       }
 

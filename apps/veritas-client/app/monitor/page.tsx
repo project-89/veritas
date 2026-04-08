@@ -191,12 +191,20 @@ export default function MonitorPage() {
               <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
                 Investigations
               </span>
-              <button
-                onClick={() => router.push('/search')}
-                className="text-[8px] font-mono uppercase text-nerv-orange hover:underline"
-              >
-                + New Scan
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => router.push('/atlas')}
+                  className="text-[8px] font-mono uppercase text-nerv-text-muted hover:text-nerv-orange"
+                >
+                  ATLAS
+                </button>
+                <button
+                  onClick={() => router.push('/search')}
+                  className="text-[8px] font-mono uppercase text-nerv-orange hover:underline"
+                >
+                  + New Scan
+                </button>
+              </div>
             </div>
 
             {loading ? (

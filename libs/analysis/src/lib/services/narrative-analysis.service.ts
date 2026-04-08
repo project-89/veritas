@@ -42,6 +42,7 @@ interface EmbeddedPost {
   sentimentLabel: string;
   engagement: number;
   embedding: number[];
+  claimFacets: string[];
 }
 
 /**
@@ -76,6 +77,8 @@ export interface AnalyzedNarrative {
   };
   /** Cluster centroid embedding */
   centroidEmbedding: number[];
+  /** Whether this is a repeated cluster or a high-signal singleton */
+  supportLevel?: 'clustered' | 'emerging';
 }
 
 export interface AnalyzeResult {
@@ -157,6 +160,7 @@ export class NarrativeAnalysisService {
         (p.engagement?.comments ?? 0) +
         (p.engagement?.shares ?? 0),
       embedding: embeddings[i] ?? [],
+      claimFacets: this.extractClaimFacets(p.text),
     }));
 
     // Step 3: Cluster
@@ -166,16 +170,26 @@ export class NarrativeAnalysisService {
     // gemini-embedding-2-preview produces 3072-dim embeddings where posts about the
     // same topic often have 0.6-0.85 similarity. Using 0.75 forces the algorithm to
     // split posts into distinct sub-narratives within a topic.
-    const { clusters, noise } = this.agglomerativeCluster(embedded, 0.75);
+    const { clusters, emerging, noise } = this.agglomerativeCluster(embedded, 0.75);
     this.logger.log(
-      `Clustered into ${clusters.length} narratives (${noise.length} unclustered)`,
+      `Clustered into ${clusters.length} narratives (+${emerging.length} emerging, ${noise.length} unclustered)`,
     );
 
     // Step 4: Build narrative objects with metrics
     const narratives: AnalyzedNarrative[] = [];
     for (let i = 0; i < clusters.length; i++) {
       const cluster = clusters[i]!;
-      const narrative = this.buildNarrativeMetrics(cluster, i);
+      const narrative = this.buildNarrativeMetrics(cluster, i, 'clustered');
+      narratives.push(narrative);
+    }
+
+    for (let i = 0; i < emerging.length; i++) {
+      const cluster = emerging[i]!;
+      const narrative = this.buildNarrativeMetrics(
+        cluster,
+        clusters.length + i,
+        'emerging',
+      );
       narratives.push(narrative);
     }
 
@@ -360,9 +374,13 @@ export class NarrativeAnalysisService {
   private agglomerativeCluster(
     posts: EmbeddedPost[],
     similarityThreshold: number,
-  ): { clusters: EmbeddedPost[][]; noise: EmbeddedPost[] } {
+  ): { clusters: EmbeddedPost[][]; emerging: EmbeddedPost[][]; noise: EmbeddedPost[] } {
     if (posts.length <= 1) {
-      return { clusters: [], noise: posts };
+      const only = posts[0];
+      if (!only) return { clusters: [], emerging: [], noise: [] };
+      return this.isEmergingNarrativeCandidate(only)
+        ? { clusters: [], emerging: [[only]], noise: [] }
+        : { clusters: [], emerging: [], noise: posts };
     }
 
     // Start with each post as its own cluster
@@ -374,8 +392,9 @@ export class NarrativeAnalysisService {
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
         const s = this.cosineSimilarity(posts[i]!.embedding, posts[j]!.embedding);
-        sim[i * n + j] = s;
-        sim[j * n + i] = s;
+        const adjusted = this.adjustNarrativeSimilarity(posts[i]!, posts[j]!, s);
+        sim[i * n + j] = adjusted;
+        sim[j * n + i] = adjusted;
       }
     }
 
@@ -406,16 +425,23 @@ export class NarrativeAnalysisService {
 
     // Separate real clusters (>= 2 posts) from noise (singletons)
     const realClusters: EmbeddedPost[][] = [];
+    const emerging: EmbeddedPost[][] = [];
     const noise: EmbeddedPost[] = [];
     for (const cluster of clusters) {
       if (cluster.length >= 2) {
         realClusters.push(cluster);
+      } else if (this.isEmergingNarrativeCandidate(cluster[0]!)) {
+        emerging.push(cluster);
       } else {
         noise.push(...cluster);
       }
     }
 
-    return { clusters: realClusters, noise };
+    emerging.sort(
+      (a, b) => this.scoreEmergingNarrativeCandidate(b[0]!) - this.scoreEmergingNarrativeCandidate(a[0]!),
+    );
+
+    return { clusters: realClusters, emerging: emerging.slice(0, 8), noise };
   }
 
   private averageLinkage(
@@ -444,6 +470,7 @@ export class NarrativeAnalysisService {
   private buildNarrativeMetrics(
     cluster: EmbeddedPost[],
     index: number,
+    supportLevel: 'clustered' | 'emerging' = 'clustered',
   ): AnalyzedNarrative {
     // Sort by timestamp
     const sorted = [...cluster].sort(
@@ -539,7 +566,80 @@ export class NarrativeAnalysisService {
       totalEngagement: cluster.reduce((s, p) => s + p.engagement, 0),
       velocity,
       centroidEmbedding: centroid,
+      supportLevel,
     };
+  }
+
+  private adjustNarrativeSimilarity(
+    a: EmbeddedPost,
+    b: EmbeddedPost,
+    cosine: number,
+  ): number {
+    let adjusted = cosine;
+
+    const aFacets = new Set(a.claimFacets);
+    const bFacets = new Set(b.claimFacets);
+    const overlap = [...aFacets].filter((facet) => bFacets.has(facet));
+
+    if (aFacets.size > 0 && bFacets.size > 0 && overlap.length === 0) {
+      adjusted *= 0.72;
+    } else if (overlap.length > 0) {
+      adjusted *= 1.08;
+    }
+
+    const isAccusation = (facets: Set<string>) =>
+      facets.has('scam') || facets.has('investigation') || facets.has('onchain');
+    const isPromotion = (facets: Set<string>) =>
+      facets.has('promotion') || facets.has('legitimacy');
+
+    if (
+      ((isAccusation(aFacets) && isPromotion(bFacets)) ||
+        (isAccusation(bFacets) && isPromotion(aFacets))) &&
+      Math.abs(a.sentimentScore - b.sentimentScore) >= 0.35
+    ) {
+      adjusted *= 0.68;
+    }
+
+    return Math.max(0, Math.min(1, adjusted));
+  }
+
+  private extractClaimFacets(text: string): string[] {
+    const lower = text.toLowerCase();
+    const facets = new Set<string>();
+
+    if (/\b(scam|fraud|rug pull|rugpull|ponzi|fake project|warning)\b/.test(lower)) {
+      facets.add('scam');
+    }
+    if (/\b(presale|launch|buy now|moon|100x|airdrop|token sale|whitelist)\b/.test(lower)) {
+      facets.add('promotion');
+    }
+    if (/\b(review|analysis|explainer|deep dive|walkthrough|breakdown)\b/.test(lower)) {
+      facets.add('analysis');
+    }
+    if (/\b(wallet|contract|deployer|etherscan|transaction|on-chain|onchain|funds)\b/.test(lower)) {
+      facets.add('onchain');
+    }
+    if (/\b(audit|certik|kyc|doxx|partnership|roadmap|utility)\b/.test(lower)) {
+      facets.add('legitimacy');
+    }
+    if (/\b(exposed|investigation|sleuth|traced|evidence|proof)\b/.test(lower)) {
+      facets.add('investigation');
+    }
+
+    return [...facets];
+  }
+
+  private isEmergingNarrativeCandidate(post: EmbeddedPost): boolean {
+    return this.scoreEmergingNarrativeCandidate(post) >= 2;
+  }
+
+  private scoreEmergingNarrativeCandidate(post: EmbeddedPost): number {
+    let score = 0;
+    if (post.claimFacets.length > 0) score += 2;
+    if (post.platform === 'youtube' || post.platform === 'rss') score += 1;
+    if (post.text.trim().length >= 220) score += 1;
+    if (post.engagement >= 25) score += 1;
+    return score;
   }
 
   private calculateVelocity(

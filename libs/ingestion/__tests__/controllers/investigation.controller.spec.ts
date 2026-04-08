@@ -195,6 +195,7 @@ describe('InvestigationController', () => {
 
     mockMentalModelRepository = {
       findByInvestigationId: jest.fn().mockResolvedValue(null),
+      findAll: jest.fn().mockResolvedValue([mockMentalModel]),
       save: jest.fn().mockResolvedValue(mockMentalModel),
       deleteByInvestigationId: jest.fn().mockResolvedValue(undefined),
     };
@@ -374,6 +375,34 @@ describe('InvestigationController', () => {
       expect(mockRepository.findAll).toHaveBeenCalledWith(
         expect.objectContaining({ limit: 10, skip: 20 })
       );
+    });
+  });
+
+  describe('listAtlasLenses', () => {
+    it('should return saved mental models with their backing investigations', async () => {
+      mockProjectDossierRepository.findByInvestigationId.mockResolvedValueOnce(mockProjectDossier);
+
+      const result = await controller.listAtlasLenses('10', '5');
+
+      expect(mockMentalModelRepository.findAll).toHaveBeenCalledWith({
+        limit: 10,
+        skip: 5,
+      });
+      expect(mockRepository.findById).toHaveBeenCalledWith('inv-1');
+      expect(mockProjectDossierRepository.findByInvestigationId).toHaveBeenCalledWith('inv-1');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        investigation: expect.objectContaining({
+          _id: 'inv-1',
+          evidenceDossier: expect.objectContaining({
+            totalSeeds: mockProjectDossier.summary.totalSeeds,
+          }),
+        }),
+        mentalModel: expect.objectContaining({
+          _id: 'model-1',
+          investigationId: 'inv-1',
+        }),
+      });
     });
   });
 

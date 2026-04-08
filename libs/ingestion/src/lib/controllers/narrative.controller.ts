@@ -15,6 +15,7 @@ import { TransformOnIngestService } from '../services/transform/transform-on-ing
 import { IngestionService } from '../services/ingestion.service';
 import { InvestigationRepository } from '../repositories/investigation.repository';
 import type { SocialMediaPost } from '../../types/social-media.types';
+import { buildPostDedupKey } from '../utils/post-dedup.util';
 
 /**
  * Controller for narrative insights and trends
@@ -103,15 +104,14 @@ export class NarrativeController {
       throw error;
     }
 
-    // Deduplicate posts — use normalized text as primary key since tweet IDs
-    // can vary across search queries
+    // Deduplicate posts using the same fingerprinting strategy as scan jobs.
+    // This preserves distinct videos/articles that share similar intros.
     const seenTexts = new Set<string>();
     const dedupedPosts: SocialMediaPost[] = [];
     const dedupedInsights: NarrativeInsight[] = [];
     for (let i = 0; i < rawResult.posts.length; i++) {
       const post = rawResult.posts[i]!;
-      // Normalize text for comparison: lowercase, strip whitespace, first 100 chars
-      const textKey = post.text.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 100);
+      const textKey = buildPostDedupKey(post);
       if (!seenTexts.has(textKey)) {
         seenTexts.add(textKey);
         dedupedPosts.push(post);

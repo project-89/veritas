@@ -79,6 +79,7 @@ export interface AnalyzedNarrative {
     trend: 'surging' | 'growing' | 'steady' | 'fading';
   };
   centroidEmbedding: number[];
+  supportLevel?: 'clustered' | 'emerging';
 }
 
 export interface SaturationReport {
@@ -558,6 +559,11 @@ export interface MentalModel {
   updatedAt: string;
 }
 
+export interface AtlasLensRecord {
+  investigation: Investigation;
+  mentalModel: MentalModel;
+}
+
 export interface Snapshot {
   _id: string;
   investigationId: string;
@@ -755,6 +761,10 @@ export async function fetchMentalModel(
   return request<{ mentalModel: MentalModel | null }>(
     `/api/investigations/${encodeURIComponent(id)}/mental-model`,
   );
+}
+
+export async function fetchAtlasLenses(): Promise<AtlasLensRecord[]> {
+  return request<AtlasLensRecord[]>('/api/investigations/atlas-lenses');
 }
 
 // ---------------------------------------------------------------------------

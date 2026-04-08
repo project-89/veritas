@@ -74,6 +74,35 @@ export class InvestigationController {
   }
 
   /**
+   * GET /investigations/atlas-lenses — list saved mental models with their backing investigations.
+   */
+  @Get('atlas-lenses')
+  async listAtlasLenses(
+    @Query('limit') limit?: string,
+    @Query('skip') skip?: string,
+  ): Promise<Array<{ investigation: InvestigationWithDossier; mentalModel: MentalModel }>> {
+    const mentalModels = await this.mentalModelRepository.findAll({
+      limit: limit ? Number(limit) : undefined,
+      skip: skip ? Number(skip) : undefined,
+    });
+
+    const records: Array<{ investigation: InvestigationWithDossier; mentalModel: MentalModel }> = [];
+    for (const mentalModel of mentalModels) {
+      const investigation = await this.investigationRepository.findById(mentalModel.investigationId);
+      if (!investigation) continue;
+      const projectDossier = await this.projectDossierRepository.findByInvestigationId(
+        mentalModel.investigationId,
+      );
+      records.push({
+        investigation: this.withEvidenceDossier(investigation, projectDossier),
+        mentalModel,
+      });
+    }
+
+    return records;
+  }
+
+  /**
    * PUT /investigations — create or find an investigation for a query.
    */
   @Put()

@@ -116,6 +116,11 @@ export function NarrativeList({
     [narratives],
   );
 
+  const emergingCount = useMemo(
+    () => narratives.filter((n) => n.supportLevel === 'emerging').length,
+    [narratives],
+  );
+
   return (
     <div className="flex flex-col h-full">
       {/* Sort controls */}
@@ -204,6 +209,9 @@ export function NarrativeList({
                 <span className="text-[11px] font-mono text-nerv-text leading-snug line-clamp-2">
                   &quot;{narrative.summary}&quot;
                 </span>
+                {narrative.supportLevel === 'emerging' && (
+                  <NervBadge label="EMERG" variant="amber" size="sm" />
+                )}
               </div>
 
               {/* Row 2: Velocity label, sentiment, volume bar, count */}
@@ -290,10 +298,11 @@ export function NarrativeList({
       )}
 
       {/* Unclustered count */}
-      {unclusteredCount > 0 && (
+      {(emergingCount > 0 || unclusteredCount > 0) && (
         <div className="px-3 py-2 border-t border-nerv-border shrink-0">
           <span className="text-[10px] font-mono text-nerv-text-muted">
-            {unclusteredCount} unclustered posts
+            {emergingCount > 0 ? `${emergingCount} emerging` : '0 emerging'}
+            {unclusteredCount > 0 ? ` · ${unclusteredCount} still unclustered` : ''}
           </span>
         </div>
       )}
