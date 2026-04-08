@@ -43,10 +43,6 @@ interface GlobePointData {
   lat: number; lng: number; color: string; size: number; eventId: string; title: string;
 }
 
-function getPointAltitude(point: GlobePointData, pulsePhase: number) {
-  return point.size >= 1.5 ? 0.007 + 0.006 * Math.sin(pulsePhase) : 0.007;
-}
-
 export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -162,7 +158,6 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
       controls.addEventListener('end', markInteraction);
 
       // --- RENDER LOOP ---
-      let pulsePhase = 0;
       let lastLabelRenderAt = 0;
       let lastLabelSignature = '';
       const getOverlayNode = (eventId: string) => {
@@ -244,7 +239,6 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
 
       const animate = () => {
         frameRef.current = requestAnimationFrame(animate);
-        pulsePhase += 0.03;
 
         // Globe rotation
         if (targetRotationX.current !== null || targetRotationY.current !== null) {
@@ -271,9 +265,6 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         } else if (autoRotate.current && !mouseDown.current) {
           globe.rotation.y += 0.0004;
         }
-
-        // Pulse
-        globe.pointAltitude((d: unknown) => getPointAltitude(d as GlobePointData, pulsePhase));
 
         controls.update();
         renderer.render(scene, camera);
