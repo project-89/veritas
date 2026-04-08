@@ -226,9 +226,17 @@ function DragHandle({ onDrag }: { onDrag: (dx: number) => void }) {
 function InvestigationWorkspace() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const normalizeRouteId = (value: string | null): string | null => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return null;
+    return trimmed;
+  };
+  const getInvestigationId = (investigation: Investigation | null | undefined): string | null =>
+    investigation?._id ?? investigation?.id ?? null;
   const query = searchParams.get('q') ?? '';
-  const invId = searchParams.get('inv');
-  const requestedScanId = searchParams.get('scan');
+  const invId = normalizeRouteId(searchParams.get('inv'));
+  const requestedScanId = normalizeRouteId(searchParams.get('scan'));
   const freshSearch = searchParams.get('fresh') === '1';
   const urlPlatforms = searchParams.get('platforms')?.split(',').filter(Boolean) ?? undefined;
   const urlTimeRange = searchParams.get('timeRange') ?? '7d';
@@ -289,8 +297,9 @@ function InvestigationWorkspace() {
         } else if (query) {
           const allInvestigations = await fetchInvestigations();
           const match = allInvestigations.find((item) => item.query === query) ?? null;
-          if (match?._id) {
-            const { investigation, projectDossier, mentalModel, dossierOverlaps } = await fetchInvestigation(match._id);
+          const matchId = match?._id ?? match?.id ?? null;
+          if (matchId) {
+            const { investigation, projectDossier, mentalModel, dossierOverlaps } = await fetchInvestigation(matchId);
             resolved = investigation;
             if (!cancelled) {
               setProjectDossier(projectDossier);
@@ -302,7 +311,7 @@ function InvestigationWorkspace() {
 
         if (!cancelled) {
           setInvestigationRecord(resolved);
-          dispatch({ type: 'SET_INVESTIGATION_ID', id: resolved?._id ?? null });
+          dispatch({ type: 'SET_INVESTIGATION_ID', id: resolved?._id ?? resolved?.id ?? null });
         }
       } catch {
         if (!cancelled) {
@@ -850,7 +859,7 @@ function InvestigationWorkspace() {
           if (!targetInvId) {
             const allInvestigations = await fetchInvestigations();
             const match = allInvestigations.find((i) => i.query === query);
-            if (match) targetInvId = match._id;
+            if (match) targetInvId = match._id ?? match.id ?? null;
           }
 
           if (targetInvId) {
@@ -861,7 +870,7 @@ function InvestigationWorkspace() {
             setProjectDossier(projectDossier);
             setMentalModel(mentalModel);
             setProjectDossierOverlaps(dossierOverlaps);
-            dispatch({ type: 'SET_INVESTIGATION_ID', id: investigation._id });
+            dispatch({ type: 'SET_INVESTIGATION_ID', id: investigation._id ?? investigation.id ?? null });
             if (snapshot && Array.isArray(snapshot.posts) && snapshot.posts.length > 0) {
               posts = snapshot.posts as RawPost[];
               dispatch({
@@ -1363,25 +1372,34 @@ function InvestigationWorkspace() {
           platforms: urlPlatforms?.length ? urlPlatforms : undefined,
           timeRange: urlTimeRange,
         });
+        const targetInvestigationId = getInvestigationId(targetInvestigation);
+        if (!targetInvestigationId) {
+          throw new Error('Created investigation missing id');
+        }
         setInvestigationRecord(targetInvestigation);
-        dispatch({ type: 'SET_INVESTIGATION_ID', id: targetInvestigation._id });
+        dispatch({ type: 'SET_INVESTIGATION_ID', id: targetInvestigationId });
 
         const nextParams = new URLSearchParams(searchParams.toString());
-        nextParams.set('inv', targetInvestigation._id);
+        nextParams.set('inv', targetInvestigationId);
         if (!nextParams.has('q')) {
           nextParams.set('q', query);
         }
         router.replace(`/results?${nextParams.toString()}`, { scroll: false });
       }
 
-      const updated = await addInvestigationEvidenceSeed(targetInvestigation._id, {
+      const targetInvestigationId = getInvestigationId(targetInvestigation);
+      if (!targetInvestigationId) {
+        throw new Error('Target investigation missing id');
+      }
+
+      const updated = await addInvestigationEvidenceSeed(targetInvestigationId, {
         kind: seed.kind,
         value: seed.value,
         notes: seed.notes ?? null,
       });
 
       setInvestigationRecord(updated);
-      dispatch({ type: 'SET_INVESTIGATION_ID', id: updated._id });
+      dispatch({ type: 'SET_INVESTIGATION_ID', id: getInvestigationId(updated) });
     } catch (err) {
       dispatch({
         type: 'SET_ERROR',
@@ -1393,14 +1411,15 @@ function InvestigationWorkspace() {
   }, [investigationRecord, query, urlPlatforms, urlTimeRange, searchParams, router, dispatch]);
 
   const handleBuildProjectDossier = useCallback(async () => {
-    if (!investigationRecord?._id) return;
+    const investigationId = getInvestigationId(investigationRecord);
+    if (!investigationId) return;
     setProjectDossierSaving(true);
     try {
-      const result = await buildProjectDossier(investigationRecord._id);
+      const result = await buildProjectDossier(investigationId);
       setInvestigationRecord(result.investigation);
       setProjectDossier(result.projectDossier);
       setProjectDossierOverlaps(result.dossierOverlaps);
-      dispatch({ type: 'SET_INVESTIGATION_ID', id: result.investigation._id });
+      dispatch({ type: 'SET_INVESTIGATION_ID', id: getInvestigationId(result.investigation) });
     } catch (err) {
       dispatch({
         type: 'SET_ERROR',
@@ -1412,9 +1431,10 @@ function InvestigationWorkspace() {
   }, [investigationRecord, dispatch]);
 
   const handleRefreshProjectDossier = useCallback(async () => {
-    if (!investigationRecord?._id || !investigationRecord.linkedProjectDossierId) return;
+    const investigationId = getInvestigationId(investigationRecord);
+    if (!investigationId || !investigationRecord?.linkedProjectDossierId) return;
     try {
-      const result = await fetchProjectDossier(investigationRecord._id);
+      const result = await fetchProjectDossier(investigationId);
       setProjectDossier(result.projectDossier);
       setProjectDossierOverlaps(result.dossierOverlaps);
     } catch {
@@ -1423,13 +1443,14 @@ function InvestigationWorkspace() {
   }, [investigationRecord]);
 
   const handleBuildMentalModel = useCallback(async () => {
-    if (!investigationRecord?._id) return;
+    const investigationId = getInvestigationId(investigationRecord);
+    if (!investigationId) return;
     setMentalModelSaving(true);
     try {
-      const result = await buildMentalModel(investigationRecord._id);
+      const result = await buildMentalModel(investigationId);
       setInvestigationRecord(result.investigation);
       setMentalModel(result.mentalModel);
-      dispatch({ type: 'SET_INVESTIGATION_ID', id: result.investigation._id });
+      dispatch({ type: 'SET_INVESTIGATION_ID', id: getInvestigationId(result.investigation) });
     } catch (err) {
       dispatch({
         type: 'SET_ERROR',
@@ -1441,9 +1462,10 @@ function InvestigationWorkspace() {
   }, [investigationRecord, dispatch]);
 
   const handleRefreshMentalModel = useCallback(async () => {
-    if (!investigationRecord?._id) return;
+    const investigationId = getInvestigationId(investigationRecord);
+    if (!investigationId) return;
     try {
-      const result = await fetchMentalModel(investigationRecord._id);
+      const result = await fetchMentalModel(investigationId);
       setMentalModel(result.mentalModel);
     } catch {
       // silent

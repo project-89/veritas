@@ -24,10 +24,14 @@ function InvestigatePageInner() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!params.id) return;
+    const investigationId =
+      typeof params.id === 'string' && params.id.trim() !== '' && params.id !== 'undefined' && params.id !== 'null'
+        ? params.id
+        : null;
+    if (!investigationId) return;
 
     // Load the investigation and redirect to the results workspace with proper params
-    fetchInvestigation(params.id)
+    fetchInvestigation(investigationId)
       .then((data) => {
         if (data.investigation) {
           const inv = data.investigation;
@@ -36,7 +40,11 @@ function InvestigatePageInner() {
           if (!existingParams.has('q')) {
             existingParams.set('q', inv.query);
           }
-          existingParams.set('inv', inv._id);
+          const resolvedInvestigationId = inv._id ?? inv.id;
+          if (!resolvedInvestigationId) {
+            throw new Error('Investigation payload missing id');
+          }
+          existingParams.set('inv', resolvedInvestigationId);
           router.replace(`/results?${existingParams.toString()}`);
         } else {
           setError('Investigation not found');

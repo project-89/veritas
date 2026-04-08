@@ -150,6 +150,9 @@ export default function SearchPage() {
         limit,
       });
       const investigationId = inv._id ?? inv.id;
+      if (!investigationId) {
+        throw new Error('Investigation creation returned no id');
+      }
       router.push(`/investigate/${investigationId}?${params.toString()}`);
     } catch {
       // Fallback to results page if investigation creation fails

@@ -599,6 +599,10 @@ export async function fetchInvestigation(
   mentalModel: MentalModel | null;
   dossierOverlaps: ProjectDossierOverlap[];
 }> {
+  const normalizedId = typeof id === 'string' ? id.trim() : '';
+  if (!normalizedId || normalizedId === 'undefined' || normalizedId === 'null') {
+    throw new Error(`Invalid investigation id: ${String(id)}`);
+  }
   const result = await request<{
     investigation: Investigation;
     latestSnapshot?: Snapshot | null;
@@ -607,7 +611,7 @@ export async function fetchInvestigation(
     mentalModel?: MentalModel | null;
     dossierOverlaps?: ProjectDossierOverlap[];
   }>(
-    `/api/investigations/${encodeURIComponent(id)}`,
+    `/api/investigations/${encodeURIComponent(normalizedId)}`,
   );
   // Backend returns "latestSnapshot", normalize to "snapshot"
   return {
