@@ -29,6 +29,14 @@ const SEED_KINDS: InvestigationEvidenceSeed['kind'][] = [
   'note',
 ];
 
+interface DraftSource {
+  uid: string;
+  kind: InvestigationEvidenceSeed['kind'];
+  value: string;
+  label: string;
+  notes: string;
+}
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -56,6 +64,16 @@ function timeAgo(iso: string | Date): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function createDraftSource(kind: InvestigationEvidenceSeed['kind'] = 'youtube'): DraftSource {
+  return {
+    uid: `src-${Math.random().toString(36).slice(2, 10)}`,
+    kind,
+    value: '',
+    label: '',
+    notes: '',
+  };
+}
+
 export default function AtlasPage() {
   const router = useRouter();
   const [lenses, setLenses] = useState<AtlasLensRecord[]>([]);
@@ -68,10 +86,7 @@ export default function AtlasPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [title, setTitle] = useState('');
-  const [kind, setKind] = useState<InvestigationEvidenceSeed['kind']>('youtube');
-  const [value, setValue] = useState('');
-  const [label, setLabel] = useState('');
-  const [notes, setNotes] = useState('');
+  const [draftSources, setDraftSources] = useState<DraftSource[]>([createDraftSource()]);
 
   const loadLenses = useCallback(async (preferId?: string | null) => {
     setLoading(true);
@@ -122,15 +137,39 @@ export default function AtlasPage() {
   );
 
   const resetSourceForm = useCallback(() => {
-    setKind('youtube');
-    setValue('');
-    setLabel('');
-    setNotes('');
+    setDraftSources([createDraftSource()]);
   }, []);
 
+  const updateDraftSource = useCallback((
+    uid: string,
+    patch: Partial<DraftSource>,
+  ) => {
+    setDraftSources((prev) =>
+      prev.map((source) => (source.uid === uid ? { ...source, ...patch } : source)),
+    );
+  }, []);
+
+  const addDraftSource = useCallback(() => {
+    setDraftSources((prev) => [...prev, createDraftSource()]);
+  }, []);
+
+  const removeDraftSource = useCallback((uid: string) => {
+    setDraftSources((prev) => {
+      if (prev.length === 1) {
+        return [createDraftSource()];
+      }
+      return prev.filter((source) => source.uid !== uid);
+    });
+  }, []);
+
+  const validDraftSources = useMemo(
+    () => draftSources.filter((source) => source.value.trim()),
+    [draftSources],
+  );
+
   const handleCreateLens = useCallback(async () => {
-    if (!title.trim() || !value.trim()) {
-      setError('Title and source value are required.');
+    if (!title.trim() || validDraftSources.length === 0) {
+      setError('Title and at least one source are required.');
       return;
     }
 
@@ -147,12 +186,14 @@ export default function AtlasPage() {
         throw new Error('ATLAS investigation did not return an id');
       }
 
-      await addInvestigationEvidenceSeed(investigationId, {
-        kind,
-        value: value.trim(),
-        label: label.trim() || undefined,
-        notes: notes.trim() || null,
-      });
+      for (const source of validDraftSources) {
+        await addInvestigationEvidenceSeed(investigationId, {
+          kind: source.kind,
+          value: source.value.trim(),
+          label: source.label.trim() || undefined,
+          notes: source.notes.trim() || null,
+        });
+      }
 
       await buildMentalModel(investigationId);
       await loadLenses(investigationId);
@@ -165,26 +206,28 @@ export default function AtlasPage() {
     } finally {
       setSaving(false);
     }
-  }, [kind, label, loadLenses, loadSelected, notes, resetSourceForm, title, value]);
+  }, [loadLenses, loadSelected, resetSourceForm, title, validDraftSources]);
 
   const handleAddSourceToLens = useCallback(async () => {
     if (!selectedId) {
       setError('Select an existing lens first.');
       return;
     }
-    if (!value.trim()) {
-      setError('Source value is required.');
+    if (validDraftSources.length === 0) {
+      setError('At least one source value is required.');
       return;
     }
 
     setSaving(true);
     try {
-      await addInvestigationEvidenceSeed(selectedId, {
-        kind,
-        value: value.trim(),
-        label: label.trim() || undefined,
-        notes: notes.trim() || null,
-      });
+      for (const source of validDraftSources) {
+        await addInvestigationEvidenceSeed(selectedId, {
+          kind: source.kind,
+          value: source.value.trim(),
+          label: source.label.trim() || undefined,
+          notes: source.notes.trim() || null,
+        });
+      }
       const built = await buildMentalModel(selectedId);
       setSelectedInvestigation(built.investigation);
       setSelectedMentalModel(built.mentalModel);
@@ -196,7 +239,7 @@ export default function AtlasPage() {
     } finally {
       setSaving(false);
     }
-  }, [selectedId, value, kind, label, notes, loadLenses, resetSourceForm]);
+  }, [selectedId, validDraftSources, loadLenses, resetSourceForm]);
 
   const handleRebuildLens = useCallback(async () => {
     if (!selectedId) return;
@@ -321,52 +364,102 @@ export default function AtlasPage() {
 
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
-                  Source Kind
+                  Source Inputs
                 </label>
-                <div className="flex flex-wrap gap-1">
-                  {SEED_KINDS.map((seedKind) => (
-                    <button
-                      key={seedKind}
-                      type="button"
-                      onClick={() => setKind(seedKind)}
-                      className={[
-                        'px-2 py-1 text-[9px] font-mono uppercase rounded-sm border transition-colors',
-                        kind === seedKind
-                          ? 'border-nerv-orange/50 bg-nerv-orange/15 text-nerv-orange'
-                          : 'border-nerv-border text-nerv-text-muted hover:text-nerv-text',
-                      ].join(' ')}
-                    >
-                      {seedKind}
-                    </button>
+                <div className="space-y-3">
+                  {draftSources.map((source, index) => (
+                    <div key={source.uid} className="border border-nerv-border bg-nerv-bg-deep/60 px-3 py-3 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
+                          Source {index + 1}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {draftSources.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeDraftSource(source.uid)}
+                              className="text-[9px] font-mono uppercase text-nerv-red hover:text-nerv-orange"
+                            >
+                              Remove
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={addDraftSource}
+                            className="w-6 h-6 border border-nerv-orange/40 text-nerv-orange hover:bg-nerv-orange/10 text-[14px] leading-none"
+                            aria-label="Add source input"
+                            title="Add source"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1">
+                        {SEED_KINDS.map((seedKind) => (
+                          <button
+                            key={`${source.uid}-${seedKind}`}
+                            type="button"
+                            onClick={() => updateDraftSource(source.uid, { kind: seedKind })}
+                            className={[
+                              'px-2 py-1 text-[9px] font-mono uppercase rounded-sm border transition-colors',
+                              source.kind === seedKind
+                                ? 'border-nerv-orange/50 bg-nerv-orange/15 text-nerv-orange'
+                                : 'border-nerv-border text-nerv-text-muted hover:text-nerv-text',
+                            ].join(' ')}
+                          >
+                            {seedKind}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
+                          Source Value
+                        </label>
+                        <input
+                          value={source.value}
+                          onChange={(e) => updateDraftSource(source.uid, { value: e.target.value })}
+                          placeholder="https://www.youtube.com/watch?v=..."
+                          className="w-full bg-nerv-bg-deep border border-nerv-border px-3 py-2 text-[11px] font-mono text-nerv-text outline-none focus:border-nerv-orange"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
+                          Label
+                        </label>
+                        <input
+                          value={source.label}
+                          onChange={(e) => updateDraftSource(source.uid, { label: e.target.value })}
+                          placeholder="Net Crypto Rexas Video"
+                          className="w-full bg-nerv-bg-deep border border-nerv-border px-3 py-2 text-[11px] font-mono text-nerv-text outline-none focus:border-nerv-orange"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
+                          Analyst Note
+                        </label>
+                        <textarea
+                          value={source.notes}
+                          onChange={(e) => updateDraftSource(source.uid, { notes: e.target.value })}
+                          placeholder="Why this source matters, what it contributes, or how it should influence the lens."
+                          rows={3}
+                          className="w-full bg-nerv-bg-deep border border-nerv-border px-3 py-2 text-[11px] font-mono text-nerv-text outline-none focus:border-nerv-orange resize-none"
+                        />
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
-                  Source Value
-                </label>
-                <input
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?v=..."
-                  className="w-full bg-nerv-bg-deep border border-nerv-border px-3 py-2 text-[11px] font-mono text-nerv-text outline-none focus:border-nerv-orange"
-                />
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
-                    Label
-                  </label>
-                  <input
-                    value={label}
-                    onChange={(e) => setLabel(e.target.value)}
-                    placeholder="Net Crypto Rexas Video"
-                    className="w-full bg-nerv-bg-deep border border-nerv-border px-3 py-2 text-[11px] font-mono text-nerv-text outline-none focus:border-nerv-orange"
-                  />
+                <div className="text-[10px] font-mono text-nerv-text-muted leading-relaxed">
+                  {validDraftSources.length} source{validDraftSources.length === 1 ? '' : 's'} ready.
+                  Add as many videos, URLs, notes, wallets, or profiles as you want before creating the lens.
                 </div>
-                <div className="flex items-end gap-2">
+                <div className="flex items-end justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => void handleCreateLens()}
@@ -381,22 +474,9 @@ export default function AtlasPage() {
                     disabled={saving || rebuilding || !selectedId}
                     className="px-3 py-2 text-[10px] font-mono uppercase border border-nerv-border text-nerv-text-secondary hover:bg-nerv-bg-elevated/40 disabled:opacity-50"
                   >
-                    Add To Selected
+                    Add All To Selected
                   </button>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
-                  Analyst Note
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Why this source matters, what kind of lens you expect, or what the source is good at."
-                  rows={5}
-                  className="w-full bg-nerv-bg-deep border border-nerv-border px-3 py-2 text-[11px] font-mono text-nerv-text outline-none focus:border-nerv-orange resize-none"
-                />
               </div>
             </div>
 

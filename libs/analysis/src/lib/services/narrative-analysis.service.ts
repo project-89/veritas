@@ -98,7 +98,12 @@ export interface AnalyzeResult {
 export class NarrativeAnalysisService {
   private readonly logger = new Logger(NarrativeAnalysisService.name);
   private readonly genAI: GoogleGenerativeAI | null = null;
-  private readonly embeddingModel: string = 'gemini-embedding-2-preview';
+  private readonly embeddingModel: string;
+  private readonly embeddingFallbackModels: string[];
+  private readonly embeddingBatchSize: number;
+  private readonly embeddingCharLimit: number;
+  private readonly embeddingRetryBaseMs: number;
+  private readonly embeddingMaxRetries: number;
   private readonly chatModel: string = 'gemini-2.0-flash';
 
   constructor(
@@ -106,6 +111,47 @@ export class NarrativeAnalysisService {
     @Optional() private readonly saturationMetrics?: SaturationMetricsService,
     @Optional() @Inject(EMBEDDING_CACHE_STORE) private readonly embeddingCache?: EmbeddingCacheStore,
   ) {
+    this.embeddingModel =
+      this.configService.get<string>('GEMINI_EMBEDDING_MODEL') ||
+      process.env['GEMINI_EMBEDDING_MODEL'] ||
+      'gemini-embedding-001';
+    this.embeddingFallbackModels = [
+      'gemini-embedding-001',
+      'gemini-embedding-2-preview',
+    ].filter((model, index, arr) => arr.indexOf(model) === index && model !== this.embeddingModel);
+    this.embeddingBatchSize = Math.max(
+      8,
+      Number(
+        this.configService.get<string>('GEMINI_EMBED_BATCH_SIZE') ||
+          process.env['GEMINI_EMBED_BATCH_SIZE'] ||
+          '32',
+      ) || 32,
+    );
+    this.embeddingCharLimit = Math.max(
+      256,
+      Number(
+        this.configService.get<string>('GEMINI_EMBED_CHAR_LIMIT') ||
+          process.env['GEMINI_EMBED_CHAR_LIMIT'] ||
+          '1200',
+      ) || 1200,
+    );
+    this.embeddingRetryBaseMs = Math.max(
+      100,
+      Number(
+        this.configService.get<string>('GEMINI_EMBED_RETRY_BASE_MS') ||
+          process.env['GEMINI_EMBED_RETRY_BASE_MS'] ||
+          '1500',
+      ) || 1500,
+    );
+    this.embeddingMaxRetries = Math.max(
+      0,
+      Number(
+        this.configService.get<string>('GEMINI_EMBED_MAX_RETRIES') ||
+          process.env['GEMINI_EMBED_MAX_RETRIES'] ||
+          '4',
+      ) || 4,
+    );
+
     const geminiKey =
       this.configService.get<string>('GEMINI_API_KEY') ||
       process.env['GEMINI_API_KEY'];
@@ -222,8 +268,8 @@ export class NarrativeAnalysisService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Generate embeddings for an array of texts using Gemini text-embedding-004.
-   * Batches in groups of 100 (API limit).
+   * Generate embeddings for an array of texts using Gemini embeddings.
+   * Uses conservative batches and backoff to avoid slamming Vertex embedding quotas.
    */
   private async batchEmbed(texts: string[]): Promise<number[][]> {
     if (!this.genAI) {
@@ -265,20 +311,20 @@ export class NarrativeAnalysisService {
     const freshEmbeddings = new Map<number, number[]>();
 
     if (uncachedTexts.length > 0) {
-      const modelsToTry = [modelName, 'gemini-embedding-001'];
+      const modelsToTry = [modelName, ...this.embeddingFallbackModels];
       let model = this.genAI.getGenerativeModel({ model: modelsToTry[0]! });
-      const BATCH_SIZE = 100;
+      const BATCH_SIZE = this.embeddingBatchSize;
       let embIdx = 0;
       let fallbackToNext = false;
 
       for (let i = 0; i < uncachedTexts.length; i += BATCH_SIZE) {
         const batchTexts = uncachedTexts.slice(i, i + BATCH_SIZE);
         const batch = batchTexts.map((t) => ({
-          content: { role: 'user' as const, parts: [{ text: t.slice(0, 2000) }] },
+          content: { role: 'user' as const, parts: [{ text: this.truncateForEmbedding(t) }] },
         }));
 
         try {
-          const result = await model.batchEmbedContents({ requests: batch });
+          const result = await this.embedBatchWithRetry(model, batch, modelsToTry[0]!);
           for (let j = 0; j < result.embeddings.length; j++) {
             const origIdx = uncachedIndices[embIdx]!;
             freshEmbeddings.set(origIdx, result.embeddings[j]!.values);
@@ -295,7 +341,7 @@ export class NarrativeAnalysisService {
             fallbackToNext = true;
             model = this.genAI.getGenerativeModel({ model: modelsToTry[1]! });
             try {
-              const retryResult = await model.batchEmbedContents({ requests: batch });
+              const retryResult = await this.embedBatchWithRetry(model, batch, modelsToTry[1]!);
               for (let j = 0; j < retryResult.embeddings.length; j++) {
                 const origIdx = uncachedIndices[embIdx]!;
                 freshEmbeddings.set(origIdx, retryResult.embeddings[j]!.values);
@@ -344,6 +390,48 @@ export class NarrativeAnalysisService {
     }
 
     return allEmbeddings;
+  }
+
+  private truncateForEmbedding(text: string): string {
+    return text.slice(0, this.embeddingCharLimit);
+  }
+
+  private isRateLimitError(err: unknown): boolean {
+    const message = err instanceof Error ? err.message : String(err);
+    return (
+      message.includes('429') ||
+      message.includes('Too Many Requests') ||
+      message.includes('Quota exceeded') ||
+      message.includes('RESOURCE_EXHAUSTED')
+    );
+  }
+
+  private async embedBatchWithRetry(
+    model: ReturnType<GoogleGenerativeAI['getGenerativeModel']>,
+    batch: Array<{ content: { role: 'user'; parts: Array<{ text: string }> } }>,
+    modelLabel: string,
+  ): Promise<Awaited<ReturnType<typeof model.batchEmbedContents>>> {
+    let attempt = 0;
+    while (true) {
+      try {
+        return await model.batchEmbedContents({ requests: batch });
+      } catch (err) {
+        if (!this.isRateLimitError(err) || attempt >= this.embeddingMaxRetries) {
+          throw err;
+        }
+
+        const backoffMs = this.embeddingRetryBaseMs * Math.pow(2, attempt);
+        this.logger.warn(
+          `Embedding rate limit for ${modelLabel}; retrying batch in ${backoffMs}ms (attempt ${attempt + 1}/${this.embeddingMaxRetries})`,
+        );
+        await this.sleep(backoffMs);
+        attempt += 1;
+      }
+    }
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /** Simple hash-based fallback when Gemini is unavailable */

@@ -7,6 +7,7 @@ import { ProjectDossierRepository } from '../../src/lib/repositories/project-dos
 import { MentalModelRepository } from '../../src/lib/repositories/mental-model.repository';
 import { ScanJobRepository } from '../../src/lib/repositories/scan-job.repository';
 import { AlertRepository } from '../../src/lib/repositories/alert.repository';
+import { AnalysisJobRepository } from '../../src/lib/repositories/analysis-job.repository';
 import { ProjectDossierService } from '../../src/lib/services/project-dossier.service';
 import { OnChainCorrelationService } from '../../src/lib/services/onchain-correlation.service';
 import { MentalModelService } from '../../src/lib/services/mental-model.service';
@@ -22,6 +23,7 @@ describe('InvestigationController', () => {
   let mockMentalModelService: any;
   let mockScanJobRepository: any;
   let mockAlertRepository: any;
+  let mockAnalysisJobRepository: any;
 
   const mockInvestigation = {
     _id: 'inv-1',
@@ -201,11 +203,20 @@ describe('InvestigationController', () => {
     };
 
     mockScanJobRepository = {
+      getJobsByInvestigation: jest.fn().mockResolvedValue([
+        { _id: 'scan-1', id: 'scan-1', status: 'running' },
+        { _id: 'scan-2', id: 'scan-2', status: 'completed' },
+      ]),
+      cancelJob: jest.fn().mockResolvedValue(undefined),
       deleteByInvestigationId: jest.fn().mockResolvedValue(1),
     };
 
     mockAlertRepository = {
       deleteByInvestigationId: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockAnalysisJobRepository = {
+      cancelJobsByScan: jest.fn().mockResolvedValue(undefined),
     };
 
     mockProjectDossierService = {
@@ -326,6 +337,10 @@ describe('InvestigationController', () => {
         {
           provide: AlertRepository,
           useValue: mockAlertRepository,
+        },
+        {
+          provide: AnalysisJobRepository,
+          useValue: mockAnalysisJobRepository,
         },
         {
           provide: ProjectDossierService,
@@ -517,6 +532,10 @@ describe('InvestigationController', () => {
     it('should delete related records and the investigation', async () => {
       const result = await controller.deleteInvestigationPermanent('inv-1');
 
+      expect(mockScanJobRepository.getJobsByInvestigation).toHaveBeenCalledWith('inv-1', 200);
+      expect(mockScanJobRepository.cancelJob).toHaveBeenCalledWith('scan-1');
+      expect(mockAnalysisJobRepository.cancelJobsByScan).toHaveBeenCalledWith('scan-1');
+      expect(mockAnalysisJobRepository.cancelJobsByScan).toHaveBeenCalledWith('scan-2');
       expect(mockProjectDossierRepository.deleteByInvestigationId).toHaveBeenCalledWith('inv-1');
       expect(mockMentalModelRepository.deleteByInvestigationId).toHaveBeenCalledWith('inv-1');
       expect(mockScanJobRepository.deleteByInvestigationId).toHaveBeenCalledWith('inv-1');

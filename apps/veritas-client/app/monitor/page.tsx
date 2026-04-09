@@ -57,9 +57,12 @@ export default function MonitorPage() {
   const [selectedInvId, setSelectedInvId] = useState<string | null>(null);
   const [menuOpenInvId, setMenuOpenInvId] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ investigation: Investigation; snapshot: any } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [alertFilter, setAlertFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previewRequestRef = useRef(0);
 
   // Load data on mount
   useEffect(() => {
@@ -92,11 +95,44 @@ export default function MonitorPage() {
 
   // Load preview when investigation selected
   useEffect(() => {
-    if (!selectedInvId) { setPreview(null); return; }
+    if (!selectedInvId) {
+      setPreview(null);
+      setPreviewError(null);
+      setPreviewLoading(false);
+      return;
+    }
+
+    const selectedInvestigation =
+      investigations.find((inv) => getInvestigationId(inv) === selectedInvId) ?? null;
+    if (selectedInvestigation) {
+      setPreview((prev) => ({
+        investigation: selectedInvestigation,
+        snapshot: prev?.investigation && getInvestigationId(prev.investigation) === selectedInvId
+          ? prev.snapshot
+          : null,
+      }));
+    }
+    setPreviewError(null);
+    setPreviewLoading(true);
+
+    const requestId = ++previewRequestRef.current;
     fetchInvestigation(selectedInvId)
-      .then((data) => setPreview(data as any))
-      .catch(() => setPreview(null));
-  }, [selectedInvId]);
+      .then((data) => {
+        if (previewRequestRef.current !== requestId) return;
+        setPreview(data as any);
+        setPreviewError(null);
+      })
+      .catch((err) => {
+        if (previewRequestRef.current !== requestId) return;
+        setPreview((prev) => prev && getInvestigationId(prev.investigation) === selectedInvId ? prev : null);
+        setPreviewError(err instanceof Error ? err.message : 'Failed to load investigation preview');
+      })
+      .finally(() => {
+        if (previewRequestRef.current === requestId) {
+          setPreviewLoading(false);
+        }
+      });
+  }, [selectedInvId, investigations]);
 
   const handleMarkRead = useCallback(async (alertId: string) => {
     await markAlertRead(alertId);
@@ -374,6 +410,11 @@ export default function MonitorPage() {
                 status="online"
               >
                 <div className="p-4 space-y-3">
+                  {previewError && (
+                    <div className="px-3 py-2 border border-nerv-red/40 bg-nerv-red/10 text-[10px] font-mono text-nerv-red">
+                      Preview load issue: {previewError}
+                    </div>
+                  )}
                   {preview ? (
                     <>
                       <div className="grid grid-cols-3 gap-4">
@@ -395,7 +436,11 @@ export default function MonitorPage() {
 
                       <div className="pt-3 flex gap-2">
                         <button
-                          onClick={() => router.push(`/investigate/${preview.investigation._id}`)}
+                          onClick={() => {
+                            const investigationId = getInvestigationId(preview.investigation);
+                            if (!investigationId) return;
+                            router.push(`/investigate/${investigationId}`);
+                          }}
                           className="px-4 py-2 bg-nerv-orange/20 border border-nerv-orange/50 text-nerv-orange text-[10px] font-mono uppercase tracking-widest hover:bg-nerv-orange/30 transition-all"
                         >
                           Open Investigation
@@ -407,6 +452,13 @@ export default function MonitorPage() {
                           Re-scan
                         </button>
                       </div>
+
+                      {previewLoading && (
+                        <div className="flex items-center gap-2 text-[9px] font-mono text-nerv-text-muted uppercase tracking-widest">
+                          <div className="w-3 h-3 border-2 border-nerv-border border-t-nerv-orange rounded-full animate-spin" />
+                          Refreshing Preview
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="flex items-center justify-center py-6">

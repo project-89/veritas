@@ -94,22 +94,11 @@ export class ScanProcessor extends WorkerHost {
         `[scan:${scanId}] ${connector}: fetched ${result.posts.length} posts, ${result.insights.length} insights`,
       );
 
-      // Deduplicate posts by a stable fingerprint — including cross-scan dedup.
-      // URL-aware fingerprints avoid collapsing distinct videos/articles that
-      // happen to share similar openings.
-      // Load existing post text keys from previous scans for the same query
+      // Deduplicate only within the current connector run.
+      // Historical rescans must preserve already-seen posts so wider windows
+      // can be re-analyzed faithfully; otherwise a fresh 30d scan would only
+      // contain "new since last scan" material.
       const seenTexts = new Set<string>();
-      try {
-        const existingPosts = await this.scanJobRepository.getExistingPostKeys(query);
-        for (const key of existingPosts) {
-          seenTexts.add(key);
-        }
-        if (existingPosts.length > 0) {
-          this.logger.debug(`[scan:${scanId}] Cross-scan dedup: ${existingPosts.length} existing post keys loaded`);
-        }
-      } catch {
-        // Non-fatal — proceed without cross-scan dedup
-      }
       const dedupedPosts: SocialMediaPost[] = [];
       const dedupedInsights: NarrativeInsight[] = [];
       for (let i = 0; i < result.posts.length; i++) {

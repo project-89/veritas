@@ -127,7 +127,8 @@ export class ScanJobRepository implements OnModuleInit {
     try {
       const job = await this.scanJobRepo.findById(scanId);
       if (!job) {
-        throw new Error(`Scan job not found: ${scanId}`);
+        this.logger.warn(`Skipping connector status update for deleted scan ${scanId} (${connector})`);
+        return;
       }
 
       // Merge the update into the existing connector status
@@ -196,7 +197,8 @@ export class ScanJobRepository implements OnModuleInit {
     try {
       const job = await this.scanJobRepo.findById(scanId);
       if (!job) {
-        throw new Error(`Scan job not found: ${scanId}`);
+        this.logger.warn(`Skipping connector results append for deleted scan ${scanId}`);
+        return;
       }
 
       const existingPosts = Array.isArray(job.posts) ? job.posts : [];
@@ -239,6 +241,12 @@ export class ScanJobRepository implements OnModuleInit {
   async updateAnalysisCache(scanId: string, cache: Record<string, unknown>): Promise<void> {
     this.ensureInitialized();
     try {
+      const existing = await this.scanJobRepo.findById(scanId);
+      if (!existing) {
+        this.logger.warn(`Skipping analysis cache save for deleted scan ${scanId}`);
+        return;
+      }
+
       // Estimate size — MongoDB has a 16MB BSON document limit.
       // Strip large fields if needed.
       const json = JSON.stringify(cache);
@@ -301,7 +309,8 @@ export class ScanJobRepository implements OnModuleInit {
     try {
       const job = await this.scanJobRepo.findById(scanId);
       if (!job) {
-        throw new Error(`Scan job not found: ${scanId}`);
+        this.logger.warn(`Cancel requested for deleted scan job: ${scanId}`);
+        return;
       }
 
       const updatedConnectors: Record<string, ConnectorStatus> = { ...job.connectors };

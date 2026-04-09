@@ -23,6 +23,7 @@ import { ProjectDossierRepository } from '../repositories/project-dossier.reposi
 import { MentalModelRepository } from '../repositories/mental-model.repository';
 import { ScanJobRepository } from '../repositories/scan-job.repository';
 import { AlertRepository } from '../repositories/alert.repository';
+import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
 import {
   ProjectDossier,
   ProjectDossierOverlap,
@@ -50,6 +51,7 @@ export class InvestigationController {
     private readonly mentalModelRepository: MentalModelRepository,
     private readonly scanJobRepository: ScanJobRepository,
     private readonly alertRepository: AlertRepository,
+    private readonly analysisJobRepository: AnalysisJobRepository,
     private readonly projectDossierService: ProjectDossierService,
     private readonly onChainCorrelationService: OnChainCorrelationService,
     private readonly mentalModelService: MentalModelService,
@@ -219,6 +221,16 @@ export class InvestigationController {
     const existing = await this.investigationRepository.findById(id);
     if (!existing) {
       throw new NotFoundException(`Investigation not found: ${id}`);
+    }
+
+    const relatedScans = await this.scanJobRepository.getJobsByInvestigation(id, 200);
+    for (const scan of relatedScans) {
+      const scanId = scan._id?.toString() ?? scan.id;
+      if (!scanId) continue;
+      if (scan.status === 'pending' || scan.status === 'running') {
+        await this.scanJobRepository.cancelJob(scanId);
+      }
+      await this.analysisJobRepository.cancelJobsByScan(scanId);
     }
 
     await this.projectDossierRepository.deleteByInvestigationId(id);

@@ -84,6 +84,17 @@ export class AnalysisJobRepository implements OnModuleInit {
     );
   }
 
+  async cancelJobsByScan(scanId: string): Promise<void> {
+    this.ensureInitialized();
+    const jobs = await this.getJobsByScan(scanId);
+    for (const job of jobs) {
+      if (job.status === 'completed' || job.status === 'cancelled' || job.status === 'failed') {
+        continue;
+      }
+      await this.cancelJob(job._id?.toString() ?? job.id);
+    }
+  }
+
   async updateStatus(
     id: string,
     update: Partial<Pick<AnalysisJob, 'status' | 'startedAt' | 'completedAt' | 'duration' | 'error' | 'result'>>,

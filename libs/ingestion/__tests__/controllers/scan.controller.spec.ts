@@ -183,6 +183,33 @@ describe('ScanController', () => {
       expect(result).toEqual({ success: true });
       expect(scanJobRepo.cancelJob).toHaveBeenCalledWith('scan-123');
     });
+
+    it('should treat cancel for a deleted scan as a no-op success', async () => {
+      (scanJobRepo.getJob as jest.Mock).mockResolvedValueOnce(null);
+
+      const result = await controller.cancelScan('scan-missing');
+
+      expect(result).toEqual({ success: true });
+      expect(scanJobRepo.cancelJob).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('analysis cache endpoints', () => {
+    it('should ignore analysis-cache writes for deleted scans', async () => {
+      (scanJobRepo.getJob as jest.Mock).mockResolvedValueOnce(null);
+
+      const result = await controller.saveAnalysisCache('scan-missing', { narratives: [] });
+
+      expect(result).toEqual({ success: true });
+    });
+
+    it('should return null analysis cache for deleted scans', async () => {
+      (scanJobRepo.getJob as jest.Mock).mockResolvedValueOnce(null);
+
+      const result = await controller.getAnalysisCache('scan-missing');
+
+      expect(result).toBeNull();
+    });
   });
 
   describe('POST /scan/:id/retry/:connector', () => {

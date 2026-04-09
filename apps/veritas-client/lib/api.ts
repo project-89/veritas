@@ -239,6 +239,44 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+function normalizeIdValue(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed && trimmed !== 'undefined' && trimmed !== 'null' ? trimmed : undefined;
+  }
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  if (value && typeof value === 'object') {
+    const maybeOid = (value as { $oid?: unknown }).$oid;
+    if (typeof maybeOid === 'string' && maybeOid.trim()) {
+      return maybeOid.trim();
+    }
+    const asString = value.toString?.();
+    if (typeof asString === 'string' && asString && asString !== '[object Object]') {
+      return asString;
+    }
+  }
+  return undefined;
+}
+
+function normalizeInvestigation(investigation: Investigation, fallbackId?: string): Investigation {
+  const resolvedId =
+    normalizeIdValue(investigation?._id) ??
+    normalizeIdValue(investigation?.id) ??
+    normalizeIdValue(fallbackId);
+
+  if (!resolvedId) {
+    return investigation;
+  }
+
+  return {
+    ...investigation,
+    _id: resolvedId,
+    id: resolvedId,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -590,7 +628,8 @@ export interface Snapshot {
  * List all investigations, ordered by most recently updated.
  */
 export async function fetchInvestigations(): Promise<Investigation[]> {
-  return request<Investigation[]>('/api/investigations');
+  const investigations = await request<Investigation[]>('/api/investigations');
+  return investigations.map((investigation) => normalizeInvestigation(investigation));
 }
 
 /**
@@ -621,7 +660,7 @@ export async function fetchInvestigation(
   );
   // Backend returns "latestSnapshot", normalize to "snapshot"
   return {
-    investigation: result.investigation,
+    investigation: normalizeInvestigation(result.investigation, normalizedId),
     snapshot: result.latestSnapshot ?? result.snapshot ?? null,
     projectDossier: result.projectDossier ?? null,
     mentalModel: result.mentalModel ?? null,
@@ -674,10 +713,11 @@ export async function createOrGetInvestigation(
   query: string,
   settings?: { name?: string; platforms?: string[]; timeRange?: string; limit?: number },
 ): Promise<Investigation> {
-  return request<Investigation>('/api/investigations', {
+  const result = await request<Investigation>('/api/investigations', {
     method: 'PUT',
     body: JSON.stringify({ query, ...settings }),
   });
+  return normalizeInvestigation(result);
 }
 
 /**
@@ -701,7 +741,7 @@ export async function addInvestigationEvidenceSeed(
       body: JSON.stringify(seed),
     },
   );
-  return result.investigation;
+  return normalizeInvestigation(result.investigation, id);
 }
 
 export async function buildProjectDossier(
@@ -721,7 +761,7 @@ export async function buildProjectDossier(
   });
 
   return {
-    investigation: result.investigation,
+    investigation: normalizeInvestigation(result.investigation, id),
     projectDossier: result.projectDossier,
     dossierOverlaps: result.dossierOverlaps,
   };
@@ -750,7 +790,7 @@ export async function buildMentalModel(
   });
 
   return {
-    investigation: result.investigation,
+    investigation: normalizeInvestigation(result.investigation, id),
     mentalModel: result.mentalModel,
   };
 }
@@ -764,7 +804,11 @@ export async function fetchMentalModel(
 }
 
 export async function fetchAtlasLenses(): Promise<AtlasLensRecord[]> {
-  return request<AtlasLensRecord[]>('/api/investigations/atlas-lenses');
+  const result = await request<AtlasLensRecord[]>('/api/investigations/atlas-lenses');
+  return result.map((record) => ({
+    ...record,
+    investigation: normalizeInvestigation(record.investigation),
+  }));
 }
 
 // ---------------------------------------------------------------------------

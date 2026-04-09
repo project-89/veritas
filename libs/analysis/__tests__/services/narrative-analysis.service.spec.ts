@@ -424,4 +424,31 @@ describe('NarrativeAnalysisService', () => {
       expect(totalAccountedFor).toBe(2);
     });
   });
+
+  describe('embedding backoff', () => {
+    it('retries embedding batches on 429 rate limits before succeeding', async () => {
+      const batchEmbedContents = jest
+        .fn()
+        .mockRejectedValueOnce(
+          new Error(
+            '[GoogleGenerativeAI Error]: [429 Too Many Requests] Quota exceeded for embed_content_input_tokens_per_minute_per_base_model',
+          ),
+        )
+        .mockResolvedValueOnce({
+          embeddings: [{ values: [0.1, 0.2] }, { values: [0.2, 0.3] }],
+        });
+
+      (service as any).genAI = {
+        getGenerativeModel: jest.fn().mockReturnValue({
+          batchEmbedContents,
+        }),
+      };
+      (service as any).embeddingRetryBaseMs = 1;
+      (service as any).embeddingMaxRetries = 2;
+
+      const result = await (service as any).batchEmbed(['first text', 'second text']);
+      expect(result).toHaveLength(2);
+      expect(batchEmbedContents).toHaveBeenCalledTimes(2);
+    });
+  });
 });

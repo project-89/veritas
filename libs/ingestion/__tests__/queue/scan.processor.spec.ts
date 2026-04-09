@@ -200,4 +200,21 @@ describe('ScanProcessor', () => {
     expect(result.postCount).toBe(2);
     expect(addedPosts).toHaveLength(2);
   });
+
+  it('should not suppress posts just because earlier scans for the same query already saw them', async () => {
+    scanJobRepo.getExistingPostKeys.mockResolvedValue([
+      'url:https://reddit.com/r/test/1',
+    ]);
+
+    const job = {
+      data: { scanId: 'scan-1', connector: 'reddit', query: 'project89', options: { timeRange: '30d' } },
+    } as any;
+
+    const result = await processor.process(job);
+
+    const addedPosts = (scanJobRepo.addConnectorResults as jest.Mock).mock.calls[0][2];
+    expect(result.postCount).toBe(1);
+    expect(addedPosts).toHaveLength(1);
+    expect(addedPosts[0]).toHaveProperty('id', 'p1');
+  });
 });

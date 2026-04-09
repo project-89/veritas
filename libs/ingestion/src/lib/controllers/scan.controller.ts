@@ -222,7 +222,8 @@ export class ScanController {
   ): Promise<{ success: boolean }> {
     const job = await this.scanJobRepository.getJob(id);
     if (!job) {
-      throw new HttpException(`Scan job not found: ${id}`, HttpStatus.NOT_FOUND);
+      this.logger.warn(`Ignoring analysis cache write for deleted or missing scan: ${id}`);
+      return { success: true };
     }
     await this.scanJobRepository.updateAnalysisCache(id, body);
     return { success: true };
@@ -237,7 +238,7 @@ export class ScanController {
   ): Promise<Record<string, unknown> | null> {
     const job = await this.scanJobRepository.getJob(id);
     if (!job) {
-      throw new HttpException(`Scan job not found: ${id}`, HttpStatus.NOT_FOUND);
+      return null;
     }
     return job.analysisCache ?? null;
   }
@@ -249,7 +250,8 @@ export class ScanController {
   async cancelScan(@Param('id') id: string): Promise<{ success: boolean }> {
     const job = await this.scanJobRepository.getJob(id);
     if (!job) {
-      throw new HttpException(`Scan job not found: ${id}`, HttpStatus.NOT_FOUND);
+      this.logger.warn(`Cancel requested for deleted or missing scan: ${id}`);
+      return { success: true };
     }
 
     await this.scanJobRepository.cancelJob(id);
