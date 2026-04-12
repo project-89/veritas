@@ -42,6 +42,7 @@ const MAGI_MODE_LABELS: Record<MagiProfileMode, string> = {
   'investigation-window': 'INV WINDOW',
   'current-state': 'CURRENT',
   historical: 'HISTORICAL',
+  'deep-history': 'DEEP HIST',
 };
 
 function normalizeDiscoveryTier(account: PlatformAccount): 'actionable' | 'corroborating' | 'extended' {
@@ -710,7 +711,7 @@ export function IdentityDossier({
                   : 'IDLE'}
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           {(Object.keys(MAGI_MODE_LABELS) as MagiProfileMode[]).map((mode) => (
             <button
               key={mode}
@@ -728,7 +729,7 @@ export function IdentityDossier({
           ))}
         </div>
         <p className="text-[9px] font-mono text-nerv-text-muted leading-relaxed">
-          Window mode uses the current investigation slice. Current mode uses the latest accessible timeline. Historical mode uses the widest locally available corpus.
+          Window mode uses the current investigation slice. Current mode uses the latest accessible timeline. Historical mode uses the widest locally available corpus. Deep history pulls a much larger timeline sample for fuller MAGI profiling.
         </p>
       </div>
 

@@ -50,7 +50,12 @@ export class GdeltAdapter implements SignalAdapter {
           return [];
         }
 
-        const data = (await response.json()) as GdeltResponse;
+        const raw = await response.text();
+        const data = this.parseResponse(raw);
+        if (!data) {
+          this.logger.warn(`GDELT returned a non-JSON response for query "${query}"`);
+          return [];
+        }
         return this.mapArticles(data);
       } catch (err) {
         if (attempt === 0) {
@@ -72,6 +77,20 @@ export class GdeltAdapter implements SignalAdapter {
   /** Build a GDELT query string from keywords (OR-joined, top 5). */
   private buildQuery(keywords: string[]): string {
     return keywords.slice(0, 5).join(' OR ');
+  }
+
+  private parseResponse(raw: string): GdeltResponse | null {
+    const trimmed = raw.trim();
+    if (!trimmed) return { articles: [] };
+    if (!(trimmed.startsWith('{') || trimmed.startsWith('['))) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(trimmed) as GdeltResponse;
+    } catch {
+      return null;
+    }
   }
 
   /**

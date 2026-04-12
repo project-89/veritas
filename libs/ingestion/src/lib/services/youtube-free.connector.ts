@@ -13,6 +13,12 @@ import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SubprocessUtil } from './utils/subprocess.util';
+import {
+  buildClaimQueryPlan,
+  looksLikeClaimQuery,
+  normalizeSearchMode,
+  type SearchMode,
+} from '../utils/query-intent.util';
 
 interface SearchOptions {
   startDate?: Date;
@@ -21,10 +27,39 @@ interface SearchOptions {
   maxResults?: number;
   /** Fetch video transcripts/subtitles via yt-dlp (slower but richer content). Default: true */
   fetchTranscripts?: boolean;
+  searchMode?: SearchMode;
 }
 
 const TRANSCRIPT_MAX_CHARS = 5000;
 const TRANSCRIPT_TEMP_PREFIX = '/tmp/veritas-yt-';
+const YOUTUBE_QUERY_STOPWORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'are',
+  'as',
+  'at',
+  'be',
+  'by',
+  'for',
+  'from',
+  'has',
+  'have',
+  'in',
+  'into',
+  'is',
+  'it',
+  'of',
+  'on',
+  'or',
+  'that',
+  'the',
+  'this',
+  'to',
+  'was',
+  'were',
+  'with',
+]);
 
 interface YtDlpVideoInfo {
   id: string;
@@ -172,8 +207,11 @@ export class YouTubeFreeConnector
       }
     };
 
-    // Initial check
-    checkForContent();
+    // Defer the initial poll so callers have a chance to attach listeners
+    // before the first data/error emission.
+    setTimeout(() => {
+      void checkForContent();
+    }, 0);
 
     const interval = setInterval(checkForContent, this.pollingInterval);
     this.streamConnections.set(streamId, interval);
@@ -265,34 +303,25 @@ export class YouTubeFreeConnector
   ): Promise<SocialMediaPost[]> {
     const limit = options?.maxResults || options?.limit || 25;
     const fetchTranscripts = options?.fetchTranscripts ?? true;
+    const searchMode = normalizeSearchMode(
+      options?.searchMode ?? (looksLikeClaimQuery(query) ? 'claim' : 'topic'),
+    );
 
     try {
-      const args = [
-        `ytsearch${limit}:${query}`,
-        '--dump-json',
-        '--no-download',
-        '--flat-playlist',
-      ];
+      let videos =
+        searchMode === 'claim'
+          ? await this.executeClaimSearch(query, limit, options)
+          : await this.executeSearch(query, limit, options);
 
-      // Add date filter if specified
-      if (options?.startDate) {
-        args.push(
-          '--dateafter',
-          this.formatYtDlpDate(options.startDate)
-        );
+      if (videos.length === 0 && searchMode !== 'claim') {
+        const compactQuery = this.buildCompactSearchQuery(query);
+        if (compactQuery && compactQuery !== query) {
+          this.logger.debug(
+            `Retrying YouTube search with compact query: "${compactQuery}"`,
+          );
+          videos = await this.executeSearch(compactQuery, limit, options);
+        }
       }
-      if (options?.endDate) {
-        args.push(
-          '--datebefore',
-          this.formatYtDlpDate(options.endDate)
-        );
-      }
-
-      const videos = await this.subprocessUtil.execJsonLines<YtDlpVideoInfo>(
-        this.ytDlpPath,
-        args,
-        { timeout: 60000 }
-      );
 
       // Second pass: fetch transcripts in batches of 5 to limit concurrency
       const transcriptMap = new Map<string, string>();
@@ -343,6 +372,91 @@ export class YouTubeFreeConnector
       this.logger.error('Error searching YouTube with yt-dlp:', error);
       throw error;
     }
+  }
+
+  private async executeSearch(
+    query: string,
+    limit: number,
+    options?: SearchOptions,
+  ): Promise<YtDlpVideoInfo[]> {
+    const args = [
+      `ytsearch${limit}:${query}`,
+      '--dump-json',
+      '--no-download',
+      '--flat-playlist',
+    ];
+
+    if (options?.startDate) {
+      args.push(
+        '--dateafter',
+        this.formatYtDlpDate(options.startDate)
+      );
+    }
+    if (options?.endDate) {
+      args.push(
+        '--datebefore',
+        this.formatYtDlpDate(options.endDate)
+      );
+    }
+
+    return this.subprocessUtil.execJsonLines<YtDlpVideoInfo>(
+      this.ytDlpPath,
+      args,
+      { timeout: 60000 }
+    );
+  }
+
+  private async executeClaimSearch(
+    query: string,
+    limit: number,
+    options?: SearchOptions,
+  ): Promise<YtDlpVideoInfo[]> {
+    const plan = buildClaimQueryPlan(query);
+    const queries = Array.from(
+      new Set([
+        query,
+        plan.compactQuery,
+        this.buildCompactSearchQuery(query),
+      ].filter((value): value is string => Boolean(value && value.trim().length > 0))),
+    );
+
+    const merged = new Map<string, YtDlpVideoInfo>();
+    for (const candidate of queries) {
+      const results = await this.executeSearch(candidate, limit, options);
+      for (const video of results) {
+        if (!merged.has(video.id)) {
+          merged.set(video.id, video);
+        }
+      }
+      if (merged.size >= limit || results.length > 0) {
+        break;
+      }
+    }
+
+    return Array.from(merged.values()).slice(0, limit);
+  }
+
+  private buildCompactSearchQuery(query: string): string | null {
+    const significantTerms = Array.from(
+      new Set(
+        query
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]+/g, ' ')
+          .split(/\s+/)
+          .map((term) => term.trim())
+          .filter(
+            (term) =>
+              term.length >= 3 &&
+              !YOUTUBE_QUERY_STOPWORDS.has(term),
+          ),
+      ),
+    );
+
+    if (significantTerms.length <= 4) {
+      return null;
+    }
+
+    return significantTerms.slice(0, 5).join(' ');
   }
 
   private transformVideoToSocialMediaPost(

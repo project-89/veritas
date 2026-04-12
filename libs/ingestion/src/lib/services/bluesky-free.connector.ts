@@ -190,14 +190,26 @@ export class BlueskyFreeConnector
     options?: { limit?: number },
   ): Promise<SocialMediaPost[]> {
     const limit = options?.limit ?? 50;
+    const normalizedHandle = handle.trim().replace(/^@/, '');
+    if (!normalizedHandle) return [];
+    if (!normalizedHandle.startsWith('did:') && !normalizedHandle.includes('.')) {
+      this.logger.debug(`Skipping invalid Bluesky actor handle: @${normalizedHandle}`);
+      return [];
+    }
     try {
-      const url = `${BSKY_PUBLIC_API}/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(handle)}&limit=${limit}`;
+      const url = `${BSKY_PUBLIC_API}/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(normalizedHandle)}&limit=${limit}`;
       const data = await this.fetchWithRetry<BlueskyFeedResponse>(url);
 
       if (!Array.isArray(data.feed)) return [];
       return data.feed.map((item) => this.transformToSocialMediaPost(item.post));
     } catch (error) {
-      this.logger.debug(`Timeline fetch failed for @${handle}:`, error);
+      const status = getErrorStatus(error);
+      if (status === 400 || status === 404) {
+        this.logger.debug(`No Bluesky timeline available for @${normalizedHandle} (${status})`);
+        return [];
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.debug(`Timeline fetch failed for @${normalizedHandle}: ${message}`);
       return [];
     }
   }

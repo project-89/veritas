@@ -64,7 +64,7 @@ export class ScanJobRepository implements OnModuleInit {
     query: string,
     investigationId: string,
     platforms: string[],
-    settings: { timeRange?: string; limit?: number },
+    settings: { timeRange?: string; limit?: number; searchMode?: 'topic' | 'claim' },
   ): Promise<ScanJob> {
     this.ensureInitialized();
 
@@ -89,6 +89,7 @@ export class ScanJobRepository implements OnModuleInit {
         platforms,
         timeRange: settings.timeRange ?? '7d',
         limit: settings.limit ?? 50,
+        searchMode: settings.searchMode ?? 'topic',
       },
       connectors,
       totalPosts: 0,

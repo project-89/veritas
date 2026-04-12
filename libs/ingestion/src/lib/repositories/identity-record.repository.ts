@@ -356,6 +356,7 @@ export class IdentityRecordRepository implements OnModuleInit {
     handle: string,
     platform: string,
     maxAgeMs: number,
+    minPosts = 1,
   ): Promise<Array<{
     text: string;
     timestamp: string;
@@ -374,6 +375,13 @@ export class IdentityRecordRepository implements OnModuleInit {
       if (age > maxAgeMs) {
         this.logger.debug(
           `Timeline cache expired for @${handle} (age: ${Math.round(age / 3600000)}h, max: ${Math.round(maxAgeMs / 3600000)}h)`,
+        );
+        return null;
+      }
+
+      if (record.cachedTimeline.posts.length < minPosts) {
+        this.logger.debug(
+          `Timeline cache for @${handle} only has ${record.cachedTimeline.posts.length} posts, need ${minPosts}`,
         );
         return null;
       }

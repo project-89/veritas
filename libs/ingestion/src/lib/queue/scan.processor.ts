@@ -15,8 +15,27 @@ export interface ScanJobData {
   options: {
     limit?: number;
     timeRange?: string;
+    searchMode?: 'topic' | 'claim';
   };
   startedAt?: string;
+}
+
+function serializePostTimestamp(timestamp: string | Date | undefined): string {
+  if (timestamp instanceof Date) {
+    return Number.isFinite(timestamp.getTime())
+      ? timestamp.toISOString()
+      : new Date().toISOString();
+  }
+
+  if (typeof timestamp === 'string' && timestamp.trim().length > 0) {
+    const parsed = new Date(timestamp);
+    if (Number.isFinite(parsed.getTime())) {
+      return parsed.toISOString();
+    }
+    return timestamp;
+  }
+
+  return new Date().toISOString();
 }
 
 @Processor('scan')
@@ -55,6 +74,7 @@ export class ScanProcessor extends WorkerHost {
       // Convert timeRange string (e.g., '7d') to actual start/end dates
       const searchOptions: ConnectorSearchOptions = {
         limit: options.limit,
+        searchMode: options.searchMode ?? 'topic',
       };
       if (options.timeRange) {
         // Support relative ranges (7d, 24h, 30m) and absolute ranges (2026-03-15_2026-03-22)
@@ -124,10 +144,7 @@ export class ScanProcessor extends WorkerHost {
           authorName: post.authorName ?? 'Unknown',
           authorHandle: post.authorHandle ?? 'unknown',
           url: post.url ?? '',
-          timestamp:
-            post.timestamp instanceof Date
-              ? post.timestamp.toISOString()
-              : String(post.timestamp),
+          timestamp: serializePostTimestamp(post.timestamp),
           sentiment: insight?.sentiment ?? { score: 0, label: 'neutral', confidence: 0 },
           themes: insight?.themes ?? [],
           entities: insight?.entities ?? [],

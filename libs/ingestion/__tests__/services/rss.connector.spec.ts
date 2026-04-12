@@ -79,6 +79,32 @@ describe('RSSConnector', () => {
         text: 'Threat analysis',
       });
     });
+
+    it('falls back to a valid timestamp when feed dates are malformed', async () => {
+      mockedGetFeedsForQuery.mockReturnValue([
+        {
+          name: 'Mock Feed',
+          url: 'https://example.com/feed.xml',
+          category: 'world_news',
+          tier: 1,
+          language: 'en',
+        },
+      ]);
+
+      jest.spyOn(connector as any, 'fetchFeedItems').mockResolvedValue([
+        {
+          title: 'Malformed date item',
+          link: 'https://example.com/posts/2',
+          pubDate: 'not-a-date',
+        },
+      ]);
+
+      const posts = await connector.searchContent('malformed');
+
+      expect(posts).toHaveLength(1);
+      expect(posts[0]?.timestamp).toBeInstanceOf(Date);
+      expect(Number.isFinite(posts[0]!.timestamp.getTime())).toBe(true);
+    });
   });
 
   describe('fetchFeedItems', () => {

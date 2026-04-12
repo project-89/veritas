@@ -58,9 +58,15 @@ export function TemporalHeatmap({
   const CELL_PADDING = 1;
 
   // Compute time buckets
-  const { buckets, bucketLabels, grid, postsByNarrativeBucket } = useMemo(() => {
+  const { buckets, bucketLabels, grid, postsByNarrativeBucket, windowLabel } = useMemo(() => {
     if (narratives.length === 0 || posts.length === 0) {
-      return { buckets: [], bucketLabels: [], grid: [], postsByNarrativeBucket: new Map() };
+      return {
+        buckets: [],
+        bucketLabels: [],
+        grid: [],
+        postsByNarrativeBucket: new Map(),
+        windowLabel: null,
+      };
     }
 
     const allTimestamps = posts.map((p) => new Date(p.timestamp).getTime()).sort((a, b) => a - b);
@@ -99,6 +105,7 @@ export function TemporalHeatmap({
     }
 
     const range = Math.max(maxTime - minTime, 3600000); // at least 1 hour
+    const useTimeLabels = range <= 86400000;
 
     // Choose bucket count based on range
     let numBuckets: number;
@@ -116,7 +123,7 @@ export function TemporalHeatmap({
       bkts.push({ start, end });
       const d = new Date(start);
       labels.push(
-        range < 86400000
+        useTimeLabels
           ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           : d.toLocaleDateString([], { month: 'short', day: 'numeric' }),
       );
@@ -166,11 +173,18 @@ export function TemporalHeatmap({
       gridData.push(row);
     }
 
+    const windowStart = new Date(minTime);
+    const windowEnd = new Date(maxTime);
+    const windowText = useTimeLabels
+      ? `${windowStart.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${windowStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → ${windowEnd.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${windowEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      : `${windowStart.toLocaleDateString([], { month: 'short', day: 'numeric' })} → ${windowEnd.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+
     return {
       buckets: bkts,
       bucketLabels: labels,
       grid: gridData,
       postsByNarrativeBucket: byNB,
+      windowLabel: windowText,
     };
   }, [narratives, posts, timeRange, scanCreatedAt]);
 
@@ -407,6 +421,11 @@ export function TemporalHeatmap({
 
   return (
     <div ref={containerRef} className="relative w-full h-full min-h-[200px]">
+      {windowLabel && (
+        <div className="absolute left-20 top-1 z-10 text-[9px] font-mono text-nerv-text-muted pointer-events-none">
+          WINDOW {windowLabel}
+        </div>
+      )}
       <canvas
         ref={canvasRef}
         style={{ width: dimensions.width, height: dimensions.height }}

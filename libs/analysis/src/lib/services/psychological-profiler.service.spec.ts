@@ -323,5 +323,47 @@ describe('PsychologicalProfilerService', () => {
 
       expect(profile.postCountAnalyzed).toBeLessThanOrEqual(120);
     });
+
+    it('allows a larger analyzed sample for deep-history profiles', async () => {
+      const service = createService('fake-key');
+
+      (service as any).genAI = {
+        getGenerativeModel: jest.fn().mockReturnValue({
+          generateContent: jest.fn().mockResolvedValue({
+            response: {
+              text: () => JSON.stringify({
+                communicationStyle: { formality: 'mixed', tone: 'mixed', complexity: 'moderate', evidence: [] },
+                coreBeliefs: [],
+                interestDomains: [],
+                emotionalTriggers: { anger: [], excitement: [], fear: [], evidence: {} },
+                engagementPatterns: { likelyToEngageWith: [], likelyToShare: [], likelyToCreate: [], contentPreferences: [] },
+                influenceSusceptibility: { vulnerableTo: [], resistantTo: [], echoChamberDepth: 'none', evidence: [] },
+                persuasionStyle: { primaryTechniques: [], targetAudience: '', effectiveness: 'low', evidence: [] },
+                riskIndicators: { radicalizationSignals: [], manipulationVulnerability: 'low', echoChamberDepth: 'none', flags: [], evidence: [] },
+                socialRole: { primary: 'follower', confidence: 0.5, evidence: [] },
+                summary: 'Deep history prompt sample.',
+              }),
+            },
+          }),
+        }),
+      };
+
+      const profile = await service.generateProfile({
+        handle: 'testuser',
+        platform: 'twitter',
+        posts: Array.from({ length: 500 }, (_, i) =>
+          makePost({
+            text: `Deep history sample ${i} with distinct framing about governance, media, and influence patterns.`,
+            timestamp: new Date(2026, 0, 1, 0, i, 0).toISOString(),
+            engagement: { likes: 500 - i, comments: i % 30, shares: i % 17 },
+          }),
+        ),
+        profileMode: 'deep-history',
+      });
+
+      expect(profile.postCountAnalyzed).toBeGreaterThan(120);
+      expect(profile.postCountAnalyzed).toBeLessThanOrEqual(180);
+      expect(profile.profileMode).toBe('deep-history');
+    });
   });
 });

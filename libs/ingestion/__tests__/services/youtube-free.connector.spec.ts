@@ -119,7 +119,7 @@ describe('YouTubeFreeConnector', () => {
       expect(subprocessUtil.execJsonLines).toHaveBeenCalledWith(
         'yt-dlp',
         expect.arrayContaining([
-          'ytsearch10:test query',
+          'ytsearch25:test query',
           '--dump-json',
           '--no-download',
           '--flat-playlist',
@@ -167,6 +167,21 @@ describe('YouTubeFreeConnector', () => {
       expect(args).toContain('20240101');
       expect(args).toContain('--datebefore');
       expect(args).toContain('20240630');
+    });
+
+    it('retries long claim-style searches with a compact query when the first search returns no results', async () => {
+      (subprocessUtil.execJsonLines as jest.Mock)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([mockVideoInfo]);
+
+      await connector.searchAndTransform('Chinese sent iran 500 DF-41 missiles to Iran', {
+        searchMode: 'claim',
+      } as any);
+
+      expect(subprocessUtil.execJsonLines).toHaveBeenCalledTimes(2);
+      expect((subprocessUtil.execJsonLines as jest.Mock).mock.calls[1][1][0]).toBe(
+        'ytsearch25:500 df-41 china iran missile send',
+      );
     });
 
     it('should correctly transform video metadata to SocialMediaPost', async () => {
@@ -265,17 +280,17 @@ describe('YouTubeFreeConnector', () => {
       jest.useRealTimers();
 
       const emitter = connector.streamAndTransform(['test']);
+      const timeoutId = setTimeout(() => {
+        emitter.emit('end');
+        done(new Error('Timed out waiting for data event'));
+      }, 3000);
+
       emitter.on('data', (insight: unknown) => {
+        clearTimeout(timeoutId);
         expect(insight).toEqual(expect.objectContaining({ id: 'insight-1' }));
         emitter.emit('end');
         done();
       });
-
-      // Safety timeout — fail if no data emitted within 3s
-      setTimeout(() => {
-        emitter.emit('end');
-        done(new Error('Timed out waiting for data event'));
-      }, 3000);
     }, 10000);
 
     it('should emit error events on failure', async () => {

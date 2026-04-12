@@ -30,6 +30,26 @@ export class ScanController {
     private readonly ingestionService: IngestionService,
   ) {}
 
+  private buildSummaryFromPosts(posts: Array<Record<string, any>>): {
+    total: number;
+    positive: number;
+    negative: number;
+    neutral: number;
+    byPlatform: Record<string, number>;
+  } {
+    return {
+      total: posts.length,
+      positive: posts.filter((post) => post['sentiment']?.label === 'positive').length,
+      negative: posts.filter((post) => post['sentiment']?.label === 'negative').length,
+      neutral: posts.filter((post) => post['sentiment']?.label === 'neutral').length,
+      byPlatform: posts.reduce<Record<string, number>>((acc, post) => {
+        const platform = typeof post['platform'] === 'string' ? post['platform'] : 'unknown';
+        acc[platform] = (acc[platform] || 0) + 1;
+        return acc;
+      }, {}),
+    };
+  }
+
   /**
    * POST /scan — Start a new scan.
    * Creates a ScanJob in MongoDB, enqueues per-connector BullMQ jobs,
@@ -44,9 +64,17 @@ export class ScanController {
       platforms?: string[];
       limit?: number;
       timeRange?: string;
+      searchMode?: 'topic' | 'claim';
     },
   ): Promise<{ scanId: string }> {
-    const { query, investigationId: requestedInvestigationId, platforms, limit, timeRange } = body;
+    const {
+      query,
+      investigationId: requestedInvestigationId,
+      platforms,
+      limit,
+      timeRange,
+      searchMode,
+    } = body;
 
     if (!query || query.trim().length === 0) {
       throw new HttpException('Query is required', HttpStatus.BAD_REQUEST);
@@ -85,6 +113,7 @@ export class ScanController {
             platforms: targetPlatforms,
             timeRange: timeRange ?? investigation.settings?.timeRange ?? '7d',
             limit: limit ?? investigation.settings?.limit ?? 50,
+            searchMode: searchMode ?? investigation.settings?.searchMode ?? 'topic',
           },
         };
         await this.investigationRepository.update(investigationId, updatePayload);
@@ -106,7 +135,7 @@ export class ScanController {
       query,
       investigationId,
       targetPlatforms,
-      { timeRange, limit },
+      { timeRange, limit, searchMode },
     );
 
     const scanId = scanJob._id?.toString() ?? scanJob.id;
@@ -129,6 +158,7 @@ export class ScanController {
         options: {
           limit,
           timeRange,
+          searchMode,
         },
         startedAt: new Date().toISOString(),
       };
@@ -226,6 +256,31 @@ export class ScanController {
       return { success: true };
     }
     await this.scanJobRepository.updateAnalysisCache(id, body);
+
+    const serializedPosts = Array.isArray(job.posts)
+      ? (job.posts as Array<Record<string, any>>)
+      : [];
+    const narratives = Array.isArray(body['narratives'])
+      ? (body['narratives'] as unknown[])
+      : null;
+
+    if (
+      narratives &&
+      typeof job.investigationId === 'string' &&
+      job.investigationId.trim().length > 0 &&
+      job.investigationId !== 'unknown'
+    ) {
+      await this.investigationRepository.upsertSnapshotForScan(
+        job.investigationId,
+        id,
+        {
+          posts: serializedPosts,
+          narratives,
+          summary: this.buildSummaryFromPosts(serializedPosts),
+        },
+      );
+    }
+
     return { success: true };
   }
 

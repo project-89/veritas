@@ -11,6 +11,8 @@ import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { PsychologicalProfile } from '@veritas/ingestion';
 
+type ProfileGenerationMode = 'investigation-window' | 'current-state' | 'historical' | 'deep-history';
+
 interface UserPost {
   text: string;
   timestamp: string;
@@ -77,11 +79,15 @@ export class PsychologicalProfilerService {
   private readonly logger = new Logger(PsychologicalProfilerService.name);
   private readonly genAI: GoogleGenerativeAI | null = null;
   private readonly deepModel = 'gemini-3.1-pro-preview';
-  private static readonly MAX_PROFILE_POSTS = 120;
-  private static readonly MAX_RECENT_POSTS = 50;
-  private static readonly MAX_TOP_ENGAGEMENT_POSTS = 30;
+  private static readonly STANDARD_MAX_PROFILE_POSTS = 120;
+  private static readonly DEEP_HISTORY_MAX_PROFILE_POSTS = 180;
+  private static readonly STANDARD_MAX_RECENT_POSTS = 50;
+  private static readonly DEEP_HISTORY_MAX_RECENT_POSTS = 72;
+  private static readonly STANDARD_MAX_TOP_ENGAGEMENT_POSTS = 30;
+  private static readonly DEEP_HISTORY_MAX_TOP_ENGAGEMENT_POSTS = 48;
   private static readonly MAX_POST_TEXT_CHARS = 280;
-  private static readonly MAX_TOTAL_POST_TEXT_CHARS = 24000;
+  private static readonly STANDARD_MAX_TOTAL_POST_TEXT_CHARS = 24000;
+  private static readonly DEEP_HISTORY_MAX_TOTAL_POST_TEXT_CHARS = 32000;
   private static readonly GENERATION_RETRIES = 3;
   private static readonly BASE_RETRY_DELAY_MS = 1500;
 
@@ -110,25 +116,27 @@ export class PsychologicalProfilerService {
       bio?: string | null;
     } | null;
     existingProfile?: PsychologicalProfile | null;
+    profileMode?: ProfileGenerationMode;
   }): Promise<PsychologicalProfile> {
     if (!this.genAI) {
       throw new Error('GEMINI_API_KEY not configured — cannot generate psychological profile');
     }
 
     const { handle, platform, posts, authorProfile, existingProfile } = params;
+    const profileMode = params.profileMode ?? existingProfile?.profileMode ?? 'current-state';
 
     if (posts.length === 0) {
       throw new Error('No posts available for profiling');
     }
 
     const normalizedPosts = this.dedupePosts(posts);
+    const profileLimits = this.getProfileLimits(profileMode);
 
-    // Sample posts strategically: recent + random older + high-engagement.
-    // The original 200 x 500-char payload was too large and made the profile
-    // generation path fragile under load.
     const sampledPosts = this.samplePosts(
       normalizedPosts,
-      PsychologicalProfilerService.MAX_PROFILE_POSTS,
+      profileLimits.maxProfilePosts,
+      profileLimits.maxRecentPosts,
+      profileLimits.maxTopEngagementPosts,
     );
 
     this.logger.log(
@@ -144,6 +152,7 @@ export class PsychologicalProfilerService {
       sampledPosts,
       authorProfile,
       existingProfile,
+      profileLimits.maxTotalPostTextChars,
     );
 
     try {
@@ -163,7 +172,7 @@ export class PsychologicalProfilerService {
         generatedAt: new Date(),
         modelUsed: this.deepModel,
         postCountAnalyzed: sampledPosts.length,
-        profileMode: existingProfile?.profileMode ?? 'current-state',
+        profileMode,
         scopeLabel: existingProfile?.scopeLabel ?? 'Current state',
         scope: existingProfile?.scope ?? {
           investigationId: null,
@@ -237,6 +246,7 @@ ${JSON_SCHEMA}`;
     posts: UserPost[],
     authorProfile?: Record<string, unknown> | null,
     existingProfile?: PsychologicalProfile | null,
+    maxTotalPostTextChars = PsychologicalProfilerService.STANDARD_MAX_TOTAL_POST_TEXT_CHARS,
   ): string {
     const dateRange = this.getDateRange(posts);
 
@@ -244,7 +254,7 @@ ${JSON_SCHEMA}`;
       ? `\nAccount: ${authorProfile['followersCount'] ?? '?'} followers, ${authorProfile['followingCount'] ?? '?'} following, verified: ${authorProfile['isVerified'] ?? false}\nBio: ${authorProfile['bio'] ?? 'N/A'}`
       : '';
 
-    const postSection = this.buildPostSection(posts);
+    const postSection = this.buildPostSection(posts, maxTotalPostTextChars);
 
     const existingSection = existingProfile
       ? `\n\n## Previous Profile (v${existingProfile.version})\nUpdate based on new evidence. Note changes.\n${existingProfile.summary.slice(0, 1200)}`
@@ -257,7 +267,12 @@ ${JSON_SCHEMA}`;
   // Post sampling strategy
   // -------------------------------------------------------------------------
 
-  private samplePosts(posts: UserPost[], maxPosts: number): UserPost[] {
+  private samplePosts(
+    posts: UserPost[],
+    maxPosts: number,
+    maxRecentPosts: number,
+    maxTopEngagementPosts: number,
+  ): UserPost[] {
     if (posts.length <= maxPosts) return posts;
 
     const sorted = [...posts].sort(
@@ -265,7 +280,7 @@ ${JSON_SCHEMA}`;
     );
 
     // Most recent posts
-    const recent = sorted.slice(0, Math.min(PsychologicalProfilerService.MAX_RECENT_POSTS, maxPosts));
+    const recent = sorted.slice(0, Math.min(maxRecentPosts, maxPosts));
 
     // Highest engagement posts
     const byEngagement = [...posts].sort(
@@ -275,10 +290,10 @@ ${JSON_SCHEMA}`;
     );
     const topEngagement = byEngagement.slice(
       0,
-      Math.min(
-        PsychologicalProfilerService.MAX_TOP_ENGAGEMENT_POSTS,
-        Math.max(maxPosts - recent.length, 0),
-      ),
+        Math.min(
+          maxTopEngagementPosts,
+          Math.max(maxPosts - recent.length, 0),
+        ),
     );
 
     // Random sample from the rest
@@ -304,7 +319,7 @@ ${JSON_SCHEMA}`;
     return result;
   }
 
-  private buildPostSection(posts: UserPost[]): string {
+  private buildPostSection(posts: UserPost[], maxTotalPostTextChars: number): string {
     let totalChars = 0;
     const lines: string[] = [];
 
@@ -315,7 +330,7 @@ ${JSON_SCHEMA}`;
         `[engagement: ${post.engagement.likes}L ${post.engagement.comments}C ${post.engagement.shares}S]` +
         `${post.sentiment ? ` [sentiment: ${post.sentiment.label}]` : ''}\n${text}`;
 
-      if (lines.length > 0 && totalChars + entry.length > PsychologicalProfilerService.MAX_TOTAL_POST_TEXT_CHARS) {
+      if (lines.length > 0 && totalChars + entry.length > maxTotalPostTextChars) {
         break;
       }
 
@@ -340,6 +355,29 @@ ${JSON_SCHEMA}`;
     }
 
     return result;
+  }
+
+  private getProfileLimits(profileMode: ProfileGenerationMode): {
+    maxProfilePosts: number;
+    maxRecentPosts: number;
+    maxTopEngagementPosts: number;
+    maxTotalPostTextChars: number;
+  } {
+    if (profileMode === 'deep-history') {
+      return {
+        maxProfilePosts: PsychologicalProfilerService.DEEP_HISTORY_MAX_PROFILE_POSTS,
+        maxRecentPosts: PsychologicalProfilerService.DEEP_HISTORY_MAX_RECENT_POSTS,
+        maxTopEngagementPosts: PsychologicalProfilerService.DEEP_HISTORY_MAX_TOP_ENGAGEMENT_POSTS,
+        maxTotalPostTextChars: PsychologicalProfilerService.DEEP_HISTORY_MAX_TOTAL_POST_TEXT_CHARS,
+      };
+    }
+
+    return {
+      maxProfilePosts: PsychologicalProfilerService.STANDARD_MAX_PROFILE_POSTS,
+      maxRecentPosts: PsychologicalProfilerService.STANDARD_MAX_RECENT_POSTS,
+      maxTopEngagementPosts: PsychologicalProfilerService.STANDARD_MAX_TOP_ENGAGEMENT_POSTS,
+      maxTotalPostTextChars: PsychologicalProfilerService.STANDARD_MAX_TOTAL_POST_TEXT_CHARS,
+    };
   }
 
   private async generateWithRetry(

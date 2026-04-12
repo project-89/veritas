@@ -6,6 +6,7 @@ import {
   OnModuleDestroy,
   Optional,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Subject, Observable } from 'rxjs';
 import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
 import { UsgsAdapter } from './signal-adapters/usgs.adapter';
@@ -88,7 +89,8 @@ export class GlobalEventAggregationService
   readonly events$: Observable<GlobalEvent> = this.subject.asObservable();
 
   constructor(
-    @Optional() @Inject(GLOBAL_EVENT_REPOSITORY) private readonly eventRepo?: EventRepository,
+    private readonly moduleRef: ModuleRef,
+    @Optional() @Inject(GLOBAL_EVENT_REPOSITORY) private eventRepo?: EventRepository,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -96,6 +98,16 @@ export class GlobalEventAggregationService
   // ---------------------------------------------------------------------------
 
   onModuleInit(): void {
+    if (!this.eventRepo) {
+      try {
+        this.eventRepo = this.moduleRef.get<EventRepository>(GLOBAL_EVENT_REPOSITORY, {
+          strict: false,
+        });
+      } catch {
+        // Best effort fallback; service can still stream live events without persistence.
+      }
+    }
+
     this.logger.log(`Starting global event aggregation (persistence: ${this.eventRepo ? 'enabled' : 'DISABLED — GLOBAL_EVENT_REPOSITORY not injected'})`);
 
     // Stagger initial polls to avoid thundering herd / rate limits

@@ -48,6 +48,19 @@ interface SearchOptions {
   limit?: number;
 }
 
+function coerceValidDate(value: unknown): Date | null {
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value : null;
+  }
+
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.getTime()) ? parsed : null;
+  }
+
+  return null;
+}
+
 /**
  * RSS/Atom feed connector
  * Handles fetching and processing RSS and Atom feeds
@@ -381,11 +394,10 @@ export class RSSConnector
     if (!options?.startDate && !options?.endDate) return items;
 
     return items.filter((item) => {
-      const itemDate = new Date(
-        this.coerceToText(item.isoDate) ||
-          this.coerceToText(item.pubDate) ||
-          Date.now()
-      );
+      const itemDate =
+        coerceValidDate(this.coerceToText(item.isoDate)) ??
+        coerceValidDate(this.coerceToText(item.pubDate));
+      if (!itemDate) return true;
       if (options.startDate && itemDate < options.startDate) return false;
       if (options.endDate && itemDate > options.endDate) return false;
       return true;
@@ -419,11 +431,10 @@ export class RSSConnector
    */
   private transformToSocialMediaPosts(items: RSSItem[]): SocialMediaPost[] {
     return items.map((item) => {
-      const pubDate = new Date(
-        this.coerceToText(item.isoDate) ||
-          this.coerceToText(item.pubDate) ||
-          Date.now()
-      );
+      const pubDate =
+        coerceValidDate(this.coerceToText(item.isoDate)) ??
+        coerceValidDate(this.coerceToText(item.pubDate)) ??
+        new Date();
       const guid = this.coerceToText(item.guid);
       const link = this.coerceToText(item.link);
       const contentSnippet = this.coerceToText(item.contentSnippet);

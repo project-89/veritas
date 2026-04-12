@@ -12,11 +12,20 @@ import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import {
+  buildClaimQueryPlan,
+  extractSignificantQueryTerms,
+  looksLikeClaimQuery,
+  normalizeSearchMode,
+  normalizeSearchText,
+  type SearchMode,
+} from '../utils/query-intent.util';
 
 interface SearchOptions {
   startDate?: Date;
   endDate?: Date;
   limit?: number;
+  searchMode?: SearchMode;
 }
 
 interface RedditJsonPost {
@@ -154,6 +163,14 @@ export class RedditFreeConnector
         options?.startDate,
         options?.endDate
       );
+      const searchMode = normalizeSearchMode(
+        options?.searchMode ?? (looksLikeClaimQuery(query) ? 'claim' : 'topic'),
+      );
+      const claimPlan = searchMode === 'claim' ? buildClaimQueryPlan(query) : null;
+      const effectiveQuery =
+        claimPlan?.compactQuery && claimPlan.compactQuery.length > 0
+          ? claimPlan.compactQuery
+          : query;
 
       const allPosts: RedditJsonPost[] = [];
       let after: string | null = null;
@@ -161,7 +178,7 @@ export class RedditFreeConnector
 
       for (let page = 0; page < maxPages; page++) {
         const params = new URLSearchParams({
-          q: query,
+          q: effectiveQuery,
           sort: 'new',
           limit: String(Math.min(100, limit - allPosts.length)),
           t: timeFilter,
@@ -193,7 +210,22 @@ export class RedditFreeConnector
         if (!after || allPosts.length >= limit) break;
       }
 
-      return this.transformPostsToSocialMediaPosts(allPosts.slice(0, limit));
+      let filteredPosts = allPosts;
+
+      if (options?.startDate || options?.endDate) {
+        const start = options.startDate?.getTime() ?? 0;
+        const end = options.endDate?.getTime() ?? Date.now();
+        filteredPosts = filteredPosts.filter((post) => {
+          const timestamp = post.created_utc * 1000;
+          return timestamp >= start && timestamp <= end;
+        });
+      }
+
+      filteredPosts = filteredPosts.filter((post) =>
+        this.postMatchesQuery(post, query, searchMode),
+      );
+
+      return this.transformPostsToSocialMediaPosts(filteredPosts.slice(0, limit));
     } catch (error) {
       this.logger.error('Error searching Reddit content:', error);
       throw error;
@@ -521,6 +553,86 @@ export class RedditFreeConnector
   ): boolean {
     const text = post.text.toLowerCase();
     return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
+  }
+
+  private postMatchesQuery(
+    post: RedditJsonPost,
+    query: string,
+    searchMode: SearchMode,
+  ): boolean {
+    const normalizedQuery = normalizeSearchText(query);
+    if (!normalizedQuery) return true;
+
+    const haystack = normalizeSearchText(
+      [post.title, post.selftext, post.url, post.subreddit].filter(Boolean).join(' ')
+    );
+
+    if (!haystack) return false;
+    if (haystack.includes(normalizedQuery)) return true;
+
+    const terms = extractSignificantQueryTerms(query);
+    if (terms.length <= 3 && searchMode !== 'claim') {
+      return true;
+    }
+
+    const matchedTerms = terms.filter((term) => this.haystackIncludesTerm(haystack, term));
+    if (searchMode === 'claim') {
+      const plan = buildClaimQueryPlan(query);
+      const matchedActors = plan.actorTerms.filter((term) =>
+        this.haystackIncludesTerm(haystack, term),
+      );
+      const matchedEvidence = plan.evidenceTerms.filter((term) =>
+        this.haystackIncludesTerm(haystack, term),
+      );
+      const matchedActions = plan.actionTerms.filter((term) =>
+        this.haystackIncludesTerm(haystack, term),
+      );
+      const matchedAnchors = plan.anchorTerms.filter((term) =>
+        this.haystackIncludesTerm(haystack, term),
+      );
+
+      const requiredActorMatches = Math.min(plan.actorTerms.length, 2);
+      if (requiredActorMatches > 0 && matchedActors.length < requiredActorMatches) {
+        return false;
+      }
+      if (plan.evidenceTerms.length > 0 && matchedEvidence.length === 0) {
+        return false;
+      }
+      if (plan.actionTerms.length > 0 && matchedActions.length === 0 && matchedAnchors.length === 0) {
+        return false;
+      }
+      if (plan.anchorTerms.length > 0 && matchedAnchors.length === 0) {
+        return false;
+      }
+
+      const claimMatchedTerms = plan.searchTerms.filter((term) =>
+        this.haystackIncludesTerm(haystack, term),
+      );
+      const requiredMatches = Math.min(
+        plan.searchTerms.length,
+        Math.max(3, Math.ceil(plan.searchTerms.length * 0.75)),
+      );
+      return claimMatchedTerms.length >= requiredMatches;
+    }
+
+    const anchorTerms = terms.filter((term) => /\d/.test(term) || term.includes('-'));
+    const matchedAnchors = anchorTerms.filter((term) =>
+      this.haystackIncludesTerm(haystack, term),
+    );
+
+    if (anchorTerms.length > 0 && matchedAnchors.length === 0) {
+      return false;
+    }
+
+    const requiredMatches = Math.min(4, Math.max(3, Math.ceil(terms.length / 2)));
+    return matchedTerms.length >= requiredMatches;
+  }
+
+  private haystackIncludesTerm(haystack: string, term: string): boolean {
+    if (haystack.includes(term)) return true;
+    const collapsedHaystack = haystack.replace(/-/g, '');
+    const collapsedTerm = term.replace(/-/g, '');
+    return collapsedTerm.length > 0 && collapsedHaystack.includes(collapsedTerm);
   }
 
   private getTimeFilter(

@@ -238,8 +238,11 @@ function InvestigationWorkspace() {
   const invId = normalizeRouteId(searchParams.get('inv'));
   const requestedScanId = normalizeRouteId(searchParams.get('scan'));
   const freshSearch = searchParams.get('fresh') === '1';
+  const urlSearchMode = searchParams.get('mode') === 'claim' ? 'claim' : 'topic';
   const urlPlatforms = searchParams.get('platforms')?.split(',').filter(Boolean) ?? undefined;
   const urlTimeRange = searchParams.get('timeRange') ?? '7d';
+  const parsedUrlLimit = Number.parseInt(searchParams.get('limit') ?? '', 10);
+  const urlLimit = Number.isFinite(parsedUrlLimit) && parsedUrlLimit > 0 ? parsedUrlLimit : undefined;
   const urlUsernames = searchParams.get('usernames')?.split(',').map(s => s.trim().replace(/^@/, '')).filter(Boolean) ?? [];
   const urlHashtags = searchParams.get('hashtags')?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
   const urlWallets = searchParams.get('wallets')?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
@@ -274,6 +277,75 @@ function InvestigationWorkspace() {
   const [scanHistory, setScanHistory] = useState<ScanJob[]>([]);
   const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scanPostsFetchedRef = useRef(false);
+  const mergeUniqueByKey = useCallback(<T,>(items: T[], keyFn: (item: T) => string): T[] => {
+    const seen = new Set<string>();
+    const merged: T[] = [];
+    for (const item of items) {
+      const key = keyFn(item);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+    return merged;
+  }, []);
+  const mergeInvestigationResults = useCallback((
+    current: NonNullable<typeof state.investigation> | null,
+    incoming: NonNullable<typeof state.investigation>,
+  ) => {
+    if (!current) return incoming;
+
+    return {
+      topic: current.topic || incoming.topic,
+      users: mergeUniqueByKey(
+        [...current.users, ...incoming.users],
+        (user) => `${user.user.handle}:${user.user.platform}`,
+      ),
+      originAnalysis: incoming.originAnalysis?.propagationChain?.length
+        ? incoming.originAnalysis
+        : current.originAnalysis,
+      cuiBono: {
+        beneficiaries: mergeUniqueByKey(
+          [...current.cuiBono.beneficiaries, ...incoming.cuiBono.beneficiaries],
+          (item) => `${item.entity}:${item.howTheyBenefit}`,
+        ),
+        agendas: mergeUniqueByKey(
+          [...current.cuiBono.agendas, ...incoming.cuiBono.agendas],
+          (item) => item,
+        ),
+        summary: [current.cuiBono.summary, incoming.cuiBono.summary].filter(Boolean).join(' ').trim(),
+      },
+      coordination: {
+        clusters: mergeUniqueByKey(
+          [...current.coordination.clusters, ...incoming.coordination.clusters],
+          (cluster) => `${cluster.pattern}:${cluster.users.slice().sort().join(',')}`,
+        ),
+        summary: [current.coordination.summary, incoming.coordination.summary].filter(Boolean).join(' ').trim(),
+      },
+      botDetection: incoming.botDetection ?? current.botDetection ?? null,
+    };
+  }, [mergeUniqueByKey]);
+  const memoizedGlobeData = useMemo(
+    () => buildGlobeData({
+      narratives: state.narratives,
+      posts: state.posts,
+      downstream: state.downstream,
+      investigation: state.investigation,
+    }),
+    [state.narratives, state.posts, state.downstream, state.investigation],
+  );
+
+  const handleGlobePointClick = useCallback((point: { metadata?: Record<string, unknown> }) => {
+    const meta = point.metadata as { narrativeCount?: number } | undefined;
+    if (!meta?.narrativeCount || meta.narrativeCount <= 0) return;
+
+    const countryCode = (point.metadata as Record<string, unknown> | undefined)?.countryCode as string | undefined;
+    if (!countryCode) return;
+
+    const firstNarrative = state.narratives[0];
+    if (firstNarrative) {
+      selectNarrative(firstNarrative.id);
+    }
+  }, [state.narratives, selectNarrative]);
 
   useEffect(() => {
     pipelineRan.current = false;
@@ -952,16 +1024,18 @@ function InvestigationWorkspace() {
           const { scanId } = await startScan(
             enhancedQuery,
             urlPlatforms,
-            undefined,
+            urlLimit,
             urlTimeRange,
             activeInvestigationId,
+            urlSearchMode,
           );
           const initialStatus = await getScanStatus(scanId);
           setScanJob(initialStatus);
           scanPostsFetchedRef.current = false;
 
           // Remove fresh=1 from URL so page refresh doesn't re-trigger scan
-          const nextParams = new URLSearchParams();
+          const nextParams = new URLSearchParams(searchParams.toString());
+          nextParams.delete('fresh');
           nextParams.set('q', query);
           if (activeInvestigationId) {
             nextParams.set('inv', activeInvestigationId);
@@ -1054,14 +1128,23 @@ function InvestigationWorkspace() {
           const sid = activeScanIdRef.current;
           if (sid) {
             const cacheUpdate: Record<string, unknown> = {};
+            let mergedInvestigation: NonNullable<typeof state.investigation> | null = null;
             for (const j of allJobs) {
               if (j.status !== 'completed' || !j.result) continue;
               if (j.type === 'investigation') {
-                cacheUpdate.investigation = j.result;
-                cacheUpdate.investigationNarrativeId = j.narrativeIds[0] ?? '';
+                mergedInvestigation = mergeInvestigationResults(
+                  mergedInvestigation,
+                  j.result as unknown as NonNullable<typeof state.investigation>,
+                );
               }
               if (j.type === 'propaganda') cacheUpdate.propaganda = j.result;
               if (j.type === 'downstream') cacheUpdate.downstream = j.result;
+            }
+            if (mergedInvestigation) {
+              cacheUpdate.investigation = mergedInvestigation;
+              cacheUpdate.investigationNarrativeId = allJobs.find(
+                (j) => j.status === 'completed' && j.type === 'investigation' && j.result,
+              )?.narrativeIds?.[0] ?? '';
             }
             if (Object.keys(cacheUpdate).length > 0) {
               // Merge with existing cache rather than overwriting
@@ -1073,7 +1156,7 @@ function InvestigationWorkspace() {
         }
       } catch { /* polling error */ }
     }, 2000);
-  }, [dispatch]);
+  }, [dispatch, mergeInvestigationResults]);
 
   // ---- Action handlers ----
   /**
@@ -1296,9 +1379,9 @@ function InvestigationWorkspace() {
       await generateMagiProfile(identityId, {
         mode,
         investigationId: state.investigationId,
-        scanId: mode === 'current-state' ? null : scanId,
-        startDate: mode === 'current-state' ? null : startDate,
-        endDate: mode === 'current-state' ? null : endDate,
+        scanId: mode === 'current-state' || mode === 'deep-history' ? null : scanId,
+        startDate: mode === 'current-state' || mode === 'deep-history' ? null : startDate,
+        endDate: mode === 'current-state' || mode === 'deep-history' ? null : endDate,
       });
       // Immediately refresh to show "queued" status
       if (state.selectedActorHandle) {
@@ -1408,7 +1491,7 @@ function InvestigationWorkspace() {
     } finally {
       setEvidenceSeedSaving(false);
     }
-  }, [investigationRecord, query, urlPlatforms, urlTimeRange, searchParams, router, dispatch]);
+  }, [investigationRecord, query, urlPlatforms, urlTimeRange, urlLimit, searchParams, router, dispatch]);
 
   const handleBuildProjectDossier = useCallback(async () => {
     const investigationId = getInvestigationId(investigationRecord);
@@ -1490,9 +1573,10 @@ function InvestigationWorkspace() {
       const { scanId } = await startScan(
         enhancedQuery,
         urlPlatforms,
-        undefined,
+        urlLimit,
         urlTimeRange,
         investigationRecord?._id ?? investigationRecord?.id ?? state.investigationId ?? undefined,
+        urlSearchMode,
       );
       const initialStatus = await getScanStatus(scanId);
       setScanJob(initialStatus);
@@ -1504,7 +1588,7 @@ function InvestigationWorkspace() {
       });
       dispatch({ type: 'SET_LOADING', loading: false });
     }
-  }, [dispatch, query]);
+  }, [dispatch, query, enhancedQuery, urlPlatforms, urlLimit, urlTimeRange, investigationRecord, state.investigationId, urlSearchMode]);
 
   const handleCancelScan = useCallback(async () => {
     if (!scanJob) return;
@@ -1659,29 +1743,11 @@ function InvestigationWorkspace() {
             </div>
           );
         }
-        const globeData = buildGlobeData({
-          narratives: state.narratives,
-          posts: state.posts,
-          downstream: state.downstream,
-          investigation: state.investigation,
-        });
         return (
           <NarrativeGlobeLazy
-            points={globeData.points}
-            arcs={globeData.arcs}
-            onPointClick={(point) => {
-              // Select the first narrative associated with this country
-              const meta = point.metadata as { narrativeCount?: number } | undefined;
-              if (meta?.narrativeCount && meta.narrativeCount > 0) {
-                // Find a narrative that mentions this country
-                const countryCode = (point.metadata as Record<string, unknown>)?.countryCode as string;
-                if (countryCode) {
-                  // Just show detail by selecting first narrative
-                  const firstNarrative = state.narratives[0];
-                  if (firstNarrative) selectNarrative(firstNarrative.id);
-                }
-              }
-            }}
+            points={memoizedGlobeData.points}
+            arcs={memoizedGlobeData.arcs}
+            onPointClick={handleGlobePointClick}
           />
         );
       }

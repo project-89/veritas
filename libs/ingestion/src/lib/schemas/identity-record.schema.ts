@@ -185,7 +185,7 @@ class PsychologicalProfileEmbed {
 
   @Prop({
     type: String,
-    enum: ['investigation-window', 'current-state', 'historical'],
+    enum: ['investigation-window', 'current-state', 'historical', 'deep-history'],
     default: 'current-state',
   })
   profileMode!: PsychologicalProfileMode;

@@ -178,10 +178,15 @@ export class AnalysisProcessor extends WorkerHost {
           sentiment: p.sentiment ?? { score: 0, label: 'neutral' },
         }));
 
-      // Fetch historical timeline
+      // Fetch timeline only for the observed platform unless Sherlock/identity
+      // expansion later provides additional platform accounts.
       let historicalPosts: UserPost[] = [];
       try {
-        const timeline = await this.fetchTimeline(handle, userTopicPosts[0]?.platform ?? 'unknown');
+        const timeline = await this.fetchTimelineForAccounts(
+          handle,
+          userTopicPosts[0]?.platform ?? 'unknown',
+          [],
+        );
         historicalPosts = timeline.posts;
       } catch {
         this.logger.debug(`Timeline fetch failed for @${handle}`);
@@ -407,6 +412,7 @@ export class AnalysisProcessor extends WorkerHost {
         posts: profileCorpus.posts,
         authorProfile: identity.authorProfile,
         existingProfile: identity.psychologicalProfile,
+        profileMode,
       });
 
       const profile = {
@@ -443,14 +449,21 @@ export class AnalysisProcessor extends WorkerHost {
 
   /** Max age for cached timelines: 6 hours */
   private static readonly TIMELINE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+  private static readonly DEFAULT_TIMELINE_LIMIT = 50;
+  private static readonly DEEP_HISTORY_TIMELINE_LIMIT = 400;
 
-  private async fetchTimeline(handle: string, platform: string): Promise<{ posts: UserPost[]; platforms: string[] }> {
+  private async fetchTimeline(
+    handle: string,
+    platform: string,
+    limit = AnalysisProcessor.DEFAULT_TIMELINE_LIMIT,
+  ): Promise<{ posts: UserPost[]; platforms: string[] }> {
     // Check identity record for a cached timeline first
     try {
       const cached = await this.identityRepo.getCachedTimeline(
         handle,
         platform,
         AnalysisProcessor.TIMELINE_CACHE_MAX_AGE_MS,
+        limit,
       );
       if (cached && cached.length > 0) {
         this.logger.debug(`Using cached timeline for @${handle}: ${cached.length} posts`);
@@ -471,7 +484,7 @@ export class AnalysisProcessor extends WorkerHost {
       if (typeof connector?.getUserTimeline !== 'function') continue;
 
       try {
-        const timelinePosts = await connector.getUserTimeline(handle, { limit: 50 });
+        const timelinePosts = await connector.getUserTimeline(handle, { limit });
         if (timelinePosts?.length > 0) {
           const connPlatform = connector.platform ?? 'unknown';
           platforms.push(connPlatform);
@@ -512,6 +525,7 @@ export class AnalysisProcessor extends WorkerHost {
     primaryHandle: string,
     primaryPlatform: string,
     platformAccounts: Array<{ platform: string; handle: string }> = [],
+    limit = AnalysisProcessor.DEFAULT_TIMELINE_LIMIT,
   ): Promise<{ posts: UserPost[]; platforms: string[] }> {
     const normalizedPrimaryHandle = this.normalizeHandleForConnector(primaryHandle);
 
@@ -521,6 +535,7 @@ export class AnalysisProcessor extends WorkerHost {
         normalizedPrimaryHandle,
         primaryPlatform,
         AnalysisProcessor.TIMELINE_CACHE_MAX_AGE_MS,
+        limit,
       );
       if (cached && cached.length > 0) {
         this.logger.debug(`Using cached timeline for @${normalizedPrimaryHandle}: ${cached.length} posts`);
@@ -551,7 +566,7 @@ export class AnalysisProcessor extends WorkerHost {
       if (!connector) continue;
 
       try {
-        const timelinePosts = await connector.getUserTimeline(target.handle, { limit: 50 });
+        const timelinePosts = await connector.getUserTimeline(target.handle, { limit });
         if (timelinePosts?.length > 0) {
           platforms.push(target.platform);
           this.logger.debug(
@@ -618,6 +633,8 @@ export class AnalysisProcessor extends WorkerHost {
         return this.getInvestigationWindowCorpus(handle, scanId, windowStart, windowEnd);
       case 'historical':
         return this.getHistoricalCorpus(handle, platform, platformAccounts, scanId, observedPosts, history, windowStart, windowEnd);
+      case 'deep-history':
+        return this.getDeepHistoryCorpus(handle, platform, platformAccounts, scanId, observedPosts, history);
       case 'current-state':
       default:
         return this.getCurrentStateCorpus(handle, platform, platformAccounts);
@@ -659,7 +676,12 @@ export class AnalysisProcessor extends WorkerHost {
     platform: string,
     platformAccounts: Array<{ platform: string; handle: string }> = [],
   ): Promise<ProfileCorpus> {
-    const timeline = await this.fetchTimelineForAccounts(handle, platform, platformAccounts);
+    const timeline = await this.fetchTimelineForAccounts(
+      handle,
+      platform,
+      platformAccounts,
+      AnalysisProcessor.DEFAULT_TIMELINE_LIMIT,
+    );
     const posts = this.dedupePosts(timeline.posts);
 
     return {
@@ -690,7 +712,12 @@ export class AnalysisProcessor extends WorkerHost {
     endDate: Date | null,
   ): Promise<ProfileCorpus> {
     const scopedScan = await this.getInvestigationWindowCorpus(handle, scanId, startDate, endDate);
-    const timeline = await this.fetchTimelineForAccounts(handle, platform, platformAccounts);
+    const timeline = await this.fetchTimelineForAccounts(
+      handle,
+      platform,
+      platformAccounts,
+      AnalysisProcessor.DEFAULT_TIMELINE_LIMIT,
+    );
     const persisted = observedPosts
       .map((post) => ({
         text: post.text ?? '',
@@ -704,6 +731,57 @@ export class AnalysisProcessor extends WorkerHost {
     const backfilled = persisted.length >= 40
       ? []
       : await this.backfillHistoricalPostsFromScans(handle, history.investigations, startDate, endDate);
+    const posts = this.dedupePosts([...persisted, ...backfilled, ...scopedScan.posts, ...timeline.posts]);
+
+    return {
+      posts,
+      scanPostCount: scopedScan.scanPostCount + persisted.length + backfilled.length,
+      timelinePostCount: timeline.posts.length,
+      platforms: Array.from(
+        new Set([
+          ...scopedScan.platforms,
+          ...timeline.platforms,
+          ...persisted.map((post) => post.platform),
+          ...backfilled.map((post) => post.platform),
+          ...posts.map((post) => post.platform),
+        ].filter(Boolean)),
+      ),
+      startDate: this.getMinTimestamp(posts),
+      endDate: this.getMaxTimestamp(posts),
+    };
+  }
+
+  private async getDeepHistoryCorpus(
+    handle: string,
+    platform: string,
+    platformAccounts: Array<{ platform: string; handle: string }> = [],
+    scanId: string | null,
+    observedPosts: Array<{
+      text: string;
+      timestamp: string;
+      platform: string;
+      url?: string | null;
+      engagement: { likes: number; comments: number; shares: number };
+      sentiment: { score: number; label: string };
+    }>,
+    history: HistoricalBackfillContext,
+  ): Promise<ProfileCorpus> {
+    const scopedScan = await this.getInvestigationWindowCorpus(handle, scanId, null, null);
+    const timeline = await this.fetchTimelineForAccounts(
+      handle,
+      platform,
+      platformAccounts,
+      AnalysisProcessor.DEEP_HISTORY_TIMELINE_LIMIT,
+    );
+    const persisted = observedPosts.map((post) => ({
+      text: post.text ?? '',
+      timestamp: post.timestamp ?? new Date().toISOString(),
+      platform: post.platform ?? 'unknown',
+      url: post.url ?? undefined,
+      engagement: post.engagement ?? { likes: 0, comments: 0, shares: 0 },
+      sentiment: post.sentiment ?? { score: 0, label: 'neutral' },
+    }));
+    const backfilled = await this.backfillHistoricalPostsFromScans(handle, history.investigations, null, null);
     const posts = this.dedupePosts([...persisted, ...backfilled, ...scopedScan.posts, ...timeline.posts]);
 
     return {
@@ -818,6 +896,7 @@ export class AnalysisProcessor extends WorkerHost {
       const platform = typeof target.platform === 'string' ? target.platform.trim().toLowerCase() : '';
       const handle = this.normalizeHandleForConnector(target.handle);
       if (!platform || !handle) continue;
+      if (!this.isValidHandleForPlatform(platform, handle)) continue;
 
       const key = `${platform}:${handle.toLowerCase()}`;
       if (seen.has(key)) continue;
@@ -832,6 +911,17 @@ export class AnalysisProcessor extends WorkerHost {
     return typeof handle === 'string' ? handle.trim().replace(/^@+/, '') : '';
   }
 
+  private isValidHandleForPlatform(platform: string, handle: string): boolean {
+    if (platform !== 'bluesky') return true;
+
+    const normalized = handle.trim().toLowerCase();
+    if (!normalized) return false;
+
+    // Bluesky actor ids are either DIDs or full domain-style handles
+    // like `name.bsky.social`. Plain X-style handles should be skipped.
+    return normalized.startsWith('did:') || normalized.includes('.');
+  }
+
   private buildScopeLabel(
     profileMode: PsychologicalProfileMode,
     startDate: Date | null,
@@ -844,6 +934,8 @@ export class AnalysisProcessor extends WorkerHost {
           : 'Investigation window';
       case 'historical':
         return 'Historical corpus';
+      case 'deep-history':
+        return 'Deep history';
       case 'current-state':
       default:
         return 'Current state';

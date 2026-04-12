@@ -3,6 +3,16 @@ import type { GlobalEvent } from './global-event.types';
 
 const MAX_EVENTS = 500;
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const RECENT_EVENTS_CACHE_KEY = 'veritas:worldmap:recent-events';
+const RECENT_EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+type RecentEventsCache = {
+  events: GlobalEvent[];
+  fetchedAt: number;
+};
+
+let recentEventsMemoryCache: RecentEventsCache | null = null;
+let recentEventsInFlight: Promise<GlobalEvent[]> | null = null;
 
 function normalizeTitle(title: string): string {
   return title.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -220,21 +230,105 @@ function mergeEvents(existing: GlobalEvent[], incoming: GlobalEvent[]): GlobalEv
     .slice(0, MAX_EVENTS);
 }
 
+function canUseSessionStorage(): boolean {
+  return typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
+}
+
+function readRecentEventsCache(): RecentEventsCache | null {
+  if (recentEventsMemoryCache) {
+    return recentEventsMemoryCache;
+  }
+
+  if (!canUseSessionStorage()) {
+    return null;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(RECENT_EVENTS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<RecentEventsCache>;
+    if (!Array.isArray(parsed.events) || typeof parsed.fetchedAt !== 'number') {
+      return null;
+    }
+    recentEventsMemoryCache = {
+      events: parsed.events as GlobalEvent[],
+      fetchedAt: parsed.fetchedAt,
+    };
+    return recentEventsMemoryCache;
+  } catch {
+    return null;
+  }
+}
+
+function writeRecentEventsCache(events: GlobalEvent[]): GlobalEvent[] {
+  const normalized = mergeEvents([], events);
+  const nextCache: RecentEventsCache = {
+    events: normalized,
+    fetchedAt: Date.now(),
+  };
+  recentEventsMemoryCache = nextCache;
+
+  if (canUseSessionStorage()) {
+    try {
+      window.sessionStorage.setItem(RECENT_EVENTS_CACHE_KEY, JSON.stringify(nextCache));
+    } catch {
+      // Ignore storage failures.
+    }
+  }
+
+  return normalized;
+}
+
+function isCacheFresh(cache: RecentEventsCache | null): boolean {
+  return !!cache && Date.now() - cache.fetchedAt < RECENT_EVENTS_CACHE_TTL_MS;
+}
+
+async function fetchRecentEvents(force = false): Promise<GlobalEvent[]> {
+  const existingCache = readRecentEventsCache();
+  if (!force && isCacheFresh(existingCache)) {
+    return existingCache!.events;
+  }
+
+  if (!force && recentEventsInFlight) {
+    return recentEventsInFlight;
+  }
+
+  recentEventsInFlight = fetch(`${API_BASE}/events/recent?limit=200`)
+    .then((r) => r.json())
+    .then((data) => {
+      const normalized = Array.isArray(data) ? writeRecentEventsCache(data as GlobalEvent[]) : [];
+      return normalized;
+    })
+    .finally(() => {
+      recentEventsInFlight = null;
+    });
+
+  return recentEventsInFlight;
+}
+
+export function prefetchRecentEvents(force = false): Promise<GlobalEvent[]> {
+  return fetchRecentEvents(force).catch(() => readRecentEventsCache()?.events ?? []);
+}
+
 export function useEventStream(options?: {
   categories?: string[];
   regions?: string[];
 }): { events: GlobalEvent[]; connected: boolean; error: string | null } {
-  const [events, setEvents] = useState<GlobalEvent[]>([]);
+  const [events, setEvents] = useState<GlobalEvent[]>(() => readRecentEventsCache()?.events ?? []);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    // 1. Fetch recent events for initial state
-    fetch(`${API_BASE}/events/recent?limit=200`)
-      .then(r => r.json())
-      .then(data => setEvents(Array.isArray(data) ? mergeEvents([], data as GlobalEvent[]) : []))
-      .catch(() => {});
+    // 1. Hydrate from warm cache immediately, then refresh recent events in background.
+    const cached = readRecentEventsCache();
+    if (cached?.events?.length) {
+      setEvents(cached.events);
+    }
+
+    void fetchRecentEvents().then((freshEvents) => {
+      setEvents((prev) => mergeEvents(prev, freshEvents));
+    }).catch(() => {});
 
     // 2. Open SSE connection
     const params = new URLSearchParams();
@@ -248,7 +342,11 @@ export function useEventStream(options?: {
     es.addEventListener('event', (e) => {
       try {
         const event = JSON.parse(e.data) as GlobalEvent;
-        setEvents(prev => mergeEvents(prev, [event]));
+        setEvents(prev => {
+          const merged = mergeEvents(prev, [event]);
+          writeRecentEventsCache(merged);
+          return merged;
+        });
       } catch {
         // Ignore malformed events
       }

@@ -38,19 +38,17 @@ export function ActorsMatrix({
   onSelectActor,
 }: ActorsMatrixProps) {
   const actors: ActorRow[] = useMemo(() => {
-    if (investigation?.users && investigation.users.length > 0) {
-      return investigation.users.map((u: UserInvestigationResult) => ({
-        handle: u.user.handle,
-        platform: u.user.platform,
-        credibility: u.credibility?.overallScore ?? 0.5,
-        botProbability: u.botScore?.botProbability ?? 0,
-        influence: u.influenceScore,
-        postCount: posts.filter(
-          (p) => p.authorHandle === u.user.handle,
-        ).length,
-        flags: u.flags,
-      }));
-    }
+    const investigationActors = (investigation?.users ?? []).map((u: UserInvestigationResult) => ({
+      handle: u.user.handle,
+      platform: u.user.platform,
+      credibility: u.credibility?.overallScore ?? 0.5,
+      botProbability: u.botScore?.botProbability ?? 0,
+      influence: u.influenceScore,
+      postCount: posts.filter(
+        (p) => p.authorHandle === u.user.handle,
+      ).length,
+      flags: u.flags,
+    }));
 
     // Derive from narrative authors
     const authorMap = new Map<
@@ -92,7 +90,7 @@ export function ActorsMatrix({
       });
     }
 
-    return Array.from(authorMap.values()).map((a) => ({
+    const discoveredActors = Array.from(authorMap.values()).map((a) => ({
       handle: a.handle,
       platform: a.platform,
       credibility: 0.5,
@@ -101,6 +99,25 @@ export function ActorsMatrix({
       postCount: a.postCount,
       flags: [],
     }));
+
+    if (investigationActors.length > 0) {
+      const merged = new Map<string, ActorRow>();
+      for (const actor of discoveredActors) {
+        merged.set(`${actor.handle}:${actor.platform}`, actor);
+      }
+      for (const actor of investigationActors) {
+        const key = `${actor.handle}:${actor.platform}`;
+        merged.set(key, {
+          ...(merged.get(key) ?? actor),
+          ...actor,
+          postCount: actor.postCount || merged.get(key)?.postCount || 0,
+          flags: actor.flags.length > 0 ? actor.flags : (merged.get(key)?.flags ?? []),
+        });
+      }
+      return Array.from(merged.values());
+    }
+
+    return discoveredActors;
   }, [narratives, posts, investigation]);
 
   const columns: NervTableColumn<ActorRow>[] = useMemo(

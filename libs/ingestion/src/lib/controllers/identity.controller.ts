@@ -132,7 +132,7 @@ export class IdentityController {
     try {
       const profileMode = body.mode ?? 'current-state';
       const scanId =
-        profileMode === 'current-state'
+        profileMode === 'current-state' || profileMode === 'deep-history'
           ? null
           : typeof body.scanId === 'string' && body.scanId.trim().length > 0
             ? body.scanId

@@ -12,9 +12,9 @@ const statusColorMap: Record<string, string> = {
 };
 
 const statusGlowMap: Record<string, string> = {
-  online: 'shadow-[0_0_6px_rgba(0,255,65,0.5)]',
-  warning: 'shadow-[0_0_6px_rgba(245,158,11,0.5)]',
-  critical: 'shadow-[0_0_8px_rgba(233,69,96,0.6)]',
+  online: 'shadow-[0_0_10px_rgba(61,255,133,0.55)]',
+  warning: 'shadow-[0_0_10px_rgba(255,191,74,0.5)]',
+  critical: 'shadow-[0_0_12px_rgba(255,102,127,0.65)]',
   offline: '',
 };
 
@@ -25,9 +25,9 @@ const sizeMap: Record<string, string> = {
 };
 
 const labelSizeMap: Record<string, string> = {
-  sm: 'text-[10px]',
-  md: 'text-xs',
-  lg: 'text-sm',
+  sm: 'text-[11px]',
+  md: 'text-[12px]',
+  lg: 'text-[13px]',
 };
 
 export function NervStatus({ status, label, size = 'md' }: NervStatusProps) {
@@ -50,7 +50,7 @@ export function NervStatus({ status, label, size = 'md' }: NervStatusProps) {
       {label && (
         <span
           className={[
-            'font-mono uppercase tracking-wider text-nerv-text-secondary',
+            'font-mono uppercase tracking-[0.16em] text-nerv-text-secondary',
             labelSizeMap[size],
           ].join(' ')}
         >

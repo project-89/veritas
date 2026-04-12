@@ -29,7 +29,7 @@ class AnalysisJobInputEmbed {
   /** Scope mode for MAGI psychological profiles */
   @Prop({
     type: String,
-    enum: ['investigation-window', 'current-state', 'historical'],
+    enum: ['investigation-window', 'current-state', 'historical', 'deep-history'],
     default: 'current-state',
   })
   profileMode!: PsychologicalProfileMode;
@@ -120,7 +120,11 @@ AnalysisJobModel.index({ status: 1, createdAt: -1 });
 // TypeScript interfaces
 // ---------------------------------------------------------------------------
 
-export type PsychologicalProfileMode = 'investigation-window' | 'current-state' | 'historical';
+export type PsychologicalProfileMode =
+  | 'investigation-window'
+  | 'current-state'
+  | 'historical'
+  | 'deep-history';
 
 export interface AnalysisJobInput {
   query: string;

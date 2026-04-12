@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { fetchUnreadAlertCount } from '../../lib/api';
+import { prefetchRecentEvents } from '../../lib/use-event-stream';
 import { NervStatus } from './nerv-status';
 import { NervBadge } from './nerv-badge';
 
@@ -29,8 +30,8 @@ function UtcClock() {
   }, []);
 
   return (
-    <span className="text-[10px] font-mono tabular-nums text-nerv-text-muted">
-      {time} <span className="text-nerv-text-muted/60">UTC</span>
+    <span className="text-[11px] font-mono tabular-nums text-nerv-text-secondary">
+      {time} <span className="text-nerv-text-muted/80">UTC</span>
     </span>
   );
 }
@@ -76,6 +77,20 @@ export function NervNav() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const idleHandle = window.setTimeout(() => {
+      if (!cancelled) {
+        void prefetchRecentEvents();
+      }
+    }, 1200);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(idleHandle);
+    };
+  }, []);
+
   const isInvestigating = pathname.startsWith('/investigate/') || pathname.startsWith('/results');
 
   const isActive = (href: string) => {
@@ -88,16 +103,16 @@ export function NervNav() {
       {/* Orange gradient bottom border */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-nerv-orange/40 to-transparent" />
 
-      <div className="px-4 h-11 flex items-center justify-between gap-4">
+      <div className="px-4 h-12 flex items-center justify-between gap-4">
         {/* Left: Logo */}
         <Link href="/" className="flex items-center gap-2 shrink-0 group">
-          <span className="text-[10px] font-mono text-nerv-orange/60 tracking-widest">
+          <span className="text-[11px] font-mono text-nerv-orange/75 tracking-widest">
             {'//'}
           </span>
-          <span className="text-sm font-mono font-bold tracking-[0.2em] text-nerv-text group-hover:text-nerv-orange transition-colors">
+          <span className="text-base font-mono font-bold tracking-[0.22em] text-nerv-text group-hover:text-nerv-orange transition-colors">
             VERITAS
           </span>
-          <span className="text-[9px] font-mono text-nerv-text-muted tracking-wider hidden sm:inline">
+          <span className="text-[10px] font-mono text-nerv-text-secondary/75 tracking-wider hidden sm:inline">
             v2.0
           </span>
         </Link>
@@ -107,16 +122,16 @@ export function NervNav() {
           {isInvestigating && (
             <Link
               href="/monitor"
-              className="px-2 py-1.5 text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted hover:text-nerv-orange transition-colors"
+              className="px-2 py-1.5 text-[11px] font-mono uppercase tracking-[0.18em] text-nerv-text-secondary hover:text-nerv-orange transition-colors"
             >
               {'\u2190'} Monitor
             </Link>
           )}
           {isInvestigating && (
-            <span className="text-[10px] font-mono text-nerv-orange/60 px-1">{'\u25B8'}</span>
+            <span className="text-[11px] font-mono text-nerv-orange/70 px-1">{'\u25B8'}</span>
           )}
           {isInvestigating && (
-            <span className="text-[10px] font-mono text-nerv-orange uppercase tracking-wider">
+            <span className="text-[11px] font-mono text-nerv-orange uppercase tracking-[0.18em]">
               Investigation
             </span>
           )}
@@ -126,11 +141,12 @@ export function NervNav() {
               <Link
                 key={link.href}
                 href={link.href}
+                onMouseEnter={link.href === '/worldmap' ? () => { void prefetchRecentEvents(); } : undefined}
                 className={[
-                  'relative px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider transition-colors rounded-sm',
+                  'relative px-3 py-1.5 text-[11px] font-mono uppercase tracking-[0.18em] transition-colors rounded-sm',
                   active
-                    ? 'text-nerv-orange bg-nerv-orange/10'
-                    : 'text-nerv-text-muted hover:text-nerv-text-secondary hover:bg-nerv-bg-panel/50',
+                    ? 'text-nerv-orange bg-nerv-orange/14 shadow-[0_0_14px_rgba(255,133,61,0.14)]'
+                    : 'text-nerv-text-secondary hover:text-nerv-text hover:bg-nerv-bg-panel/70',
                 ].join(' ')}
               >
                 {link.label}
@@ -161,7 +177,7 @@ export function NervNav() {
           <div className="w-px h-4 bg-nerv-border hidden sm:block" />
           <div className="hidden sm:flex items-center gap-1.5">
             <NervStatus status="online" size="sm" />
-            <span className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">
+            <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-nerv-text-secondary">
               SYS:ONLINE
             </span>
           </div>

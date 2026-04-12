@@ -13,11 +13,13 @@ describe('ScanController', () => {
     findById: jest.Mock;
     update: jest.Mock;
     setLastScanId: jest.Mock;
+    upsertSnapshotForScan: jest.Mock;
   };
   let scanJobRepositoryMock: {
     createJob: jest.Mock;
     getJob: jest.Mock;
     getJobPosts: jest.Mock;
+    updateAnalysisCache: jest.Mock;
     cancelJob: jest.Mock;
     resetConnector: jest.Mock;
     getActiveJobs: jest.Mock;
@@ -32,7 +34,7 @@ describe('ScanController', () => {
     query: 'test query',
     investigationId: 'inv-456',
     status: 'running' as const,
-    settings: { platforms: ['reddit', 'twitter'], timeRange: '7d', limit: 100 },
+    settings: { platforms: ['reddit', 'twitter'], timeRange: '7d', limit: 100, searchMode: 'topic' as const },
     connectors: {
       reddit: { status: 'done' as const, postCount: 50, insightCount: 50, startedAt: null, completedAt: null, error: null, duration: null },
       twitter: { status: 'running' as const, postCount: 0, insightCount: 0, startedAt: null, completedAt: null, error: null, duration: null },
@@ -55,10 +57,12 @@ describe('ScanController', () => {
           platforms: ['reddit'],
           timeRange: '30d',
           limit: 25,
+          searchMode: 'topic',
         },
       }),
       update: jest.fn().mockResolvedValue(undefined),
       setLastScanId: jest.fn().mockResolvedValue(undefined),
+      upsertSnapshotForScan: jest.fn().mockResolvedValue({ id: 'snap-1' }),
     };
 
     scanQueue = {
@@ -70,6 +74,7 @@ describe('ScanController', () => {
       createJob: jest.fn().mockResolvedValue(mockScanJob),
       getJob: jest.fn().mockResolvedValue(mockScanJob),
       getJobPosts: jest.fn().mockResolvedValue([]),
+      updateAnalysisCache: jest.fn().mockResolvedValue(undefined),
       cancelJob: jest.fn().mockResolvedValue(undefined),
       resetConnector: jest.fn().mockResolvedValue(undefined),
       getActiveJobs: jest.fn().mockResolvedValue([mockScanJob]),
@@ -132,6 +137,7 @@ describe('ScanController', () => {
         platforms: ['twitter'],
         limit: 250,
         timeRange: '90d',
+        searchMode: 'claim',
       });
 
       expect(result).toHaveProperty('scanId');
@@ -141,6 +147,7 @@ describe('ScanController', () => {
           platforms: ['twitter'],
           timeRange: '90d',
           limit: 250,
+          searchMode: 'claim',
         },
       });
       expect(investigationRepo.findOrCreateByQuery).not.toHaveBeenCalled();
@@ -148,7 +155,7 @@ describe('ScanController', () => {
         'rexas finance team',
         'inv-existing',
         ['twitter'],
-        { timeRange: '90d', limit: 250 },
+        { timeRange: '90d', limit: 250, searchMode: 'claim' },
       );
       expect(investigationRepo.setLastScanId).toHaveBeenCalledWith('inv-existing', 'scan-123');
     });
@@ -209,6 +216,40 @@ describe('ScanController', () => {
       const result = await controller.getAnalysisCache('scan-missing');
 
       expect(result).toBeNull();
+    });
+
+    it('persists a snapshot when narratives are saved to the analysis cache', async () => {
+      const jobWithPosts = {
+        ...mockScanJob,
+        status: 'completed' as const,
+        posts: [
+          {
+            id: 'post-1',
+            platform: 'reddit',
+            sentiment: { label: 'negative' },
+          },
+        ],
+      };
+      (scanJobRepo.getJob as jest.Mock).mockResolvedValueOnce(jobWithPosts);
+
+      const result = await controller.saveAnalysisCache('scan-123', {
+        narratives: [{ id: 'n-1', summary: 'claim' }],
+      });
+
+      expect(result).toEqual({ success: true });
+      expect(investigationRepo.upsertSnapshotForScan).toHaveBeenCalledWith(
+        'inv-456',
+        'scan-123',
+        expect.objectContaining({
+          posts: jobWithPosts.posts,
+          narratives: [{ id: 'n-1', summary: 'claim' }],
+          summary: expect.objectContaining({
+            total: 1,
+            negative: 1,
+            byPlatform: { reddit: 1 },
+          }),
+        }),
+      );
     });
   });
 

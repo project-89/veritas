@@ -12,25 +12,25 @@
   [data-theme='dark'] {
     --font-jetbrains: 'JetBrains Mono';
     --font-inter: 'Inter';
-    --nerv-bg-deep: 10 10 15;
-    --nerv-bg: 15 15 26;
-    --nerv-bg-panel: 26 26 46;
-    --nerv-bg-elevated: 37 37 64;
-    --nerv-border: 42 42 69;
-    --nerv-border-active: 58 58 95;
-    --nerv-text: 224 224 232;
-    --nerv-text-secondary: 136 136 160;
-    --nerv-text-muted: 85 85 112;
-    --nerv-orange: 255 107 43;
-    --nerv-green: 0 255 65;
-    --nerv-red: 233 69 96;
-    --nerv-blue: 14 165 233;
-    --nerv-amber: 245 158 11;
-    --nerv-purple: 168 85 247;
-    --nerv-scanline-color: rgba(0, 255, 65, 0.012);
-    --nerv-scrollbar-track: #0a0a0f;
-    --nerv-scrollbar-thumb: #2a2a45;
-    --nerv-scrollbar-thumb-hover: #3a3a5f;
+    --nerv-bg-deep: 8 11 20;
+    --nerv-bg: 14 18 31;
+    --nerv-bg-panel: 24 30 50;
+    --nerv-bg-elevated: 35 43 72;
+    --nerv-border: 63 74 112;
+    --nerv-border-active: 95 109 160;
+    --nerv-text: 238 242 255;
+    --nerv-text-secondary: 178 188 226;
+    --nerv-text-muted: 124 136 179;
+    --nerv-orange: 255 133 61;
+    --nerv-green: 61 255 133;
+    --nerv-red: 255 102 127;
+    --nerv-blue: 72 194 255;
+    --nerv-amber: 255 191 74;
+    --nerv-purple: 191 122 255;
+    --nerv-scanline-color: rgba(61, 255, 133, 0.018);
+    --nerv-scrollbar-track: #09101d;
+    --nerv-scrollbar-thumb: #3f4d75;
+    --nerv-scrollbar-thumb-hover: #566792;
   }
 
   /* ── LIGHT THEME (NERV — clean white command center) ── */
@@ -60,7 +60,8 @@
 
   body {
     @apply bg-nerv-bg-deep text-nerv-text antialiased;
-    font-size: 14px;
+    font-size: 15px;
+    line-height: 1.5;
   }
 
   /* Monospace for all data elements */
@@ -86,6 +87,26 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--nerv-scrollbar-thumb-hover);
+  }
+
+  [class*='text-[8px]'] {
+    font-size: 9px !important;
+    line-height: 1.45 !important;
+  }
+
+  [class*='text-[9px]'] {
+    font-size: 10px !important;
+    line-height: 1.45 !important;
+  }
+
+  [class*='text-[10px]'] {
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+  }
+
+  [class*='text-[11px]'] {
+    font-size: 12px !important;
+    line-height: 1.5 !important;
   }
 }
 
@@ -138,15 +159,15 @@
   /* Glow effects */
   .nerv-glow-red {
     --nerv-glow-color: #e94560;
-    box-shadow: 0 0 4px #e94560;
+    box-shadow: 0 0 10px rgba(255, 102, 127, 0.45);
   }
   .nerv-glow-orange {
     --nerv-glow-color: #ff6b2b;
-    box-shadow: 0 0 4px #ff6b2b;
+    box-shadow: 0 0 10px rgba(255, 133, 61, 0.4);
   }
   .nerv-glow-green {
     --nerv-glow-color: #00ff41;
-    box-shadow: 0 0 4px #00ff41;
+    box-shadow: 0 0 10px rgba(61, 255, 133, 0.4);
   }
 
   /* Resizable panel drag handle */

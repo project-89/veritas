@@ -254,6 +254,44 @@ describe('RedditFreeConnector', () => {
       expect(url).toContain('t=day');
     });
 
+    it('filters out broad incidental matches for long claim-style queries', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          data: {
+            children: [
+              {
+                kind: 't3',
+                data: {
+                  ...mockRedditResponse.data.children[0]!.data,
+                  id: 'broad-1',
+                  title: 'China and Iran tensions rise again',
+                  selftext: 'General discussion with no missile details.',
+                },
+              },
+              {
+                kind: 't3',
+                data: {
+                  ...mockRedditResponse.data.children[0]!.data,
+                  id: 'match-1',
+                  title: 'Chinese sent DF41 missiles to Iran',
+                  selftext: 'Claim alleges 500 missiles were moved overnight.',
+                },
+              },
+            ],
+            after: null,
+            before: null,
+          },
+        },
+      });
+
+      const posts = await connector.searchContent(
+        'Chinese sent iran 500 DF-41 missiles to Iran',
+        { searchMode: 'claim' },
+      );
+
+      expect(posts.map((post) => post.id)).toEqual(['match-1']);
+    });
+
     it('should throw on API errors', async () => {
       mockAxiosInstance.get.mockRejectedValue(new Error('429 Too Many Requests'));
 
@@ -307,7 +345,25 @@ describe('RedditFreeConnector', () => {
     });
 
     it('should emit data events for matching posts on interval', async () => {
-      mockAxiosInstance.get.mockResolvedValue({ data: mockRedditResponse });
+      jest.spyOn(connector, 'searchContent').mockResolvedValue([
+        {
+          id: 'abc123',
+          text: 'This is the post body',
+          platform: 'reddit',
+          authorId: 'testuser',
+          authorName: 'testuser',
+          authorHandle: 'testuser',
+          url: 'https://reddit.com/r/test/comments/abc123/test_post/',
+          timestamp: new Date(),
+          engagementMetrics: {
+            likes: 1,
+            shares: 0,
+            comments: 0,
+            reach: 1,
+            viralityScore: 0.1,
+          },
+        },
+      ] as any);
 
       // Use a keyword that matches the mock post content
       const emitter = connector.streamContent(['post body']);
@@ -322,7 +378,9 @@ describe('RedditFreeConnector', () => {
     });
 
     it('should emit error events on failure', async () => {
-      mockAxiosInstance.get.mockRejectedValue(new Error('Network failure'));
+      jest
+        .spyOn(connector, 'searchContent')
+        .mockRejectedValue(new Error('Network failure'));
 
       const emitter = connector.streamContent(['test']);
       const errorHandler = jest.fn();

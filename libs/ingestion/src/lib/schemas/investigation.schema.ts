@@ -12,6 +12,9 @@ class InvestigationSettingsEmbed {
 
   @Prop({ type: Number, default: 50 })
   limit!: number;
+
+  @Prop({ type: String, enum: ['topic', 'claim'], default: 'topic' })
+  searchMode!: 'topic' | 'claim';
 }
 
 // Snapshot summary sub-schema (internal Mongoose class)
@@ -187,6 +190,7 @@ export interface InvestigationSettings {
   platforms: string[];
   timeRange: string;
   limit: number;
+  searchMode?: 'topic' | 'claim';
 }
 
 export interface Investigation {

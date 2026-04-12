@@ -200,6 +200,55 @@ const initialState: InvestigationState = {
 // Reducer
 // ---------------------------------------------------------------------------
 
+function mergeUniqueByKey<T>(items: T[], keyFn: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const merged: T[] = [];
+  for (const item of items) {
+    const key = keyFn(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(item);
+  }
+  return merged;
+}
+
+function mergeInvestigationResults(
+  current: InvestigationResult | null,
+  incoming: InvestigationResult,
+): InvestigationResult {
+  if (!current) return incoming;
+
+  return {
+    topic: current.topic || incoming.topic,
+    users: mergeUniqueByKey(
+      [...current.users, ...incoming.users],
+      (user) => `${user.user.handle}:${user.user.platform}`,
+    ),
+    originAnalysis: incoming.originAnalysis?.propagationChain?.length
+      ? incoming.originAnalysis
+      : current.originAnalysis,
+    cuiBono: {
+      beneficiaries: mergeUniqueByKey(
+        [...current.cuiBono.beneficiaries, ...incoming.cuiBono.beneficiaries],
+        (item) => `${item.entity}:${item.howTheyBenefit}`,
+      ),
+      agendas: mergeUniqueByKey(
+        [...current.cuiBono.agendas, ...incoming.cuiBono.agendas],
+        (item) => item,
+      ),
+      summary: [current.cuiBono.summary, incoming.cuiBono.summary].filter(Boolean).join(' ').trim(),
+    },
+    coordination: {
+      clusters: mergeUniqueByKey(
+        [...current.coordination.clusters, ...incoming.coordination.clusters],
+        (cluster) => `${cluster.pattern}:${cluster.users.slice().sort().join(',')}`,
+      ),
+      summary: [current.coordination.summary, incoming.coordination.summary].filter(Boolean).join(' ').trim(),
+    },
+    botDetection: incoming.botDetection ?? current.botDetection ?? null,
+  };
+}
+
 function reducer(state: InvestigationState, action: Action): InvestigationState {
   switch (action.type) {
     case 'SET_QUERY':
@@ -244,7 +293,7 @@ function reducer(state: InvestigationState, action: Action): InvestigationState 
     case 'SET_INVESTIGATION':
       return {
         ...state,
-        investigation: action.data,
+        investigation: mergeInvestigationResults(state.investigation, action.data),
         investigatingNarrativeId: null,
         investigatedNarrativeIds: state.investigatedNarrativeIds.includes(action.narrativeId)
           ? state.investigatedNarrativeIds

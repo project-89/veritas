@@ -361,6 +361,69 @@ export class InvestigationRepository implements OnModuleInit {
   }
 
   /**
+   * Create or refresh the snapshot associated with a specific scan.
+   */
+  async upsertSnapshotForScan(
+    investigationId: string,
+    scanId: string,
+    data: {
+      posts: unknown[];
+      narratives: unknown[];
+      summary: SnapshotSummary;
+    },
+  ): Promise<Snapshot> {
+    this.ensureInitialized();
+    try {
+      const existing = await this.snapshotRepo.find(
+        { investigationId, scanId } as Record<string, unknown>,
+        {
+          limit: 1,
+          sort: { timestamp: -1 },
+        },
+      );
+
+      const current = existing[0];
+      if (!current) {
+        return this.addSnapshot(investigationId, {
+          scanId,
+          posts: data.posts,
+          narratives: data.narratives,
+          summary: data.summary,
+        });
+      }
+
+      const currentId =
+        (current._id as unknown as { toString?: () => string })?.toString?.() ??
+        current.id;
+      const updated = await this.snapshotRepo.updateById(currentId, {
+        timestamp: new Date(),
+        postCount: data.posts.length,
+        narrativeCount: data.narratives.length,
+        summary: data.summary,
+        posts: data.posts,
+        narratives: data.narratives,
+      } as Partial<Snapshot>);
+
+      if (!updated) {
+        throw new Error(`Snapshot not found during upsert: ${currentId}`);
+      }
+
+      await this.investigationRepo.updateById(investigationId, {
+        lastSnapshotId: currentId,
+      } as Partial<Investigation>);
+
+      return updated;
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(
+        `Error in upsertSnapshotForScan: ${err.message}`,
+        err.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Get snapshots for an investigation, sorted by most recent first.
    */
   async getSnapshots(

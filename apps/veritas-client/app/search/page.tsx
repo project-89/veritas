@@ -72,6 +72,7 @@ export default function SearchPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [caseMode, setCaseMode] = useState<'new' | 'existing'>('new');
+  const [searchMode, setSearchMode] = useState<'topic' | 'claim'>('topic');
   const [caseTitle, setCaseTitle] = useState('');
   const [query, setQuery] = useState('');
   const [platforms, setPlatforms] = useState<string[]>(['twitter', 'reddit', 'youtube', 'rss', 'farcaster']);
@@ -118,6 +119,7 @@ export default function SearchPage() {
 
     // Build URL params for the investigation workspace
     const params = new URLSearchParams({ q });
+    params.set('mode', searchMode);
     if (platforms.length > 0) params.set('platforms', platforms.join(','));
     if (limit !== 100) params.set('limit', String(limit));
     if (timeRange === 'custom' && customStart && customEnd) {
@@ -158,7 +160,7 @@ export default function SearchPage() {
       // Fallback to results page if investigation creation fails
       router.push(`/results?${params.toString()}`);
     }
-  }, [query, caseTitle, caseMode, selectedInvestigationId, platforms, limit, timeRange, customStart, customEnd, usernames, hashtags, wallets, subreddits, router]);
+  }, [query, caseTitle, caseMode, selectedInvestigationId, platforms, limit, timeRange, customStart, customEnd, usernames, hashtags, wallets, subreddits, router, searchMode]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleScan();
@@ -253,8 +255,31 @@ export default function SearchPage() {
 
             {/* Query row */}
             <div>
+              <div className="flex items-center gap-2 mb-2">
+                {[
+                  { id: 'topic', label: 'Topic Search', hint: 'Campaign or entity discovery' },
+                  { id: 'claim', label: 'Claim Search', hint: 'Anchored allegation or factual claim' },
+                ].map((mode) => {
+                  const selected = searchMode === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      onClick={() => setSearchMode(mode.id as 'topic' | 'claim')}
+                      className={[
+                        'px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest border rounded-sm transition-all',
+                        selected
+                          ? 'border-nerv-blue/60 text-nerv-blue bg-nerv-blue/10'
+                          : 'border-nerv-border text-nerv-text-muted hover:text-nerv-text hover:border-nerv-text-muted',
+                      ].join(' ')}
+                      title={mode.hint}
+                    >
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
               <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5">
-                Scan Query
+                {searchMode === 'claim' ? 'Claim Query' : 'Scan Query'}
               </label>
               <div className="flex gap-2">
                 <input
@@ -263,7 +288,11 @@ export default function SearchPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Enter narrative topic..."
+                  placeholder={
+                    searchMode === 'claim'
+                      ? 'Enter a factual claim or allegation...'
+                      : 'Enter narrative topic...'
+                  }
                   className="flex-1 px-3 py-2.5 font-mono text-sm bg-nerv-bg border border-nerv-border text-nerv-green placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-green/50 focus:shadow-[0_0_8px_rgba(0,255,65,0.15)] transition-all"
                 />
                 <button
@@ -273,6 +302,11 @@ export default function SearchPage() {
                 >
                   {caseMode === 'existing' ? 'Append Scan' : 'Create Case'}
                 </button>
+              </div>
+              <div className="mt-1 text-[8px] font-mono text-nerv-text-muted">
+                {searchMode === 'claim'
+                  ? 'Claim mode prioritizes anchors, event terms, and stricter post matching.'
+                  : 'Topic mode is broader and better for campaign or entity discovery.'}
               </div>
             </div>
 

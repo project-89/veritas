@@ -266,6 +266,62 @@ describe('InvestigationRepository', () => {
     });
   });
 
+  describe('upsertSnapshotForScan', () => {
+    it('creates a snapshot when no scan snapshot exists yet', async () => {
+      mockSnapshotRepo.find.mockResolvedValueOnce([]);
+
+      const result = await repository.upsertSnapshotForScan('inv-1', 'scan-1', {
+        posts: [{ id: 'p-1' }],
+        narratives: [{ id: 'n-1' }],
+        summary: mockSnapshot.summary,
+      });
+
+      expect(mockSnapshotRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          investigationId: 'inv-1',
+          scanId: 'scan-1',
+          postCount: 1,
+          narrativeCount: 1,
+        }),
+      );
+      expect(result).toEqual(mockSnapshot);
+    });
+
+    it('updates the existing snapshot when scanId already exists', async () => {
+      mockSnapshotRepo.find.mockResolvedValueOnce([mockSnapshot]);
+      mockSnapshotRepo.updateById.mockResolvedValueOnce({
+        ...mockSnapshot,
+        scanId: 'scan-1',
+        posts: [{ id: 'p-2' }],
+      });
+
+      const result = await repository.upsertSnapshotForScan('inv-1', 'scan-1', {
+        posts: [{ id: 'p-2' }],
+        narratives: [],
+        summary: mockSnapshot.summary,
+      });
+
+      expect(mockSnapshotRepo.updateById).toHaveBeenCalledWith(
+        'snap-1',
+        expect.objectContaining({
+          postCount: 1,
+          narrativeCount: 0,
+          posts: [{ id: 'p-2' }],
+        }),
+      );
+      expect(mockInvestigationRepo.updateById).toHaveBeenCalledWith(
+        'inv-1',
+        expect.objectContaining({ lastSnapshotId: 'snap-1' }),
+      );
+      expect(result).toEqual(
+        expect.objectContaining({
+          scanId: 'scan-1',
+          posts: [{ id: 'p-2' }],
+        }),
+      );
+    });
+  });
+
   describe('addEvidenceSeed', () => {
     it('should append a new evidence seed and persist the updated investigation', async () => {
       const seed = {

@@ -464,7 +464,7 @@ export interface Investigation {
   createdAt: string;
   updatedAt: string;
   status: 'active' | 'archived';
-  settings: { platforms: string[]; timeRange: string; limit: number };
+  settings: { platforms: string[]; timeRange: string; limit: number; searchMode?: 'topic' | 'claim' };
   lastSnapshotId: string | null;
   lastScanId: string | null;
   linkedProjectDossierId: string | null;
@@ -1368,6 +1368,7 @@ export interface ScanJob {
     platforms: string[];
     timeRange: string;
     limit: number;
+    searchMode: 'topic' | 'claim';
   };
   connectors: Record<string, ConnectorStatus>;
   totalPosts: number;
@@ -1391,10 +1392,11 @@ export async function startScan(
   limit?: number,
   timeRange?: string,
   investigationId?: string,
+  searchMode?: 'topic' | 'claim',
 ): Promise<{ scanId: string }> {
   return request<{ scanId: string }>('/api/scan', {
     method: 'POST',
-    body: JSON.stringify({ query, platforms, limit, timeRange, investigationId }),
+    body: JSON.stringify({ query, platforms, limit, timeRange, investigationId, searchMode }),
   });
 }
 
@@ -1591,7 +1593,11 @@ export interface ProfileImage {
   isCurrent: boolean;
 }
 
-export type MagiProfileMode = 'investigation-window' | 'current-state' | 'historical';
+export type MagiProfileMode =
+  | 'investigation-window'
+  | 'current-state'
+  | 'historical'
+  | 'deep-history';
 
 export interface PsychologicalProfile {
   version: number;
