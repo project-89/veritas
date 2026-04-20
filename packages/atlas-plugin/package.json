@@ -1,0 +1,11 @@
+{
+  "name": "@veritas/plugin-atlas",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@veritas/shared/types": "workspace:*"
+  }
+}

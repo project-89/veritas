@@ -2,6 +2,8 @@ import type {
   VeritasPluginManifest,
   VeritasPluginNavItem,
 } from '@veritas/shared/types';
+import { atlasPluginManifest } from '../../../../../packages/atlas-plugin/src/manifest';
+import { magiPluginManifest } from '../../../../../packages/magi-plugin/src/manifest';
 
 const CORE_PLUGIN_MANIFESTS: VeritasPluginManifest[] = [
   {
@@ -31,46 +33,15 @@ const CORE_PLUGIN_MANIFESTS: VeritasPluginManifest[] = [
       services: ['ScanProcessor', 'AnalysisProcessor'],
     },
   },
-  {
-    id: 'veritas.plugin.atlas',
-    name: 'ATLAS Lenses',
-    version: '1.0.0',
-    kind: 'public-plugin',
-    status: 'installed',
-    description: 'Reusable lens extraction and application workflows.',
-    capabilities: ['atlas-lenses'],
-    ui: {
-      navItems: [{ slot: 'top-nav', href: '/atlas', label: 'ATLAS', order: 40 }],
-      routes: [{ slot: 'page-route', path: '/atlas', label: 'ATLAS' }],
-      slots: ['investigation-action', 'identity-panel'],
-    },
-    backend: {
-      moduleName: 'AtlasPluginModule',
-      controllers: ['InvestigationController'],
-      services: ['MentalModelService'],
-    },
-  },
-  {
-    id: 'veritas.plugin.magi',
-    name: 'MAGI Profiles',
-    version: '1.0.0',
-    kind: 'private-plugin',
-    status: 'installed',
-    description: 'Psychological and behavioral identity profiling.',
-    capabilities: ['magi-profiles'],
-    ui: {
-      slots: ['identity-panel', 'investigation-action'],
-    },
-    backend: {
-      moduleName: 'MagiPluginModule',
-      controllers: ['IdentityController'],
-      services: ['PsychologicalProfilerService'],
-    },
-  },
+];
+
+const INSTALLED_PLUGIN_MANIFESTS: VeritasPluginManifest[] = [
+  atlasPluginManifest,
+  magiPluginManifest,
 ];
 
 export function getInstalledPluginManifests(): VeritasPluginManifest[] {
-  return CORE_PLUGIN_MANIFESTS.slice();
+  return [...CORE_PLUGIN_MANIFESTS, ...INSTALLED_PLUGIN_MANIFESTS];
 }
 
 export function getTopNavPluginItems(): VeritasPluginNavItem[] {
