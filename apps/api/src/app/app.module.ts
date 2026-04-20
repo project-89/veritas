@@ -5,6 +5,10 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
 import {
+  MagiIdentityController,
+  MAGI_PLUGIN_APP_PROVIDERS,
+} from '../../../../packages/magi-plugin/src/backend';
+import {
   AnalysisModule,
   ClaimVerificationService,
   CrossPlatformIdentityService,
@@ -13,7 +17,6 @@ import {
   GLOBAL_EVENT_REPOSITORY,
   GraphBotDetectionService,
   PropagandaAnalysisService,
-  PsychologicalProfilerService,
   SIGNAL_CACHE_STORE,
   SourceCredibilityService,
 } from '@veritas/analysis';
@@ -29,7 +32,6 @@ import {
   GRAPH_BOT_DETECTION_SERVICE,
   IngestionModule,
   PROPAGANDA_SERVICE,
-  PSYCHOLOGICAL_PROFILER_SERVICE,
   SignalCacheRepository,
   SOURCE_CREDIBILITY_SERVICE,
 } from '@veritas/ingestion';
@@ -117,12 +119,12 @@ import { SchedulerService } from './services/scheduler.service';
     { provide: CROSS_PLATFORM_SERVICE, useExisting: CrossPlatformIdentityService },
     { provide: SOURCE_CREDIBILITY_SERVICE, useExisting: SourceCredibilityService },
     { provide: GRAPH_BOT_DETECTION_SERVICE, useExisting: GraphBotDetectionService },
-    { provide: PSYCHOLOGICAL_PROFILER_SERVICE, useExisting: PsychologicalProfilerService },
+    ...MAGI_PLUGIN_APP_PROVIDERS,
     // Memgraph is now handled by GraphDatabaseService in AnalysisModule (auto-connects with graceful fallback).
     // Uncomment when Redis is available:
     // { provide: 'REDIS_SERVICE', useFactory: (db: DatabaseService) => db, inject: [DatabaseService] },
   ],
-  controllers: [InvestigationController, MonitorController, EventsController, PluginsController],
+  controllers: [InvestigationController, MonitorController, EventsController, PluginsController, MagiIdentityController],
   exports: ['MONGODB_SERVICE'],
 })
 export class AppModule implements NestModule {

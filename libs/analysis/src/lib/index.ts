@@ -20,7 +20,6 @@ export * from './services/graph-database.service';
 export * from './services/source-credibility.service';
 export * from './services/graph-bot-detection.service';
 export * from './services/claim-verification.service';
-export * from './services/psychological-profiler.service';
 export * from './services/platform-credibility.service';
 export * from './services/social-graph-intelligence.service';
 export * from './services/saturation-metrics.service';

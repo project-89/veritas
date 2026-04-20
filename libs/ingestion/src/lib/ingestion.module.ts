@@ -17,7 +17,6 @@ import { ProjectDossierRepository } from './repositories/project-dossier.reposit
 import { MentalModelRepository } from './repositories/mental-model.repository';
 import { EmbeddingCacheRepository } from './repositories/embedding-cache.repository';
 import { RssCacheRepository } from './repositories/rss-cache.repository';
-import { IdentityController } from './controllers/identity.controller';
 import { DatabaseModule, DatabaseService } from '@veritas/database';
 import { IngestionResolver } from './resolvers/ingestion.resolver';
 import { TransformOnIngestService } from './services/transform/transform-on-ingest.service';
@@ -322,7 +321,7 @@ export class IngestionModule {
     return {
       module: IngestionModule,
       imports,
-      controllers: [IngestionController, NarrativeController, InvestigationController, ScanController, AnalysisJobController, IdentityController],
+      controllers: [IngestionController, NarrativeController, InvestigationController, ScanController, AnalysisJobController],
       providers,
       exports,
       global: options?.isGlobal || false,
