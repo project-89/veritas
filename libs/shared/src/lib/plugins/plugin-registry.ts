@@ -2,8 +2,7 @@ import type {
   VeritasPluginManifest,
   VeritasPluginNavItem,
 } from '@veritas/shared/types';
-import { atlasPluginManifest } from '../../../../../packages/atlas-plugin/src/manifest';
-import { magiPluginManifest } from '../../../../../packages/magi-plugin/src/manifest';
+import { INSTALLED_PLUGIN_MANIFESTS } from './generated-plugin-manifests';
 
 const CORE_PLUGIN_MANIFESTS: VeritasPluginManifest[] = [
   {
@@ -33,11 +32,6 @@ const CORE_PLUGIN_MANIFESTS: VeritasPluginManifest[] = [
       services: ['ScanProcessor', 'AnalysisProcessor'],
     },
   },
-];
-
-const INSTALLED_PLUGIN_MANIFESTS: VeritasPluginManifest[] = [
-  atlasPluginManifest,
-  magiPluginManifest,
 ];
 
 export function getInstalledPluginManifests(): VeritasPluginManifest[] {

@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
+    "plugins:sync": "node scripts/generate-plugin-registry.js",
     "test": "nx run-many --target=test --all",
     "test:visualization": "nx test visualization",
     "test:api": "nx test api",

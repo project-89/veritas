@@ -1,0 +1,23 @@
+{
+  "id": "veritas.plugin.atlas",
+  "manifest": {
+    "entry": "src/manifest.ts",
+    "symbol": "atlasPluginManifest"
+  },
+  "client": {
+    "routes": [
+      {
+        "path": "/atlas",
+        "entry": "src/index.ts",
+        "symbol": "AtlasPage"
+      }
+    ],
+    "investigationPanels": [
+      {
+        "capability": "atlas-lenses",
+        "entry": "src/index.ts",
+        "symbol": "AtlasInvestigationPanel"
+      }
+    ]
+  }
+}

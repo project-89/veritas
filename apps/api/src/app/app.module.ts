@@ -5,10 +5,6 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
 import {
-  MagiIdentityController,
-  MAGI_PLUGIN_APP_PROVIDERS,
-} from '../../../../packages/magi-plugin/src/backend';
-import {
   AnalysisModule,
   ClaimVerificationService,
   CrossPlatformIdentityService,
@@ -39,6 +35,7 @@ import { EventsController } from './controllers/events.controller';
 import { InvestigationController } from './controllers/investigation.controller';
 import { MonitorController } from './controllers/monitor.controller';
 import { PluginsController } from './controllers/plugins.controller';
+import { GENERATED_PLUGIN_APP_PROVIDERS, GENERATED_PLUGIN_CONTROLLERS } from './generated-plugin-backend';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { LoggingService } from './services/logging.service';
 import { RefreshService } from './services/refresh.service';
@@ -119,12 +116,12 @@ import { SchedulerService } from './services/scheduler.service';
     { provide: CROSS_PLATFORM_SERVICE, useExisting: CrossPlatformIdentityService },
     { provide: SOURCE_CREDIBILITY_SERVICE, useExisting: SourceCredibilityService },
     { provide: GRAPH_BOT_DETECTION_SERVICE, useExisting: GraphBotDetectionService },
-    ...MAGI_PLUGIN_APP_PROVIDERS,
+    ...GENERATED_PLUGIN_APP_PROVIDERS,
     // Memgraph is now handled by GraphDatabaseService in AnalysisModule (auto-connects with graceful fallback).
     // Uncomment when Redis is available:
     // { provide: 'REDIS_SERVICE', useFactory: (db: DatabaseService) => db, inject: [DatabaseService] },
   ],
-  controllers: [InvestigationController, MonitorController, EventsController, PluginsController, MagiIdentityController],
+  controllers: [InvestigationController, MonitorController, EventsController, PluginsController, ...GENERATED_PLUGIN_CONTROLLERS],
   exports: ['MONGODB_SERVICE'],
 })
 export class AppModule implements NestModule {

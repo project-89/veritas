@@ -1,0 +1,21 @@
+{
+  "id": "veritas.plugin.magi",
+  "manifest": {
+    "entry": "src/manifest.ts",
+    "symbol": "magiPluginManifest"
+  },
+  "client": {
+    "identityPanels": [
+      {
+        "capability": "magi-profiles",
+        "entry": "src/index.ts",
+        "symbol": "MagiIdentityPanel"
+      }
+    ]
+  },
+  "backend": {
+    "entry": "src/backend/index.ts",
+    "controllersSymbol": "MAGI_PLUGIN_CONTROLLERS",
+    "providersSymbol": "MAGI_PLUGIN_APP_PROVIDERS"
+  }
+}

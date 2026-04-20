@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { AtlasInvestigationPanel } from '@veritas/plugin-atlas';
 import type {
   AnalyzedNarrative,
   RawPost,
@@ -21,6 +20,7 @@ import type {
   ProjectDossierOverlap,
   MentalModel,
 } from '../../lib/api';
+import { GENERATED_INVESTIGATION_PANEL_COMPONENTS } from '../../lib/generated-plugin-components';
 import { getPluginsForSlot, hasPluginCapability, usePluginManifest } from '../../lib/plugins';
 import { IdentityDossier } from './identity-dossier';
 import type { SearchSummary } from '../../lib/investigation-context';
@@ -1285,14 +1285,18 @@ function InvestigationSummary({
         )}
       </div>
 
-      {hasAtlas && (
-        <AtlasInvestigationPanel
-          mentalModel={mentalModel}
-          mentalModelSaving={mentalModelSaving}
-          onBuildMentalModel={onBuildMentalModel}
-          onRefreshMentalModel={onRefreshMentalModel}
-        />
-      )}
+      {hasAtlas && (() => {
+        const AtlasInvestigationPanel = GENERATED_INVESTIGATION_PANEL_COMPONENTS['atlas-lenses'];
+        if (!AtlasInvestigationPanel) return null;
+        return (
+          <AtlasInvestigationPanel
+            mentalModel={mentalModel}
+            mentalModelSaving={mentalModelSaving}
+            onBuildMentalModel={onBuildMentalModel}
+            onRefreshMentalModel={onRefreshMentalModel}
+          />
+        );
+      })()}
 
       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-nerv-border">
         {onGenerateReport && (

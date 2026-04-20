@@ -1,7 +1,7 @@
 'use client';
 
-import { MagiIdentityPanel } from '@veritas/plugin-magi';
 import type { IdentityRecord, PlatformAccount } from '../../lib/api';
+import { GENERATED_IDENTITY_PANEL_COMPONENTS } from '../../lib/generated-plugin-components';
 import { hasPluginCapability, usePluginManifest } from '../../lib/plugins';
 import { NervBadge } from './nerv-badge';
 import { NervBar } from './nerv-bar';
@@ -359,9 +359,11 @@ export function IdentityDossier({
         </div>
       )}
 
-      {hasMagi && (
-        <MagiIdentityPanel identity={identity} onGenerateProfile={onGenerateProfile} />
-      )}
+      {hasMagi && (() => {
+        const MagiIdentityPanel = GENERATED_IDENTITY_PANEL_COMPONENTS['magi-profiles'];
+        if (!MagiIdentityPanel) return null;
+        return <MagiIdentityPanel identity={identity} onGenerateProfile={onGenerateProfile} />;
+      })()}
 
       {/* Investigation timeline */}
       <InvestigationTimeline identity={identity} />
