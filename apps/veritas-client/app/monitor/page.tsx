@@ -15,6 +15,7 @@ import {
   type Investigation,
   type Alert,
 } from '../../lib/api';
+import { hasPluginCapability, usePluginManifest } from '../../lib/plugins';
 import {
   NervAlert,
   NervBadge,
@@ -51,6 +52,7 @@ function severityVariant(severity: string): 'blue' | 'amber' | 'red' {
 
 export default function MonitorPage() {
   const router = useRouter();
+  const { plugins } = usePluginManifest();
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -63,6 +65,7 @@ export default function MonitorPage() {
   const [loading, setLoading] = useState(true);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previewRequestRef = useRef(0);
+  const hasAtlas = hasPluginCapability(plugins, 'atlas-lenses');
 
   // Load data on mount
   useEffect(() => {
@@ -228,12 +231,14 @@ export default function MonitorPage() {
                 Investigations
               </span>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => router.push('/atlas')}
-                  className="text-[8px] font-mono uppercase text-nerv-text-muted hover:text-nerv-orange"
-                >
-                  ATLAS
-                </button>
+                {hasAtlas && (
+                  <button
+                    onClick={() => router.push('/atlas')}
+                    className="text-[8px] font-mono uppercase text-nerv-text-muted hover:text-nerv-orange"
+                  >
+                    ATLAS
+                  </button>
+                )}
                 <button
                   onClick={() => router.push('/search')}
                   className="text-[8px] font-mono uppercase text-nerv-orange hover:underline"

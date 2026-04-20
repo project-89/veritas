@@ -4,15 +4,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { fetchUnreadAlertCount } from '../../lib/api';
+import { getTopNavItemsFromPlugins, usePluginManifest } from '../../lib/plugins';
 import { prefetchRecentEvents } from '../../lib/use-event-stream';
 import { NervStatus } from './nerv-status';
 import { NervBadge } from './nerv-badge';
 
-const NAV_LINKS = [
+const DEFAULT_NAV_LINKS: ReadonlyArray<{ href: string; label: string }> = [
   { href: '/monitor', label: 'Monitor' },
   { href: '/search', label: 'Search' },
   { href: '/worldmap', label: 'World Map' },
-] as const;
+];
 
 function UtcClock() {
   const [time, setTime] = useState('');
@@ -59,6 +60,14 @@ export function NervNav() {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const { theme, toggle: toggleTheme } = useTheme();
+  const { plugins } = usePluginManifest();
+
+  const navLinks =
+    getTopNavItemsFromPlugins(plugins).map((item) => ({
+      href: item.href,
+      label: item.label,
+    })) || DEFAULT_NAV_LINKS;
+  const resolvedNavLinks = navLinks.length > 0 ? navLinks : DEFAULT_NAV_LINKS;
 
   useEffect(() => {
     let mounted = true;
@@ -135,7 +144,7 @@ export function NervNav() {
               Investigation
             </span>
           )}
-          {!isInvestigating ? NAV_LINKS.map((link) => {
+          {!isInvestigating ? resolvedNavLinks.map((link) => {
             const active = isActive(link.href);
             return (
               <Link

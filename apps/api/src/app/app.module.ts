@@ -36,6 +36,7 @@ import {
 import { EventsController } from './controllers/events.controller';
 import { InvestigationController } from './controllers/investigation.controller';
 import { MonitorController } from './controllers/monitor.controller';
+import { PluginsController } from './controllers/plugins.controller';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { LoggingService } from './services/logging.service';
 import { RefreshService } from './services/refresh.service';
@@ -121,7 +122,7 @@ import { SchedulerService } from './services/scheduler.service';
     // Uncomment when Redis is available:
     // { provide: 'REDIS_SERVICE', useFactory: (db: DatabaseService) => db, inject: [DatabaseService] },
   ],
-  controllers: [InvestigationController, MonitorController, EventsController],
+  controllers: [InvestigationController, MonitorController, EventsController, PluginsController],
   exports: ['MONGODB_SERVICE'],
 })
 export class AppModule implements NestModule {

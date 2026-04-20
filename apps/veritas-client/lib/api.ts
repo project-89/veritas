@@ -116,6 +116,41 @@ export interface TrendsResponse {
   generatedAt: string;
 }
 
+export interface PluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  kind: 'core' | 'public-plugin' | 'private-plugin';
+  status: 'installed' | 'not-installed' | 'disabled';
+  capabilities: string[];
+  description?: string;
+  ui?: {
+    navItems?: Array<{ slot: 'top-nav'; href: string; label: string; order?: number }>;
+    routes?: Array<{ slot: 'page-route'; path: string; label: string }>;
+    slots?: Array<
+      | 'top-nav'
+      | 'page-route'
+      | 'results-tab'
+      | 'investigation-panel'
+      | 'identity-panel'
+      | 'dossier-panel'
+      | 'investigation-action'
+      | 'monitor-card-action'
+    >;
+  };
+  backend?: {
+    moduleName?: string;
+    controllers?: string[];
+    services?: string[];
+    queueProcessors?: string[];
+  };
+}
+
+export interface PluginManifestResponse {
+  plugins: PluginManifest[];
+  generatedAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // Investigation types -- deep narrative investigation results
 // ---------------------------------------------------------------------------
@@ -809,6 +844,10 @@ export async function fetchAtlasLenses(): Promise<AtlasLensRecord[]> {
     ...record,
     investigation: normalizeInvestigation(record.investigation),
   }));
+}
+
+export async function fetchPluginManifest(): Promise<PluginManifestResponse> {
+  return request<PluginManifestResponse>('/api/plugins/manifest');
 }
 
 // ---------------------------------------------------------------------------

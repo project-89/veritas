@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { IdentityRecord, MagiProfileMode, PlatformAccount, PsychologicalProfile } from '../../lib/api';
+import { hasPluginCapability, usePluginManifest } from '../../lib/plugins';
 import { NervBadge } from './nerv-badge';
 import { NervBar } from './nerv-bar';
 import { NervSparkline } from './nerv-sparkline';
@@ -651,6 +652,7 @@ export function IdentityDossier({
   loading,
   onGenerateProfile,
 }: IdentityDossierProps) {
+  const { plugins } = usePluginManifest();
   if (loading) {
     return (
       <div className="p-4 text-center">
@@ -665,6 +667,7 @@ export function IdentityDossier({
   const hasProfile = identity.psychologicalProfile != null;
   const profileStatus = identity.profileGenerationStatus;
   const canGenerate = profileStatus !== 'queued' && profileStatus !== 'generating';
+  const hasMagi = hasPluginCapability(plugins, 'magi-profiles');
 
   return (
     <div className="p-3 space-y-3">
@@ -696,49 +699,53 @@ export function IdentityDossier({
         </div>
       )}
 
-      <div className="p-3 border border-nerv-orange/30 bg-nerv-orange/5 rounded-sm space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-orange">
-            MAGI PROFILE SCOPE
-          </span>
-          <span className="text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted">
-            {profileStatus === 'queued'
-              ? 'QUEUED'
-              : profileStatus === 'generating'
-                ? 'GENERATING'
-                : hasProfile
-                  ? 'READY'
-                  : 'IDLE'}
-          </span>
-        </div>
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-          {(Object.keys(MAGI_MODE_LABELS) as MagiProfileMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => onGenerateProfile?.(id, mode)}
-              disabled={!canGenerate}
-              className={`px-2 py-2 font-mono uppercase tracking-wider text-[9px] border rounded-sm transition-colors ${
-                canGenerate
-                  ? 'bg-nerv-orange/15 text-nerv-orange hover:bg-nerv-orange/25 border-nerv-orange/40'
-                  : 'bg-nerv-amber/20 text-nerv-amber border-nerv-amber/50 cursor-wait animate-pulse'
-              }`}
-              title={`Generate ${MAGI_MODE_LABELS[mode].toLowerCase()} MAGI profile`}
-            >
-              {MAGI_MODE_LABELS[mode]}
-            </button>
-          ))}
-        </div>
-        <p className="text-[9px] font-mono text-nerv-text-muted leading-relaxed">
-          Window mode uses the current investigation slice. Current mode uses the latest accessible timeline. Historical mode uses the widest locally available corpus. Deep history pulls a much larger timeline sample for fuller MAGI profiling.
-        </p>
-      </div>
+      {hasMagi && (
+        <>
+          <div className="p-3 border border-nerv-orange/30 bg-nerv-orange/5 rounded-sm space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-orange">
+                MAGI PROFILE SCOPE
+              </span>
+              <span className="text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted">
+                {profileStatus === 'queued'
+                  ? 'QUEUED'
+                  : profileStatus === 'generating'
+                    ? 'GENERATING'
+                    : hasProfile
+                      ? 'READY'
+                      : 'IDLE'}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {(Object.keys(MAGI_MODE_LABELS) as MagiProfileMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => onGenerateProfile?.(id, mode)}
+                  disabled={!canGenerate}
+                  className={`px-2 py-2 font-mono uppercase tracking-wider text-[9px] border rounded-sm transition-colors ${
+                    canGenerate
+                      ? 'bg-nerv-orange/15 text-nerv-orange hover:bg-nerv-orange/25 border-nerv-orange/40'
+                      : 'bg-nerv-amber/20 text-nerv-amber border-nerv-amber/50 cursor-wait animate-pulse'
+                  }`}
+                  title={`Generate ${MAGI_MODE_LABELS[mode].toLowerCase()} MAGI profile`}
+                >
+                  {MAGI_MODE_LABELS[mode]}
+                </button>
+              ))}
+            </div>
+            <p className="text-[9px] font-mono text-nerv-text-muted leading-relaxed">
+              Window mode uses the current investigation slice. Current mode uses the latest accessible timeline. Historical mode uses the widest locally available corpus. Deep history pulls a much larger timeline sample for fuller MAGI profiling.
+            </p>
+          </div>
 
-      {hasProfile && identity.psychologicalProfile ? (
-        <MagiProfile profile={identity.psychologicalProfile} />
-      ) : (
-        <p className="text-[9px] font-mono text-nerv-text-muted leading-relaxed">
-          Deep psychological and behavioral analysis using {identity.totalPostsAnalyzed}+ observed posts. Covers communication style, beliefs, emotional triggers, influence patterns, and risk indicators.
-        </p>
+          {hasProfile && identity.psychologicalProfile ? (
+            <MagiProfile profile={identity.psychologicalProfile} />
+          ) : (
+            <p className="text-[9px] font-mono text-nerv-text-muted leading-relaxed">
+              Deep psychological and behavioral analysis using {identity.totalPostsAnalyzed}+ observed posts. Covers communication style, beliefs, emotional triggers, influence patterns, and risk indicators.
+            </p>
+          )}
+        </>
       )}
 
       {/* Investigation timeline */}
