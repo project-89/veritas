@@ -84,6 +84,7 @@ export {
 // Queue
 export { ScanProcessor } from './lib/queue/scan.processor';
 export { AnalysisProcessor } from './lib/queue/analysis.processor';
+export type { AnalysisJobData } from './lib/queue/analysis.processor';
 
 // Identity records
 export { IdentityRecordRepository } from './lib/repositories/identity-record.repository';

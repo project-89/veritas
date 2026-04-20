@@ -2,7 +2,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = process.cwd();
-const PACKAGES_DIR = path.join(ROOT, 'packages');
+const PLUGIN_ROOTS = [
+  path.join(ROOT, 'packages'),
+  path.join(ROOT, 'private-plugins', 'packages'),
+];
 const SHARED_OUTPUT = path.join(ROOT, 'libs/shared/src/lib/plugins/generated-plugin-manifests.ts');
 const CLIENT_OUTPUT = path.join(ROOT, 'apps/veritas-client/lib/generated-plugin-components.ts');
 const API_OUTPUT = path.join(ROOT, 'apps/api/src/app/generated-plugin-backend.ts');
@@ -18,23 +21,36 @@ function relativeImport(fromFile, toFile) {
 }
 
 function readPluginConfigs() {
-  if (!fs.existsSync(PACKAGES_DIR)) return [];
+  const discovered = [];
 
-  return fs
-    .readdirSync(PACKAGES_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => {
-      const pluginRoot = path.join(PACKAGES_DIR, entry.name);
-      const configPath = path.join(pluginRoot, 'plugin.json');
-      if (!fs.existsSync(configPath)) return null;
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      return {
-        name: entry.name,
-        root: pluginRoot,
-        ...config,
-      };
-    })
-    .filter(Boolean);
+  for (const packagesDir of PLUGIN_ROOTS) {
+    if (!fs.existsSync(packagesDir)) continue;
+
+    const pluginEntries = fs
+      .readdirSync(packagesDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => {
+        const pluginRoot = path.join(packagesDir, entry.name);
+        const configPath = path.join(pluginRoot, 'plugin.json');
+        if (!fs.existsSync(configPath)) return null;
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        return {
+          name: entry.name,
+          root: pluginRoot,
+          ...config,
+        };
+      })
+      .filter(Boolean);
+
+    discovered.push(...pluginEntries);
+  }
+
+  const dedupedById = new Map();
+  for (const plugin of discovered) {
+    dedupedById.set(plugin.id, plugin);
+  }
+
+  return Array.from(dedupedById.values());
 }
 
 function buildSharedOutput(plugins) {
