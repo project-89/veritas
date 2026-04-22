@@ -6,6 +6,7 @@ module.exports = {
     path: join(__dirname, '../../dist/apps/api'),
   },
   resolve: {
+    symlinks: false,
     alias: {
       '@veritas/database': join(__dirname, '../../libs/database/src/index.ts'),
       '@veritas/analysis': join(__dirname, '../../libs/analysis/src/index.ts'),

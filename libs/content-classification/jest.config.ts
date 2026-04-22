@@ -20,6 +20,7 @@ export default {
     '/node_modules/(?!franc-min|trigram-utils).+\\.js$',
   ],
   moduleNameMapper: {
+    '^afinn-165$': '<rootDir>/__mocks__/afinn-165.ts',
     '^@veritas/database$': '<rootDir>/../../libs/database/src/index.ts',
     '^@veritas/shared/types$': '<rootDir>/../../libs/shared/types/src/index.ts',
     '^@veritas/shared$': '<rootDir>/../../libs/shared/types/src/index.ts',

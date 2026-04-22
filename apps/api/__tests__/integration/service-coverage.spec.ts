@@ -105,7 +105,6 @@ import { DeepInvestigationService } from '../../../../libs/analysis/src/lib/serv
 import { CrossPlatformIdentityService } from '../../../../libs/analysis/src/lib/services/cross-platform-identity.service';
 import { SourceCredibilityService } from '../../../../libs/analysis/src/lib/services/source-credibility.service';
 import { GraphBotDetectionService } from '../../../../libs/analysis/src/lib/services/graph-bot-detection.service';
-import { PsychologicalProfilerService } from '../../../../libs/analysis/src/lib/services/psychological-profiler.service';
 import { PlatformCredibilityService } from '../../../../libs/analysis/src/lib/services/platform-credibility.service';
 import { SocialGraphIntelligenceService } from '../../../../libs/analysis/src/lib/services/social-graph-intelligence.service';
 import { GraphDatabaseService } from '../../../../libs/analysis/src/lib/services/graph-database.service';
@@ -312,11 +311,6 @@ describe('Section 1: Service Registration Audit', () => {
 
     it('should construct GraphBotDetectionService', () => {
       const svc = new GraphBotDetectionService(graphDb);
-      expect(svc).toBeDefined();
-    });
-
-    it('should construct PsychologicalProfilerService', () => {
-      const svc = new PsychologicalProfilerService(configService);
       expect(svc).toBeDefined();
     });
 
@@ -1446,85 +1440,6 @@ describe('Section 4: Analysis Service Contracts', () => {
       expect(result).toHaveProperty('generatedAt');
       expect(typeof result.content).toBe('string');
       expect(result.content.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('PsychologicalProfilerService', () => {
-    const svc = new PsychologicalProfilerService(configService);
-
-    it('requires API key to generate profiles', () => {
-      const noKeySvc = new PsychologicalProfilerService(makeConfigService({ GEMINI_API_KEY: '' }));
-      expect(noKeySvc).toBeDefined();
-    });
-
-    it('generateProfile returns all profile dimensions', async () => {
-      mockGenerateContent.mockResolvedValueOnce({
-        response: {
-          text: () =>
-            JSON.stringify({
-              communicationStyle: {
-                formality: 'casual',
-                tone: 'analytical',
-                complexity: 'moderate',
-                evidence: ['Post about crypto analysis'],
-              },
-              coreBeliefs: [{ belief: 'Decentralization is key', confidence: 0.8, evidence: ['Post 1'] }],
-              interestDomains: [{ domain: 'cryptocurrency', engagementLevel: 'primary', postCount: 50 }],
-              emotionalTriggers: {
-                anger: ['regulation'],
-                excitement: ['new tech'],
-                fear: ['market crash'],
-                evidence: { anger: ['Post 2'], excitement: ['Post 3'], fear: ['Post 4'] },
-              },
-              engagementPatterns: {
-                likelyToEngageWith: ['crypto news'],
-                likelyToShare: ['price analysis'],
-                likelyToCreate: ['thread commentary'],
-                contentPreferences: ['data-driven'],
-              },
-              influenceSusceptibility: {
-                vulnerableTo: ['FOMO messaging'],
-                resistantTo: ['appeals to authority'],
-                echoChamberDepth: 'moderate',
-                evidence: ['Post 5'],
-              },
-              persuasionStyle: {
-                primaryTechniques: ['data citation'],
-                targetAudience: 'crypto-curious',
-                effectiveness: 'moderate',
-                evidence: ['Post 6'],
-              },
-              riskIndicators: {
-                radicalizationSignals: [],
-                manipulationVulnerability: 'low',
-                echoChamberDepth: 'moderate',
-                flags: [],
-                evidence: [],
-              },
-              socialRole: { primary: 'analyst', confidence: 0.7, evidence: ['Post 7'] },
-              summary: 'Analytical crypto enthusiast with moderate echo chamber engagement.',
-            }),
-        },
-      });
-
-      const posts = Array.from({ length: 10 }, (_, i) =>
-        makeUserPost({ text: `Crypto analysis post ${i}` }),
-      );
-      const result = await svc.generateProfile({
-        handle: '@testuser',
-        platform: 'twitter',
-        posts,
-      });
-      expect(result).toHaveProperty('communicationStyle');
-      expect(result).toHaveProperty('coreBeliefs');
-      expect(result).toHaveProperty('interestDomains');
-      expect(result).toHaveProperty('emotionalTriggers');
-      expect(result).toHaveProperty('engagementPatterns');
-      expect(result).toHaveProperty('influenceSusceptibility');
-      expect(result).toHaveProperty('persuasionStyle');
-      expect(result).toHaveProperty('riskIndicators');
-      expect(result).toHaveProperty('socialRole');
-      expect(result).toHaveProperty('summary');
     });
   });
 

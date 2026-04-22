@@ -29,7 +29,10 @@
     },
     "test": {
       "executor": "@nx/jest:jest",
-      "options": { "passWithNoTests": true }
+      "options": {
+        "jestConfig": "apps/veritas-client/jest.config.ts",
+        "passWithNoTests": true
+      }
     }
   }
 }

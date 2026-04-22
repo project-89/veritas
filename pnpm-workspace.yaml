@@ -1,2 +1,5 @@
 packages:
   - 'packages/*'
+  - 'libs/*'
+  - 'libs/shared/*'
+  - 'private-plugins/packages/*'

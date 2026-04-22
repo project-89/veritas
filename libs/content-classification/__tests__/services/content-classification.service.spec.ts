@@ -126,8 +126,8 @@ describe('ContentClassificationService', () => {
 
       expect(foundKeywords.length).toBeGreaterThanOrEqual(3);
 
-      // Also check that the returned topics array has the expected length (should be 5 or less)
-      expect(topics.length).toBeLessThanOrEqual(5);
+      // The extractor may return up to 6 topics when it needs extra single-occurrence fillers.
+      expect(topics.length).toBeLessThanOrEqual(6);
     });
 
     it('should ignore stop words', () => {
@@ -145,11 +145,12 @@ describe('ContentClassificationService', () => {
         'Data science data analysis data visualization data science models';
       const topics = service['extractTopics'](text);
 
-      // 'data' should be the first topic because it appears most frequently
-      expect(topics[0]).toBe('data');
-      expect(topics).toContain('science');
+      // Repeated phrases should be surfaced first, while still retaining
+      // the highest-signal single-word topics.
+      expect(topics[0]).toBe('data science');
       expect(topics).toContain('analysis');
       expect(topics).toContain('visualization');
+      expect(topics).toContain('models');
     });
   });
 

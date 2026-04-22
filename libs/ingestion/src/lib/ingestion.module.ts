@@ -268,15 +268,15 @@ export class IngestionModule {
       providers.push({ provide: TELEGRAM_CONNECTOR, useClass: TelegramFreeConnector });
     }
 
-    if ((connectorConfig as Record<string, unknown>).wikipedia !== false) {
+    if ((connectorConfig as Record<string, unknown>)['wikipedia'] !== false) {
       providers.push({ provide: WIKIPEDIA_CONNECTOR, useClass: WikipediaEventsConnector });
     }
 
-    if ((connectorConfig as Record<string, unknown>).bluesky !== false) {
+    if ((connectorConfig as Record<string, unknown>)['bluesky'] !== false) {
       providers.push({ provide: BLUESKY_CONNECTOR, useClass: BlueskyFreeConnector });
     }
 
-    if ((connectorConfig as Record<string, unknown>).fourchan !== false) {
+    if ((connectorConfig as Record<string, unknown>)['fourchan'] !== false) {
       providers.push({ provide: FOURCHAN_CONNECTOR, useClass: FourChanFreeConnector });
     }
 
