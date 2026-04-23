@@ -14,6 +14,13 @@
         "tsConfig": "libs/analysis/tsconfig.lib.json",
         "assets": ["libs/analysis/*.md"]
       }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "env -u NO_COLOR pnpm exec jest --config libs/analysis/jest.config.ts --passWithNoTests --watchman=false",
+        "cwd": "{workspaceRoot}"
+      }
     }
   }
 }

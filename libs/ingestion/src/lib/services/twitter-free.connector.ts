@@ -214,6 +214,7 @@ export class TwitterFreeConnector
         this.logger.error('Error in Twitter stream:', error);
       }
     }, this.pollingInterval);
+    interval.unref?.();
 
     this.streamConnections.set(streamId, interval);
 

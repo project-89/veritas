@@ -314,6 +314,7 @@ export class RedditFreeConnector
         this.logger.error('Error in Reddit stream:', error);
       }
     }, this.pollingInterval);
+    interval.unref?.();
 
     this.streamConnections.set(streamId, interval);
 
@@ -358,6 +359,7 @@ export class RedditFreeConnector
         this.logger.error('Error in Reddit stream:', error);
       }
     }, this.pollingInterval);
+    interval.unref?.();
 
     this.streamConnections.set(`transform-${streamId}`, interval);
 

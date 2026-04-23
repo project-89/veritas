@@ -32,8 +32,10 @@
       }
     },
     "test": {
+      "executor": "nx:run-commands",
       "options": {
-        "passWithNoTests": true
+        "command": "env -u NO_COLOR pnpm exec jest --config apps/api/jest.config.ts --passWithNoTests --watchman=false",
+        "cwd": "{workspaceRoot}"
       }
     }
   }

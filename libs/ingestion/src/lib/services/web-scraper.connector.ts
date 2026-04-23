@@ -514,6 +514,7 @@ export class WebScraperConnector
         this.logger.error('Error in web scraper stream:', error);
       }
     }, this.pollingInterval);
+    interval.unref?.();
 
     this.streamConnections.set(streamId, interval);
     this.interval = interval;
@@ -573,6 +574,7 @@ export class WebScraperConnector
         this.logger.error('Error in web scraper stream:', error);
       }
     }, this.pollingInterval);
+    interval.unref?.();
 
     this.streamConnections.set(`transform-${streamId}`, interval);
 

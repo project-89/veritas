@@ -2,9 +2,9 @@
 
 import { RedisRepository } from '../../src/lib/redis/redis-repository';
 
-// Mock uuid to return predictable values
-jest.mock('uuid', () => ({
-  v4: jest.fn().mockReturnValue('mock-uuid-1234'),
+// Mock randomUUID to return a predictable value
+jest.mock('node:crypto', () => ({
+  randomUUID: jest.fn().mockReturnValue('mock-uuid-1234'),
 }));
 
 interface TestEntity {

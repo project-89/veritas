@@ -385,12 +385,14 @@ export class DownstreamEffectsService {
       }
 
       // 2. Cache miss or no cache store — fetch fresh from adapter
+      let timeoutHandle: NodeJS.Timeout | undefined;
       try {
         const signals = await Promise.race([
           adapter.fetchSignals({ keywords, startDate, endDate }),
-          new Promise<ExternalSignal[]>((_, reject) =>
-            setTimeout(() => reject(new Error('timeout')), 10_000),
-          ),
+          new Promise<ExternalSignal[]>((_, reject) => {
+            timeoutHandle = setTimeout(() => reject(new Error('timeout')), 10_000);
+            timeoutHandle.unref?.();
+          }),
         ]);
 
         this.logger.log(
@@ -416,6 +418,10 @@ export class DownstreamEffectsService {
       } catch (err) {
         this.logger.warn(`Adapter "${adapter.name}" [${adapter.scope}] failed: ${err}`);
         return [] as ExternalSignal[];
+      } finally {
+        if (timeoutHandle) {
+          clearTimeout(timeoutHandle);
+        }
       }
     });
 

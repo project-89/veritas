@@ -139,9 +139,10 @@ export class FacebookJinaConnector
       }
     };
 
-    checkPages();
+    void checkPages();
 
     const interval = setInterval(checkPages, this.pollingInterval);
+    interval.unref?.();
     this.streamConnections.set(streamId, interval);
 
     emitter.on('end', () => {

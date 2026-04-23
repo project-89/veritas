@@ -42,6 +42,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       `Scheduler started — checking for due investigations every ${SchedulerService.CHECK_INTERVAL_MS / 1000}s`,
     );
     this.intervalHandle = setInterval(() => void this.tick(), SchedulerService.CHECK_INTERVAL_MS);
+    this.intervalHandle.unref?.();
   }
 
   onModuleDestroy(): void {

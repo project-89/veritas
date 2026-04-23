@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { RedisClientType } from 'redis';
-import { v4 as uuidv4 } from 'uuid';
 import type {
   FilterQuery,
   FindOptions,
@@ -164,7 +164,7 @@ export class RedisRepository<T extends { id: string }>
       // Generate ID if not provided
       const entity = {
         ...data,
-        id: data.id || uuidv4(),
+        id: data.id || randomUUID(),
       } as T;
 
       const key = this.getKey(entity.id);
@@ -190,7 +190,7 @@ export class RedisRepository<T extends { id: string }>
       for (const item of data) {
         const entity = {
           ...item,
-          id: item.id || uuidv4(),
+          id: item.id || randomUUID(),
         } as T;
 
         const key = this.getKey(entity.id);

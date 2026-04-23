@@ -49,7 +49,11 @@ export class TransformOnIngestService {
     }
 
     // Schedule daily cleanup of expired data
-    setInterval(() => this.cleanupExpiredData(), 24 * 60 * 60 * 1000);
+    const cleanupInterval = setInterval(
+      () => this.cleanupExpiredData(),
+      24 * 60 * 60 * 1000
+    );
+    cleanupInterval.unref?.();
   }
 
   /**

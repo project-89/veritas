@@ -87,6 +87,7 @@ export class GlobalEventAggregationService
   // RxJS event stream
   private readonly subject = new Subject<GlobalEvent>();
   readonly events$: Observable<GlobalEvent> = this.subject.asObservable();
+  private initialPollTimeouts: Array<ReturnType<typeof setTimeout>> = [];
 
   constructor(
     private readonly moduleRef: ModuleRef,
@@ -112,17 +113,18 @@ export class GlobalEventAggregationService
 
     // Stagger initial polls to avoid thundering herd / rate limits
     void this.pollUsgs();
-    setTimeout(() => void this.pollCoingecko(), 10_000);  // 10s delay
-    setTimeout(() => void this.pollRss(), 20_000);        // 20s delay
-    setTimeout(() => void this.pollGdelt(), 60_000);      // 60s delay
-    setTimeout(() => void this.pollGdacs(), 75_000);      // 75s delay
-    setTimeout(() => void this.pollReliefweb(), 80_000);  // 80s delay
+    this.scheduleInitialPoll(() => void this.pollCoingecko(), 10_000);
+    this.scheduleInitialPoll(() => void this.pollRss(), 20_000);
+    this.scheduleInitialPoll(() => void this.pollGdelt(), 60_000);
+    this.scheduleInitialPoll(() => void this.pollGdacs(), 75_000);
+    this.scheduleInitialPoll(() => void this.pollReliefweb(), 80_000);
 
     // ACLED polling — disabled by default (requires API key setup)
     const acledEnabled = process.env['ACLED_ENABLED'] === 'true';
     if (acledEnabled) {
-      setTimeout(() => void this.pollAcled(), 90_000);
+      this.scheduleInitialPoll(() => void this.pollAcled(), 90_000);
       this.acledInterval = setInterval(() => void this.pollAcled(), ACLED_INTERVAL_MS);
+      this.acledInterval.unref?.();
     } else {
       this.logger.log('ACLED polling disabled (set ACLED_ENABLED=true to enable)');
     }
@@ -132,29 +134,37 @@ export class GlobalEventAggregationService
       () => void this.pollUsgs(),
       USGS_INTERVAL_MS,
     );
+    this.usgsInterval.unref?.();
     this.gdeltInterval = setInterval(
       () => void this.pollGdelt(),
       GDELT_INTERVAL_MS,
     );
+    this.gdeltInterval.unref?.();
     this.coingeckoInterval = setInterval(
       () => void this.pollCoingecko(),
       COINGECKO_INTERVAL_MS,
     );
+    this.coingeckoInterval.unref?.();
     this.gdacsInterval = setInterval(
       () => void this.pollGdacs(),
       GDACS_INTERVAL_MS,
     );
+    this.gdacsInterval.unref?.();
     this.reliefwebInterval = setInterval(
       () => void this.pollReliefweb(),
       RELIEFWEB_INTERVAL_MS,
     );
+    this.reliefwebInterval.unref?.();
     this.rssInterval = setInterval(
       () => void this.pollRss(),
       RSS_INTERVAL_MS,
     );
+    this.rssInterval.unref?.();
   }
 
   onModuleDestroy(): void {
+    this.initialPollTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.initialPollTimeouts = [];
     if (this.rssInterval) clearInterval(this.rssInterval);
     if (this.coingeckoInterval) clearInterval(this.coingeckoInterval);
     if (this.usgsInterval) clearInterval(this.usgsInterval);
@@ -164,6 +174,12 @@ export class GlobalEventAggregationService
     if (this.reliefwebInterval) clearInterval(this.reliefwebInterval);
     this.subject.complete();
     this.logger.log('Global event aggregation stopped');
+  }
+
+  private scheduleInitialPoll(task: () => void, delayMs: number): void {
+    const timeout = setTimeout(task, delayMs);
+    timeout.unref?.();
+    this.initialPollTimeouts.push(timeout);
   }
 
   // ---------------------------------------------------------------------------

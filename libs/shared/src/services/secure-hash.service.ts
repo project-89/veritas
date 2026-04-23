@@ -156,8 +156,9 @@ export class SecureHashService {
    * Schedule periodic salt rotation
    */
   private scheduleSaltRotation(): void {
-    setInterval(() => {
+    const interval = setInterval(() => {
       this.saltRepository.rotateSalts();
     }, this.SALT_ROTATION_INTERVAL);
+    interval.unref?.();
   }
 }

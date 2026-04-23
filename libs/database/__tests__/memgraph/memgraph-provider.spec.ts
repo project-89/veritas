@@ -141,7 +141,6 @@ describe('MemgraphProvider', () => {
       const params = { param1: 'value1' };
 
       const result = await provider.query(query, params);
-      console.log(result);
 
       // Verify that session was created and run was called
       const neo4j = require('neo4j-driver');

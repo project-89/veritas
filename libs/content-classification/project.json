@@ -28,11 +28,10 @@
       }
     },
     "test": {
-      "executor": "@nx/jest:jest",
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "executor": "nx:run-commands",
       "options": {
-        "jestConfig": "libs/content-classification/jest.config.ts",
-        "passWithNoTests": true
+        "command": "env -u NO_COLOR pnpm exec jest --config libs/content-classification/jest.config.ts --passWithNoTests --watchman=false",
+        "cwd": "{workspaceRoot}"
       }
     }
   },

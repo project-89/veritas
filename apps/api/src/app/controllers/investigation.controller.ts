@@ -171,6 +171,7 @@ export class InvestigationController {
 
           // 2b. Cross-platform discovery via Sherlock (with 15s timeout)
           //     Find this user's accounts on other platforms we can fetch from
+          let identityTimeout: NodeJS.Timeout | undefined;
           try {
             const identity = await Promise.race([
               this.crossPlatformIdentity.resolveIdentity(handle),
@@ -183,8 +184,8 @@ export class InvestigationController {
                 relevantAccounts: never[];
                 totalFound: 0;
                 searchDuration: 0;
-              }>((resolve) =>
-                setTimeout(
+              }>((resolve) => {
+                identityTimeout = setTimeout(
                   () =>
                     resolve({
                       queriedUsername: handle,
@@ -197,8 +198,9 @@ export class InvestigationController {
                       searchDuration: 0 as const,
                     }),
                   15_000,
-                ),
-              ),
+                );
+                identityTimeout.unref?.();
+              }),
             ]);
             if (identity.actionableAccounts.length > 0) {
               const discoveredPlatforms = identity.actionableAccounts
@@ -213,6 +215,10 @@ export class InvestigationController {
             }
           } catch (err) {
             this.logger.debug(`Sherlock lookup skipped for @${handle}: ${err}`);
+          } finally {
+            if (identityTimeout) {
+              clearTimeout(identityTimeout);
+            }
           }
 
           // 3. Fetch historical timeline from connectors that support it

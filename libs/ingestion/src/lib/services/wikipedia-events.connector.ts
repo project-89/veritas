@@ -89,7 +89,7 @@ export class WikipediaEventsConnector implements DataConnector {
   streamAndTransform(keywords: string[]): EventEmitter {
     const emitter = new EventEmitter();
     // Wikipedia current events don't stream — emit once then close
-    setTimeout(() => {
+    const initialFetch = setTimeout(() => {
       void (async () => {
         try {
           const insights = await this.searchAndTransform(keywords.join(' '));
@@ -102,6 +102,7 @@ export class WikipediaEventsConnector implements DataConnector {
         emitter.emit('end');
       })();
     }, 0);
+    initialFetch.unref?.();
     return emitter;
   }
 

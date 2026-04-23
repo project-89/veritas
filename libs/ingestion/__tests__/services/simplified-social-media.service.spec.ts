@@ -229,8 +229,10 @@ describe('TransformOnIngestService', () => {
   let twitterConnector: ModernPlatformConnector;
   let facebookConnector: ModernPlatformConnector;
   let redditConnector: ModernPlatformConnector;
+  let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     twitterConnector = new ModernPlatformConnector('twitter');
     facebookConnector = new ModernPlatformConnector('facebook');
     redditConnector = new ModernPlatformConnector('reddit');
@@ -240,6 +242,10 @@ describe('TransformOnIngestService', () => {
       facebookConnector,
       redditConnector
     );
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   describe('Module Lifecycle', () => {

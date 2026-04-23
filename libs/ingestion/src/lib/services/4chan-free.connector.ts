@@ -117,8 +117,9 @@ export class FourChanFreeConnector
       }
     };
 
-    poll();
+    void poll();
     const interval = setInterval(poll, this.pollingInterval);
+    interval.unref?.();
     this.streamConnections.set(streamId, interval);
 
     emitter.on('end', () => {

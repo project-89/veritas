@@ -125,7 +125,9 @@ export class ContentClassificationModule {
 
       return provider;
     } catch (error) {
-      console.error(`Error creating database provider ${providerType}:`, error);
+      if (process.env['NODE_ENV'] !== 'test') {
+        console.error(`Error creating database provider ${providerType}:`, error);
+      }
       // Return a mock provider for testing scenarios
       return {
         connect: async () => Promise.resolve(),

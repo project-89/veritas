@@ -5,6 +5,9 @@ describe('MentalModelService', () => {
     const service = new MentalModelService({
       get: jest.fn().mockReturnValue(undefined),
     } as any);
+    jest
+      .spyOn(service as any, 'generateWithLLM')
+      .mockResolvedValue(null);
 
     const result = await service.buildFromInvestigation({
       investigation: {

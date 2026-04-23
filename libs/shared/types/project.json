@@ -15,6 +15,13 @@
         "assets": ["libs/shared/types/*.md"],
         "buildableProjectDepsInPackageJsonType": "dependencies"
       }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "env -u NO_COLOR pnpm exec jest --config libs/shared/types/jest.config.ts --passWithNoTests --watchman=false",
+        "cwd": "{workspaceRoot}"
+      }
     }
   }
 }

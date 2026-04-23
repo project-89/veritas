@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { Module, Global } from '@nestjs/common';
+import type { DynamicModule } from '@nestjs/common';
 import { IngestionModule } from '../src/lib/ingestion.module';
 import { NarrativeRepository } from '../src/lib/repositories/narrative-insight.repository';
 import { TwitterFreeConnector } from '../src/lib/services/twitter-free.connector';
@@ -8,6 +9,54 @@ import { RedditFreeConnector } from '../src/lib/services/reddit-free.connector';
 import { TransformOnIngestService } from '../src/lib/services/transform/transform-on-ingest.service';
 import { ConfigService } from '@nestjs/config';
 import { ContentClassificationService } from '@veritas/content-classification';
+
+jest.mock('../src/lib/queue/scan.processor', () => ({
+  ScanProcessor: class MockScanProcessor {},
+}));
+
+jest.mock('@nestjs/bullmq', () => {
+  const { Module, Inject } = jest.requireActual('@nestjs/common') as typeof import('@nestjs/common');
+
+  const queueProviders = [
+    {
+      provide: 'BullQueue_scan',
+      useValue: {
+        add: jest.fn(),
+        close: jest.fn(),
+      },
+    },
+    {
+      provide: 'BullQueue_analysis',
+      useValue: {
+        add: jest.fn(),
+        close: jest.fn(),
+      },
+    },
+  ];
+
+  class MockBullModule {
+    static registerQueue = jest.fn().mockImplementation(
+      (): DynamicModule => ({
+        module: MockBullModule,
+        providers: queueProviders,
+        exports: [MockBullModule, ...queueProviders.map((provider) => provider.provide)],
+      }),
+    );
+  }
+  class MockWorkerHost {}
+  Module({})(MockBullModule);
+
+  return {
+    __esModule: true,
+    BullModule: MockBullModule,
+    InjectQueue: (name: string) => Inject(`BullQueue_${name}`),
+    Processor:
+      () =>
+      <TFunction extends Function>(target: TFunction): TFunction =>
+        target,
+    WorkerHost: MockWorkerHost,
+  };
+});
 
 // Mock providers for MEMGRAPH_SERVICE and KAFKA_SERVICE
 const mockMemgraphService = {

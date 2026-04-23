@@ -209,11 +209,13 @@ export class YouTubeFreeConnector
 
     // Defer the initial poll so callers have a chance to attach listeners
     // before the first data/error emission.
-    setTimeout(() => {
+    const initialPoll = setTimeout(() => {
       void checkForContent();
     }, 0);
+    initialPoll.unref?.();
 
     const interval = setInterval(checkForContent, this.pollingInterval);
+    interval.unref?.();
     this.streamConnections.set(streamId, interval);
 
     emitter.on('end', () => {
