@@ -1,9 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test, TestingModule } from '@nestjs/testing';
 import {
   DeepInvestigationService,
   UserPost,
-  DeepInvestigationResult,
 } from '../../src/lib/services/deep-investigation.service';
 
 function makeUserPost(overrides: Partial<UserPost> = {}): UserPost {
@@ -55,8 +54,16 @@ describe('DeepInvestigationService', () => {
 
       timelines.set('user_alpha', {
         topicPosts: [
-          makeUserPost({ text: 'This topic is important', timestamp: '2025-06-01T10:00:00Z', sentiment: { score: 0.5, label: 'positive' } }),
-          makeUserPost({ text: 'More about this topic', timestamp: '2025-06-01T14:00:00Z', sentiment: { score: 0.3, label: 'positive' } }),
+          makeUserPost({
+            text: 'This topic is important',
+            timestamp: '2025-06-01T10:00:00Z',
+            sentiment: { score: 0.5, label: 'positive' },
+          }),
+          makeUserPost({
+            text: 'More about this topic',
+            timestamp: '2025-06-01T14:00:00Z',
+            sentiment: { score: 0.3, label: 'positive' },
+          }),
         ],
         historicalPosts: [
           makeUserPost({ text: 'Random other post', timestamp: '2025-05-15T08:00:00Z' }),
@@ -66,7 +73,11 @@ describe('DeepInvestigationService', () => {
 
       timelines.set('user_beta', {
         topicPosts: [
-          makeUserPost({ text: 'I agree about this topic', timestamp: '2025-06-01T12:00:00Z', sentiment: { score: 0.4, label: 'positive' } }),
+          makeUserPost({
+            text: 'I agree about this topic',
+            timestamp: '2025-06-01T12:00:00Z',
+            sentiment: { score: 0.4, label: 'positive' },
+          }),
         ],
         historicalPosts: [
           makeUserPost({ text: 'Some history', timestamp: '2025-05-01T08:00:00Z' }),
@@ -144,10 +155,22 @@ describe('DeepInvestigationService', () => {
 
       timelines.set('flip_flopper', {
         topicPosts: [
-          makeUserPost({ timestamp: '2025-06-01T10:00:00Z', sentiment: { score: 0.8, label: 'positive' } }),
-          makeUserPost({ timestamp: '2025-06-02T10:00:00Z', sentiment: { score: 0.6, label: 'positive' } }),
-          makeUserPost({ timestamp: '2025-06-03T10:00:00Z', sentiment: { score: -0.7, label: 'negative' } }),
-          makeUserPost({ timestamp: '2025-06-04T10:00:00Z', sentiment: { score: -0.5, label: 'negative' } }),
+          makeUserPost({
+            timestamp: '2025-06-01T10:00:00Z',
+            sentiment: { score: 0.8, label: 'positive' },
+          }),
+          makeUserPost({
+            timestamp: '2025-06-02T10:00:00Z',
+            sentiment: { score: 0.6, label: 'positive' },
+          }),
+          makeUserPost({
+            timestamp: '2025-06-03T10:00:00Z',
+            sentiment: { score: -0.7, label: 'negative' },
+          }),
+          makeUserPost({
+            timestamp: '2025-06-04T10:00:00Z',
+            sentiment: { score: -0.5, label: 'negative' },
+          }),
         ],
         historicalPosts: [],
       });

@@ -1,101 +1,100 @@
 'use client';
 
+import dynamic from 'next/dynamic';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-
 import {
-  InvestigationProvider,
-  useInvestigation,
-  type CenterMode,
-  type PipelineStage,
-} from '../../lib/investigation-context';
-
-import {
-  analyzeNarratives,
-  addInvestigationEvidenceSeed,
-  fetchDeviations,
-  analyzePropaganda,
-  analyzeEntities,
-  buildProjectDossier,
-  buildMentalModel,
-  fetchDownstreamEffects,
-  createOrGetInvestigation,
-  fetchInvestigation,
-  fetchInvestigations,
-  fetchProjectDossier,
-  fetchMentalModel,
-  verifyClaims,
-  saveAnalysisCache,
-  getAnalysisCache,
-  generateReport,
-  fetchAlerts,
-  startScan,
-  getScanStatus,
-  getScanPosts,
-  cancelScan,
-  retryScanConnector,
-  getRecentScans,
-  getInvestigationScans,
-  type RawPost,
-  type Investigation,
-  type ProjectDossier,
-  type ProjectDossierOverlap,
-  type MentalModel,
-  type AnalyzedNarrative,
-  type ExtractedClaim,
-  type ScanJob,
-  type AnalysisJob,
-  startAnalysisJobs,
-  getAnalysisJobsByScan,
-  cancelAnalysisJob,
-  type StartAnalysisJobRequest,
-  getIdentityByHandle,
-  generateMagiProfile,
-  type MagiProfileMode,
-  type DeviationResponse,
-  type PropagandaAnalysisResult,
-  type EntityAnalysisResponse,
-  type DownstreamEffectsResult,
-  type SaturationReport,
-  compareNarratives,
-  comparePlatforms,
-  runIntelligenceAssessment,
-} from '../../lib/api';
-
-import {
-  NervPanel,
-  NervProgress,
-  NervTicker,
   NervBadge,
-  NervStatus,
+  NervProgress,
   type NervProgressStage,
+  NervStatus,
+  NervTicker,
   type NervTickerItem,
 } from '../../components/nerv';
-import { ScanProgress } from '../../components/nerv/scan-progress';
-import { SaturationIndicator } from '../../components/nerv/saturation-indicator';
-import { EvidenceChainPanel } from '../../components/nerv/evidence-chain-panel';
-import { SocialGraphPanel } from '../../components/nerv/social-graph-panel';
-import { AnalysisQueuePanel } from '../../components/nerv/analysis-queue-panel';
-import { ScanHistoryBar } from '../../components/nerv/scan-history-bar';
-
-import { NarrativeList } from '../../components/nerv/narrative-list';
-import { TemporalHeatmap } from '../../components/nerv/temporal-heatmap';
 import { ActorsMatrix } from '../../components/nerv/actors-matrix';
+import { AnalysisQueuePanel } from '../../components/nerv/analysis-queue-panel';
 import { ClaimsMatrix } from '../../components/nerv/claims-matrix';
+import { DetailPanel } from '../../components/nerv/detail-panel';
 import { EffectsChain } from '../../components/nerv/effects-chain';
 import { EntityPanel } from '../../components/nerv/entity-panel';
+import { EvidenceChainPanel } from '../../components/nerv/evidence-chain-panel';
 import { GenealogyPanel } from '../../components/nerv/genealogy-panel';
-import { PropagationFlow } from '../../components/nerv/propagation-flow';
+import { IntelligenceReportPanel } from '../../components/nerv/intelligence-report-panel';
+import { NarrativeComparisonPanel } from '../../components/nerv/narrative-comparison-panel';
+import { NarrativeList } from '../../components/nerv/narrative-list';
 import { NarrativeRadar } from '../../components/nerv/narrative-radar';
 import { PlatformComparisonPanel } from '../../components/nerv/platform-comparison-panel';
-import { NarrativeComparisonPanel } from '../../components/nerv/narrative-comparison-panel';
-import { IntelligenceReportPanel } from '../../components/nerv/intelligence-report-panel';
-import { DetailPanel } from '../../components/nerv/detail-panel';
-import dynamic from 'next/dynamic';
+import { PropagationFlow } from '../../components/nerv/propagation-flow';
+import { SaturationIndicator } from '../../components/nerv/saturation-indicator';
+import { ScanHistoryBar } from '../../components/nerv/scan-history-bar';
+import { ScanProgress } from '../../components/nerv/scan-progress';
+import { SocialGraphPanel } from '../../components/nerv/social-graph-panel';
+import { TemporalHeatmap } from '../../components/nerv/temporal-heatmap';
+import {
+  type AnalyzeResult,
+  type AnalyzedNarrative,
+  addInvestigationEvidenceSeed,
+  analyzeEntities,
+  analyzeNarratives,
+  analyzePropaganda,
+  buildMentalModel,
+  buildProjectDossier,
+  cancelAnalysisJob,
+  cancelScan,
+  type ClaimVerificationBatchResult,
+  compareNarratives,
+  comparePlatforms,
+  createOrGetInvestigation,
+  type DeviationResponse,
+  type DownstreamEffectsResult,
+  type EntityAnalysisInsight,
+  type EntityAnalysisResponse,
+  type ExtractedClaim,
+  fetchAlerts,
+  fetchDeviations,
+  fetchDownstreamEffects,
+  fetchInvestigation,
+  fetchInvestigations,
+  fetchMentalModel,
+  fetchProjectDossier,
+  generateMagiProfile,
+  generateReport,
+  getAnalysisCache,
+  getAnalysisJobsByScan,
+  getIdentityByHandle,
+  getInvestigationScans,
+  getRecentScans,
+  getScanPosts,
+  getScanStatus,
+  type Investigation,
+  type InvestigationResult,
+  type MagiProfileMode,
+  type MentalModel,
+  type ProjectDossier,
+  type ProjectDossierOverlap,
+  type PropagandaAnalysisResult,
+  type RawPost,
+  retryScanConnector,
+  runIntelligenceAssessment,
+  type SaturationReport,
+  type ScanJob,
+  type StartAnalysisJobRequest,
+  saveAnalysisCache,
+  startAnalysisJobs,
+  startScan,
+  verifyClaims,
+} from '../../lib/api';
 import { buildGlobeData } from '../../lib/globe-data';
+import {
+  type CenterMode,
+  InvestigationProvider,
+  type PipelineStage,
+  useInvestigation,
+} from '../../lib/investigation-context';
 
 const NarrativeGlobeLazy = dynamic(
-  () => import('../../components/nerv/narrative-globe').then((m) => ({ default: m.NarrativeGlobe })),
+  () =>
+    import('../../components/nerv/narrative-globe').then((m) => ({ default: m.NarrativeGlobe })),
   { ssr: false },
 );
 
@@ -153,9 +152,7 @@ const SHORTCUT_MAP = new Map<string, CenterMode>(
 // Pipeline stages for progress bar
 // ---------------------------------------------------------------------------
 
-function getPipelineStages(
-  pipeline: Record<PipelineStage, string>,
-): NervProgressStage[] {
+function getPipelineStages(pipeline: Record<PipelineStage, string>): NervProgressStage[] {
   const stages: PipelineStage[] = [
     'search',
     'analyze',
@@ -166,14 +163,19 @@ function getPipelineStages(
   ];
   return stages.map((s) => ({
     label: s,
-    status: pipeline[s] === 'done'
-      ? 'done'
-      : pipeline[s] === 'running'
-        ? 'running'
-        : pipeline[s] === 'error'
-          ? 'error'
-          : 'queued',
+    status:
+      pipeline[s] === 'done'
+        ? 'done'
+        : pipeline[s] === 'running'
+          ? 'running'
+          : pipeline[s] === 'error'
+            ? 'error'
+            : 'queued',
   }));
+}
+
+function getInvestigationId(investigation: Investigation | null | undefined): string | null {
+  return investigation?._id ?? investigation?.id ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -210,12 +212,14 @@ function DragHandle({ onDrag }: { onDrag: (dx: number) => void }) {
   );
 
   return (
-    <div
+    <button
+      type="button"
+      aria-label="Resize investigation panels"
       onMouseDown={handleMouseDown}
       className="w-1.5 shrink-0 cursor-col-resize bg-nerv-border hover:bg-nerv-orange/40 active:bg-nerv-orange/60 transition-colors relative group"
     >
       <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-nerv-text-muted/20 group-hover:bg-nerv-orange/60" />
-    </div>
+    </button>
   );
 }
 
@@ -226,14 +230,25 @@ function DragHandle({ onDrag }: { onDrag: (dx: number) => void }) {
 function InvestigationWorkspace() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const searchParamsString = searchParams.toString();
+  interface CachedAnalysisPayload {
+    narratives?: AnalyzeResult;
+    deviations?: DeviationResponse;
+    propaganda?: PropagandaAnalysisResult;
+    claims?: ClaimVerificationBatchResult;
+    entities?: EntityAnalysisResponse;
+    downstream?: DownstreamEffectsResult;
+    investigation?: InvestigationResult;
+    investigationNarrativeId?: string;
+    unclusteredCount?: number;
+    saturation?: SaturationReport;
+  }
   const normalizeRouteId = (value: string | null): string | null => {
     if (!value) return null;
     const trimmed = value.trim();
     if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return null;
     return trimmed;
   };
-  const getInvestigationId = (investigation: Investigation | null | undefined): string | null =>
-    investigation?._id ?? investigation?.id ?? null;
   const query = searchParams.get('q') ?? '';
   const invId = normalizeRouteId(searchParams.get('inv'));
   const requestedScanId = normalizeRouteId(searchParams.get('scan'));
@@ -242,27 +257,69 @@ function InvestigationWorkspace() {
   const urlPlatforms = searchParams.get('platforms')?.split(',').filter(Boolean) ?? undefined;
   const urlTimeRange = searchParams.get('timeRange') ?? '7d';
   const parsedUrlLimit = Number.parseInt(searchParams.get('limit') ?? '', 10);
-  const urlLimit = Number.isFinite(parsedUrlLimit) && parsedUrlLimit > 0 ? parsedUrlLimit : undefined;
-  const urlUsernames = searchParams.get('usernames')?.split(',').map(s => s.trim().replace(/^@/, '')).filter(Boolean) ?? [];
-  const urlHashtags = searchParams.get('hashtags')?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
-  const urlWallets = searchParams.get('wallets')?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
-  const urlSubreddits = searchParams.get('subreddits')?.split(',').map(s => s.trim().replace(/^r\//, '')).filter(Boolean) ?? [];
+  const urlLimit =
+    Number.isFinite(parsedUrlLimit) && parsedUrlLimit > 0 ? parsedUrlLimit : undefined;
+  const urlUsernames = useMemo(
+    () =>
+      searchParams
+        .get('usernames')
+        ?.split(',')
+        .map((s) => s.trim().replace(/^@/, ''))
+        .filter(Boolean) ?? [],
+    [searchParams],
+  );
+  const urlHashtags = useMemo(
+    () =>
+      searchParams
+        .get('hashtags')
+        ?.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean) ?? [],
+    [searchParams],
+  );
+  const urlWallets = useMemo(
+    () =>
+      searchParams
+        .get('wallets')
+        ?.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean) ?? [],
+    [searchParams],
+  );
+  const urlSubreddits = useMemo(
+    () =>
+      searchParams
+        .get('subreddits')
+        ?.split(',')
+        .map((s) => s.trim().replace(/^r\//, ''))
+        .filter(Boolean) ?? [],
+    [searchParams],
+  );
 
-  // Build enhanced query: base query + hashtags + subreddit scoping
+  // Build enhanced query: base query + hashtags + wallet terms + subreddit scoping
   const enhancedQuery = useMemo(() => {
     const parts = [query];
     for (const tag of urlHashtags) {
       const t = tag.startsWith('#') ? tag : `#${tag}`;
       if (!query.includes(t)) parts.push(t);
     }
+    for (const wallet of urlWallets) {
+      if (!query.includes(wallet)) parts.push(wallet);
+    }
     for (const sub of urlSubreddits) {
       if (!query.includes(`subreddit:${sub}`)) parts.push(`subreddit:${sub}`);
     }
     return parts.join(' ');
-  }, [query, urlHashtags, urlSubreddits]);
+  }, [query, urlHashtags, urlSubreddits, urlWallets]);
   const { state, dispatch, selectNarrative, selectActor, selectClaim, setCenterMode } =
     useInvestigation();
   const pipelineRan = useRef(false);
+  const pipelineResetKey = `${query}::${invId ?? ''}::${requestedScanId ?? ''}::${freshSearch ? '1' : '0'}`;
+  const lastPipelineResetKeyRef = useRef<string | null>(null);
+  if (lastPipelineResetKeyRef.current !== pipelineResetKey) {
+    lastPipelineResetKeyRef.current = pipelineResetKey;
+    pipelineRan.current = false;
+  }
   const [radarSelectedIds, setRadarSelectedIds] = useState<string[]>([]);
   const [leftWidth, setLeftWidth] = useState(280);
   const [rightWidth, setRightWidth] = useState(380);
@@ -288,68 +345,79 @@ function InvestigationWorkspace() {
     }
     return merged;
   }, []);
-  const mergeInvestigationResults = useCallback((
-    current: NonNullable<typeof state.investigation> | null,
-    incoming: NonNullable<typeof state.investigation>,
-  ) => {
-    if (!current) return incoming;
+  const mergeInvestigationResults = useCallback(
+    (
+      current: NonNullable<typeof state.investigation> | null,
+      incoming: NonNullable<typeof state.investigation>,
+    ) => {
+      if (!current) return incoming;
 
-    return {
-      topic: current.topic || incoming.topic,
-      users: mergeUniqueByKey(
-        [...current.users, ...incoming.users],
-        (user) => `${user.user.handle}:${user.user.platform}`,
-      ),
-      originAnalysis: incoming.originAnalysis?.propagationChain?.length
-        ? incoming.originAnalysis
-        : current.originAnalysis,
-      cuiBono: {
-        beneficiaries: mergeUniqueByKey(
-          [...current.cuiBono.beneficiaries, ...incoming.cuiBono.beneficiaries],
-          (item) => `${item.entity}:${item.howTheyBenefit}`,
+      return {
+        topic: current.topic || incoming.topic,
+        users: mergeUniqueByKey(
+          [...current.users, ...incoming.users],
+          (user) => `${user.user.handle}:${user.user.platform}`,
         ),
-        agendas: mergeUniqueByKey(
-          [...current.cuiBono.agendas, ...incoming.cuiBono.agendas],
-          (item) => item,
-        ),
-        summary: [current.cuiBono.summary, incoming.cuiBono.summary].filter(Boolean).join(' ').trim(),
-      },
-      coordination: {
-        clusters: mergeUniqueByKey(
-          [...current.coordination.clusters, ...incoming.coordination.clusters],
-          (cluster) => `${cluster.pattern}:${cluster.users.slice().sort().join(',')}`,
-        ),
-        summary: [current.coordination.summary, incoming.coordination.summary].filter(Boolean).join(' ').trim(),
-      },
-      botDetection: incoming.botDetection ?? current.botDetection ?? null,
-    };
-  }, [mergeUniqueByKey]);
+        originAnalysis: incoming.originAnalysis?.propagationChain?.length
+          ? incoming.originAnalysis
+          : current.originAnalysis,
+        cuiBono: {
+          beneficiaries: mergeUniqueByKey(
+            [...current.cuiBono.beneficiaries, ...incoming.cuiBono.beneficiaries],
+            (item) => `${item.entity}:${item.howTheyBenefit}`,
+          ),
+          agendas: mergeUniqueByKey(
+            [...current.cuiBono.agendas, ...incoming.cuiBono.agendas],
+            (item) => item,
+          ),
+          summary: [current.cuiBono.summary, incoming.cuiBono.summary]
+            .filter(Boolean)
+            .join(' ')
+            .trim(),
+        },
+        coordination: {
+          clusters: mergeUniqueByKey(
+            [...current.coordination.clusters, ...incoming.coordination.clusters],
+            (cluster) => `${cluster.pattern}:${cluster.users.slice().sort().join(',')}`,
+          ),
+          summary: [current.coordination.summary, incoming.coordination.summary]
+            .filter(Boolean)
+            .join(' ')
+            .trim(),
+        },
+        botDetection: incoming.botDetection ?? current.botDetection ?? null,
+      };
+    },
+    [mergeUniqueByKey],
+  );
   const memoizedGlobeData = useMemo(
-    () => buildGlobeData({
-      narratives: state.narratives,
-      posts: state.posts,
-      downstream: state.downstream,
-      investigation: state.investigation,
-    }),
+    () =>
+      buildGlobeData({
+        narratives: state.narratives,
+        posts: state.posts,
+        downstream: state.downstream,
+        investigation: state.investigation,
+      }),
     [state.narratives, state.posts, state.downstream, state.investigation],
   );
 
-  const handleGlobePointClick = useCallback((point: { metadata?: Record<string, unknown> }) => {
-    const meta = point.metadata as { narrativeCount?: number } | undefined;
-    if (!meta?.narrativeCount || meta.narrativeCount <= 0) return;
+  const handleGlobePointClick = useCallback(
+    (point: { metadata?: Record<string, unknown> }) => {
+      const meta = point.metadata as { narrativeCount?: number } | undefined;
+      if (!meta?.narrativeCount || meta.narrativeCount <= 0) return;
 
-    const countryCode = (point.metadata as Record<string, unknown> | undefined)?.countryCode as string | undefined;
-    if (!countryCode) return;
+      const countryCode = (point.metadata as Record<string, unknown> | undefined)?.countryCode as
+        | string
+        | undefined;
+      if (!countryCode) return;
 
-    const firstNarrative = state.narratives[0];
-    if (firstNarrative) {
-      selectNarrative(firstNarrative.id);
-    }
-  }, [state.narratives, selectNarrative]);
-
-  useEffect(() => {
-    pipelineRan.current = false;
-  }, [query, invId, requestedScanId, freshSearch]);
+      const firstNarrative = state.narratives[0];
+      if (firstNarrative) {
+        selectNarrative(firstNarrative.id);
+      }
+    },
+    [state.narratives, selectNarrative],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -359,7 +427,8 @@ function InvestigationWorkspace() {
         let resolved: Investigation | null = null;
 
         if (invId) {
-          const { investigation, projectDossier, mentalModel, dossierOverlaps } = await fetchInvestigation(invId);
+          const { investigation, projectDossier, mentalModel, dossierOverlaps } =
+            await fetchInvestigation(invId);
           resolved = investigation;
           if (!cancelled) {
             setProjectDossier(projectDossier);
@@ -371,7 +440,8 @@ function InvestigationWorkspace() {
           const match = allInvestigations.find((item) => item.query === query) ?? null;
           const matchId = match?._id ?? match?.id ?? null;
           if (matchId) {
-            const { investigation, projectDossier, mentalModel, dossierOverlaps } = await fetchInvestigation(matchId);
+            const { investigation, projectDossier, mentalModel, dossierOverlaps } =
+              await fetchInvestigation(matchId);
             resolved = investigation;
             if (!cancelled) {
               setProjectDossier(projectDossier);
@@ -424,24 +494,31 @@ function InvestigationWorkspace() {
   const [comparingPlatforms, setComparingPlatforms] = useState(false);
   const [intelligenceLoading, setIntelligenceLoading] = useState(false);
 
-  const handleCompareNarratives = useCallback(async (ids: string[]) => {
-    if (ids.length < 2) return;
-    const [a, b] = ids;
-    const narrativeA = state.narratives.find(n => n.id === a);
-    const narrativeB = state.narratives.find(n => n.id === b);
-    if (!narrativeA || !narrativeB) return;
-    setComparingNarratives(true);
-    try {
-      const postsA = narrativeA.postIndices.map(i => state.posts[i]).filter((p): p is RawPost => Boolean(p));
-      const postsB = narrativeB.postIndices.map(i => state.posts[i]).filter((p): p is RawPost => Boolean(p));
-      const result = await compareNarratives(narrativeA, narrativeB, postsA, postsB);
-      dispatch({ type: 'SET_COMPARISON', data: result });
-    } catch {
-      // silently fail
-    } finally {
-      setComparingNarratives(false);
-    }
-  }, [state.narratives, state.posts, dispatch]);
+  const handleCompareNarratives = useCallback(
+    async (ids: string[]) => {
+      if (ids.length < 2) return;
+      const [a, b] = ids;
+      const narrativeA = state.narratives.find((n) => n.id === a);
+      const narrativeB = state.narratives.find((n) => n.id === b);
+      if (!narrativeA || !narrativeB) return;
+      setComparingNarratives(true);
+      try {
+        const postsA = narrativeA.postIndices
+          .map((i) => state.posts[i])
+          .filter((p): p is RawPost => Boolean(p));
+        const postsB = narrativeB.postIndices
+          .map((i) => state.posts[i])
+          .filter((p): p is RawPost => Boolean(p));
+        const result = await compareNarratives(narrativeA, narrativeB, postsA, postsB);
+        dispatch({ type: 'SET_COMPARISON', data: result });
+      } catch {
+        // silently fail
+      } finally {
+        setComparingNarratives(false);
+      }
+    },
+    [state.narratives, state.posts, dispatch],
+  );
 
   const handlePlatformComparison = useCallback(async () => {
     if (state.narratives.length === 0) return;
@@ -456,27 +533,31 @@ function InvestigationWorkspace() {
     }
   }, [state.narratives, state.posts, dispatch]);
 
-  const handleIntelligence = useCallback(async (type: string) => {
-    setIntelligenceLoading(true);
-    try {
-      const result = await runIntelligenceAssessment({
-        type,
-        narratives: state.narratives,
-        posts: state.posts,
-        investigation: state.investigation ?? undefined,
-        claims: state.claims ?? undefined,
-      });
-      dispatch({ type: 'SET_INTELLIGENCE_REPORT', data: result });
-    } catch {
-      // silently fail
-    } finally {
-      setIntelligenceLoading(false);
-    }
-  }, [state.narratives, state.posts, state.investigation, state.claims, dispatch]);
+  const handleIntelligence = useCallback(
+    async (type: string) => {
+      setIntelligenceLoading(true);
+      try {
+        const result = await runIntelligenceAssessment({
+          type,
+          narratives: state.narratives,
+          posts: state.posts,
+          investigation: state.investigation ?? undefined,
+          claims: state.claims ?? undefined,
+        });
+        dispatch({ type: 'SET_INTELLIGENCE_REPORT', data: result });
+      } catch {
+        // silently fail
+      } finally {
+        setIntelligenceLoading(false);
+      }
+    },
+    [state.narratives, state.posts, state.investigation, state.claims, dispatch],
+  );
 
   // Load scan history for the current investigation when available.
   useEffect(() => {
-    const targetInvestigationId = investigationRecord?._id ?? investigationRecord?.id ?? invId ?? null;
+    const targetInvestigationId =
+      investigationRecord?._id ?? investigationRecord?.id ?? invId ?? null;
 
     if (targetInvestigationId) {
       getInvestigationScans(targetInvestigationId, 50)
@@ -502,11 +583,15 @@ function InvestigationWorkspace() {
   const restoreFromCache = useCallback(
     async (scanId: string): Promise<boolean> => {
       try {
-        const cache = await getAnalysisCache(scanId);
+        const cache = (await getAnalysisCache(scanId)) as CachedAnalysisPayload | null;
         if (!cache) return false;
 
         if (cache.narratives) {
-          dispatch({ type: 'SET_NARRATIVES', narratives: cache.narratives as AnalyzedNarrative[], unclusteredCount: (cache.unclusteredCount as number) ?? 0 });
+          dispatch({
+            type: 'SET_NARRATIVES',
+            narratives: cache.narratives.narratives ?? [],
+            unclusteredCount: cache.unclusteredCount ?? 0,
+          });
           dispatch({ type: 'SET_PIPELINE', stage: 'analyze', status: 'done' });
         }
         if (cache.saturation) {
@@ -529,7 +614,11 @@ function InvestigationWorkspace() {
           dispatch({ type: 'SET_PIPELINE', stage: 'downstream', status: 'done' });
         }
         if (cache.investigation) {
-          dispatch({ type: 'SET_INVESTIGATION', data: cache.investigation as any, narrativeId: (cache.investigationNarrativeId as string) ?? '' });
+          dispatch({
+            type: 'SET_INVESTIGATION',
+            data: cache.investigation,
+            narrativeId: cache.investigationNarrativeId ?? '',
+          });
         }
 
         dispatch({ type: 'SET_LOADING', loading: false });
@@ -583,7 +672,10 @@ function InvestigationWorkspace() {
     const latestByQuery = new Map<string, ScanJob>();
     for (const scan of scanHistory) {
       const existing = latestByQuery.get(scan.query);
-      if (!existing || new Date(scan.createdAt).getTime() > new Date(existing.createdAt).getTime()) {
+      if (
+        !existing ||
+        new Date(scan.createdAt).getTime() > new Date(existing.createdAt).getTime()
+      ) {
         latestByQuery.set(scan.query, scan);
       }
     }
@@ -603,16 +695,105 @@ function InvestigationWorkspace() {
     return query;
   }, [activeHistoryScanId, scanHistory, query]);
 
-  const buildPostSummary = useCallback((posts: RawPost[]) => ({
-    total: posts.length,
-    positive: posts.filter((p) => p.sentiment?.label === 'positive').length,
-    negative: posts.filter((p) => p.sentiment?.label === 'negative').length,
-    neutral: posts.filter((p) => p.sentiment?.label === 'neutral').length,
-    byPlatform: posts.reduce<Record<string, number>>((acc, p) => {
-      acc[p.platform] = (acc[p.platform] || 0) + 1;
-      return acc;
-    }, {}),
-  }), []);
+  const buildPostSummary = useCallback(
+    (posts: RawPost[]) => ({
+      total: posts.length,
+      positive: posts.filter((p) => p.sentiment?.label === 'positive').length,
+      negative: posts.filter((p) => p.sentiment?.label === 'negative').length,
+      neutral: posts.filter((p) => p.sentiment?.label === 'neutral').length,
+      byPlatform: posts.reduce<Record<string, number>>((acc, p) => {
+        acc[p.platform] = (acc[p.platform] || 0) + 1;
+        return acc;
+      }, {}),
+    }),
+    [],
+  );
+
+  // ---- Analysis queue setup (must be before handlers that start polling) ----
+  const analysisJobPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mergedJobIdsRef = useRef<Set<string>>(new Set());
+
+  /** Start polling for analysis job results. Merges completed jobs into state as they finish. */
+  const startAnalysisPolling = useCallback(
+    (scanId: string) => {
+      if (analysisJobPollRef.current) return;
+
+      analysisJobPollRef.current = setInterval(async () => {
+        try {
+          const allJobs = await getAnalysisJobsByScan(scanId);
+          dispatch({ type: 'SET_ANALYSIS_JOBS', jobs: allJobs });
+
+          for (const j of allJobs) {
+            const jId = j._id ?? j.id;
+            if (j.status !== 'completed' || !j.result || mergedJobIdsRef.current.has(jId)) continue;
+
+            mergedJobIdsRef.current.add(jId);
+            if (j.type === 'investigation') {
+              dispatch({
+                type: 'SET_INVESTIGATION',
+                data: j.result as unknown as InvestigationResult,
+                narrativeId: j.narrativeIds[0] ?? '',
+              });
+            } else if (j.type === 'propaganda') {
+              dispatch({
+                type: 'SET_PROPAGANDA',
+                data: j.result as unknown as PropagandaAnalysisResult,
+              });
+              dispatch({ type: 'SET_PIPELINE', stage: 'propaganda', status: 'done' });
+            } else if (j.type === 'downstream') {
+              const dsResult = j.result as unknown as DownstreamEffectsResult;
+              if (dsResult?.narrativeCorrelations?.length > 0) {
+                dispatch({ type: 'SET_DOWNSTREAM', data: dsResult });
+                dispatch({ type: 'SET_PIPELINE', stage: 'downstream', status: 'done' });
+              }
+            }
+          }
+
+          const active = allJobs.filter((j) => j.status === 'pending' || j.status === 'running');
+          if (active.length === 0 && analysisJobPollRef.current) {
+            clearInterval(analysisJobPollRef.current);
+            analysisJobPollRef.current = null;
+
+            const sid = activeScanIdRef.current;
+            if (sid) {
+              const cacheUpdate: Record<string, unknown> = {};
+              let mergedInvestigation: NonNullable<typeof state.investigation> | null = null;
+              for (const j of allJobs) {
+                if (j.status !== 'completed' || !j.result) continue;
+                if (j.type === 'investigation') {
+                  mergedInvestigation = mergeInvestigationResults(
+                    mergedInvestigation,
+                    j.result as unknown as NonNullable<typeof state.investigation>,
+                  );
+                }
+                if (j.type === 'propaganda') cacheUpdate.propaganda = j.result;
+                if (j.type === 'downstream') cacheUpdate.downstream = j.result;
+              }
+              if (mergedInvestigation) {
+                cacheUpdate.investigation = mergedInvestigation;
+                cacheUpdate.investigationNarrativeId =
+                  allJobs.find(
+                    (j) => j.status === 'completed' && j.type === 'investigation' && j.result,
+                  )?.narrativeIds?.[0] ?? '';
+              }
+              if (Object.keys(cacheUpdate).length > 0) {
+                getAnalysisCache(sid)
+                  .then((existing) => {
+                    saveAnalysisCache(sid, { ...(existing ?? {}), ...cacheUpdate }).catch(
+                      () => undefined,
+                    );
+                  })
+                  .catch(() => undefined);
+              }
+            }
+          }
+        } catch {
+          /* polling error */
+        }
+      }, 2000);
+    },
+    [dispatch, mergeInvestigationResults],
+  );
 
   // ---- Helper: run analysis stages 2-6 on collected posts ----
   const runAnalysisStages = useCallback(
@@ -642,27 +823,36 @@ function InvestigationWorkspace() {
         const topNarrative = narratives[0];
         if (topNarrative && activeScanIdRef.current) {
           try {
-            const topAuthors = (topNarrative.authors ?? []).slice(0, 5).map(a => a.handle);
+            const topAuthors = (topNarrative.authors ?? []).slice(0, 5).map((a) => a.handle);
             if (topAuthors.length > 0) {
-              const investigationJobs = [{
-                type: 'investigation' as const,
-                narrativeIds: [topNarrative.id],
-                input: {
-                  query,
-                  narrativeSummaries: [topNarrative.summary],
-                  narratives: narratives.slice(0, 3).map(n => ({ id: n.id, summary: n.summary })),
-                  userHandles: topAuthors,
-                  postCount: posts.length,
+              const investigationJobs = [
+                {
+                  type: 'investigation' as const,
+                  narrativeIds: [topNarrative.id],
+                  input: {
+                    query,
+                    narrativeSummaries: [topNarrative.summary],
+                    narratives: narratives
+                      .slice(0, 3)
+                      .map((n) => ({ id: n.id, summary: n.summary })),
+                    userHandles: topAuthors,
+                    postCount: posts.length,
+                  },
                 },
-              }];
+              ];
               await startAnalysisJobs(activeScanIdRef.current, investigationJobs);
               startAnalysisPolling(activeScanIdRef.current);
             }
-          } catch { /* non-fatal */ }
+          } catch {
+            /* non-fatal */
+          }
         }
       } catch (err) {
         dispatch({ type: 'SET_PIPELINE', stage: 'analyze', status: 'error' });
-        dispatch({ type: 'SET_ERROR', error: `Analysis failed: ${err instanceof Error ? err.message : 'unknown'}` });
+        dispatch({
+          type: 'SET_ERROR',
+          error: `Analysis failed: ${err instanceof Error ? err.message : 'unknown'}`,
+        });
       }
 
       // Stage 3: Deviations
@@ -699,7 +889,9 @@ function InvestigationWorkspace() {
           const verificationResult = await verifyClaims(propagandaResult.claims);
           dispatch({ type: 'SET_CLAIMS', data: verificationResult });
           cacheData.claims = verificationResult;
-        } catch { /* silent */ }
+        } catch {
+          /* silent */
+        }
       }
 
       // Stage 5: Entities
@@ -707,9 +899,9 @@ function InvestigationWorkspace() {
         dispatch({ type: 'SET_PIPELINE', stage: 'entities', status: 'running' });
         // Build insights from posts that have entity/sentiment data from the scan processor.
         // Themes are promoted into topic entities so the topic tab has real content.
-        const insights = posts
-          .map((p: any) => {
-            const entityList = Array.isArray(p.entities) ? p.entities : [];
+        const insights: EntityAnalysisInsight[] = posts
+          .map((p) => {
+            const entityList: Array<{ name: string; type: string; relevance: number }> = [];
             const authorEntity =
               typeof p.authorHandle === 'string' && p.authorHandle.trim().length > 0
                 ? {
@@ -726,7 +918,10 @@ function InvestigationWorkspace() {
                   : null;
             const themeEntities = Array.isArray(p.themes)
               ? p.themes
-                  .filter((theme: unknown): theme is string => typeof theme === 'string' && theme.trim().length > 0)
+                  .filter(
+                    (theme: unknown): theme is string =>
+                      typeof theme === 'string' && theme.trim().length > 0,
+                  )
                   .map((theme: string) => ({
                     name: theme.trim(),
                     type: 'topic',
@@ -735,13 +930,21 @@ function InvestigationWorkspace() {
               : [];
 
             const deduped = new Map<string, { name: string; type: string; relevance: number }>();
-            for (const entity of [...entityList, ...(authorEntity ? [authorEntity] : []), ...themeEntities]) {
-              if (!entity || typeof entity.name !== 'string' || entity.name.trim().length === 0) continue;
+            for (const entity of [
+              ...entityList,
+              ...(authorEntity ? [authorEntity] : []),
+              ...themeEntities,
+            ]) {
+              if (!entity || typeof entity.name !== 'string' || entity.name.trim().length === 0)
+                continue;
               const key = `${entity.type ?? 'entity'}::${entity.name.trim().toLowerCase()}`;
               if (!deduped.has(key)) {
                 deduped.set(key, {
                   name: entity.name.trim(),
-                  type: typeof entity.type === 'string' && entity.type.trim().length > 0 ? entity.type : 'entity',
+                  type:
+                    typeof entity.type === 'string' && entity.type.trim().length > 0
+                      ? entity.type
+                      : 'entity',
                   relevance: typeof entity.relevance === 'number' ? entity.relevance : 0.5,
                 });
               }
@@ -755,11 +958,8 @@ function InvestigationWorkspace() {
               sentiment: p.sentiment ?? { score: 0, label: 'neutral', confidence: 0 },
             };
           })
-          .map((p: any) => ({
-            ...p,
-          }))
-          .filter((p: any) => p.entities.length > 0);
-        const entityResult = await analyzeEntities(posts, insights as any[], narratives);
+          .filter((p) => p.entities.length > 0);
+        const entityResult = await analyzeEntities(posts, insights, narratives);
         dispatch({ type: 'SET_ENTITIES', data: entityResult });
         dispatch({ type: 'SET_PIPELINE', stage: 'entities', status: 'done' });
         cacheData.entities = entityResult;
@@ -812,31 +1012,35 @@ function InvestigationWorkspace() {
 
       dispatch({ type: 'SET_LOADING', loading: false });
     },
-    [dispatch],
+    [dispatch, query, startAnalysisPolling, urlUsernames],
   );
 
-  const handleSelectHistoricalScan = useCallback(async (selectedScan: ScanJob) => {
-    const selectedScanId = selectedScan._id ?? selectedScan.id;
-    if (!selectedScanId) return;
+  const handleSelectHistoricalScan = useCallback(
+    async (selectedScan: ScanJob) => {
+      const selectedScanId = selectedScan._id ?? selectedScan.id;
+      if (!selectedScanId) return;
 
-    dispatch({ type: 'RESET' });
-    dispatch({ type: 'SET_QUERY', query: selectedScan.query });
-    dispatch({ type: 'SET_ERROR', error: null });
-    dispatch({ type: 'SET_LOADING', loading: true });
+      dispatch({ type: 'RESET' });
+      dispatch({ type: 'SET_QUERY', query: selectedScan.query });
+      dispatch({ type: 'SET_ERROR', error: null });
+      dispatch({ type: 'SET_LOADING', loading: true });
 
-    activeScanIdRef.current = selectedScanId;
-    setScanJob(selectedScan);
-    scanPostsFetchedRef.current = false;
+      activeScanIdRef.current = selectedScanId;
+      setScanJob(selectedScan);
+      scanPostsFetchedRef.current = false;
 
-    const nextParams = new URLSearchParams();
-    nextParams.set('q', selectedScan.query);
-    const activeInvestigationId = investigationRecord?._id ?? investigationRecord?.id ?? invId ?? null;
-    if (activeInvestigationId) {
-      nextParams.set('inv', activeInvestigationId);
-    }
-    nextParams.set('scan', selectedScanId);
-    router.replace(`/results?${nextParams.toString()}`, { scroll: false });
-  }, [dispatch, investigationRecord, invId, router]);
+      const nextParams = new URLSearchParams();
+      nextParams.set('q', selectedScan.query);
+      const activeInvestigationId =
+        investigationRecord?._id ?? investigationRecord?.id ?? invId ?? null;
+      if (activeInvestigationId) {
+        nextParams.set('inv', activeInvestigationId);
+      }
+      nextParams.set('scan', selectedScanId);
+      router.replace(`/results?${nextParams.toString()}`, { scroll: false });
+    },
+    [dispatch, investigationRecord, invId, router],
+  );
 
   // ---- Scan polling: when a scan is active, poll status every 2s ----
   useEffect(() => {
@@ -858,28 +1062,30 @@ function InvestigationWorkspace() {
         dispatch({ type: 'SET_PIPELINE', stage: 'search', status: 'done' });
 
         // Always fetch posts when scan completes
-        getScanPosts(scanId).then(({ posts }) => {
-          if (posts.length > 0) {
-            const summary = {
-              total: posts.length,
-              positive: posts.filter((p) => p.sentiment?.label === 'positive').length,
-              negative: posts.filter((p) => p.sentiment?.label === 'negative').length,
-              neutral: posts.filter((p) => p.sentiment?.label === 'neutral').length,
-              byPlatform: posts.reduce<Record<string, number>>((acc, p) => {
-                acc[p.platform] = (acc[p.platform] || 0) + 1;
-                return acc;
-              }, {}),
-            };
-            dispatch({ type: 'SET_SEARCH_DATA', posts, insights: [], summary });
-            runAnalysisStages(posts);
-          } else {
-            dispatch({ type: 'SET_ERROR', error: 'Scan completed but no posts were collected' });
+        getScanPosts(scanId)
+          .then(({ posts }) => {
+            if (posts.length > 0) {
+              const summary = {
+                total: posts.length,
+                positive: posts.filter((p) => p.sentiment?.label === 'positive').length,
+                negative: posts.filter((p) => p.sentiment?.label === 'negative').length,
+                neutral: posts.filter((p) => p.sentiment?.label === 'neutral').length,
+                byPlatform: posts.reduce<Record<string, number>>((acc, p) => {
+                  acc[p.platform] = (acc[p.platform] || 0) + 1;
+                  return acc;
+                }, {}),
+              };
+              dispatch({ type: 'SET_SEARCH_DATA', posts, insights: [], summary });
+              runAnalysisStages(posts);
+            } else {
+              dispatch({ type: 'SET_ERROR', error: 'Scan completed but no posts were collected' });
+              dispatch({ type: 'SET_LOADING', loading: false });
+            }
+          })
+          .catch((err) => {
+            dispatch({ type: 'SET_ERROR', error: `Failed to fetch scan results: ${err}` });
             dispatch({ type: 'SET_LOADING', loading: false });
-          }
-        }).catch((err) => {
-          dispatch({ type: 'SET_ERROR', error: `Failed to fetch scan results: ${err}` });
-          dispatch({ type: 'SET_LOADING', loading: false });
-        });
+          });
       }
       return undefined;
     }
@@ -935,14 +1141,19 @@ function InvestigationWorkspace() {
           }
 
           if (targetInvId) {
-            const { investigation, snapshot, projectDossier, mentalModel, dossierOverlaps } = await fetchInvestigation(targetInvId);
+            const { investigation, snapshot, projectDossier, mentalModel, dossierOverlaps } =
+              await fetchInvestigation(targetInvId);
             resolvedInvestigationId = targetInvId;
-            resolvedScanId = requestedScanId ?? snapshot?.scanId ?? investigation.lastScanId ?? null;
+            resolvedScanId =
+              requestedScanId ?? snapshot?.scanId ?? investigation.lastScanId ?? null;
             setInvestigationRecord(investigation);
             setProjectDossier(projectDossier);
             setMentalModel(mentalModel);
             setProjectDossierOverlaps(dossierOverlaps);
-            dispatch({ type: 'SET_INVESTIGATION_ID', id: investigation._id ?? investigation.id ?? null });
+            dispatch({
+              type: 'SET_INVESTIGATION_ID',
+              id: investigation._id ?? investigation.id ?? null,
+            });
             if (snapshot && Array.isArray(snapshot.posts) && snapshot.posts.length > 0) {
               posts = snapshot.posts as RawPost[];
               dispatch({
@@ -970,7 +1181,11 @@ function InvestigationWorkspace() {
         // Try 2: Load from most recent completed scan job (scan queue stores posts too)
         if (!loadedFromCache) {
           try {
-            const matchingScan = await findPersistedScan(query, resolvedInvestigationId, resolvedScanId);
+            const matchingScan = await findPersistedScan(
+              query,
+              resolvedInvestigationId,
+              resolvedScanId,
+            );
             if (matchingScan) {
               resolvedPersistedScan = matchingScan;
               activeScanIdRef.current = matchingScan._id ?? matchingScan.id;
@@ -978,7 +1193,12 @@ function InvestigationWorkspace() {
               const { posts: scanPosts } = await getScanPosts(activeScanIdRef.current);
               if (scanPosts.length > 0) {
                 posts = scanPosts;
-                dispatch({ type: 'SET_SEARCH_DATA', posts, insights: [], summary: buildPostSummary(scanPosts) });
+                dispatch({
+                  type: 'SET_SEARCH_DATA',
+                  posts,
+                  insights: [],
+                  summary: buildPostSummary(scanPosts),
+                });
                 dispatch({ type: 'SET_PIPELINE', stage: 'search', status: 'done' });
                 loadedFromCache = true;
               }
@@ -995,7 +1215,8 @@ function InvestigationWorkspace() {
           // Try to restore from analysis cache (instant — no API calls)
           let restored = false;
           const scanForQuery =
-            resolvedPersistedScan ?? await findPersistedScan(query, resolvedInvestigationId, resolvedScanId);
+            resolvedPersistedScan ??
+            (await findPersistedScan(query, resolvedInvestigationId, resolvedScanId));
           if (scanForQuery) {
             activeScanIdRef.current = scanForQuery._id ?? scanForQuery.id;
             setScanJob(scanForQuery);
@@ -1034,7 +1255,7 @@ function InvestigationWorkspace() {
           scanPostsFetchedRef.current = false;
 
           // Remove fresh=1 from URL so page refresh doesn't re-trigger scan
-          const nextParams = new URLSearchParams(searchParams.toString());
+          const nextParams = new URLSearchParams(searchParamsString);
           nextParams.delete('fresh');
           nextParams.set('q', query);
           if (activeInvestigationId) {
@@ -1057,24 +1278,40 @@ function InvestigationWorkspace() {
     };
 
     run();
-  }, [query, dispatch, findPersistedScan, runAnalysisStages, investigationRecord, invId, requestedScanId, state.investigationId, buildPostSummary]); // eslint-disable-line react-hooks/exhaustive-deps -- search boot flow is intentionally centralized
+  }, [
+    query,
+    dispatch,
+    findPersistedScan,
+    runAnalysisStages,
+    investigationRecord,
+    invId,
+    requestedScanId,
+    state.investigationId,
+    buildPostSummary,
+    enhancedQuery,
+    restoreFromCache,
+    urlPlatforms,
+    urlLimit,
+    urlTimeRange,
+    urlSearchMode,
+    freshSearch,
+    searchParamsString,
+    router,
+  ]);
 
   // ---- Fetch alerts ----
   useEffect(() => {
     if (!state.investigationId) return;
     fetchAlerts(state.investigationId)
       .then((alerts) => dispatch({ type: 'SET_ALERTS', alerts }))
-      .catch(() => {});
+      .catch(() => undefined);
   }, [state.investigationId, dispatch]);
 
   // ---- Keyboard shortcuts for center modes ----
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Ignore if user is typing in an input
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      ) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
       const key = e.key.toUpperCase();
@@ -1086,77 +1323,6 @@ function InvestigationWorkspace() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [setCenterMode]);
-
-  // ---- Analysis queue setup (must be before action handlers that reference startAnalysisPolling) ----
-  const analysisJobPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const mergedJobIdsRef = useRef<Set<string>>(new Set());
-
-  /** Start polling for analysis job results. Merges completed jobs into state as they finish. */
-  const startAnalysisPolling = useCallback((scanId: string) => {
-    if (analysisJobPollRef.current) return;
-
-    analysisJobPollRef.current = setInterval(async () => {
-      try {
-        const allJobs = await getAnalysisJobsByScan(scanId);
-        dispatch({ type: 'SET_ANALYSIS_JOBS', jobs: allJobs });
-
-        for (const j of allJobs) {
-          const jId = j._id ?? j.id;
-          if (j.status !== 'completed' || !j.result || mergedJobIdsRef.current.has(jId)) continue;
-
-          mergedJobIdsRef.current.add(jId);
-          if (j.type === 'investigation') {
-            dispatch({ type: 'SET_INVESTIGATION', data: j.result as any, narrativeId: j.narrativeIds[0] ?? '' });
-          } else if (j.type === 'propaganda') {
-            dispatch({ type: 'SET_PROPAGANDA', data: j.result as any });
-            dispatch({ type: 'SET_PIPELINE', stage: 'propaganda', status: 'done' });
-          } else if (j.type === 'downstream') {
-            const dsResult = j.result as any;
-            if (dsResult?.narrativeCorrelations?.length > 0) {
-              dispatch({ type: 'SET_DOWNSTREAM', data: dsResult });
-              dispatch({ type: 'SET_PIPELINE', stage: 'downstream', status: 'done' });
-            }
-          }
-        }
-
-        const active = allJobs.filter((j) => j.status === 'pending' || j.status === 'running');
-        if (active.length === 0 && analysisJobPollRef.current) {
-          clearInterval(analysisJobPollRef.current);
-          analysisJobPollRef.current = null;
-
-          // Save completed results to analysis cache for page refresh persistence
-          const sid = activeScanIdRef.current;
-          if (sid) {
-            const cacheUpdate: Record<string, unknown> = {};
-            let mergedInvestigation: NonNullable<typeof state.investigation> | null = null;
-            for (const j of allJobs) {
-              if (j.status !== 'completed' || !j.result) continue;
-              if (j.type === 'investigation') {
-                mergedInvestigation = mergeInvestigationResults(
-                  mergedInvestigation,
-                  j.result as unknown as NonNullable<typeof state.investigation>,
-                );
-              }
-              if (j.type === 'propaganda') cacheUpdate.propaganda = j.result;
-              if (j.type === 'downstream') cacheUpdate.downstream = j.result;
-            }
-            if (mergedInvestigation) {
-              cacheUpdate.investigation = mergedInvestigation;
-              cacheUpdate.investigationNarrativeId = allJobs.find(
-                (j) => j.status === 'completed' && j.type === 'investigation' && j.result,
-              )?.narrativeIds?.[0] ?? '';
-            }
-            if (Object.keys(cacheUpdate).length > 0) {
-              // Merge with existing cache rather than overwriting
-              getAnalysisCache(sid).then((existing) => {
-                saveAnalysisCache(sid, { ...(existing ?? {}), ...cacheUpdate }).catch(() => {});
-              }).catch(() => {});
-            }
-          }
-        }
-      } catch { /* polling error */ }
-    }, 2000);
-  }, [dispatch, mergeInvestigationResults]);
 
   // ---- Action handlers ----
   /**
@@ -1227,10 +1393,20 @@ function InvestigationWorkspace() {
         startAnalysisPolling(scanId);
       } catch (err) {
         dispatch({ type: 'SET_INVESTIGATING', narrativeId: null });
-        dispatch({ type: 'SET_ERROR', error: `Analysis failed: ${err instanceof Error ? err.message : 'unknown'}` });
+        dispatch({
+          type: 'SET_ERROR',
+          error: `Analysis failed: ${err instanceof Error ? err.message : 'unknown'}`,
+        });
       }
     },
-    [state.narratives, state.posts, state.query, state.selectedNarrativeIds, dispatch, startAnalysisPolling],
+    [
+      state.narratives,
+      state.posts,
+      state.query,
+      state.selectedNarrativeIds,
+      dispatch,
+      startAnalysisPolling,
+    ],
   );
 
   // ---- Analysis queue handlers (startAnalysisPolling defined above) ----
@@ -1243,7 +1419,9 @@ function InvestigationWorkspace() {
     const scanId = activeScanIdRef.current;
     if (!scanId || state.selectedNarrativeIds.length === 0) return;
 
-    const selectedNarratives = state.narratives.filter((n) => state.selectedNarrativeIds.includes(n.id));
+    const selectedNarratives = state.narratives.filter((n) =>
+      state.selectedNarrativeIds.includes(n.id),
+    );
     const sharedInput = {
       query: state.query,
       narrativeSummaries: selectedNarratives.map((n) => n.summary),
@@ -1256,9 +1434,13 @@ function InvestigationWorkspace() {
       ...state.selectedNarrativeIds.map((nId) => {
         const narrative = state.narratives.find((n) => n.id === nId);
         const handles = narrative
-          ? Array.from(new Set(
-              narrative.authors.map((a) => a.handle).filter((h): h is string => Boolean(h) && h !== 'unknown'),
-            )).slice(0, 20)
+          ? Array.from(
+              new Set(
+                narrative.authors
+                  .map((a) => a.handle)
+                  .filter((h): h is string => Boolean(h) && h !== 'unknown'),
+              ),
+            ).slice(0, 20)
           : [];
         return {
           type: 'investigation' as const,
@@ -1292,18 +1474,30 @@ function InvestigationWorkspace() {
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: `Failed to start analysis jobs: ${err}` });
     }
-  }, [state.selectedNarrativeIds, state.narratives, state.query, state.posts.length, dispatch, startAnalysisPolling]);
+  }, [
+    state.selectedNarrativeIds,
+    state.narratives,
+    state.query,
+    state.posts.length,
+    dispatch,
+    startAnalysisPolling,
+  ]);
 
-  const handleCancelAnalysisJob = useCallback(async (jobId: string) => {
-    try {
-      await cancelAnalysisJob(jobId);
-      const scanId = activeScanIdRef.current;
-      if (scanId) {
-        const allJobs = await getAnalysisJobsByScan(scanId);
-        dispatch({ type: 'SET_ANALYSIS_JOBS', jobs: allJobs });
+  const handleCancelAnalysisJob = useCallback(
+    async (jobId: string) => {
+      try {
+        await cancelAnalysisJob(jobId);
+        const scanId = activeScanIdRef.current;
+        if (scanId) {
+          const allJobs = await getAnalysisJobsByScan(scanId);
+          dispatch({ type: 'SET_ANALYSIS_JOBS', jobs: allJobs });
+        }
+      } catch {
+        /* silent */
       }
-    } catch { /* silent */ }
-  }, [dispatch]);
+    },
+    [dispatch],
+  );
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -1337,7 +1531,10 @@ function InvestigationWorkspace() {
       const result = await verifyClaims(claims);
       dispatch({ type: 'SET_CLAIMS', data: result });
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: `Claim verification failed: ${err instanceof Error ? err.message : 'unknown'}` });
+      dispatch({
+        type: 'SET_ERROR',
+        error: `Claim verification failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      });
     } finally {
       setVerifyingClaims(false);
     }
@@ -1357,58 +1554,65 @@ function InvestigationWorkspace() {
 
   const profilePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleGenerateProfile = useCallback(async (identityId: string, mode: MagiProfileMode) => {
-    try {
-      const scanId = activeScanIdRef.current;
-      const validTimestamps = state.posts
-        .map((post) => new Date(post.timestamp).getTime())
-        .filter((value) => Number.isFinite(value));
+  const handleGenerateProfile = useCallback(
+    async (identityId: string, mode: MagiProfileMode) => {
+      try {
+        const scanId = activeScanIdRef.current;
+        const validTimestamps = state.posts
+          .map((post) => new Date(post.timestamp).getTime())
+          .filter((value) => Number.isFinite(value));
 
-      if (mode === 'investigation-window' && (!scanId || validTimestamps.length === 0)) {
-        dispatch({ type: 'SET_ERROR', error: 'No active investigation window is available for a window-scoped MAGI profile' });
-        return;
-      }
-
-      const startDate = validTimestamps.length > 0
-        ? new Date(Math.min(...validTimestamps)).toISOString()
-        : null;
-      const endDate = validTimestamps.length > 0
-        ? new Date(Math.max(...validTimestamps)).toISOString()
-        : null;
-
-      await generateMagiProfile(identityId, {
-        mode,
-        investigationId: state.investigationId,
-        scanId: mode === 'current-state' || mode === 'deep-history' ? null : scanId,
-        startDate: mode === 'current-state' || mode === 'deep-history' ? null : startDate,
-        endDate: mode === 'current-state' || mode === 'deep-history' ? null : endDate,
-      });
-      // Immediately refresh to show "queued" status
-      if (state.selectedActorHandle) {
-        const updated = await getIdentityByHandle(state.selectedActorHandle);
-        dispatch({ type: 'SET_IDENTITY', identity: updated });
-      }
-      // Poll until profile is complete
-      if (profilePollRef.current) clearInterval(profilePollRef.current);
-      profilePollRef.current = setInterval(async () => {
-        if (!state.selectedActorHandle) {
-          if (profilePollRef.current) clearInterval(profilePollRef.current);
-          profilePollRef.current = null;
+        if (mode === 'investigation-window' && (!scanId || validTimestamps.length === 0)) {
+          dispatch({
+            type: 'SET_ERROR',
+            error: 'No active investigation window is available for a window-scoped MAGI profile',
+          });
           return;
         }
-        const refreshed = await getIdentityByHandle(state.selectedActorHandle);
-        if (refreshed) {
-          dispatch({ type: 'SET_IDENTITY', identity: refreshed });
-          if (refreshed.profileGenerationStatus === 'complete' || refreshed.profileGenerationStatus === 'failed') {
+
+        const startDate =
+          validTimestamps.length > 0 ? new Date(Math.min(...validTimestamps)).toISOString() : null;
+        const endDate =
+          validTimestamps.length > 0 ? new Date(Math.max(...validTimestamps)).toISOString() : null;
+
+        await generateMagiProfile(identityId, {
+          mode,
+          investigationId: state.investigationId,
+          scanId: mode === 'current-state' || mode === 'deep-history' ? null : scanId,
+          startDate: mode === 'current-state' || mode === 'deep-history' ? null : startDate,
+          endDate: mode === 'current-state' || mode === 'deep-history' ? null : endDate,
+        });
+        // Immediately refresh to show "queued" status
+        if (state.selectedActorHandle) {
+          const updated = await getIdentityByHandle(state.selectedActorHandle);
+          dispatch({ type: 'SET_IDENTITY', identity: updated });
+        }
+        // Poll until profile is complete
+        if (profilePollRef.current) clearInterval(profilePollRef.current);
+        profilePollRef.current = setInterval(async () => {
+          if (!state.selectedActorHandle) {
             if (profilePollRef.current) clearInterval(profilePollRef.current);
             profilePollRef.current = null;
+            return;
           }
-        }
-      }, 3000);
-    } catch (err) {
-      dispatch({ type: 'SET_ERROR', error: `Profile generation failed: ${err}` });
-    }
-  }, [state.posts, state.investigationId, state.selectedActorHandle, dispatch]);
+          const refreshed = await getIdentityByHandle(state.selectedActorHandle);
+          if (refreshed) {
+            dispatch({ type: 'SET_IDENTITY', identity: refreshed });
+            if (
+              refreshed.profileGenerationStatus === 'complete' ||
+              refreshed.profileGenerationStatus === 'failed'
+            ) {
+              if (profilePollRef.current) clearInterval(profilePollRef.current);
+              profilePollRef.current = null;
+            }
+          }
+        }, 3000);
+      } catch (err) {
+        dispatch({ type: 'SET_ERROR', error: `Profile generation failed: ${err}` });
+      }
+    },
+    [state.posts, state.investigationId, state.selectedActorHandle, dispatch],
+  );
 
   const handleRunDownstream = useCallback(async () => {
     if (state.narratives.length === 0 || state.posts.length === 0) return;
@@ -1441,57 +1645,77 @@ function InvestigationWorkspace() {
     }
   }, [state.query, state.summary, state.narratives, state.investigation]);
 
-  const handleAddEvidenceSeed = useCallback(async (seed: {
-    kind: 'url' | 'youtube' | 'article' | 'post' | 'wallet' | 'contract' | 'domain' | 'document' | 'note';
-    value: string;
-    notes?: string | null;
-  }) => {
-    setEvidenceSeedSaving(true);
-    try {
-      let targetInvestigation = investigationRecord;
+  const handleAddEvidenceSeed = useCallback(
+    async (seed: {
+      kind:
+        | 'url'
+        | 'youtube'
+        | 'article'
+        | 'post'
+        | 'wallet'
+        | 'contract'
+        | 'domain'
+        | 'document'
+        | 'note';
+      value: string;
+      notes?: string | null;
+    }) => {
+      setEvidenceSeedSaving(true);
+      try {
+        let targetInvestigation = investigationRecord;
 
-      if (!targetInvestigation) {
-        targetInvestigation = await createOrGetInvestigation(query, {
-          platforms: urlPlatforms?.length ? urlPlatforms : undefined,
-          timeRange: urlTimeRange,
-        });
+        if (!targetInvestigation) {
+          targetInvestigation = await createOrGetInvestigation(query, {
+            platforms: urlPlatforms?.length ? urlPlatforms : undefined,
+            timeRange: urlTimeRange,
+          });
+          const targetInvestigationId = getInvestigationId(targetInvestigation);
+          if (!targetInvestigationId) {
+            throw new Error('Created investigation missing id');
+          }
+          setInvestigationRecord(targetInvestigation);
+          dispatch({ type: 'SET_INVESTIGATION_ID', id: targetInvestigationId });
+
+          const nextParams = new URLSearchParams(searchParams.toString());
+          nextParams.set('inv', targetInvestigationId);
+          if (!nextParams.has('q')) {
+            nextParams.set('q', query);
+          }
+          router.replace(`/results?${nextParams.toString()}`, { scroll: false });
+        }
+
         const targetInvestigationId = getInvestigationId(targetInvestigation);
         if (!targetInvestigationId) {
-          throw new Error('Created investigation missing id');
+          throw new Error('Target investigation missing id');
         }
-        setInvestigationRecord(targetInvestigation);
-        dispatch({ type: 'SET_INVESTIGATION_ID', id: targetInvestigationId });
 
-        const nextParams = new URLSearchParams(searchParams.toString());
-        nextParams.set('inv', targetInvestigationId);
-        if (!nextParams.has('q')) {
-          nextParams.set('q', query);
-        }
-        router.replace(`/results?${nextParams.toString()}`, { scroll: false });
+        const updated = await addInvestigationEvidenceSeed(targetInvestigationId, {
+          kind: seed.kind,
+          value: seed.value,
+          notes: seed.notes ?? null,
+        });
+
+        setInvestigationRecord(updated);
+        dispatch({ type: 'SET_INVESTIGATION_ID', id: getInvestigationId(updated) });
+      } catch (err) {
+        dispatch({
+          type: 'SET_ERROR',
+          error: `Failed to attach evidence seed: ${err instanceof Error ? err.message : 'unknown error'}`,
+        });
+      } finally {
+        setEvidenceSeedSaving(false);
       }
-
-      const targetInvestigationId = getInvestigationId(targetInvestigation);
-      if (!targetInvestigationId) {
-        throw new Error('Target investigation missing id');
-      }
-
-      const updated = await addInvestigationEvidenceSeed(targetInvestigationId, {
-        kind: seed.kind,
-        value: seed.value,
-        notes: seed.notes ?? null,
-      });
-
-      setInvestigationRecord(updated);
-      dispatch({ type: 'SET_INVESTIGATION_ID', id: getInvestigationId(updated) });
-    } catch (err) {
-      dispatch({
-        type: 'SET_ERROR',
-        error: `Failed to attach evidence seed: ${err instanceof Error ? err.message : 'unknown error'}`,
-      });
-    } finally {
-      setEvidenceSeedSaving(false);
-    }
-  }, [investigationRecord, query, urlPlatforms, urlTimeRange, urlLimit, searchParams, router, dispatch]);
+    },
+    [
+      investigationRecord,
+      query,
+      urlPlatforms,
+      urlTimeRange,
+      searchParams,
+      router,
+      dispatch,
+    ],
+  );
 
   const handleBuildProjectDossier = useCallback(async () => {
     const investigationId = getInvestigationId(investigationRecord);
@@ -1588,7 +1812,17 @@ function InvestigationWorkspace() {
       });
       dispatch({ type: 'SET_LOADING', loading: false });
     }
-  }, [dispatch, query, enhancedQuery, urlPlatforms, urlLimit, urlTimeRange, investigationRecord, state.investigationId, urlSearchMode]);
+  }, [
+    dispatch,
+    query,
+    enhancedQuery,
+    urlPlatforms,
+    urlLimit,
+    urlTimeRange,
+    investigationRecord,
+    state.investigationId,
+    urlSearchMode,
+  ]);
 
   const handleCancelScan = useCallback(async () => {
     if (!scanJob) return;
@@ -1678,6 +1912,7 @@ function InvestigationWorkspace() {
             NO ACTIVE INVESTIGATION
           </div>
           <button
+            type="button"
             onClick={() => router.push('/')}
             className="px-4 py-2 text-[10px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
           >
@@ -1755,7 +1990,6 @@ function InvestigationWorkspace() {
         return (
           <EntityPanel
             entities={state.entities}
-            narratives={state.narratives}
             selectedActorHandle={state.selectedActorHandle}
             onSelectActor={selectActor}
           />
@@ -1794,11 +2028,7 @@ function InvestigationWorkspace() {
         );
       }
       case 'flow':
-        return (
-          <PropagationFlow
-            investigation={state.investigation}
-          />
-        );
+        return <PropagationFlow investigation={state.investigation} />;
       case 'evidence':
         return (
           <EvidenceChainPanel
@@ -1819,7 +2049,13 @@ function InvestigationWorkspace() {
         return (
           <NarrativeRadar
             narratives={state.narratives}
-            selectedIds={radarSelectedIds.length > 0 ? radarSelectedIds : (state.selectedNarrativeId ? [state.selectedNarrativeId] : [])}
+            selectedIds={
+              radarSelectedIds.length > 0
+                ? radarSelectedIds
+                : state.selectedNarrativeId
+                  ? [state.selectedNarrativeId]
+                  : []
+            }
             deviations={state.deviations}
             onCompare={handleCompareNarratives}
           />
@@ -1864,9 +2100,14 @@ function InvestigationWorkspace() {
               </span>
             )}
             {investigationRecord?.name && (
-              <span className="text-[9px] font-mono text-nerv-text-muted/50 shrink-0">{'\u2192'}</span>
+              <span className="text-[9px] font-mono text-nerv-text-muted/50 shrink-0">
+                {'\u2192'}
+              </span>
             )}
-            <span className="text-[11px] font-mono font-bold text-nerv-orange truncate max-w-[300px]" title={query}>
+            <span
+              className="text-[11px] font-mono font-bold text-nerv-orange truncate max-w-[300px]"
+              title={query}
+            >
               &quot;{query}&quot;
             </span>
             <NervStatus
@@ -1875,11 +2116,7 @@ function InvestigationWorkspace() {
               size="sm"
             />
             {state.narratives.length > 0 && (
-              <NervBadge
-                label={`${state.narratives.length}N`}
-                variant="muted"
-                size="sm"
-              />
+              <NervBadge label={`${state.narratives.length}N`} variant="muted" size="sm" />
             )}
             <SaturationIndicator
               saturation={state.saturation}
@@ -1894,6 +2131,7 @@ function InvestigationWorkspace() {
             )}
           </div>
           <button
+            type="button"
             onClick={handleRefresh}
             disabled={pipelineRunning}
             className={[
@@ -1919,6 +2157,7 @@ function InvestigationWorkspace() {
                 return (
                   <button
                     key={tabScanId}
+                    type="button"
                     onClick={() => handleSelectHistoricalScan(tab)}
                     className={[
                       'shrink-0 px-3 py-1.5 border rounded-sm text-left transition-all',
@@ -1945,12 +2184,15 @@ function InvestigationWorkspace() {
         <div className="flex items-center gap-1 overflow-x-auto px-4 py-1 border-t border-nerv-border/50">
           {CENTER_MODE_GROUPS.map((group) => (
             <div key={group.label} className="flex items-center gap-0.5 shrink-0">
-              <span className="text-[7px] font-mono uppercase text-nerv-text-muted/50 mr-1">{group.label}</span>
+              <span className="text-[7px] font-mono uppercase text-nerv-text-muted/50 mr-1">
+                {group.label}
+              </span>
               {group.modes.map((mode) => {
                 const active = state.centerMode === mode.key;
                 return (
                   <button
                     key={mode.key}
+                    type="button"
                     onClick={() => setCenterMode(mode.key)}
                     className={`px-2 py-1 text-[9px] font-mono uppercase tracking-wider transition-all rounded-sm ${
                       active
@@ -1988,14 +2230,12 @@ function InvestigationWorkspace() {
         )}
 
         {/* Analysis queue progress — only shown while jobs are active */}
-        {state.analysisJobs.length > 0 && state.analysisJobs.some((j) => j.status === 'pending' || j.status === 'running') && (
-          <div className="px-4 pb-1">
-            <AnalysisQueuePanel
-              jobs={state.analysisJobs}
-              onCancel={handleCancelAnalysisJob}
-            />
-          </div>
-        )}
+        {state.analysisJobs.length > 0 &&
+          state.analysisJobs.some((j) => j.status === 'pending' || j.status === 'running') && (
+            <div className="px-4 pb-1">
+              <AnalysisQueuePanel jobs={state.analysisJobs} onCancel={handleCancelAnalysisJob} />
+            </div>
+          )}
 
         {/* Scan history — only shown when 2+ scans exist */}
         {scanHistory.length >= 2 && (
@@ -2024,17 +2264,16 @@ function InvestigationWorkspace() {
       {/* Three-panel workspace */}
       <div className="flex-1 flex min-h-0">
         {/* LEFT: Narrative List */}
-        <div className="overflow-auto flex flex-col bg-nerv-bg shrink-0" style={{ width: leftWidth }}>
+        <div
+          className="overflow-auto flex flex-col bg-nerv-bg shrink-0"
+          style={{ width: leftWidth }}
+        >
           <div className="px-3 py-2 border-b border-nerv-border flex items-center justify-between shrink-0">
             <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
               NARRATIVES
             </span>
             {state.narratives.length > 0 && (
-              <NervBadge
-                label={String(state.narratives.length)}
-                variant="orange"
-                size="sm"
-              />
+              <NervBadge label={String(state.narratives.length)} variant="orange" size="sm" />
             )}
           </div>
           {state.narratives.length > 0 ? (
@@ -2046,7 +2285,9 @@ function InvestigationWorkspace() {
               selectedNarrativeIds={state.selectedNarrativeIds}
               analysisJobs={state.analysisJobs}
               investigatedNarrativeIds={state.investigatedNarrativeIds}
-              onToggleSelection={(id) => dispatch({ type: 'TOGGLE_NARRATIVE_SELECTION', narrativeId: id })}
+              onToggleSelection={(id) =>
+                dispatch({ type: 'TOGGLE_NARRATIVE_SELECTION', narrativeId: id })
+              }
               onAnalyzeSelected={handleAnalyzeSelected}
               onClearSelection={() => dispatch({ type: 'CLEAR_NARRATIVE_SELECTION' })}
             />
@@ -2069,10 +2310,7 @@ function InvestigationWorkspace() {
         {/* CENTER: Visualization + Mode Selector */}
         <div className="flex-1 flex flex-col overflow-hidden bg-nerv-bg-deep min-w-0">
           {/* Visualization area */}
-          <div className="flex-1 overflow-auto min-h-0">
-            {renderCenterPanel()}
-          </div>
-
+          <div className="flex-1 overflow-auto min-h-0">{renderCenterPanel()}</div>
         </div>
 
         {/* RIGHT resize handle */}

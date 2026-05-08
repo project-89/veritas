@@ -1,15 +1,13 @@
 import { ConfigService } from '@nestjs/config';
-import { PropagandaAnalysisService } from './propaganda.service';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { RawPost } from './deviation.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
+import { PropagandaAnalysisService } from './propaganda.service';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeNarrative(
-  overrides: Partial<AnalyzedNarrative> & { id: string },
-): AnalyzedNarrative {
+function makeNarrative(overrides: Partial<AnalyzedNarrative> & { id: string }): AnalyzedNarrative {
   return {
     summary: overrides.summary ?? `Summary for ${overrides.id}`,
     postIndices: overrides.postIndices ?? [0, 1],
@@ -216,17 +214,20 @@ describe('PropagandaAnalysisService', () => {
     });
 
     it('handles response with markdown fences', () => {
-      const raw = '```json\n' + JSON.stringify({
-        techniques: [],
-        claims: [],
-        frames: [],
-        overallAssessment: {
-          manipulationLikelihood: 'low',
-          confidence: 0.3,
-          reasoning: 'No significant patterns.',
-          caveats: ['Limited data.'],
-        },
-      }) + '\n```';
+      const raw =
+        '```json\n' +
+        JSON.stringify({
+          techniques: [],
+          claims: [],
+          frames: [],
+          overallAssessment: {
+            manipulationLikelihood: 'low',
+            confidence: 0.3,
+            reasoning: 'No significant patterns.',
+            caveats: ['Limited data.'],
+          },
+        }) +
+        '\n```';
 
       const result = (service as any).parseResponse(raw);
       expect(result.overallAssessment.manipulationLikelihood).toBe('low');
@@ -292,8 +293,22 @@ describe('PropagandaAnalysisService', () => {
       const raw = JSON.stringify({
         techniques: [],
         claims: [
-          { claim: '', type: 'factual', sources: [], firstSeen: '', frequency: 1, verifiability: 'verifiable' },
-          { claim: 'Valid claim', type: 'factual', sources: [], firstSeen: '', frequency: 1, verifiability: 'verifiable' },
+          {
+            claim: '',
+            type: 'factual',
+            sources: [],
+            firstSeen: '',
+            frequency: 1,
+            verifiability: 'verifiable',
+          },
+          {
+            claim: 'Valid claim',
+            type: 'factual',
+            sources: [],
+            firstSeen: '',
+            frequency: 1,
+            verifiability: 'verifiable',
+          },
         ],
         frames: [],
         overallAssessment: {
@@ -351,7 +366,8 @@ describe('PropagandaAnalysisService', () => {
             description: 'Blaming a specific group for complex problems',
             confidence: 0.85,
             examples: ['They are the reason our economy is failing'],
-            educationalNote: 'Scapegoating simplifies complex issues by assigning blame to a target group.',
+            educationalNote:
+              'Scapegoating simplifies complex issues by assigning blame to a target group.',
           },
           {
             id: 'technique-1',
@@ -359,7 +375,8 @@ describe('PropagandaAnalysisService', () => {
             description: 'Using fear to influence the audience',
             confidence: 0.7,
             examples: ['If we do not act now, everything will be destroyed'],
-            educationalNote: 'Fear appeals bypass rational analysis by triggering fight-or-flight responses.',
+            educationalNote:
+              'Fear appeals bypass rational analysis by triggering fight-or-flight responses.',
           },
         ],
         claims: [
@@ -433,13 +450,46 @@ describe('PropagandaAnalysisService', () => {
       const raw = JSON.stringify({
         techniques: [],
         claims: [
-          { claim: 'The vaccine has a 95% efficacy rate', type: 'factual', sources: ['@doctor1'], firstSeen: '2025-01-01T00:00:00Z', frequency: 20, verifiability: 'verifiable' },
-          { claim: 'This policy is unjust', type: 'normative', sources: ['@activist1'], firstSeen: '2025-01-02T00:00:00Z', frequency: 15, verifiability: 'subjective' },
-          { claim: 'The economy will crash next year', type: 'predictive', sources: ['@analyst1'], firstSeen: '2025-01-03T00:00:00Z', frequency: 8, verifiability: 'unfalsifiable' },
-          { claim: 'The situation is being misrepresented', type: 'interpretive', sources: ['@reporter1'], firstSeen: '2025-01-04T00:00:00Z', frequency: 12, verifiability: 'subjective' },
+          {
+            claim: 'The vaccine has a 95% efficacy rate',
+            type: 'factual',
+            sources: ['@doctor1'],
+            firstSeen: '2025-01-01T00:00:00Z',
+            frequency: 20,
+            verifiability: 'verifiable',
+          },
+          {
+            claim: 'This policy is unjust',
+            type: 'normative',
+            sources: ['@activist1'],
+            firstSeen: '2025-01-02T00:00:00Z',
+            frequency: 15,
+            verifiability: 'subjective',
+          },
+          {
+            claim: 'The economy will crash next year',
+            type: 'predictive',
+            sources: ['@analyst1'],
+            firstSeen: '2025-01-03T00:00:00Z',
+            frequency: 8,
+            verifiability: 'unfalsifiable',
+          },
+          {
+            claim: 'The situation is being misrepresented',
+            type: 'interpretive',
+            sources: ['@reporter1'],
+            firstSeen: '2025-01-04T00:00:00Z',
+            frequency: 12,
+            verifiability: 'subjective',
+          },
         ],
         frames: [],
-        overallAssessment: { manipulationLikelihood: 'low', confidence: 0.3, reasoning: 'test', caveats: [] },
+        overallAssessment: {
+          manipulationLikelihood: 'low',
+          confidence: 0.3,
+          reasoning: 'test',
+          caveats: [],
+        },
       });
 
       const result = (service as any).parseResponse(raw);
@@ -464,10 +514,22 @@ describe('PropagandaAnalysisService', () => {
       const raw = JSON.stringify({
         techniques: [],
         claims: [
-          { claim: 'Test', type: 'factual', sources: [], firstSeen: '', frequency: -5, verifiability: 'verifiable' },
+          {
+            claim: 'Test',
+            type: 'factual',
+            sources: [],
+            firstSeen: '',
+            frequency: -5,
+            verifiability: 'verifiable',
+          },
         ],
         frames: [],
-        overallAssessment: { manipulationLikelihood: 'low', confidence: 0.1, reasoning: 'test', caveats: [] },
+        overallAssessment: {
+          manipulationLikelihood: 'low',
+          confidence: 0.1,
+          reasoning: 'test',
+          caveats: [],
+        },
       });
 
       const result = (service as any).parseResponse(raw);

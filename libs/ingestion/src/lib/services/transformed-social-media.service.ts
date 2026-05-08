@@ -1,12 +1,7 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-  OnModuleDestroy,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { EventEmitter } from 'events';
-import { SocialMediaConnector } from '../interfaces/social-media-connector.interface';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { SocialMediaConnector } from '../interfaces/social-media-connector.interface';
 import { SourceNode } from '../schemas';
 
 export type SocialMediaPlatform = 'twitter' | 'facebook' | 'reddit';
@@ -20,17 +15,15 @@ export type SocialMediaPlatform = 'twitter' | 'facebook' | 'reddit';
  * with privacy regulations.
  */
 @Injectable()
-export class TransformedSocialMediaService
-  implements OnModuleInit, OnModuleDestroy
-{
+export class TransformedSocialMediaService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TransformedSocialMediaService.name);
   private readonly connectors: SocialMediaConnector[];
 
   constructor(
     // Connectors injected via NestJS DI - they should extend BaseSocialMediaConnector
-    private readonly twitterConnector: any,
-    private readonly facebookConnector: any,
-    private readonly redditConnector: any
+    private readonly twitterConnector: SocialMediaConnector,
+    private readonly facebookConnector: SocialMediaConnector,
+    private readonly redditConnector: SocialMediaConnector,
   ) {
     // Initialize the connector array
     this.connectors = [twitterConnector, facebookConnector, redditConnector];
@@ -43,12 +36,9 @@ export class TransformedSocialMediaService
         try {
           await connector.validateCredentials();
         } catch (error) {
-          this.logger.error(
-            `Failed to validate credentials for ${connector.platform}`,
-            error
-          );
+          this.logger.error(`Failed to validate credentials for ${connector.platform}`, error);
         }
-      })
+      }),
     );
 
     this.logger.log('TransformedSocialMediaService initialized');
@@ -56,9 +46,7 @@ export class TransformedSocialMediaService
 
   async onModuleDestroy() {
     // Disconnect all connectors
-    await Promise.all(
-      this.connectors.map((connector) => connector.disconnect())
-    );
+    await Promise.all(this.connectors.map((connector) => connector.disconnect()));
 
     this.logger.log('TransformedSocialMediaService destroyed');
   }
@@ -73,12 +61,13 @@ export class TransformedSocialMediaService
       endDate?: Date;
       limit?: number;
       platforms?: SocialMediaPlatform[];
-    }
+    },
   ): Promise<NarrativeInsight[]> {
     // Filter connectors by platform if specified
-    const targetConnectors = options?.platforms
+    const selectedPlatforms = options?.platforms;
+    const targetConnectors = selectedPlatforms
       ? this.connectors.filter((connector) =>
-          options.platforms!.includes(connector.platform as SocialMediaPlatform)
+          selectedPlatforms.includes(connector.platform as SocialMediaPlatform),
         )
       : this.connectors;
 
@@ -91,12 +80,9 @@ export class TransformedSocialMediaService
           limit: options?.limit,
         })
         .catch((error: Error) => {
-          this.logger.error(
-            `Error searching ${connector.platform}: ${error.message}`,
-            error.stack
-          );
+          this.logger.error(`Error searching ${connector.platform}: ${error.message}`, error.stack);
           return [] as NarrativeInsight[];
-        })
+        }),
     );
 
     // Wait for all searches to complete
@@ -105,8 +91,7 @@ export class TransformedSocialMediaService
     // Combine and sort by timestamp (newest first)
     const allInsights = results.flat();
     return allInsights.sort(
-      (a: NarrativeInsight, b: NarrativeInsight) =>
-        b.timestamp.getTime() - a.timestamp.getTime()
+      (a: NarrativeInsight, b: NarrativeInsight) => b.timestamp.getTime() - a.timestamp.getTime(),
     );
   }
 
@@ -117,23 +102,22 @@ export class TransformedSocialMediaService
     keywords: string[],
     options?: {
       platforms?: SocialMediaPlatform[];
-    }
+    },
   ): EventEmitter {
     const emitter = new EventEmitter();
     let hasError = false;
 
     // Filter connectors by platform if specified
-    const targetConnectors = options?.platforms
+    const selectedPlatforms = options?.platforms;
+    const targetConnectors = selectedPlatforms
       ? this.connectors.filter((connector) =>
-          options.platforms!.includes(connector.platform as SocialMediaPlatform)
+          selectedPlatforms.includes(connector.platform as SocialMediaPlatform),
         )
       : this.connectors;
 
     this.logger.log(
-      `Starting stream for keywords [${keywords.join(
-        ', '
-      )}] across platforms: ` +
-        targetConnectors.map((c) => c.platform).join(', ')
+      `Starting stream for keywords [${keywords.join(', ')}] across platforms: ` +
+        targetConnectors.map((c) => c.platform).join(', '),
     );
 
     // Set up streams for each connector
@@ -162,7 +146,7 @@ export class TransformedSocialMediaService
         const err = error as Error;
         this.logger.error(
           `Failed to start ${connector.platform} stream: ${err.message}`,
-          err.stack
+          err.stack,
         );
         emitter.emit('error', {
           platform: connector.platform,
@@ -181,7 +165,7 @@ export class TransformedSocialMediaService
    */
   async getAnonymizedSourceDetails(
     authorId: string,
-    platform: SocialMediaPlatform
+    platform: SocialMediaPlatform,
   ): Promise<Partial<SourceNode>> {
     const connector = this.connectors.find((c) => c.platform === platform);
     if (!connector) {
@@ -192,10 +176,7 @@ export class TransformedSocialMediaService
       return await connector.getAuthorDetails(authorId);
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error getting author details from ${platform}: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error getting author details from ${platform}: ${err.message}`, err.stack);
       throw error;
     }
   }

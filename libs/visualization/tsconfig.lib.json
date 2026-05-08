@@ -4,11 +4,7 @@
     "outDir": "../../dist/out-tsc",
     "declaration": true,
     "composite": true,
-    "types": [
-      "node",
-      "@nx/react/typings/cssmodule.d.ts",
-      "@nx/react/typings/image.d.ts"
-    ],
+    "types": ["node", "@nx/react/typings/cssmodule.d.ts", "@nx/react/typings/image.d.ts"],
     "jsx": "react-jsx"
   },
   "exclude": [
@@ -23,9 +19,9 @@
     "src/**/*.test.jsx"
   ],
   "include": [
-    "src/**/*.js", 
-    "src/**/*.jsx", 
-    "src/**/*.ts", 
+    "src/**/*.js",
+    "src/**/*.jsx",
+    "src/**/*.ts",
     "src/**/*.tsx",
     "src/lib/**/*.ts",
     "src/lib/**/*.tsx",

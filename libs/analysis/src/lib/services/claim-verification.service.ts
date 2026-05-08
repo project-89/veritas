@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { IdentityRecordRepository } from '@veritas/ingestion';
 import { DexScreenerEvidenceAdapter } from './evidence-adapters/dexscreener.evidence-adapter';
 import { EtherscanEvidenceAdapter } from './evidence-adapters/etherscan.evidence-adapter';
 import type {
@@ -11,7 +10,10 @@ import type {
 } from './evidence-adapters/evidence-adapter.interface';
 import { GitHubEvidenceAdapter } from './evidence-adapters/github.evidence-adapter';
 import { SecEdgarEvidenceAdapter } from './evidence-adapters/sec-edgar.evidence-adapter';
-import { SocialGraphEvidenceAdapter } from './evidence-adapters/social-graph.evidence-adapter';
+import {
+  type IdentityRecordLookup,
+  SocialGraphEvidenceAdapter,
+} from './evidence-adapters/social-graph.evidence-adapter';
 import { PlatformCredibilityService } from './platform-credibility.service';
 import type { ExtractedClaim } from './propaganda.service';
 
@@ -110,7 +112,7 @@ export class ClaimVerificationService {
     platformCredibility?: PlatformCredibilityService,
     @Optional()
     @Inject('IDENTITY_RECORD_REPOSITORY')
-    identityRepo?: IdentityRecordRepository,
+    identityRepo?: IdentityRecordLookup,
   ) {
     const geminiKey =
       this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
@@ -247,9 +249,7 @@ export class ClaimVerificationService {
           sourcesChecked.push(adapter.name);
           adapterEvidenceSources.push(...result.value);
         } else if (result.status === 'rejected') {
-          this.logger.warn(
-            `Evidence adapter ${adapter.name} failed: ${result.reason}`,
-          );
+          this.logger.warn(`Evidence adapter ${adapter.name} failed: ${result.reason}`);
         }
       }
     }
@@ -400,11 +400,15 @@ export class ClaimVerificationService {
     evidence: Array<
       | { source: 'Wikipedia'; items: WikiSearchResult[] }
       | { source: 'GDELT'; items: GdeltArticle[] }
-    >,
-    sourcesChecked: string[],
-    adapterEvidence: EvidenceSource[] = [],
+  >,
+  sourcesChecked: string[],
+  adapterEvidence: EvidenceSource[] = [],
   ): Promise<VerificationResult> {
-    const model = this.genAI!.getGenerativeModel({ model: this.chatModel });
+    if (!this.genAI) {
+      throw new Error('Gemini client is not initialized');
+    }
+
+    const model = this.genAI.getGenerativeModel({ model: this.chatModel });
 
     const evidenceText = this.formatEvidenceForPrompt(evidence);
     const adapterEvidenceText = this.formatAdapterEvidenceForPrompt(adapterEvidence);

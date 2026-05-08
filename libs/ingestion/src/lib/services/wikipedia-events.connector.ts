@@ -1,11 +1,8 @@
-import {
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter } from 'events';
-import type { SourceNode } from '../schemas';
 import type { NarrativeInsight } from '../../types/narrative-insight.interface';
 import type { ConnectorSearchOptions, DataConnector } from '../interfaces/data-connector.interface';
+import type { SourceNode } from '../schemas';
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
 
@@ -106,7 +103,8 @@ export class WikipediaEventsConnector implements DataConnector {
     return emitter;
   }
 
-  async getAuthorDetails(_authorId: string): Promise<Partial<SourceNode>> {
+  async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
+    void authorId;
     return {
       platform: 'wikipedia',
       name: 'Wikipedia',
@@ -131,9 +129,7 @@ export class WikipediaEventsConnector implements DataConnector {
 
     const filtered =
       keywords.length > 0
-        ? events.filter((e) =>
-            keywords.some((kw) => e.text.toLowerCase().includes(kw)),
-          )
+        ? events.filter((e) => keywords.some((kw) => e.text.toLowerCase().includes(kw)))
         : events;
 
     return filtered.slice(0, limit ?? 50);
@@ -172,9 +168,7 @@ export class WikipediaEventsConnector implements DataConnector {
 
     // Match <li> content — each represents one event
     const liRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi;
-    let match: RegExpExecArray | null;
-
-    while ((match = liRegex.exec(html)) !== null) {
+    for (let match = liRegex.exec(html); match !== null; match = liRegex.exec(html)) {
       const rawContent = match[1];
       if (!rawContent) continue;
 

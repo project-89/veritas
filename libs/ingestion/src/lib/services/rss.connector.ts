@@ -1,25 +1,18 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-  Optional,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventEmitter } from 'events';
+import { SourceNode } from '@veritas/shared/types';
 import axios from 'axios';
+import { EventEmitter } from 'events';
 import Parser from 'rss-parser';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { getAllFeeds, getFeedsForQuery } from '../config/rss-feed-catalog';
 import {
-  SocialMediaConnector,
   SocialMediaPost,
 } from '../interfaces/social-media-connector.interface';
 import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
-import { getFeedsForQuery, getAllFeeds } from '../config/rss-feed-catalog';
-import { SourceNode } from '@veritas/shared/types';
-import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { RssCacheRepository } from '../repositories/rss-cache.repository';
 import type { RssCacheItem } from '../schemas/rss-cache.schema';
+import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 
 interface RSSItem {
   title?: unknown;
@@ -66,9 +59,7 @@ function coerceValidDate(value: unknown): Date | null {
  * Handles fetching and processing RSS and Atom feeds
  */
 @Injectable()
-export class RSSConnector
-  implements TransformOnIngestConnector, OnModuleInit, OnModuleDestroy
-{
+export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, OnModuleDestroy {
   platform = 'rss' as const;
   private static readonly DEFAULT_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
   private static readonly FEED_FETCH_TIMEOUT_MS = 15000;
@@ -163,10 +154,7 @@ export class RSSConnector
    * Search content from RSS feeds
    * Implements SocialMediaConnector interface
    */
-  async searchContent(
-    query: string,
-    options?: SearchOptions
-  ): Promise<SocialMediaPost[]> {
+  async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
     try {
       // Use query-relevant feeds (smart matching) instead of all 177
       const relevantFeeds = getFeedsForQuery(query);
@@ -223,10 +211,7 @@ export class RSSConnector
    * Enhanced searchAndTransform method that returns anonymized insights
    * Implements TransformOnIngestConnector interface
    */
-  async searchAndTransform(
-    query: string,
-    options?: SearchOptions
-  ): Promise<NarrativeInsight[]> {
+  async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     try {
       this.logger.log(`Searching RSS feeds for: ${query}`);
 
@@ -236,9 +221,7 @@ export class RSSConnector
       // Transform immediately - no raw storage
       const insights = await this.transformService.transformBatch(posts);
 
-      this.logger.log(
-        `Transformed ${insights.length} RSS items into anonymized insights`
-      );
+      this.logger.log(`Transformed ${insights.length} RSS items into anonymized insights`);
 
       // Return only anonymized insights
       return insights;
@@ -281,10 +264,7 @@ export class RSSConnector
   /**
    * Fetch items from a feed URL (with RSS cache layer)
    */
-  private async fetchFeedItems(
-    feedUrl: string,
-    options?: SearchOptions
-  ): Promise<RSSItem[]> {
+  private async fetchFeedItems(feedUrl: string, options?: SearchOptions): Promise<RSSItem[]> {
     try {
       // --- Check RSS cache first ---
       if (this.rssCacheRepo) {
@@ -333,7 +313,7 @@ export class RSSConnector
         }));
         this.rssCacheRepo
           .setCachedFeed(feedUrl, feedUrl, cacheItems, RSSConnector.DEFAULT_CACHE_MAX_AGE_MS)
-          .catch(() => {});
+          .catch(() => undefined);
       }
 
       // Apply date filters if provided
@@ -378,12 +358,16 @@ export class RSSConnector
 
     const withoutBom = xml.replace(/^\uFEFF/, '');
     const firstTagIndex = withoutBom.indexOf('<');
-    const trimmedToFirstTag =
-      firstTagIndex > 0 ? withoutBom.slice(firstTagIndex) : withoutBom;
+    const trimmedToFirstTag = firstTagIndex > 0 ? withoutBom.slice(firstTagIndex) : withoutBom;
+    const withoutControlChars = Array.from(trimmedToFirstTag)
+      .filter((char) => {
+        const code = char.charCodeAt(0);
+        return code >= 32 || code === 9 || code === 10 || code === 13;
+      })
+      .join('');
 
-    return trimmedToFirstTag
+    return withoutControlChars
       .replace(/&(?!#\d+;|#x[a-fA-F0-9]+;|[a-zA-Z][\w.-]*;)/g, '&amp;')
-      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
       .trim();
   }
 
@@ -473,15 +457,7 @@ export class RSSConnector
         .join(' ');
     }
     if (typeof value === 'object') {
-      const candidateKeys = [
-        'name',
-        'term',
-        'label',
-        'value',
-        'text',
-        'content',
-        'title',
-      ] as const;
+      const candidateKeys = ['name', 'term', 'label', 'value', 'text', 'content', 'title'] as const;
 
       for (const key of candidateKeys) {
         const candidate = (value as Record<string, unknown>)[key];
@@ -527,9 +503,8 @@ export class RSSConnector
     const consecutiveFailures =
       previous?.lastErrorSignature === summary ? previous.consecutiveFailures + 1 : 1;
     const cooldownMs = Math.min(
-      RSSConnector.FEED_FAILURE_BASE_COOLDOWN_MS *
-        2 ** Math.max(0, consecutiveFailures - 1),
-      RSSConnector.FEED_FAILURE_MAX_COOLDOWN_MS
+      RSSConnector.FEED_FAILURE_BASE_COOLDOWN_MS * 2 ** Math.max(0, consecutiveFailures - 1),
+      RSSConnector.FEED_FAILURE_MAX_COOLDOWN_MS,
     );
 
     this.feedFailureState.set(feedUrl, {
@@ -539,13 +514,11 @@ export class RSSConnector
     });
 
     const shouldLog =
-      !previous ||
-      previous.lastErrorSignature !== summary ||
-      previous.consecutiveFailures < 2;
+      !previous || previous.lastErrorSignature !== summary || previous.consecutiveFailures < 2;
 
     if (shouldLog) {
       this.logger.warn(
-        `RSS feed unavailable (${summary}). Suppressing ${feedUrl} for ${Math.round(cooldownMs / 60000)}m`
+        `RSS feed unavailable (${summary}). Suppressing ${feedUrl} for ${Math.round(cooldownMs / 60000)}m`,
       );
     }
   }
@@ -680,9 +653,7 @@ export class RSSConnector
             emitter.emit('data', insight);
           }
 
-          this.logger.debug(
-            `Emitted ${insights.length} anonymized insights from RSS stream`
-          );
+          this.logger.debug(`Emitted ${insights.length} anonymized insights from RSS stream`);
         }
       } catch (error) {
         emitter.emit('error', error);
@@ -706,10 +677,7 @@ export class RSSConnector
   /**
    * Filter items by keywords
    */
-  private filterItemsByKeywords(
-    items: RSSItem[],
-    keywords: string[]
-  ): RSSItem[] {
+  private filterItemsByKeywords(items: RSSItem[], keywords: string[]): RSSItem[] {
     if (!keywords.length) {
       return items;
     }
@@ -725,9 +693,7 @@ export class RSSConnector
         .join(' ')
         .toLowerCase();
 
-      return keywords.some((keyword) =>
-        itemText.includes(keyword.toLowerCase())
-      );
+      return keywords.some((keyword) => itemText.includes(keyword.toLowerCase()));
     });
   }
 

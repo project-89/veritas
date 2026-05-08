@@ -1,21 +1,20 @@
-import { Test } from '@nestjs/testing';
-import { Module, Global } from '@nestjs/common';
 import type { DynamicModule } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Test } from '@nestjs/testing';
+import { ContentClassificationService } from '@veritas/content-classification';
 import { IngestionModule } from '../src/lib/ingestion.module';
 import { NarrativeRepository } from '../src/lib/repositories/narrative-insight.repository';
-import { TwitterFreeConnector } from '../src/lib/services/twitter-free.connector';
-import { FacebookJinaConnector } from '../src/lib/services/facebook-jina.connector';
-import { RedditFreeConnector } from '../src/lib/services/reddit-free.connector';
 import { TransformOnIngestService } from '../src/lib/services/transform/transform-on-ingest.service';
-import { ConfigService } from '@nestjs/config';
-import { ContentClassificationService } from '@veritas/content-classification';
 
 jest.mock('../src/lib/queue/scan.processor', () => ({
   ScanProcessor: class MockScanProcessor {},
 }));
 
 jest.mock('@nestjs/bullmq', () => {
-  const { Module, Inject } = jest.requireActual('@nestjs/common') as typeof import('@nestjs/common');
+  const { Module, Inject } = jest.requireActual(
+    '@nestjs/common',
+  ) as typeof import('@nestjs/common');
 
   const queueProviders = [
     {
@@ -34,6 +33,7 @@ jest.mock('@nestjs/bullmq', () => {
     },
   ];
 
+  // biome-ignore lint/complexity/noStaticOnlyClass: test double mirrors BullModule static API.
   class MockBullModule {
     static registerQueue = jest.fn().mockImplementation(
       (): DynamicModule => ({
@@ -52,7 +52,7 @@ jest.mock('@nestjs/bullmq', () => {
     InjectQueue: (name: string) => Inject(`BullQueue_${name}`),
     Processor:
       () =>
-      <TFunction extends Function>(target: TFunction): TFunction =>
+      <TFunction extends (...args: never[]) => unknown>(target: TFunction): TFunction =>
         target,
     WorkerHost: MockWorkerHost,
   };

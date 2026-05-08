@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
-import { TwitterFreeConnector } from '../../src/lib/services/twitter-free.connector';
-import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
 import { EventEmitter } from 'events';
+import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
+import { TwitterFreeConnector } from '../../src/lib/services/twitter-free.connector';
 
 // Mock the scraper module
 const mockSearchTweets = jest.fn();
@@ -99,7 +99,9 @@ describe('TwitterFreeConnector', () => {
         mockConfigService as ConfigService,
         mockTransformService as unknown as TransformOnIngestService,
       );
-      await expect((connector as any).connectToApi()).rejects.toThrow('Twitter connector requires authentication');
+      await expect((connector as any).connectToApi()).rejects.toThrow(
+        'Twitter connector requires authentication',
+      );
     });
   });
 
@@ -117,7 +119,9 @@ describe('TwitterFreeConnector', () => {
 
   describe('searchContent', () => {
     it('should search tweets and return SocialMediaPost array', async () => {
-      async function* gen() { yield mockTweet; }
+      async function* gen() {
+        yield mockTweet;
+      }
       mockSearchTweets.mockReturnValue(gen());
       const results = await connector.searchContent('AI', { limit: 10 });
       expect(results).toHaveLength(1);
@@ -132,7 +136,9 @@ describe('TwitterFreeConnector', () => {
     });
 
     it('should respect limit', async () => {
-      async function* gen() { for (let i = 0; i < 100; i++) yield { ...mockTweet, id: `t${i}` }; }
+      async function* gen() {
+        for (let i = 0; i < 100; i++) yield { ...mockTweet, id: `t${i}` };
+      }
       mockSearchTweets.mockReturnValue(gen());
       const results = await connector.searchContent('test', { limit: 5 });
       expect(results).toHaveLength(5);
@@ -155,22 +161,45 @@ describe('TwitterFreeConnector', () => {
 
     it('should handle missing optional fields', async () => {
       async function* gen() {
-        yield { id: '999', text: 'Minimal', hashtags: [], mentions: [], photos: [], videos: [], urls: [], thread: [] };
+        yield {
+          id: '999',
+          text: 'Minimal',
+          hashtags: [],
+          mentions: [],
+          photos: [],
+          videos: [],
+          urls: [],
+          thread: [],
+        };
       }
       mockSearchTweets.mockReturnValue(gen());
       const results = await connector.searchContent('test');
-      expect(results[0]).toMatchObject({ id: '999', authorId: '', engagementMetrics: { likes: 0, shares: 0 } });
+      expect(results[0]).toMatchObject({
+        id: '999',
+        authorId: '',
+        engagementMetrics: { likes: 0, shares: 0 },
+      });
     });
   });
 
   describe('getAuthorDetails', () => {
     it('should fetch profile and map to SourceNode', async () => {
       mockGetProfile.mockResolvedValue({
-        userId: 'u1', username: 'johndoe', name: 'John Doe',
-        biography: 'Dev', followersCount: 5000, isVerified: false, isBlueVerified: true,
+        userId: 'u1',
+        username: 'johndoe',
+        name: 'John Doe',
+        biography: 'Dev',
+        followersCount: 5000,
+        isVerified: false,
+        isBlueVerified: true,
       });
       const result = await connector.getAuthorDetails('johndoe');
-      expect(result).toMatchObject({ id: 'u1', name: 'John Doe', platform: 'twitter', verificationStatus: 'verified' });
+      expect(result).toMatchObject({
+        id: 'u1',
+        name: 'John Doe',
+        platform: 'twitter',
+        verificationStatus: 'verified',
+      });
     });
   });
 

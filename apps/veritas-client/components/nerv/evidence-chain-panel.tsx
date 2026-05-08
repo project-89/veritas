@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import type {
   ClaimVerificationBatchResult,
-  PropagandaAnalysisResult,
-  VerificationResult,
   EvidenceItem,
   InvestigativeLead,
+  PropagandaAnalysisResult,
+  VerificationResult,
 } from '../../lib/api';
 import { NervBadge } from './nerv-badge';
 import { NervBar } from './nerv-bar';
@@ -33,22 +33,12 @@ const STATUS_VARIANT: Record<string, 'green' | 'red' | 'amber' | 'blue' | 'muted
   unverified: 'muted',
 };
 
-const SOURCE_ICONS: Record<string, string> = {
-  'on-chain': '\u26D3',    // chain
-  financial: '\u2616',      // building-like
-  social: '\u263A',         // smiley / social
-  governmental: '\u2616',   // building
-  journalistic: '\u2609',   // globe-like
-};
-
 function sourceIcon(source: string): string {
   const lower = source.toLowerCase();
   if (lower.includes('etherscan') || lower.includes('chain') || lower.includes('dex'))
     return '\u26D3'; // chain
-  if (lower.includes('github') || lower.includes('code'))
-    return '\u2318'; // code/command
-  if (lower.includes('sec') || lower.includes('edgar') || lower.includes('gov'))
-    return '\u2616'; // building
+  if (lower.includes('github') || lower.includes('code')) return '\u2318'; // code/command
+  if (lower.includes('sec') || lower.includes('edgar') || lower.includes('gov')) return '\u2616'; // building
   if (lower.includes('wikipedia') || lower.includes('gdelt') || lower.includes('news'))
     return '\u2609'; // globe
   return '\u25CB'; // circle
@@ -72,15 +62,14 @@ function CollapsibleSection({
   return (
     <div className="border border-nerv-border rounded-sm">
       <button
+        type="button"
         onClick={onToggle}
         className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-nerv-bg-elevated/30 transition-colors"
       >
         <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
           {title}
         </span>
-        <span className="text-[9px] text-nerv-text-muted">
-          {isOpen ? '\u25B4' : '\u25BE'}
-        </span>
+        <span className="text-[9px] text-nerv-text-muted">{isOpen ? '\u25B4' : '\u25BE'}</span>
       </button>
       {isOpen && <div className="px-2 pb-2 space-y-1">{children}</div>}
     </div>
@@ -99,9 +88,7 @@ function EvidenceItemRow({
     item.credibility === 'high' ? 'green' : item.credibility === 'medium' ? 'amber' : 'red';
 
   return (
-    <div
-      className={`pl-2 py-1 border-l-2 ${borderColor} bg-nerv-bg-elevated/20 rounded-r-sm`}
-    >
+    <div className={`pl-2 py-1 border-l-2 ${borderColor} bg-nerv-bg-elevated/20 rounded-r-sm`}>
       <div className="flex items-center gap-1.5">
         <span className="text-[10px]">{sourceIcon(item.source)}</span>
         <span className="text-[9px] font-mono text-nerv-text-secondary font-bold truncate">
@@ -145,8 +132,8 @@ function LeadCard({ lead }: { lead: InvestigativeLead }) {
           variant={lead.automatable ? 'green' : 'amber'}
           size="sm"
         />
-        {lead.dataSources.map((ds, i) => (
-          <NervBadge key={i} label={ds} variant="blue" size="sm" />
+        {lead.dataSources.map((ds) => (
+          <NervBadge key={ds} label={ds} variant="blue" size="sm" />
         ))}
       </div>
     </div>
@@ -156,8 +143,7 @@ function LeadCard({ lead }: { lead: InvestigativeLead }) {
 function ClaimCard({ result }: { result: VerificationResult }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const toggle = (section: string) =>
-    setExpanded(expanded === section ? null : section);
+  const toggle = (section: string) => setExpanded(expanded === section ? null : section);
 
   const statusVariant = STATUS_VARIANT[result.status] ?? 'muted';
   const hasEvidence =
@@ -181,11 +167,7 @@ function ClaimCard({ result }: { result: VerificationResult }) {
           <NervBar
             value={result.confidence}
             color={
-              result.confidence > 0.7
-                ? '#00FF41'
-                : result.confidence > 0.4
-                ? '#f59e0b'
-                : '#e94560'
+              result.confidence > 0.7 ? '#00FF41' : result.confidence > 0.4 ? '#f59e0b' : '#e94560'
             }
             height={4}
             showLabel
@@ -201,11 +183,19 @@ function ClaimCard({ result }: { result: VerificationResult }) {
           onToggle={() => toggle('evidence')}
         >
           <div className="space-y-1.5">
-            {result.evidence.supporting.map((ev, i) => (
-              <EvidenceItemRow key={`s-${i}`} item={ev} stance="supporting" />
+            {result.evidence.supporting.map((ev) => (
+              <EvidenceItemRow
+                key={`s-${ev.source}-${ev.url ?? ev.excerpt.slice(0, 32)}`}
+                item={ev}
+                stance="supporting"
+              />
             ))}
-            {result.evidence.contradicting.map((ev, i) => (
-              <EvidenceItemRow key={`c-${i}`} item={ev} stance="contradicting" />
+            {result.evidence.contradicting.map((ev) => (
+              <EvidenceItemRow
+                key={`c-${ev.source}-${ev.url ?? ev.excerpt.slice(0, 32)}`}
+                item={ev}
+                stance="contradicting"
+              />
             ))}
           </div>
         </CollapsibleSection>
@@ -219,8 +209,8 @@ function ClaimCard({ result }: { result: VerificationResult }) {
           onToggle={() => toggle('leads')}
         >
           <div className="space-y-1.5">
-            {leads.map((lead, i) => (
-              <LeadCard key={i} lead={lead} />
+            {leads.map((lead) => (
+              <LeadCard key={lead.question} lead={lead} />
             ))}
           </div>
         </CollapsibleSection>
@@ -238,14 +228,9 @@ function ClaimCard({ result }: { result: VerificationResult }) {
           </p>
           {result.caveats.length > 0 && (
             <div className="mt-1 pt-1 border-t border-nerv-border/30">
-              <span className="text-[8px] font-mono uppercase text-nerv-text-muted">
-                Caveats:
-              </span>
-              {result.caveats.map((c, i) => (
-                <p
-                  key={i}
-                  className="text-[8px] font-mono text-nerv-amber/80 leading-relaxed"
-                >
+              <span className="text-[8px] font-mono uppercase text-nerv-text-muted">Caveats:</span>
+              {result.caveats.map((c) => (
+                <p key={c} className="text-[8px] font-mono text-nerv-amber/80 leading-relaxed">
                   {'\u25B3'} {c}
                 </p>
               ))}
@@ -279,6 +264,7 @@ export function EvidenceChainPanel({
           </div>
           {onTriggerAnalysis && (
             <button
+              type="button"
               onClick={onTriggerAnalysis}
               className="mt-4 px-4 py-2 text-[10px] font-mono uppercase tracking-wider border border-nerv-amber text-nerv-amber hover:bg-nerv-amber/10 rounded-sm transition-colors font-bold"
             >
@@ -286,15 +272,16 @@ export function EvidenceChainPanel({
             </button>
           )}
           <div className="text-[11px] font-mono text-nerv-orange mt-3 max-w-[320px] leading-relaxed">
-            {'\u2192'} Click <span className="font-bold">ANALYZE</span> on a
-            scanned narrative to generate claims and verify them.
+            {'\u2192'} Click <span className="font-bold">ANALYZE</span> on a scanned narrative to
+            generate claims and verify them.
           </div>
         </div>
       </div>
     );
   }
 
-  const totalLeads = (claims.investigativeLeads ?? []).length +
+  const totalLeads =
+    (claims.investigativeLeads ?? []).length +
     claims.results.reduce((acc, r) => acc + (r.investigativeLeads?.length ?? 0), 0);
 
   return (
@@ -306,27 +293,11 @@ export function EvidenceChainPanel({
             Evidence Chains
           </span>
           <div className="flex items-center gap-2">
-            <NervBadge
-              label={`${claims.verifiedCount} verified`}
-              variant="green"
-              size="sm"
-            />
-            <NervBadge
-              label={`${claims.disputedCount} disputed`}
-              variant="red"
-              size="sm"
-            />
-            <NervBadge
-              label={`${claims.unverifiedCount} unverified`}
-              variant="muted"
-              size="sm"
-            />
+            <NervBadge label={`${claims.verifiedCount} verified`} variant="green" size="sm" />
+            <NervBadge label={`${claims.disputedCount} disputed`} variant="red" size="sm" />
+            <NervBadge label={`${claims.unverifiedCount} unverified`} variant="muted" size="sm" />
             {totalLeads > 0 && (
-              <NervBadge
-                label={`${totalLeads} leads`}
-                variant="amber"
-                size="sm"
-              />
+              <NervBadge label={`${totalLeads} leads`} variant="amber" size="sm" />
             )}
           </div>
         </div>
@@ -346,24 +317,20 @@ export function EvidenceChainPanel({
                 propaganda.overallAssessment.manipulationLikelihood === 'high'
                   ? 'red'
                   : propaganda.overallAssessment.manipulationLikelihood === 'medium'
-                  ? 'amber'
-                  : 'green'
+                    ? 'amber'
+                    : 'green'
               }
               size="sm"
             />
-            <NervBar
-              value={propaganda.overallAssessment.confidence}
-              color="#f59e0b"
-              height={4}
-            />
+            <NervBar value={propaganda.overallAssessment.confidence} color="#f59e0b" height={4} />
           </div>
         )}
       </div>
 
       {/* Claims list */}
       <div className="flex-1 overflow-auto p-3 space-y-2">
-        {claims.results.map((result, i) => (
-          <ClaimCard key={i} result={result} />
+        {claims.results.map((result) => (
+          <ClaimCard key={`${result.claim}-${result.status}`} result={result} />
         ))}
 
         {/* Batch-level investigative leads */}
@@ -372,8 +339,8 @@ export function EvidenceChainPanel({
             <div className="text-[9px] font-mono uppercase tracking-wider text-nerv-orange font-bold">
               Additional Investigative Leads
             </div>
-            {claims.investigativeLeads!.map((lead, i) => (
-              <LeadCard key={i} lead={lead} />
+            {(claims.investigativeLeads ?? []).map((lead) => (
+              <LeadCard key={lead.question} lead={lead} />
             ))}
           </div>
         )}
@@ -385,13 +352,8 @@ export function EvidenceChainPanel({
               Propaganda Techniques Detected ({propaganda.techniques.length})
             </div>
             <div className="flex flex-wrap gap-1">
-              {propaganda.techniques.map((tech, i) => (
-                <NervBadge
-                  key={i}
-                  label={tech.name}
-                  variant="red"
-                  size="sm"
-                />
+              {propaganda.techniques.map((tech) => (
+                <NervBadge key={tech.name} label={tech.name} variant="red" size="sm" />
               ))}
             </div>
           </div>

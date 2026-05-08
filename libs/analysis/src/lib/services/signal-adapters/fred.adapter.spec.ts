@@ -46,7 +46,9 @@ describe('FredAdapter', () => {
     });
 
     const signals = await adapter.fetchSignals(defaultParams);
-    const dffSignals = signals.filter((s) => (s.metadata as { seriesId: string }).seriesId === 'DFF');
+    const dffSignals = signals.filter(
+      (s) => (s.metadata as { seriesId: string }).seriesId === 'DFF',
+    );
     expect(dffSignals.length).toBeGreaterThanOrEqual(2);
     expect(dffSignals[0]!.title).toContain('Federal Funds Rate');
     expect(dffSignals[0]!.source).toBe('FRED (Federal Reserve)');

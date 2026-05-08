@@ -1,25 +1,39 @@
-import { Controller, Post, Body, Logger } from '@nestjs/common';
-import { NarrativeAnalysisService } from '../services/narrative-analysis.service';
-import type { AnalyzeResult, AnalyzedNarrative } from '../services/narrative-analysis.service';
-import type { SaturationReport } from '../services/saturation-metrics.service';
-import { DeviationService } from '../services/deviation.service';
-import type { DeviationResponse, RawPost } from '../services/deviation.service';
-import { ReportService } from '../services/report.service';
-import type { ReportParams, ReportResult } from '../services/report.service';
-import { PropagandaAnalysisService } from '../services/propaganda.service';
-import type { PropagandaAnalysisResult, ExtractedClaim } from '../services/propaganda.service';
-import { ComparisonService } from '../services/comparison.service';
-import type { NarrativeComparison, TimePeriodComparison, PlatformComparison } from '../services/comparison.service';
-import { EntityAnalysisService } from '../services/entity-analysis.service';
-import type { EntityAnalysisResponse, InsightInput } from '../services/entity-analysis.service';
-import { NarrativeGenealogyService } from '../services/genealogy.service';
-import type { GenealogyResponse, NarrativeSnapshot } from '../services/genealogy.service';
-import { DownstreamEffectsService } from '../services/downstream-effects.service';
-import type { DownstreamEffectsResult, MyceliumData } from '../services/downstream-effects.service';
-import { ClaimVerificationService } from '../services/claim-verification.service';
+import { Body, Controller, Logger, Post } from '@nestjs/common';
 import type { ClaimVerificationBatchResult } from '../services/claim-verification.service';
-import { IntelligenceEngineService } from '../services/intelligence-engine.service';
+import { ClaimVerificationService } from '../services/claim-verification.service';
+import type {
+  NarrativeComparison,
+  PlatformComparison,
+  TimePeriodComparison,
+} from '../services/comparison.service';
+import { ComparisonService } from '../services/comparison.service';
+import type {
+  DeepInvestigationResult,
+  UserInvestigationResult,
+} from '../services/deep-investigation.service';
+import type { DeviationResponse, RawPost } from '../services/deviation.service';
+import { DeviationService } from '../services/deviation.service';
+import type { DownstreamEffectsResult, MyceliumData } from '../services/downstream-effects.service';
+import { DownstreamEffectsService } from '../services/downstream-effects.service';
+import type { EntityAnalysisResponse, InsightInput } from '../services/entity-analysis.service';
+import { EntityAnalysisService } from '../services/entity-analysis.service';
+import type { GenealogyResponse, NarrativeSnapshot } from '../services/genealogy.service';
+import { NarrativeGenealogyService } from '../services/genealogy.service';
+import type {
+  BotDetectionResult,
+  BotScore,
+  StructuralPattern,
+} from '../services/graph-bot-detection.service';
 import type { IntelligenceReport } from '../services/intelligence-engine.service';
+import { IntelligenceEngineService } from '../services/intelligence-engine.service';
+import type { AnalyzedNarrative, AnalyzeResult } from '../services/narrative-analysis.service';
+import { NarrativeAnalysisService } from '../services/narrative-analysis.service';
+import type { ExtractedClaim, PropagandaAnalysisResult } from '../services/propaganda.service';
+import { PropagandaAnalysisService } from '../services/propaganda.service';
+import type { ReportParams, ReportResult } from '../services/report.service';
+import { ReportService } from '../services/report.service';
+import type { ExternalSignal } from '../services/signal-adapters/signal-adapter.interface';
+import type { GlobalEvent } from '../types/global-event';
 
 interface AnalyzeRequestPost {
   text: string;
@@ -29,6 +43,199 @@ interface AnalyzeRequestPost {
   timestamp: string;
   sentiment?: { score: number; label: string };
   engagement?: { likes: number; comments: number; shares: number };
+}
+
+type AssessmentType = 'campaign' | 'manipulation' | 'crisis' | 'influence' | 'legitimacy';
+
+interface VerifyClaimsRequest {
+  claims: ExtractedClaim[];
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function coerceBotScores(value: unknown): BotScore[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((score): score is Record<string, unknown> => score != null && typeof score === 'object')
+    .map((score) => ({
+      handle: asString(score['handle']),
+      platform: asString(score['platform']),
+      botProbability: asNumber(score['botProbability']),
+      structuralScore: asNumber(score['structuralScore']),
+      temporalScore: asNumber(score['temporalScore']),
+      behavioralScore: asNumber(score['behavioralScore']),
+      detectedPatterns: Array.isArray(score['detectedPatterns'])
+        ? score['detectedPatterns'].filter((pattern): pattern is string => typeof pattern === 'string')
+        : [],
+    }));
+}
+
+function asStructuralPatternType(value: unknown): StructuralPattern['type'] {
+  return value === 'star' || value === 'chain' || value === 'clique' ? value : 'chain';
+}
+
+function coerceStructuralPatterns(value: unknown): StructuralPattern[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(
+      (pattern): pattern is Record<string, unknown> =>
+        pattern != null && typeof pattern === 'object',
+    )
+    .map((pattern) => ({
+      type: asStructuralPatternType(pattern['type']),
+      description: asString(pattern['description']),
+      members: Array.isArray(pattern['members'])
+        ? pattern['members'].filter((member): member is string => typeof member === 'string')
+        : [],
+      confidence: asNumber(pattern['confidence']),
+    }));
+}
+
+function coerceBotDetectionResult(value: unknown): BotDetectionResult {
+  const source =
+    value != null && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  return {
+    scores: coerceBotScores(source['scores']),
+    structuralPatterns: coerceStructuralPatterns(source['structuralPatterns']),
+    graphEnhanced: typeof source['graphEnhanced'] === 'boolean' ? source['graphEnhanced'] : false,
+    summary: asString(source['summary']),
+  };
+}
+
+function coerceBenefits(value: unknown): DeepInvestigationResult['cuiBono']['beneficiaries'] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object')
+    .map((item) => ({
+      entity: asString(item['entity']),
+      howTheyBenefit: asString(item['howTheyBenefit']),
+      confidence: asNumber(item['confidence']),
+    }));
+}
+
+function coerceStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+function coerceUserInvestigations(value: unknown): UserInvestigationResult[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(
+    (item): item is UserInvestigationResult =>
+      item != null &&
+      typeof item === 'object' &&
+      'user' in item &&
+      item.user != null &&
+      typeof item.user === 'object' &&
+      'handle' in item.user &&
+      typeof item.user.handle === 'string' &&
+      'platform' in item.user &&
+      typeof item.user.platform === 'string',
+  );
+}
+
+function coerceInvestigation(value: unknown): DeepInvestigationResult {
+  const source =
+    value != null && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const originSource =
+    source['originAnalysis'] != null && typeof source['originAnalysis'] === 'object'
+      ? (source['originAnalysis'] as Record<string, unknown>)
+      : {};
+  const cuiBonoSource =
+    source['cuiBono'] != null && typeof source['cuiBono'] === 'object'
+      ? (source['cuiBono'] as Record<string, unknown>)
+      : {};
+  const coordinationSource =
+    source['coordination'] != null && typeof source['coordination'] === 'object'
+      ? (source['coordination'] as Record<string, unknown>)
+      : {};
+
+  return {
+    topic: asString(source['topic']),
+    users: coerceUserInvestigations(source['users']),
+    originAnalysis: {
+      firstMover: asString(originSource['firstMover']),
+      firstPlatform: asString(originSource['firstPlatform']),
+      firstTimestamp: asString(originSource['firstTimestamp']),
+      propagationChain: Array.isArray(originSource['propagationChain'])
+        ? originSource['propagationChain'].filter(
+            (item): item is DeepInvestigationResult['originAnalysis']['propagationChain'][number] =>
+              item != null && typeof item === 'object',
+          )
+        : [],
+    },
+    cuiBono: {
+      beneficiaries: coerceBenefits(cuiBonoSource['beneficiaries']),
+      agendas: coerceStringArray(cuiBonoSource['agendas']),
+      summary: asString(cuiBonoSource['summary']),
+    },
+    coordination: {
+      clusters: Array.isArray(coordinationSource['clusters'])
+        ? coordinationSource['clusters'].filter(
+            (item): item is DeepInvestigationResult['coordination']['clusters'][number] =>
+              item != null && typeof item === 'object',
+          )
+        : [],
+      summary: asString(coordinationSource['summary']),
+    },
+  };
+}
+
+function coerceSignals(value: unknown): ExternalSignal[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(
+    (signal): signal is ExternalSignal =>
+      signal != null &&
+      typeof signal === 'object' &&
+      'id' in signal &&
+      typeof signal.id === 'string' &&
+      'domain' in signal &&
+      typeof signal.domain === 'string' &&
+      'title' in signal &&
+      typeof signal.title === 'string',
+  );
+}
+
+function coerceGlobalEvents(value: unknown): GlobalEvent[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(
+    (event): event is GlobalEvent =>
+      event != null &&
+      typeof event === 'object' &&
+      'id' in event &&
+      typeof event.id === 'string' &&
+      'category' in event &&
+      typeof event.category === 'string' &&
+      'timestamp' in event &&
+      typeof event.timestamp === 'string',
+  );
 }
 
 @Controller('narratives')
@@ -53,9 +260,7 @@ export class NarrativeAnalysisController {
    * Returns semantically grouped narratives with LLM-generated summaries.
    */
   @Post('analyze')
-  async analyze(
-    @Body() body: { posts: AnalyzeRequestPost[] },
-  ): Promise<AnalyzeResult> {
+  async analyze(@Body() body: { posts: AnalyzeRequestPost[] }): Promise<AnalyzeResult> {
     this.logger.log(`Analyzing ${body.posts?.length ?? 0} posts`);
     return this.narrativeAnalysis.analyze(body.posts ?? []);
   }
@@ -87,9 +292,7 @@ export class NarrativeAnalysisController {
    * Returns markdown or HTML content.
    */
   @Post('report')
-  async generateReport(
-    @Body() body: ReportParams,
-  ): Promise<ReportResult> {
+  async generateReport(@Body() body: ReportParams): Promise<ReportResult> {
     this.logger.log(
       `Generating ${body.format} report for "${body.query}" (${body.narratives?.length ?? 0} narratives)`,
     );
@@ -158,10 +361,7 @@ export class NarrativeAnalysisController {
         return this.comparisonService.compareTimePeriods(body.periodA, body.periodB);
       }
       case 'platform': {
-        return this.comparisonService.comparePlatforms(
-          body.narratives ?? [],
-          body.posts ?? [],
-        );
+        return this.comparisonService.comparePlatforms(body.narratives ?? [], body.posts ?? []);
       }
       default:
         throw new Error(`Unknown comparison type: ${body.type}`);
@@ -174,11 +374,7 @@ export class NarrativeAnalysisController {
   @Post('entities')
   analyzeEntities(
     @Body()
-    body: {
-      posts: RawPost[];
-      insights: InsightInput[];
-      narratives: AnalyzedNarrative[];
-    },
+    body: { posts: RawPost[]; insights: InsightInput[]; narratives: AnalyzedNarrative[] },
   ): EntityAnalysisResponse {
     const posts = body.posts ?? [];
     const insights = body.insights ?? [];
@@ -197,9 +393,7 @@ export class NarrativeAnalysisController {
    * Build narrative genealogy from multiple investigation snapshots.
    */
   @Post('genealogy')
-  buildGenealogy(
-    @Body() body: { snapshots: NarrativeSnapshot[] },
-  ): GenealogyResponse {
+  buildGenealogy(@Body() body: { snapshots: NarrativeSnapshot[] }): GenealogyResponse {
     const snapshots = body.snapshots ?? [];
     this.logger.log(`Genealogy: ${snapshots.length} snapshots`);
 
@@ -217,9 +411,7 @@ export class NarrativeAnalysisController {
   ): Promise<DownstreamEffectsResult & { myceliumData: MyceliumData }> {
     const narratives = body.narratives ?? [];
     const posts = body.posts ?? [];
-    this.logger.log(
-      `Downstream effects: ${narratives.length} narratives, ${posts.length} posts`,
-    );
+    this.logger.log(`Downstream effects: ${narratives.length} narratives, ${posts.length} posts`);
 
     const result = await this.downstreamEffectsService.analyze(narratives, posts);
     const myceliumData = this.downstreamEffectsService.toMyceliumData(
@@ -236,9 +428,7 @@ export class NarrativeAnalysisController {
    * LLM reasoning (or heuristic fallback).
    */
   @Post('verify-claims')
-  async verifyClaims(
-    @Body() body: { claims: ExtractedClaim[] },
-  ): Promise<ClaimVerificationBatchResult> {
+  async verifyClaims(@Body() body: VerifyClaimsRequest): Promise<ClaimVerificationBatchResult> {
     const claims = body.claims ?? [];
     this.logger.log(`Claim verification: ${claims.length} claims`);
     return this.claimVerificationService.verifyBatch(claims);
@@ -251,75 +441,76 @@ export class NarrativeAnalysisController {
   @Post('intelligence')
   async runIntelligenceAssessment(
     @Body() body: {
-      type: 'campaign' | 'manipulation' | 'crisis' | 'influence' | 'legitimacy';
+      type: AssessmentType;
       narratives: AnalyzedNarrative[];
       posts: RawPost[];
-      investigation?: any;
-      botScores?: any[];
-      claims?: any;
-      globalEvents?: any[];
-      signals?: any[];
+      investigation?: unknown;
+      botScores?: unknown;
+      claims?: ClaimVerificationBatchResult;
+      globalEvents?: unknown;
+      signals?: unknown;
     },
   ): Promise<IntelligenceReport> {
     const { type, narratives = [], posts = [] } = body;
-    this.logger.log(`Intelligence assessment: type=${type}, ${narratives.length} narratives, ${posts.length} posts`);
+    this.logger.log(
+      `Intelligence assessment: type=${type}, ${narratives.length} narratives, ${posts.length} posts`,
+    );
 
     switch (type) {
       case 'campaign': {
-        // Build a BotDetectionResult stub if bot scores are available, otherwise use defaults
-        const botResult = {
-          scores: (body.botScores ?? []) as any[],
-          structuralPatterns: [] as any[],
-          graphEnhanced: false,
-          summary: '',
-        };
-        const investigation = body.investigation ?? {
-          topic: '',
-          users: [],
-          originAnalysis: { firstMover: '', firstPlatform: '', firstTimestamp: '', propagationChain: [] },
-          cuiBono: { beneficiaries: [], agendas: [], summary: '' },
-          coordination: { clusters: [], summary: '' },
-        };
-        const report = this.intelligenceEngineService.detectCoordinatedCampaign(botResult, investigation);
+        const botResult = coerceBotDetectionResult(body.botScores);
+        const investigation = coerceInvestigation(body.investigation);
+        const report = this.intelligenceEngineService.detectCoordinatedCampaign(
+          botResult,
+          investigation,
+        );
         return { type: 'campaign', report };
       }
       case 'manipulation': {
-        const signals = (body.signals ?? []) as any[];
-        const postData = posts.map((p) => ({ text: p.text, authorHandle: (p as any).authorHandle ?? '' }));
-        const report = this.intelligenceEngineService.detectMarketManipulation(narratives, signals, postData);
+        const signals = coerceSignals(body.signals);
+        const postData = posts.map((post) => ({
+          text: post.text,
+          authorHandle: typeof post.authorHandle === 'string' ? post.authorHandle : '',
+        }));
+        const report = this.intelligenceEngineService.detectMarketManipulation(
+          narratives,
+          signals,
+          postData,
+        );
         return { type: 'manipulation', report };
       }
       case 'crisis': {
-        const events = (body.globalEvents ?? []) as any[];
+        const events = coerceGlobalEvents(body.globalEvents);
         const report = this.intelligenceEngineService.assessCrisisRisk(events, narratives);
         return { type: 'crisis', report };
       }
       case 'influence': {
-        const botResult = {
-          scores: (body.botScores ?? []) as any[],
-          structuralPatterns: [] as any[],
-          graphEnhanced: false,
-          summary: '',
-        };
-        const investigation = body.investigation ?? {
-          topic: '',
-          users: [],
-          originAnalysis: { firstMover: '', firstPlatform: '', firstTimestamp: '', propagationChain: [] },
-          cuiBono: { beneficiaries: [], agendas: [], summary: '' },
-          coordination: { clusters: [], summary: '' },
-        };
-        const report = this.intelligenceEngineService.attributeInfluenceOperation(investigation, botResult, narratives);
+        const botResult = coerceBotDetectionResult(body.botScores);
+        const investigation = coerceInvestigation(body.investigation);
+        const report = this.intelligenceEngineService.attributeInfluenceOperation(
+          investigation,
+          botResult,
+        );
         return { type: 'influence', report };
       }
       case 'legitimacy': {
-        const verification = body.claims ?? { results: [], summary: '', verifiedCount: 0, disputedCount: 0, unverifiedCount: 0 };
+        const verification = body.claims ?? {
+          results: [],
+          summary: '',
+          verifiedCount: 0,
+          disputedCount: 0,
+          unverifiedCount: 0,
+        };
         const platforms: Record<string, number> = {};
         for (const n of narratives) {
           for (const [p, count] of Object.entries(n.platforms ?? {})) {
             platforms[p] = (platforms[p] ?? 0) + count;
           }
         }
-        const report = this.intelligenceEngineService.scoreNarrativeLegitimacy(verification, platforms);
+        const report = this.intelligenceEngineService.scoreNarrativeLegitimacy(
+          verification,
+          platforms,
+        );
         return { type: 'legitimacy', report };
       }
       default:

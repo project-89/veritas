@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import * as d3 from "d3";
-
+import * as d3 from 'd3';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface NarrativeEvent {
   id: string;
@@ -32,23 +31,29 @@ interface TemporalNarrativeVisualizationProps {
   onEventClick?: (event: NarrativeEvent) => void;
 }
 
-export const TemporalNarrativeVisualization: React.FC<
-  TemporalNarrativeVisualizationProps
-> = ({ data, width = 900, height = 600, onStreamClick, onEventClick }) => {
+export const TemporalNarrativeVisualization: React.FC<TemporalNarrativeVisualizationProps> = ({
+  data,
+  width = 900,
+  height = 600,
+  onStreamClick,
+  onEventClick,
+}) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedStream, setSelectedStream] = useState<string | null>(null);
 
   useEffect(() => {
     if (!svgRef.current || !data || !data.timePoints.length) return;
+    const firstTimePoint = data.timePoints[0];
+    const lastTimePoint = data.timePoints[data.timePoints.length - 1];
+    if (!firstTimePoint || !lastTimePoint) {
+      return;
+    }
 
     // Clear previous visualization
-    d3.select(svgRef.current).selectAll("*").remove();
+    d3.select(svgRef.current).selectAll('*').remove();
 
     // Create SVG container
-    const svg = d3
-      .select(svgRef.current)
-      .attr("width", width)
-      .attr("height", height);
+    const svg = d3.select(svgRef.current).attr('width', width).attr('height', height);
 
     // Define margins — left margin accommodates the legend
     const margin = { top: 40, right: 30, bottom: 60, left: 200 };
@@ -56,53 +61,51 @@ export const TemporalNarrativeVisualization: React.FC<
     const innerHeight = height - margin.top - margin.bottom;
 
     // Create container group
-    const g = svg
-      .append("g")
-      .attr("transform", `translate(${margin.left}, ${margin.top})`);
+    const g = svg.append('g').attr('transform', `translate(${margin.left}, ${margin.top})`);
 
     // Setup scales
     const timeScale = d3
       .scaleTime()
-      .domain([data.timePoints[0]!, data.timePoints[data.timePoints.length - 1]!])
+      .domain([firstTimePoint, lastTimePoint])
       .range([0, innerWidth]);
 
-    const strengthScale = d3
-      .scaleLinear()
-      .domain([0, 1])
-      .range([innerHeight, 0]);
+    const strengthScale = d3.scaleLinear().domain([0, 1]).range([innerHeight, 0]);
 
     // Create axes
     const xAxis = d3.axisBottom(timeScale);
     const yAxis = d3.axisLeft(strengthScale);
 
     // Add X axis
-    g.append("g")
-      .attr("class", "x-axis")
-      .attr("transform", `translate(0, ${innerHeight})`)
+    g.append('g')
+      .attr('class', 'x-axis')
+      .attr('transform', `translate(0, ${innerHeight})`)
       .call(xAxis)
-      .append("text")
-      .attr("fill", "#000")
-      .attr("x", innerWidth / 2)
-      .attr("y", 40)
-      .attr("text-anchor", "middle")
-      .text("Time");
+      .append('text')
+      .attr('fill', '#000')
+      .attr('x', innerWidth / 2)
+      .attr('y', 40)
+      .attr('text-anchor', 'middle')
+      .text('Time');
 
     // Add Y axis
-    g.append("g")
-      .attr("class", "y-axis")
+    g.append('g')
+      .attr('class', 'y-axis')
       .call(yAxis)
-      .append("text")
-      .attr("fill", "#000")
-      .attr("transform", "rotate(-90)")
-      .attr("y", -40)
-      .attr("x", -innerHeight / 2)
-      .attr("text-anchor", "middle")
-      .text("Narrative Strength");
+      .append('text')
+      .attr('fill', '#000')
+      .attr('transform', 'rotate(-90)')
+      .attr('y', -40)
+      .attr('x', -innerHeight / 2)
+      .attr('text-anchor', 'middle')
+      .text('Narrative Strength');
 
     // Create area generator
     const areaGenerator = d3
       .area<number>()
-      .x((d, i) => timeScale(data.timePoints[i]!))
+      .x((d, i) => {
+        void d;
+        return timeScale(data.timePoints[i] ?? firstTimePoint);
+      })
       .y0(innerHeight)
       .y1((d) => strengthScale(d))
       .curve(d3.curveBasis);
@@ -115,15 +118,15 @@ export const TemporalNarrativeVisualization: React.FC<
       }
 
       // Draw stream area
-      g.append("path")
+      g.append('path')
         .datum(stream.strength)
-        .attr("d", areaGenerator)
-        .attr("fill", stream.color)
-        .attr("fill-opacity", selectedStream === stream.id ? 0.8 : 0.5)
-        .attr("stroke", stream.color)
-        .attr("stroke-width", 1)
-        .attr("cursor", "pointer")
-        .on("click", () => {
+        .attr('d', areaGenerator)
+        .attr('fill', stream.color)
+        .attr('fill-opacity', selectedStream === stream.id ? 0.8 : 0.5)
+        .attr('stroke', stream.color)
+        .attr('stroke-width', 1)
+        .attr('cursor', 'pointer')
+        .on('click', () => {
           setSelectedStream(selectedStream === stream.id ? null : stream.id);
           if (onStreamClick) onStreamClick(stream.id);
         });
@@ -132,120 +135,110 @@ export const TemporalNarrativeVisualization: React.FC<
       g.selectAll(`.event-${stream.id}`)
         .data(stream.events)
         .enter()
-        .append("circle")
-        .attr("class", `event-${stream.id}`)
-        .attr("cx", (d) => timeScale(d.timestamp))
-        .attr("cy", (d) => {
+        .append('circle')
+        .attr('class', `event-${stream.id}`)
+        .attr('cx', (d) => timeScale(d.timestamp))
+        .attr('cy', (d) => {
           // Find the closest time point
-          const timeIndex = data.timePoints.findIndex(
-            (t) => t.getTime() >= d.timestamp.getTime()
-          );
-          const strength = stream.strength[timeIndex >= 0 ? timeIndex : 0]!;
+          const timeIndex = data.timePoints.findIndex((t) => t.getTime() >= d.timestamp.getTime());
+          const strength = stream.strength[timeIndex >= 0 ? timeIndex : 0] ?? 0;
           return strengthScale(strength);
         })
-        .attr("r", (d) => 3 + d.impact * 5) // Size based on impact
-        .attr("fill", stream.color)
-        .attr("stroke", "#fff")
-        .attr("stroke-width", 1)
-        .attr("cursor", "pointer")
-        .on("click", (event, d) => {
+        .attr('r', (d) => 3 + d.impact * 5) // Size based on impact
+        .attr('fill', stream.color)
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 1)
+        .attr('cursor', 'pointer')
+        .on('click', (event, d) => {
           event.stopPropagation();
           if (onEventClick) onEventClick(d);
         })
-        .append("title")
+        .append('title')
         .text((d) => d.content);
     });
 
     // Draw external events if they exist
     if (data.externalEvents && data.externalEvents.length > 0) {
       // Add event lines
-      g.selectAll(".external-event-line")
+      g.selectAll('.external-event-line')
         .data(data.externalEvents)
         .enter()
-        .append("line")
-        .attr("class", "external-event-line")
-        .attr("x1", (d) => timeScale(d.timestamp))
-        .attr("y1", 0)
-        .attr("x2", (d) => timeScale(d.timestamp))
-        .attr("y2", innerHeight)
-        .attr("stroke", "#888")
-        .attr("stroke-width", (d) => 1 + d.impact)
-        .attr("stroke-dasharray", "3,3")
-        .attr("opacity", 0.7);
+        .append('line')
+        .attr('class', 'external-event-line')
+        .attr('x1', (d) => timeScale(d.timestamp))
+        .attr('y1', 0)
+        .attr('x2', (d) => timeScale(d.timestamp))
+        .attr('y2', innerHeight)
+        .attr('stroke', '#888')
+        .attr('stroke-width', (d) => 1 + d.impact)
+        .attr('stroke-dasharray', '3,3')
+        .attr('opacity', 0.7);
 
       // Add event labels
-      g.selectAll(".external-event-label")
+      g.selectAll('.external-event-label')
         .data(data.externalEvents)
         .enter()
-        .append("text")
-        .attr("class", "external-event-label")
-        .attr("x", (d) => timeScale(d.timestamp))
-        .attr("y", 10)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "10px")
-        .attr("transform", (d) => `rotate(-45, ${timeScale(d.timestamp)}, 10)`)
-        .text((d) =>
-          d.content.length > 20 ? d.content.substring(0, 20) + "..." : d.content
-        )
-        .append("title")
+        .append('text')
+        .attr('class', 'external-event-label')
+        .attr('x', (d) => timeScale(d.timestamp))
+        .attr('y', 10)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '10px')
+        .attr('transform', (d) => `rotate(-45, ${timeScale(d.timestamp)}, 10)`)
+        .text((d) => (d.content.length > 20 ? d.content.substring(0, 20) + '...' : d.content))
+        .append('title')
         .text((d) => d.content);
     }
 
     // Add legend on the left side
-    const legend = svg
-      .append("g")
-      .attr("transform", `translate(10, ${margin.top})`);
-
-    const maxLabelWidth = margin.left - 30; // space for color square + padding
+    const legend = svg.append('g').attr('transform', `translate(10, ${margin.top})`);
 
     data.streams.forEach((stream, i) => {
       const row = legend
-        .append("g")
-        .attr("transform", `translate(0, ${i * 22})`)
-        .attr("cursor", "pointer")
-        .on("click", () => {
+        .append('g')
+        .attr('transform', `translate(0, ${i * 22})`)
+        .attr('cursor', 'pointer')
+        .on('click', () => {
           setSelectedStream(selectedStream === stream.id ? null : stream.id);
           if (onStreamClick) onStreamClick(stream.id);
         });
 
       row
-        .append("rect")
-        .attr("x", 0)
-        .attr("y", 0)
-        .attr("width", 12)
-        .attr("height", 12)
-        .attr("rx", 2)
-        .attr("fill", stream.color)
-        .attr("opacity", selectedStream && selectedStream !== stream.id ? 0.3 : 1);
+        .append('rect')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('width', 12)
+        .attr('height', 12)
+        .attr('rx', 2)
+        .attr('fill', stream.color)
+        .attr('opacity', selectedStream && selectedStream !== stream.id ? 0.3 : 1);
 
-      const label = stream.name.length > 22
-        ? stream.name.substring(0, 22) + "..."
-        : stream.name;
+      const label = stream.name.length > 22 ? stream.name.substring(0, 22) + '...' : stream.name;
 
       row
-        .append("text")
-        .attr("x", 18)
-        .attr("y", 11)
+        .append('text')
+        .attr('x', 18)
+        .attr('y', 11)
         .text(label)
-        .attr("font-size", "11px")
-        .attr("fill", "#cbd5e1")
-        .attr("opacity", selectedStream && selectedStream !== stream.id ? 0.4 : 1)
-        .append("title")
+        .attr('font-size', '11px')
+        .attr('fill', '#cbd5e1')
+        .attr('opacity', selectedStream && selectedStream !== stream.id ? 0.4 : 1)
+        .append('title')
         .text(stream.name);
     });
 
     // Add reset button
     if (selectedStream) {
       legend
-        .append("text")
-        .attr("x", 0)
-        .attr("y", data.streams.length * 22 + 18)
-        .text("Reset")
-        .attr("font-size", "11px")
-        .attr("cursor", "pointer")
-        .attr("fill", "#818cf8")
-        .attr("text-decoration", "underline")
-        .on("click", () => {
+        .append('text')
+        .attr('x', 0)
+        .attr('y', data.streams.length * 22 + 18)
+        .text('Reset')
+        .attr('font-size', '11px')
+        .attr('cursor', 'pointer')
+        .attr('fill', '#818cf8')
+        .attr('text-decoration', 'underline')
+        .on('click', () => {
           setSelectedStream(null);
         });
     }
@@ -259,11 +252,8 @@ export const TemporalNarrativeVisualization: React.FC<
       </div>
       {selectedStream && (
         <div className="stream-details">
-          <h4>
-            Selected Narrative:{" "}
-            {data.streams.find((s) => s.id === selectedStream)?.name}
-          </h4>
-          <button onClick={() => setSelectedStream(null)}>
+          <h4>Selected Narrative: {data.streams.find((s) => s.id === selectedStream)?.name}</h4>
+          <button type="button" onClick={() => setSelectedStream(null)}>
             Clear Selection
           </button>
         </div>
@@ -285,26 +275,26 @@ export const generateSampleData = (): TemporalData => {
   // Create narrative streams
   const streams: NarrativeStream[] = [
     {
-      id: "narrative-1",
-      name: "Main Narrative",
-      color: "#4299E1",
+      id: 'narrative-1',
+      name: 'Main Narrative',
+      color: '#4299E1',
       strength: [],
       events: [],
     },
     {
-      id: "narrative-2",
-      name: "Counter Narrative",
-      color: "#F56565",
+      id: 'narrative-2',
+      name: 'Counter Narrative',
+      color: '#F56565',
       strength: [],
       events: [],
     },
     {
-      id: "narrative-3",
-      name: "Emerging Perspective",
-      color: "#48BB78",
+      id: 'narrative-3',
+      name: 'Emerging Perspective',
+      color: '#48BB78',
       strength: [],
       events: [],
-      relatedStreams: ["narrative-1"],
+      relatedStreams: ['narrative-1'],
     },
   ];
 
@@ -317,23 +307,20 @@ export const generateSampleData = (): TemporalData => {
       const change = (Math.random() - 0.5) * 0.1;
 
       // Special patterns for each narrative
-      if (stream.id === "narrative-1") {
+      if (stream.id === 'narrative-1') {
         // Main narrative grows steadily
         currentStrength = Math.min(0.9, currentStrength + 0.01 + change);
-      } else if (stream.id === "narrative-2") {
+      } else if (stream.id === 'narrative-2') {
         // Counter narrative spikes in the middle then declines
         if (i > 10 && i < 20) {
           currentStrength = Math.min(0.8, currentStrength + 0.03 + change);
         } else {
           currentStrength = Math.max(0.1, currentStrength - 0.01 + change);
         }
-      } else if (stream.id === "narrative-3") {
+      } else if (stream.id === 'narrative-3') {
         // Emerging narrative starts later and grows rapidly
         if (i < 15) {
-          currentStrength = Math.max(
-            0.05,
-            Math.min(0.2, currentStrength + change)
-          );
+          currentStrength = Math.max(0.05, Math.min(0.2, currentStrength + change));
         } else {
           currentStrength = Math.min(0.7, currentStrength + 0.04 + change);
         }
@@ -344,69 +331,78 @@ export const generateSampleData = (): TemporalData => {
   });
 
   // Add some key events to each narrative
-  streams[0]!.events = [
-    {
-      id: "event-1-1",
-      timestamp: timePoints[5]!,
-      content: "Initial coverage in mainstream media",
-      impact: 0.6,
-    },
-    {
-      id: "event-1-2",
-      timestamp: timePoints[15]!,
-      content: "Official statement released",
-      impact: 0.8,
-    },
-    {
-      id: "event-1-3",
-      timestamp: timePoints[25]!,
-      content: "Follow-up investigation published",
-      impact: 0.7,
-    },
-  ];
+  const primaryStream = streams[0];
+  if (primaryStream) {
+    primaryStream.events = [
+      {
+        id: 'event-1-1',
+        timestamp: timePoints[5] ?? now,
+        content: 'Initial coverage in mainstream media',
+        impact: 0.6,
+      },
+      {
+        id: 'event-1-2',
+        timestamp: timePoints[15] ?? now,
+        content: 'Official statement released',
+        impact: 0.8,
+      },
+      {
+        id: 'event-1-3',
+        timestamp: timePoints[25] ?? now,
+        content: 'Follow-up investigation published',
+        impact: 0.7,
+      },
+    ];
+  }
 
-  streams[1]!.events = [
-    {
-      id: "event-2-1",
-      timestamp: timePoints[12]!,
-      content: "Alternative theory gains traction",
-      impact: 0.5,
-    },
-    {
-      id: "event-2-2",
-      timestamp: timePoints[18]!,
-      content: "Viral social media post challenges mainstream view",
-      impact: 0.9,
-    },
-  ];
+  const counterStream = streams[1];
+  if (counterStream) {
+    counterStream.events = [
+      {
+        id: 'event-2-1',
+        timestamp: timePoints[12] ?? now,
+        content: 'Alternative theory gains traction',
+        impact: 0.5,
+      },
+      {
+        id: 'event-2-2',
+        timestamp: timePoints[18] ?? now,
+        content: 'Viral social media post challenges mainstream view',
+        impact: 0.9,
+      },
+    ];
+  }
 
-  streams[2]!.events = [
-    {
-      id: "event-3-1",
-      timestamp: timePoints[16]!,
-      content: "New evidence emerges",
-      impact: 0.4,
-    },
-    {
-      id: "event-3-2",
-      timestamp: timePoints[23]!,
-      content: "Academic paper published supporting this view",
-      impact: 0.7,
-    },
-  ];
+  const emergingStream = streams[2];
+  if (emergingStream) {
+    emergingStream.events = [
+      {
+        id: 'event-3-1',
+        timestamp: timePoints[16] ?? now,
+        content: 'New evidence emerges',
+        impact: 0.4,
+      },
+      {
+        id: 'event-3-2',
+        timestamp: timePoints[23] ?? now,
+        content: 'Academic paper published supporting this view',
+        impact: 0.7,
+      },
+    ];
+  }
 
   // Add some external events that affected all narratives
   const externalEvents: NarrativeEvent[] = [
     {
-      id: "external-1",
-      timestamp: timePoints[10]!,
-      content: "Major related news event",
+      id: 'external-1',
+      timestamp: timePoints[10] ?? now,
+      content: 'Major related news event',
       impact: 0.9,
     },
     {
-      id: "external-2",
-      timestamp: timePoints[20]!,
-      content: "Government policy announcement",
+      id: 'external-2',
+      timestamp: timePoints[20] ?? now,
+      content: 'Government policy announcement',
       impact: 0.7,
     },
   ];
@@ -416,4 +412,4 @@ export const generateSampleData = (): TemporalData => {
     streams,
     externalEvents,
   };
-}; 
+};

@@ -1,14 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ContentResolver } from '../../src/lib/resolvers/content.resolver';
 import { ContentService } from '../../src/lib/services/content.service';
-import {
-  SemanticSearchParamsType,
-  SimilarContentResultType,
-} from '../../src/lib/types/content.types';
+import { SemanticSearchParamsType } from '../../src/lib/types/content.types';
 
 describe('ContentResolver', () => {
   let resolver: ContentResolver;
-  let contentService: ContentService;
 
   const mockContentService = {
     getContentById: jest.fn(),
@@ -37,7 +33,6 @@ describe('ContentResolver', () => {
     }).compile();
 
     resolver = module.get<ContentResolver>(ContentResolver);
-    contentService = module.get<ContentService>(ContentService);
   });
 
   it('should be defined', () => {
@@ -73,7 +68,7 @@ describe('ContentResolver', () => {
           semanticQuery: params.semanticQuery,
           minScore: params.minScore,
         },
-        true
+        true,
       );
       expect(result).toHaveLength(2);
       expect(result[0]!.id).toBe('result-1');
@@ -81,16 +76,14 @@ describe('ContentResolver', () => {
 
     it('should throw an error when service is not available', async () => {
       // Create resolver without service
-      const moduleWithoutService: TestingModule =
-        await Test.createTestingModule({
-          providers: [ContentResolver],
-        }).compile();
+      const moduleWithoutService: TestingModule = await Test.createTestingModule({
+        providers: [ContentResolver],
+      }).compile();
 
-      const resolverWithoutService =
-        moduleWithoutService.get<ContentResolver>(ContentResolver);
+      const resolverWithoutService = moduleWithoutService.get<ContentResolver>(ContentResolver);
 
       await expect(
-        resolverWithoutService.semanticSearch({ semanticQuery: 'test' })
+        resolverWithoutService.semanticSearch({ semanticQuery: 'test' }),
       ).rejects.toThrow();
     });
   });
@@ -109,12 +102,7 @@ describe('ContentResolver', () => {
 
       mockContentService.findSimilarContent.mockResolvedValue(similarContent);
 
-      const result = await resolver.similarContent(
-        id,
-        limit,
-        minScore,
-        useExistingEmbedding
-      );
+      const result = await resolver.similarContent(id, limit, minScore, useExistingEmbedding);
 
       expect(mockContentService.findSimilarContent).toHaveBeenCalledWith(id, {
         limit,
@@ -149,9 +137,7 @@ describe('ContentResolver', () => {
         embedding: [0.1, 0.2, 0.3, 0.4],
       };
 
-      mockContentService.generateEmbedding.mockResolvedValue(
-        contentWithEmbedding
-      );
+      mockContentService.generateEmbedding.mockResolvedValue(contentWithEmbedding);
 
       const result = await resolver.generateEmbedding(id);
 
@@ -174,9 +160,7 @@ describe('ContentResolver', () => {
 
       const result = await resolver.generateAllEmbeddings(batchSize);
 
-      expect(mockContentService.generateAllEmbeddings).toHaveBeenCalledWith(
-        batchSize
-      );
+      expect(mockContentService.generateAllEmbeddings).toHaveBeenCalledWith(batchSize);
       expect(result).toBe(42);
     });
 
@@ -185,9 +169,7 @@ describe('ContentResolver', () => {
 
       await resolver.generateAllEmbeddings();
 
-      expect(mockContentService.generateAllEmbeddings).toHaveBeenCalledWith(
-        undefined
-      );
+      expect(mockContentService.generateAllEmbeddings).toHaveBeenCalledWith(undefined);
     });
   });
 });

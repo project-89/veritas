@@ -1,5 +1,12 @@
 'use client';
 
+import {
+  addInvestigationEvidenceSeed,
+  buildMentalModel,
+  createOrGetInvestigation,
+  fetchAtlasLenses,
+  fetchInvestigation,
+} from '../../lib/api';
 import { GENERATED_PAGE_ROUTE_COMPONENTS } from '../../lib/generated-plugin-components';
 
 const AtlasPageComponent = GENERATED_PAGE_ROUTE_COMPONENTS['/atlas'];
@@ -15,5 +22,15 @@ export default function AtlasPageRoute() {
     );
   }
 
-  return <AtlasPageComponent />;
+  return (
+    <AtlasPageComponent
+      api={{
+        fetchAtlasLenses,
+        fetchInvestigation,
+        createOrGetInvestigation,
+        addInvestigationEvidenceSeed,
+        buildMentalModel,
+      }}
+    />
+  );
 }

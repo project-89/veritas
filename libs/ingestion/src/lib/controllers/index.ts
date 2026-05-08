@@ -1,2 +1,2 @@
-export * from './narrative.controller';
 export * from './ingestion.controller';
+export * from './narrative.controller';

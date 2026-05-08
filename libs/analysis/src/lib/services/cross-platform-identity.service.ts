@@ -1,16 +1,19 @@
-import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { execFile } from 'child_process';
-import { readFile, mkdir, rm } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
 import { randomBytes } from 'crypto';
+import { mkdir, readFile, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 /** Injection token for identity record persistence (optional — provided by app module) */
 export const IDENTITY_RECORD_STORE = Symbol('IDENTITY_RECORD_STORE');
 
 /** Interface to avoid hard dependency on ingestion lib */
 interface IdentityRecordStore {
-  findByHandle(handle: string, platform: string): Promise<{
+  findByHandle(
+    handle: string,
+    platform: string,
+  ): Promise<{
     _id: string;
     id: string;
     primaryHandle: string;
@@ -140,7 +143,10 @@ export class CrossPlatformIdentityService {
   private readonly logger = new Logger(CrossPlatformIdentityService.name);
   private readonly sherlockPath: string;
   private readonly timeout: number = 15; // seconds per site
-  private readonly cache = new Map<string, { result: IdentityResolutionResult; timestamp: number }>();
+  private readonly cache = new Map<
+    string,
+    { result: IdentityResolutionResult; timestamp: number }
+  >();
   private readonly cacheTTL = 3600000; // 1 hour
 
   constructor(
@@ -157,7 +163,7 @@ export class CrossPlatformIdentityService {
     } catch {
       this.logger.warn(
         'Sherlock is not installed. Cross-platform identity resolution will be unavailable. ' +
-        'Install with: pip install sherlock-project',
+          'Install with: pip install sherlock-project',
       );
     }
   }
@@ -183,9 +189,10 @@ export class CrossPlatformIdentityService {
     if (this.identityStore) {
       try {
         // Try multiple platform guesses since we don't know the primary
-        const record = await this.identityStore.findByHandle(cleanUsername, 'twitter')
-          ?? await this.identityStore.findByHandle(cleanUsername, 'reddit')
-          ?? await this.identityStore.findByHandle(cleanUsername, 'unknown');
+        const record =
+          (await this.identityStore.findByHandle(cleanUsername, 'twitter')) ??
+          (await this.identityStore.findByHandle(cleanUsername, 'reddit')) ??
+          (await this.identityStore.findByHandle(cleanUsername, 'unknown'));
 
         if (record?.platformAccounts && record.platformAccounts.length > 0) {
           // Check if any sherlock-discovered accounts exist and are recent
@@ -193,13 +200,10 @@ export class CrossPlatformIdentityService {
             (a) => a.discoveryMethod === 'sherlock',
           );
           if (sherlockAccounts.length > 0) {
-            const newest = sherlockAccounts.reduce(
-              (latest, a) => {
-                const t = new Date(a.discoveredAt).getTime();
-                return t > latest ? t : latest;
-              },
-              0,
-            );
+            const newest = sherlockAccounts.reduce((latest, a) => {
+              const t = new Date(a.discoveredAt).getTime();
+              return t > latest ? t : latest;
+            }, 0);
             if (Date.now() - newest < CrossPlatformIdentityService.PERSIST_TTL_MS) {
               this.logger.debug(
                 `Using persisted Sherlock data for "${cleanUsername}" (${sherlockAccounts.length} accounts, age: ${Math.round((Date.now() - newest) / 3600000)}h)`,
@@ -210,8 +214,12 @@ export class CrossPlatformIdentityService {
                 username: a.handle,
                 tier: this.normalizeTier(a.platform, a.discoveryTier),
               }));
-              const { actionableAccounts, corroboratingAccounts, extendedAccounts, relevantAccounts } =
-                this.partitionAccounts(accounts);
+              const {
+                actionableAccounts,
+                corroboratingAccounts,
+                extendedAccounts,
+                relevantAccounts,
+              } = this.partitionAccounts(accounts);
 
               const result: IdentityResolutionResult = {
                 queriedUsername: cleanUsername,
@@ -265,7 +273,7 @@ export class CrossPlatformIdentityService {
 
     this.logger.log(
       `Found ${accounts.length} accounts for "${cleanUsername}" ` +
-      `(${relevantAccounts.length} relevant) in ${result.searchDuration}ms`,
+        `(${relevantAccounts.length} relevant) in ${result.searchDuration}ms`,
     );
 
     return result;
@@ -281,9 +289,10 @@ export class CrossPlatformIdentityService {
     if (!this.identityStore) return;
 
     try {
-      const record = await this.identityStore.findByHandle(username, 'twitter')
-        ?? await this.identityStore.findByHandle(username, 'reddit')
-        ?? await this.identityStore.findByHandle(username, 'unknown');
+      const record =
+        (await this.identityStore.findByHandle(username, 'twitter')) ??
+        (await this.identityStore.findByHandle(username, 'reddit')) ??
+        (await this.identityStore.findByHandle(username, 'unknown'));
 
       if (!record) {
         this.logger.debug(`No identity record for "${username}" — skipping Sherlock persistence`);
@@ -291,9 +300,7 @@ export class CrossPlatformIdentityService {
       }
 
       const now = new Date();
-      const existingKeys = new Set(
-        record.platformAccounts.map((a) => `${a.platform}:${a.handle}`),
-      );
+      const existingKeys = new Set(record.platformAccounts.map((a) => `${a.platform}:${a.handle}`));
 
       const newAccounts = accounts
         .filter((a) => !existingKeys.has(`${a.platform}:${a.username}`))
@@ -338,9 +345,7 @@ export class CrossPlatformIdentityService {
    * Batch resolve multiple usernames.
    * Processes sequentially to avoid overwhelming Sherlock / rate limits.
    */
-  async batchResolve(
-    usernames: string[],
-  ): Promise<Map<string, IdentityResolutionResult>> {
+  async batchResolve(usernames: string[]): Promise<Map<string, IdentityResolutionResult>> {
     const results = new Map<string, IdentityResolutionResult>();
 
     for (const username of usernames) {
@@ -377,13 +382,19 @@ export class CrossPlatformIdentityService {
     try {
       const outputFile = join(tmpDir, `${username}.csv`);
 
-      await this.exec(this.sherlockPath, [
-        username,
-        '--csv',
-        '--output', outputFile,
-        '--timeout', String(this.timeout),
-        '--print-found',
-      ], 120000); // 2 min max total
+      await this.exec(
+        this.sherlockPath,
+        [
+          username,
+          '--csv',
+          '--output',
+          outputFile,
+          '--timeout',
+          String(this.timeout),
+          '--print-found',
+        ],
+        120000,
+      ); // 2 min max total
 
       // Parse CSV output
       const csvContent = await readFile(outputFile, 'utf-8').catch(() => '');
@@ -393,7 +404,9 @@ export class CrossPlatformIdentityService {
       return [];
     } finally {
       // Cleanup temp directory
-      await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+      await rm(tmpDir, { recursive: true, force: true }).catch((cleanupError) => {
+        this.logger.debug(`Failed to clean Sherlock temp dir "${tmpDir}": ${cleanupError}`);
+      });
     }
   }
 
@@ -403,7 +416,10 @@ export class CrossPlatformIdentityService {
 
     // Skip header line
     for (let i = 1; i < lines.length; i++) {
-      const line = lines[i]!;
+      const line = lines[i];
+      if (!line) {
+        continue;
+      }
       // CSV format: username,name,url_main,url_user,exists,http_status,response_time_s
       const parts = line.split(',');
       if (parts.length < 4) continue;
@@ -487,11 +503,7 @@ export class CrossPlatformIdentityService {
   // Util
   // ---------------------------------------------------------------------------
 
-  private exec(
-    command: string,
-    args: string[],
-    timeout = 15000,
-  ): Promise<string> {
+  private exec(command: string, args: string[], timeout = 15000): Promise<string> {
     return new Promise((resolve, reject) => {
       execFile(command, args, { timeout }, (error, stdout, stderr) => {
         if (error && error.killed) {

@@ -2,8 +2,8 @@
  * Main index file for the ingestion library
  */
 
-// Service exports
-export * from './services';
+// Controller exports
+export * from './controllers';
 
 // Interface exports
 export * from './interfaces';
@@ -13,17 +13,15 @@ export * from './repositories';
 
 // Resolver exports
 export * from './resolvers';
-
+export * from './schemas';
+// Service exports
+export * from './services';
+// Schema exports
+export type { EngagementMetrics } from './types';
 // Type exports
 export * from './types';
 
-// Schema exports
-export type { EngagementMetrics } from './types';
-export * from './schemas';
-
-// Controller exports
-export * from './controllers';
-
 // Mock implementations for testing
 import * as Mocks from './__mocks__';
+
 export { Mocks };

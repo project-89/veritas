@@ -173,7 +173,9 @@ describe('ProjectDossierService', () => {
     );
 
     expect(overlaps).toHaveLength(1);
-    expect(overlaps[0]?.matchedTypes).toEqual(expect.arrayContaining(['domain', 'wallet', 'counterparty', 'token_contract']));
+    expect(overlaps[0]?.matchedTypes).toEqual(
+      expect.arrayContaining(['domain', 'wallet', 'counterparty', 'token_contract']),
+    );
     expect(overlaps[0]?.score).toBeGreaterThan(0);
   });
 });

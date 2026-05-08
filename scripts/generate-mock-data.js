@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const { faker } = require('@faker-js/faker');
 
 // Ensure output directory exists
@@ -30,18 +30,11 @@ const generateSource = (id) => {
     url: faker.internet.url(),
     verified: Math.random() > 0.8,
     credibilityScore: faker.number.float({ min: 0, max: 1, precision: 0.01 }),
-    followerCount:
-      platform !== 'news'
-        ? faker.number.int({ min: 0, max: 1000000 })
-        : undefined,
+    followerCount: platform !== 'news' ? faker.number.int({ min: 0, max: 1000000 }) : undefined,
     description: faker.lorem.sentence(),
     profileImageUrl: faker.image.avatar(),
     createdAt: faker.date.past().toISOString(),
-    verificationStatus: faker.helpers.arrayElement([
-      'verified',
-      'unverified',
-      'suspicious',
-    ]),
+    verificationStatus: faker.helpers.arrayElement(['verified', 'unverified', 'suspicious']),
     metadata: {
       location: faker.location.city(),
       joinDate: faker.date.past().toISOString(),
@@ -69,21 +62,13 @@ const generateContent = (id, sourceId) => {
       views: faker.number.int({ min: 0, max: 100000 }),
     },
     sentiment: faker.number.float({ min: -1, max: 1, precision: 0.01 }),
-    entities: Array.from(
-      { length: faker.number.int({ min: 0, max: 5 }) },
-      () => ({
-        name: faker.person.fullName(),
-        type: faker.helpers.arrayElement([
-          'person',
-          'organization',
-          'location',
-          'event',
-        ]),
-        sentiment: faker.number.float({ min: -1, max: 1, precision: 0.01 }),
-      })
-    ),
+    entities: Array.from({ length: faker.number.int({ min: 0, max: 5 }) }, () => ({
+      name: faker.person.fullName(),
+      type: faker.helpers.arrayElement(['person', 'organization', 'location', 'event']),
+      sentiment: faker.number.float({ min: -1, max: 1, precision: 0.01 }),
+    })),
     topics: Array.from({ length: faker.number.int({ min: 1, max: 3 }) }, () =>
-      faker.word.sample().toLowerCase()
+      faker.word.sample().toLowerCase(),
     ),
     metadata: {
       language: 'en',
@@ -104,18 +89,13 @@ const generateNarrative = (id) => {
     updatedAt: new Date().toISOString(),
     strength: faker.number.float({ min: 0, max: 1, precision: 0.01 }),
     topics: Array.from({ length: faker.number.int({ min: 1, max: 5 }) }, () =>
-      faker.word.sample().toLowerCase()
+      faker.word.sample().toLowerCase(),
     ),
     sentiment: faker.number.float({ min: -1, max: 1, precision: 0.01 }),
     contentCount: faker.number.int({ min: 5, max: 100 }),
     sourceCount: faker.number.int({ min: 2, max: 30 }),
     metadata: {
-      status: faker.helpers.arrayElement([
-        'active',
-        'emerging',
-        'fading',
-        'dormant',
-      ]),
+      status: faker.helpers.arrayElement(['active', 'emerging', 'fading', 'dormant']),
       visibility: faker.number.float({ min: 0, max: 1, precision: 0.01 }),
     },
   };
@@ -134,18 +114,13 @@ const generateNarrativeBranch = (narrativeId, parentId = null) => {
     divergencePoint: randomRecentDate(),
     strength: faker.number.float({ min: 0, max: 1, precision: 0.01 }),
     topics: Array.from({ length: faker.number.int({ min: 1, max: 3 }) }, () =>
-      faker.word.sample().toLowerCase()
+      faker.word.sample().toLowerCase(),
     ),
     sentiment: faker.number.float({ min: -1, max: 1, precision: 0.01 }),
     contentCount: faker.number.int({ min: 2, max: 50 }),
     sourceCount: faker.number.int({ min: 1, max: 15 }),
     metadata: {
-      status: faker.helpers.arrayElement([
-        'active',
-        'emerging',
-        'fading',
-        'dormant',
-      ]),
+      status: faker.helpers.arrayElement(['active', 'emerging', 'fading', 'dormant']),
       divergenceStrength: faker.number.float({
         min: 0,
         max: 1,
@@ -209,10 +184,7 @@ const generateDataset = () => {
         max: narratives.length - 1,
       });
       relationships.push(
-        generateContentNarrativeRelationship(
-          content.id,
-          narratives[narrativeIndex].id
-        )
+        generateContentNarrativeRelationship(content.id, narratives[narrativeIndex].id),
       );
     }
   });
@@ -230,32 +202,20 @@ const generateDataset = () => {
 const dataset = generateDataset();
 
 // Save each entity type to a separate file
-fs.writeFileSync(
-  path.join(outputDir, 'sources.json'),
-  JSON.stringify(dataset.sources, null, 2)
-);
-fs.writeFileSync(
-  path.join(outputDir, 'contents.json'),
-  JSON.stringify(dataset.contents, null, 2)
-);
+fs.writeFileSync(path.join(outputDir, 'sources.json'), JSON.stringify(dataset.sources, null, 2));
+fs.writeFileSync(path.join(outputDir, 'contents.json'), JSON.stringify(dataset.contents, null, 2));
 fs.writeFileSync(
   path.join(outputDir, 'narratives.json'),
-  JSON.stringify(dataset.narratives, null, 2)
+  JSON.stringify(dataset.narratives, null, 2),
 );
-fs.writeFileSync(
-  path.join(outputDir, 'branches.json'),
-  JSON.stringify(dataset.branches, null, 2)
-);
+fs.writeFileSync(path.join(outputDir, 'branches.json'), JSON.stringify(dataset.branches, null, 2));
 fs.writeFileSync(
   path.join(outputDir, 'relationships.json'),
-  JSON.stringify(dataset.relationships, null, 2)
+  JSON.stringify(dataset.relationships, null, 2),
 );
 
 // Save the complete dataset
-fs.writeFileSync(
-  path.join(outputDir, 'dataset.json'),
-  JSON.stringify(dataset, null, 2)
-);
+fs.writeFileSync(path.join(outputDir, 'dataset.json'), JSON.stringify(dataset, null, 2));
 
 console.log(`Generated mock data in ${outputDir}`);
 console.log(`- ${dataset.sources.length} sources`);

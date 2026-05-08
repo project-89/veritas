@@ -136,7 +136,7 @@ export function rgbToHex(rgb: { r: number; g: number; b: number }): string {
 export function calculateEdgeColor(
   edgeType: string,
   weight: number,
-  baseColors: Record<string, string>
+  baseColors: Record<string, string>,
 ): string {
   // Get base color from edge type
   const baseColor = baseColors[edgeType] || '#999999';

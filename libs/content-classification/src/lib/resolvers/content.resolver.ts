@@ -1,24 +1,19 @@
-import { Resolver, Query, Mutation, Args, Int, Float } from '@nestjs/graphql';
+import { Optional } from '@nestjs/common';
+import { Args, Float, Int, Mutation, Query, Resolver } from '@nestjs/graphql';
 import {
-  Injectable,
-  Optional,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
-import {
+  ContentSearchParams,
   ContentService,
   ExtendedContentNode,
-  ContentSearchParams,
 } from '../services/content.service';
 
 import {
-  ContentType,
   ContentCreateInputType,
-  ContentUpdateInputType,
   ContentSearchParamsType,
-  SimilarContentResultType,
-  SemanticSearchParamsType,
+  ContentType,
+  ContentUpdateInputType,
   EngagementMetricsInputType,
+  SemanticSearchParamsType,
+  SimilarContentResultType,
 } from '../types/content.types';
 
 @Resolver(() => ContentType)
@@ -32,7 +27,7 @@ export class ContentResolver {
   private ensureContentService(): void {
     if (!this.contentService) {
       throw new Error(
-        'Content service not available - use ContentClassificationModule.forRoot() with databaseProvider'
+        'Content service not available - use ContentClassificationModule.forRoot() with databaseProvider',
       );
     }
   }
@@ -45,7 +40,7 @@ export class ContentResolver {
 
   @Query(() => [ContentType])
   async searchContent(
-    @Args('params', { type: () => ContentSearchParamsType }) params: ContentSearchParamsType
+    @Args('params', { type: () => ContentSearchParamsType }) params: ContentSearchParamsType,
   ): Promise<ExtendedContentNode[]> {
     this.ensureContentService();
     return this.contentService.searchContent(params);
@@ -54,7 +49,7 @@ export class ContentResolver {
   @Query(() => [ContentType])
   async relatedContent(
     @Args('id') id: string,
-    @Args('limit', { nullable: true }) limit?: number
+    @Args('limit', { nullable: true }) limit?: number,
   ): Promise<ExtendedContentNode[]> {
     this.ensureContentService();
     return this.contentService.getRelatedContent(id, limit);
@@ -62,7 +57,7 @@ export class ContentResolver {
 
   @Mutation(() => ContentType)
   async createContent(
-    @Args('input', { type: () => ContentCreateInputType }) input: ContentCreateInputType
+    @Args('input', { type: () => ContentCreateInputType }) input: ContentCreateInputType,
   ): Promise<ExtendedContentNode> {
     this.ensureContentService();
     return this.contentService.createContent(input);
@@ -71,7 +66,7 @@ export class ContentResolver {
   @Mutation(() => ContentType)
   async updateContent(
     @Args('id') id: string,
-    @Args('input', { type: () => ContentUpdateInputType }) input: ContentUpdateInputType
+    @Args('input', { type: () => ContentUpdateInputType }) input: ContentUpdateInputType,
   ): Promise<ExtendedContentNode | null> {
     this.ensureContentService();
     return this.contentService.updateContent(id, input);
@@ -86,7 +81,8 @@ export class ContentResolver {
   @Mutation(() => ContentType)
   async updateEngagementMetrics(
     @Args('id') id: string,
-    @Args('metrics', { type: () => EngagementMetricsInputType }) metrics: EngagementMetricsInputType
+    @Args('metrics', { type: () => EngagementMetricsInputType })
+    metrics: EngagementMetricsInputType,
   ): Promise<ExtendedContentNode | null> {
     this.ensureContentService();
     return this.contentService.updateContent(id, {
@@ -96,7 +92,7 @@ export class ContentResolver {
 
   @Query(() => [ContentType])
   async semanticSearch(
-    @Args('params', { type: () => SemanticSearchParamsType }) params: SemanticSearchParamsType
+    @Args('params', { type: () => SemanticSearchParamsType }) params: SemanticSearchParamsType,
   ): Promise<ExtendedContentNode[]> {
     this.ensureContentService();
 
@@ -122,7 +118,7 @@ export class ContentResolver {
     @Args('limit', { type: () => Int, nullable: true }) limit?: number,
     @Args('minScore', { type: () => Float, nullable: true }) minScore?: number,
     @Args('useExistingEmbedding', { nullable: true })
-    useExistingEmbedding?: boolean
+    useExistingEmbedding?: boolean,
   ): Promise<Array<{ content: ExtendedContentNode; score: number }>> {
     this.ensureContentService();
 
@@ -134,9 +130,7 @@ export class ContentResolver {
   }
 
   @Mutation(() => ContentType)
-  async generateEmbedding(
-    @Args('id') id: string
-  ): Promise<ExtendedContentNode> {
+  async generateEmbedding(@Args('id') id: string): Promise<ExtendedContentNode> {
     this.ensureContentService();
 
     const result = await this.contentService.generateEmbedding(id);
@@ -149,7 +143,7 @@ export class ContentResolver {
 
   @Mutation(() => Int)
   async generateAllEmbeddings(
-    @Args('batchSize', { type: () => Int, nullable: true }) batchSize?: number
+    @Args('batchSize', { type: () => Int, nullable: true }) batchSize?: number,
   ): Promise<number> {
     this.ensureContentService();
 

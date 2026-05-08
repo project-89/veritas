@@ -27,7 +27,7 @@ export class SubprocessUtil {
   async exec(
     command: string,
     args: string[],
-    options?: SubprocessOptions
+    options?: SubprocessOptions,
   ): Promise<SubprocessResult> {
     const timeout = options?.timeout ?? 30000;
     const maxBuffer = options?.maxBuffer ?? 10 * 1024 * 1024; // 10MB
@@ -51,12 +51,8 @@ export class SubprocessUtil {
       const err = error as Record<string, unknown>;
       // execFile errors include stdout/stderr on failure
       if (err['code'] === 'ETIMEDOUT') {
-        this.logger.error(
-          `Command timed out after ${timeout}ms: ${command} ${args.join(' ')}`
-        );
-        throw new Error(
-          `Command timed out after ${timeout}ms: ${command} ${args.join(' ')}`
-        );
+        this.logger.error(`Command timed out after ${timeout}ms: ${command} ${args.join(' ')}`);
+        throw new Error(`Command timed out after ${timeout}ms: ${command} ${args.join(' ')}`);
       }
 
       // Command executed but returned non-zero exit code
@@ -76,24 +72,18 @@ export class SubprocessUtil {
   /**
    * Execute a command and parse stdout as JSON
    */
-  async execJson<T>(
-    command: string,
-    args: string[],
-    options?: SubprocessOptions
-  ): Promise<T> {
+  async execJson<T>(command: string, args: string[], options?: SubprocessOptions): Promise<T> {
     const result = await this.exec(command, args, options);
 
     if (result.exitCode !== 0) {
-      throw new Error(
-        `Command exited with code ${result.exitCode}: ${result.stderr}`
-      );
+      throw new Error(`Command exited with code ${result.exitCode}: ${result.stderr}`);
     }
 
     try {
       return JSON.parse(result.stdout) as T;
     } catch {
       throw new Error(
-        `Failed to parse JSON output from ${command}: ${result.stdout.slice(0, 200)}`
+        `Failed to parse JSON output from ${command}: ${result.stdout.slice(0, 200)}`,
       );
     }
   }
@@ -104,14 +94,12 @@ export class SubprocessUtil {
   async execJsonLines<T>(
     command: string,
     args: string[],
-    options?: SubprocessOptions
+    options?: SubprocessOptions,
   ): Promise<T[]> {
     const result = await this.exec(command, args, options);
 
     if (result.exitCode !== 0) {
-      throw new Error(
-        `Command exited with code ${result.exitCode}: ${result.stderr}`
-      );
+      throw new Error(`Command exited with code ${result.exitCode}: ${result.stderr}`);
     }
 
     const lines = result.stdout
@@ -123,9 +111,7 @@ export class SubprocessUtil {
       try {
         return JSON.parse(line) as T;
       } catch {
-        throw new Error(
-          `Failed to parse JSON on line ${index + 1}: ${line.slice(0, 200)}`
-        );
+        throw new Error(`Failed to parse JSON on line ${index + 1}: ${line.slice(0, 200)}`);
       }
     });
   }

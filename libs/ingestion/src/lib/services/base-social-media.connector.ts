@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter } from 'events';
 import { ConfigService } from '@nestjs/config';
-import { SocialMediaConnector } from '../interfaces/social-media-connector.interface';
-import { DataConnector, ConnectorSearchOptions } from '../interfaces/data-connector.interface';
-import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { SocialMediaPost } from '../../types/social-media.types';
+import { EventEmitter } from 'events';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { SocialMediaPost } from '../../types/social-media.types';
+import { ConnectorSearchOptions, DataConnector } from '../interfaces/data-connector.interface';
+import { SocialMediaConnector } from '../interfaces/social-media-connector.interface';
 import { SourceNode } from '../schemas';
+import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 
 // Define an interface for streams that may have close/destroy methods
 interface ExtendedEventEmitter extends EventEmitter {
@@ -19,9 +19,7 @@ interface ExtendedEventEmitter extends EventEmitter {
  * Implements common functionality and error handling.
  */
 @Injectable()
-export abstract class BaseSocialMediaConnector
-  implements SocialMediaConnector, DataConnector
-{
+export abstract class BaseSocialMediaConnector implements SocialMediaConnector, DataConnector {
   protected readonly logger: Logger;
   protected isConnected = false;
   protected streamConnections: Map<string, NodeJS.Timeout | ExtendedEventEmitter> = new Map();
@@ -33,7 +31,7 @@ export abstract class BaseSocialMediaConnector
 
   constructor(
     protected readonly configService: ConfigService,
-    protected readonly transformService: TransformOnIngestService
+    protected readonly transformService: TransformOnIngestService,
   ) {
     this.logger = new Logger(this.constructor.name);
   }
@@ -50,10 +48,7 @@ export abstract class BaseSocialMediaConnector
     } catch (error: unknown) {
       this.isConnected = false;
       const err = error as Error;
-      this.logger.error(
-        `Failed to connect to ${this.platform}: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Failed to connect to ${this.platform}: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -70,9 +65,9 @@ export abstract class BaseSocialMediaConnector
         for (const [keyword, connection] of this.streamConnections.entries()) {
           if (connection) {
             if (typeof (connection as ExtendedEventEmitter).close === 'function') {
-              (connection as ExtendedEventEmitter).close!();
+              (connection as ExtendedEventEmitter).close?.();
             } else if (typeof (connection as ExtendedEventEmitter).destroy === 'function') {
-              (connection as ExtendedEventEmitter).destroy!();
+              (connection as ExtendedEventEmitter).destroy?.();
             } else if (connection instanceof EventEmitter) {
               connection.removeAllListeners();
             }
@@ -87,10 +82,7 @@ export abstract class BaseSocialMediaConnector
       }
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error disconnecting from ${this.platform}: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error disconnecting from ${this.platform}: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -104,7 +96,7 @@ export abstract class BaseSocialMediaConnector
       startDate?: Date;
       endDate?: Date;
       limit?: number;
-    }
+    },
   ): Promise<NarrativeInsight[]> {
     try {
       this.logger.log(`Searching ${this.platform} for: "${query}"`);
@@ -122,16 +114,14 @@ export abstract class BaseSocialMediaConnector
       // 2. Transform the posts using the transform-on-ingest service
       const insights = await this.transformService.transformBatch(posts);
 
-      this.logger.debug(
-        `Transformed ${insights.length} posts into anonymized insights`
-      );
+      this.logger.debug(`Transformed ${insights.length} posts into anonymized insights`);
 
       return insights;
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Error searching and transforming ${this.platform} content: ${err.message}`,
-        err.stack
+        err.stack,
       );
       throw error;
     }
@@ -144,7 +134,7 @@ export abstract class BaseSocialMediaConnector
    */
   async searchWithRawData(
     query: string,
-    options?: ConnectorSearchOptions
+    options?: ConnectorSearchOptions,
   ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> {
     try {
       this.logger.log(`Searching ${this.platform} (with raw data) for: "${query}"`);
@@ -165,7 +155,7 @@ export abstract class BaseSocialMediaConnector
       const err = error as Error;
       this.logger.error(
         `Error in searchWithRawData for ${this.platform}: ${err.message}`,
-        err.stack
+        err.stack,
       );
       throw error;
     }
@@ -178,9 +168,7 @@ export abstract class BaseSocialMediaConnector
     const emitter = new EventEmitter();
 
     try {
-      this.logger.log(
-        `Starting ${this.platform} stream for keywords: ${keywords.join(', ')}`
-      );
+      this.logger.log(`Starting ${this.platform} stream for keywords: ${keywords.join(', ')}`);
 
       // 1. Create a stream of raw posts
       const rawStream = this.streamContent(keywords) as ExtendedEventEmitter;
@@ -192,20 +180,14 @@ export abstract class BaseSocialMediaConnector
           emitter.emit('data', insight);
         } catch (error: unknown) {
           const err = error as Error;
-          this.logger.error(
-            `Error transforming streamed post: ${err.message}`,
-            err.stack
-          );
+          this.logger.error(`Error transforming streamed post: ${err.message}`, err.stack);
           // Don't emit transformation errors, just log them
         }
       });
 
       // Forward errors from the raw stream
       rawStream.on('error', (error: Error) => {
-        this.logger.error(
-          `Error in ${this.platform} stream: ${error.message}`,
-          error
-        );
+        this.logger.error(`Error in ${this.platform} stream: ${error.message}`, error);
         emitter.emit('error', error);
       });
 
@@ -222,10 +204,7 @@ export abstract class BaseSocialMediaConnector
       });
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error setting up ${this.platform} stream: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error setting up ${this.platform} stream: ${err.message}`, err.stack);
 
       // Emit error asynchronously to match EventEmitter behavior
       process.nextTick(() => {
@@ -256,10 +235,7 @@ export abstract class BaseSocialMediaConnector
       return isValid;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error validating ${this.platform} credentials: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error validating ${this.platform} credentials: ${err.message}`, err.stack);
       return false;
     }
   }
@@ -286,7 +262,7 @@ export abstract class BaseSocialMediaConnector
    */
   abstract searchContent(
     query: string,
-    options?: ConnectorSearchOptions
+    options?: ConnectorSearchOptions,
   ): Promise<SocialMediaPost[]>;
 
   /**

@@ -1,18 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NarrativeAnalysisController } from '../../src/lib/controllers/narrative-analysis.controller';
-import {
-  NarrativeAnalysisService,
-  AnalyzeResult,
-} from '../../src/lib/services/narrative-analysis.service';
-import { DeviationService } from '../../src/lib/services/deviation.service';
-import { ReportService } from '../../src/lib/services/report.service';
-import { PropagandaAnalysisService } from '../../src/lib/services/propaganda.service';
+import { ClaimVerificationService } from '../../src/lib/services/claim-verification.service';
 import { ComparisonService } from '../../src/lib/services/comparison.service';
+import { DeviationService } from '../../src/lib/services/deviation.service';
+import { DownstreamEffectsService } from '../../src/lib/services/downstream-effects.service';
 import { EntityAnalysisService } from '../../src/lib/services/entity-analysis.service';
 import { NarrativeGenealogyService } from '../../src/lib/services/genealogy.service';
-import { DownstreamEffectsService } from '../../src/lib/services/downstream-effects.service';
-import { ClaimVerificationService } from '../../src/lib/services/claim-verification.service';
 import { IntelligenceEngineService } from '../../src/lib/services/intelligence-engine.service';
+import {
+  AnalyzeResult,
+  NarrativeAnalysisService,
+} from '../../src/lib/services/narrative-analysis.service';
+import { PropagandaAnalysisService } from '../../src/lib/services/propaganda.service';
+import { ReportService } from '../../src/lib/services/report.service';
 
 describe('NarrativeAnalysisController', () => {
   let controller: NarrativeAnalysisController;
@@ -62,13 +62,25 @@ describe('NarrativeAnalysisController', () => {
         {
           provide: ReportService,
           useValue: {
-            generateReport: jest.fn().mockResolvedValue({ content: '# Report', generatedAt: new Date().toISOString() }),
+            generateReport: jest
+              .fn()
+              .mockResolvedValue({ content: '# Report', generatedAt: new Date().toISOString() }),
           },
         },
         {
           provide: PropagandaAnalysisService,
           useValue: {
-            analyze: jest.fn().mockResolvedValue({ techniques: [], claims: [], frames: [], overallAssessment: { manipulationLikelihood: 'low', confidence: 0, reasoning: '', caveats: [] } }),
+            analyze: jest.fn().mockResolvedValue({
+              techniques: [],
+              claims: [],
+              frames: [],
+              overallAssessment: {
+                manipulationLikelihood: 'low',
+                confidence: 0,
+                reasoning: '',
+                caveats: [],
+              },
+            }),
           },
         },
         {
@@ -96,24 +108,66 @@ describe('NarrativeAnalysisController', () => {
         {
           provide: DownstreamEffectsService,
           useValue: {
-            analyze: jest.fn().mockResolvedValue({ narrativeCorrelations: [], externalSignals: [], summary: '' }),
+            analyze: jest
+              .fn()
+              .mockResolvedValue({ narrativeCorrelations: [], externalSignals: [], summary: '' }),
             toMyceliumData: jest.fn().mockReturnValue({ nodes: [], branches: [], clusters: [] }),
           },
         },
         {
           provide: ClaimVerificationService,
           useValue: {
-            verifyClaims: jest.fn().mockResolvedValue({ results: [], summary: '', verifiedCount: 0, disputedCount: 0, unverifiedCount: 0 }),
+            verifyClaims: jest.fn().mockResolvedValue({
+              results: [],
+              summary: '',
+              verifiedCount: 0,
+              disputedCount: 0,
+              unverifiedCount: 0,
+            }),
           },
         },
         {
           provide: IntelligenceEngineService,
           useValue: {
-            detectCoordinatedCampaign: jest.fn().mockReturnValue({ detected: false, confidence: 0, signals: [], actors: [], timeline: [], summary: '' }),
-            detectMarketManipulation: jest.fn().mockReturnValue({ detected: false, confidence: 0, patterns: [], affectedAssets: [], timeline: [], summary: '' }),
+            detectCoordinatedCampaign: jest.fn().mockReturnValue({
+              detected: false,
+              confidence: 0,
+              signals: [],
+              actors: [],
+              timeline: [],
+              summary: '',
+            }),
+            detectMarketManipulation: jest.fn().mockReturnValue({
+              detected: false,
+              confidence: 0,
+              patterns: [],
+              affectedAssets: [],
+              timeline: [],
+              summary: '',
+            }),
             assessCrisisRisk: jest.fn().mockReturnValue({ alerts: [], regions: [], summary: '' }),
-            attributeInfluenceOperation: jest.fn().mockReturnValue({ detected: false, confidence: 0, originators: [], amplificationNetwork: [], beneficiaries: [], techniques: [], timeline: [], summary: '' }),
-            scoreNarrativeLegitimacy: jest.fn().mockReturnValue({ narrativeId: '', narrativeSummary: '', legitimacyScore: 0.5, verdict: 'uncertain', factualClaims: [], platformBreakdown: [], sourceQuality: 0.5, evidenceBalance: { supporting: 0, contradicting: 0, neutral: 0 }, investigativeLeads: [], summary: '' }),
+            attributeInfluenceOperation: jest.fn().mockReturnValue({
+              detected: false,
+              confidence: 0,
+              originators: [],
+              amplificationNetwork: [],
+              beneficiaries: [],
+              techniques: [],
+              timeline: [],
+              summary: '',
+            }),
+            scoreNarrativeLegitimacy: jest.fn().mockReturnValue({
+              narrativeId: '',
+              narrativeSummary: '',
+              legitimacyScore: 0.5,
+              verdict: 'uncertain',
+              factualClaims: [],
+              platformBreakdown: [],
+              sourceQuality: 0.5,
+              evidenceBalance: { supporting: 0, contradicting: 0, neutral: 0 },
+              investigativeLeads: [],
+              summary: '',
+            }),
           },
         },
       ],
@@ -164,14 +218,22 @@ describe('NarrativeAnalysisController', () => {
         unclustered: [],
       });
 
-      const result = await controller.analyze({ posts: undefined as any });
+      await controller.analyze({ posts: undefined as any });
 
       expect(service.analyze).toHaveBeenCalledWith([]);
     });
 
     it('should return narratives with all required fields', async () => {
       const result = await controller.analyze({
-        posts: [{ text: 'test', platform: 'twitter', authorName: 'T', authorHandle: 't', timestamp: '2025-01-01T00:00:00Z' }],
+        posts: [
+          {
+            text: 'test',
+            platform: 'twitter',
+            authorName: 'T',
+            authorHandle: 't',
+            timestamp: '2025-01-01T00:00:00Z',
+          },
+        ],
       });
 
       const narrative = result.narratives[0]!;

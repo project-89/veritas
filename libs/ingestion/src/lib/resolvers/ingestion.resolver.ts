@@ -1,8 +1,8 @@
-import { Resolver, Mutation, Args, Query, ObjectType, Field, Float } from '@nestjs/graphql';
+import { Inject, Logger, Optional } from '@nestjs/common';
+import { Args, Field, Float, Mutation, ObjectType, Query, Resolver } from '@nestjs/graphql';
+import { SourceNode } from '@veritas/shared/types';
 import GraphQLJSON from 'graphql-type-json';
 import { NarrativeRepository } from '../repositories/narrative-insight.repository';
-import { SourceNode } from '@veritas/shared/types';
-import { Inject, Logger, Optional } from '@nestjs/common';
 
 /** Interface for the graph database service */
 interface GraphDatabaseService {
@@ -44,19 +44,16 @@ class SourceType implements SourceNode {
   updatedAt!: Date;
 }
 
+import * as crypto from 'crypto';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { SocialMediaPost } from '../../types/social-media.types';
+import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
+import { NarrativeInsightType, NarrativeTrendType } from '../types/graphql.types';
 import {
   ContentIngestionInput,
   SourceIngestionInput,
   VerificationStatus,
 } from '../types/ingestion.types';
-import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
-import { SocialMediaPost } from '../../types/social-media.types';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
-import {
-  NarrativeTrendType,
-  NarrativeInsightType,
-} from '../types/graphql.types';
-import * as crypto from 'crypto';
 
 /**
  * GraphQL resolver for ingestion operations
@@ -70,11 +67,11 @@ export class IngestionResolver {
     private readonly transformService: TransformOnIngestService,
     private readonly narrativeRepository: NarrativeRepository,
     @Optional() @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: GraphDatabaseService,
-    @Optional() @Inject('KAFKA_SERVICE') private readonly kafkaClient: EventStreamingClient
+    @Optional() @Inject('KAFKA_SERVICE') private readonly kafkaClient: EventStreamingClient,
   ) {}
 
   private mapVerificationStatus(
-    status: VerificationStatus
+    status: VerificationStatus,
   ): 'verified' | 'unverified' | 'suspicious' {
     return status.toLowerCase() as 'verified' | 'unverified' | 'suspicious';
   }
@@ -86,7 +83,7 @@ export class IngestionResolver {
   @Mutation(() => NarrativeInsightType)
   async ingestSocialContent(
     @Args('content', { type: () => ContentIngestionInput }) content: ContentIngestionInput,
-    @Args('source', { type: () => SourceIngestionInput }) source: SourceIngestionInput
+    @Args('source', { type: () => SourceIngestionInput }) source: SourceIngestionInput,
   ): Promise<NarrativeInsight> {
     // First convert to SocialMediaPost format
     const socialMediaPost: SocialMediaPost = {
@@ -115,9 +112,7 @@ export class IngestionResolver {
 
     // Transform immediately using our transform-on-ingest service
     // This ensures no raw data is stored in the system
-    const narrativeInsight = await this.transformService.transform(
-      socialMediaPost
-    );
+    const narrativeInsight = await this.transformService.transform(socialMediaPost);
 
     return narrativeInsight;
   }
@@ -129,7 +124,7 @@ export class IngestionResolver {
   async getNarrativeInsights(
     @Args('timeframe') timeframe: string,
     @Args('limit', { nullable: true }) limit?: number,
-    @Args('skip', { nullable: true }) skip?: number
+    @Args('skip', { nullable: true }) skip?: number,
   ): Promise<NarrativeInsight[]> {
     return this.narrativeRepository.findByTimeframe(timeframe, {
       limit,
@@ -151,7 +146,7 @@ export class IngestionResolver {
   @Mutation(() => SourceType)
   async verifySource(
     @Args('sourceId') sourceId: string,
-    @Args('status', { type: () => VerificationStatus }) status: VerificationStatus
+    @Args('status', { type: () => VerificationStatus }) status: VerificationStatus,
   ): Promise<SourceNode> {
     try {
       // Update graph database
@@ -179,10 +174,7 @@ export class IngestionResolver {
       return result[0]?.['s'] as SourceNode;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error verifying source: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error verifying source: ${err.message}`, err.stack);
       throw error;
     }
   }

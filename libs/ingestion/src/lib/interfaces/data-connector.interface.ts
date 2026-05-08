@@ -40,10 +40,7 @@ export interface DataConnector {
    * @param query - Search query
    * @param options - Search options
    */
-  searchAndTransform(
-    query: string,
-    options?: ConnectorSearchOptions
-  ): Promise<NarrativeInsight[]>;
+  searchAndTransform(query: string, options?: ConnectorSearchOptions): Promise<NarrativeInsight[]>;
 
   /**
    * Stream content and transform it into anonymized narrative insights

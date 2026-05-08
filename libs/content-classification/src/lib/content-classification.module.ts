@@ -1,16 +1,12 @@
 import { DynamicModule, Module, Provider } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import type { DatabaseProvider, DatabaseProviderOptions, Repository } from '@veritas/database';
+import { ContentController } from './controllers/content.controller';
+import { getContentModel } from './models';
+import { ContentResolver } from './resolvers/content.resolver';
 import { ContentService } from './services/content.service';
 import { ContentClassificationService } from './services/content-classification.service';
-import { ContentController } from './controllers/content.controller';
-import { ContentResolver } from './resolvers/content.resolver';
-import { getContentModel } from './models';
 import { EmbeddingsService } from './services/embeddings.service';
-import type {
-  DatabaseProvider,
-  DatabaseProviderOptions,
-  Repository,
-} from '@veritas/database';
 
 /**
  * Database provider options
@@ -30,9 +26,7 @@ export interface EmbeddingsOptions {
 }
 
 // Factory function type to create a provider
-type ProviderFactory = (
-  options: DatabaseProviderOptions
-) => Promise<DatabaseProvider>;
+type ProviderFactory = (options: DatabaseProviderOptions) => Promise<DatabaseProvider>;
 
 /**
  * Provides options for configuring the ContentClassificationModule
@@ -109,7 +103,7 @@ export class ContentClassificationModule {
   static async createDatabaseProvider(
     providerType: 'mongodb' | 'memgraph' | 'redis',
     providerOptions: DatabaseProviderOptions,
-    providerFactories: Record<string, ProviderFactory>
+    providerFactories: Record<string, ProviderFactory>,
   ): Promise<DatabaseProvider> {
     try {
       if (!providerFactories[providerType]) {
@@ -157,9 +151,7 @@ export class ContentClassificationModule {
    * @param options Module options
    * @returns Module configuration
    */
-  static forRoot(
-    options: ContentClassificationModuleOptions = {}
-  ): DynamicModule {
+  static forRoot(options: ContentClassificationModuleOptions = {}): DynamicModule {
     const providers: Provider[] = [
       ContentClassificationService,
       {
@@ -180,7 +172,7 @@ export class ContentClassificationModule {
           return ContentClassificationModule.createDatabaseProvider(
             providerType,
             providerOptions,
-            providerFactories
+            providerFactories,
           );
         },
       });
@@ -193,17 +185,13 @@ export class ContentClassificationModule {
         useFactory: (config: ConfigService, dbProvider: DatabaseProvider) => {
           // Set environment variables for the embeddings service if provided
           if (options.embeddingsOptions?.endpointUrl) {
-            process.env['EMBEDDING_SERVICE_ENDPOINT'] =
-              options.embeddingsOptions.endpointUrl;
+            process.env['EMBEDDING_SERVICE_ENDPOINT'] = options.embeddingsOptions.endpointUrl;
           }
           if (options.embeddingsOptions?.apiKey) {
-            process.env['EMBEDDING_SERVICE_API_KEY'] =
-              options.embeddingsOptions.apiKey;
+            process.env['EMBEDDING_SERVICE_API_KEY'] = options.embeddingsOptions.apiKey;
           }
           if (options.embeddingsOptions?.embeddingDim) {
-            process.env['EMBEDDING_DIMENSION'] = String(
-              options.embeddingsOptions.embeddingDim
-            );
+            process.env['EMBEDDING_DIMENSION'] = String(options.embeddingsOptions.embeddingDim);
           }
 
           return new EmbeddingsService(config, dbProvider);

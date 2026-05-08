@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Connection, createConnection, Model } from 'mongoose';
-import type { DatabaseProvider, DatabaseProviderOptions } from '../interfaces/database-provider.interface';
-import { MongoDBRepository } from './mongodb-repository';
+import { Connection, Document, Model, Schema, createConnection } from 'mongoose';
+import type {
+  DatabaseProvider,
+  DatabaseProviderOptions,
+} from '../interfaces/database-provider.interface';
 import type { Repository } from '../interfaces/repository.interface';
+import { MongoDBRepository } from './mongodb-repository';
 
 /**
  * MongoDB implementation of the DatabaseProvider interface
@@ -10,8 +13,7 @@ import type { Repository } from '../interfaces/repository.interface';
 @Injectable()
 export class MongoDBProvider implements DatabaseProvider {
   private connection: Connection | null = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private models: Map<string, Model<any>> = new Map();
+  private models: Map<string, Model<unknown & Document>> = new Map();
   private repositories: Map<string, Repository<unknown>> = new Map();
   private readonly logger = new Logger(MongoDBProvider.name);
 
@@ -34,10 +36,7 @@ export class MongoDBProvider implements DatabaseProvider {
       this.logger.log('Successfully connected to MongoDB');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Failed to connect to MongoDB: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Failed to connect to MongoDB: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -53,10 +52,7 @@ export class MongoDBProvider implements DatabaseProvider {
         this.logger.log('Disconnected from MongoDB');
       } catch (error: unknown) {
         const err = error as Error;
-        this.logger.error(
-          `Failed to disconnect from MongoDB: ${err.message}`,
-          err.stack
-        );
+        this.logger.error(`Failed to disconnect from MongoDB: ${err.message}`, err.stack);
         throw error;
       }
     }
@@ -74,18 +70,23 @@ export class MongoDBProvider implements DatabaseProvider {
    * @param name The name of the model
    * @param schema The Mongoose schema for the model
    */
-  registerModel(name: string, schema?: unknown): unknown {
+  registerModel(name: string, schema?: Schema<unknown>): unknown {
     if (!this.connection) {
       throw new Error('Cannot register model: MongoDB is not connected');
     }
 
     if (!this.models.has(name)) {
       this.logger.log(`Registering model: ${name}`);
-      const model = this.connection.model(name, schema as any);
+      const model = this.connection.model<unknown & Document>(name, schema);
       this.models.set(name, model);
     }
 
-    return this.models.get(name)!;
+    const model = this.models.get(name);
+    if (!model) {
+      throw new Error(`Model '${name}' was not registered correctly`);
+    }
+
+    return model;
   }
 
   /**
@@ -102,8 +103,11 @@ export class MongoDBProvider implements DatabaseProvider {
     }
 
     if (!this.repositories.has(entityName)) {
-      const model = this.models.get(entityName)!;
-      const repository = new MongoDBRepository<T>(model as any);
+      const model = this.models.get(entityName);
+      if (!model) {
+        throw new Error(`Model '${entityName}' is not registered`);
+      }
+      const repository = new MongoDBRepository<T>(model as unknown as Model<T & Document>);
       this.repositories.set(entityName, repository);
     }
 

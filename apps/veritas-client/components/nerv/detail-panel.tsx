@@ -3,32 +3,32 @@
 import { useMemo, useState } from 'react';
 import type {
   AnalyzedNarrative,
-  RawPost,
-  InvestigationResult,
-  PropagandaAnalysisResult,
   ClaimVerificationBatchResult,
   DeviationResponse,
-  UserInvestigationResult,
-  VerificationResult,
   EvidenceItem,
   IdentityRecord,
-  MagiProfileMode,
-  Investigation as InvestigationRecord,
   InvestigationEvidenceEntity,
   InvestigationEvidenceSeed,
+  Investigation as InvestigationRecord,
+  InvestigationResult,
+  MagiProfileMode,
+  MentalModel,
   ProjectDossier,
   ProjectDossierOverlap,
-  MentalModel,
+  PropagandaAnalysisResult,
+  RawPost,
+  UserInvestigationResult,
+  VerificationResult,
 } from '../../lib/api';
 import { GENERATED_INVESTIGATION_PANEL_COMPONENTS } from '../../lib/generated-plugin-components';
+import type { SearchSummary } from '../../lib/investigation-context';
 import { getPluginsForSlot, hasPluginCapability, usePluginManifest } from '../../lib/plugins';
 import { IdentityDossier } from './identity-dossier';
-import type { SearchSummary } from '../../lib/investigation-context';
-import { NervPanel } from './nerv-panel';
-import { NervMetric } from './nerv-metric';
-import { NervSparkline } from './nerv-sparkline';
 import { NervBadge } from './nerv-badge';
 import { NervBar } from './nerv-bar';
+import { NervMetric } from './nerv-metric';
+import { NervPanel } from './nerv-panel';
+import { NervSparkline } from './nerv-sparkline';
 
 interface DetailPanelProps {
   // Selection
@@ -124,7 +124,10 @@ const DOSSIER_GROUP_LABELS: Record<string, string> = {
   url: 'URLs',
 };
 
-const ONCHAIN_STATUS_VARIANT: Record<'unavailable' | 'partial' | 'ready', 'muted' | 'amber' | 'green'> = {
+const ONCHAIN_STATUS_VARIANT: Record<
+  'unavailable' | 'partial' | 'ready',
+  'muted' | 'amber' | 'green'
+> = {
   unavailable: 'muted',
   partial: 'amber',
   ready: 'green',
@@ -162,9 +165,7 @@ function NarrativeDetail({
     [narrative, posts],
   );
 
-  const deviation = deviations?.deviations?.find(
-    (d) => d.narrativeId === narrative.id,
-  );
+  const deviation = deviations?.deviations?.find((d) => d.narrativeId === narrative.id);
 
   const sentimentData = useMemo(
     () => narrative.sentimentTrajectory?.map((p) => p.score) ?? [],
@@ -191,7 +192,12 @@ function NarrativeDetail({
         <span className="text-nerv-orange">{'\u2192'}</span>
         <span>{new Date(narrative.lastSeen).toLocaleDateString()}</span>
         <span className="text-nerv-text-muted/60 ml-1">
-          ({Math.ceil((new Date(narrative.lastSeen).getTime() - new Date(narrative.firstSeen).getTime()) / (1000 * 60 * 60 * 24))}d span)
+          (
+          {Math.ceil(
+            (new Date(narrative.lastSeen).getTime() - new Date(narrative.firstSeen).getTime()) /
+              (1000 * 60 * 60 * 24),
+          )}
+          d span)
         </span>
       </div>
 
@@ -201,7 +207,11 @@ function NarrativeDetail({
           label="Sentiment"
           value={narrative.avgSentiment.toFixed(2)}
           severity={
-            narrative.avgSentiment < -0.3 ? 'critical' : narrative.avgSentiment < -0.1 ? 'warning' : 'normal'
+            narrative.avgSentiment < -0.3
+              ? 'critical'
+              : narrative.avgSentiment < -0.1
+                ? 'warning'
+                : 'normal'
           }
           sparkline={sentimentData.length > 1 ? sentimentData : undefined}
         />
@@ -211,10 +221,7 @@ function NarrativeDetail({
           unit="/hr"
           trend={velocityTrend as 'up' | 'down' | 'stable'}
         />
-        <NervMetric
-          label="Engagement"
-          value={narrative.totalEngagement.toLocaleString()}
-        />
+        <NervMetric label="Engagement" value={narrative.totalEngagement.toLocaleString()} />
         <NervMetric
           label="Deviation"
           value={deviation ? deviation.deviationMagnitude.toFixed(2) : '--'}
@@ -250,7 +257,7 @@ function NarrativeDetail({
           PLATFORM BREAKDOWN
         </div>
         <div className="space-y-1">
-          {Object.entries(narrative.platforms)
+          {(Object.entries(narrative.platforms) as Array<[string, number]>)
             .sort(([, a], [, b]) => b - a)
             .map(([platform, count]) => (
               <div key={platform} className="flex items-center gap-2">
@@ -305,96 +312,106 @@ function NarrativeDetail({
         </div>
         <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
           {narrativePosts
-            .sort((a, b) => (b?.engagement?.viralityScore ?? 0) - (a?.engagement?.viralityScore ?? 0))
+            .sort(
+              (a, b) => (b?.engagement?.viralityScore ?? 0) - (a?.engagement?.viralityScore ?? 0),
+            )
             .slice(0, 10)
-            .map((post, idx) => {
+            .map((post) => {
               if (!post) return null;
               return (
-              <div
-                key={`${post.id}-${idx}`}
-                className="px-2 py-1.5 bg-nerv-bg-elevated/40 border border-nerv-border/30 rounded-sm"
-              >
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-[9px] font-mono text-nerv-text-secondary">
-                    @{post.authorHandle || post.authorName}
-                  </span>
-                  <NervBadge
-                    label={post.platform === 'twitter' ? 'X' : post.platform.toUpperCase().slice(0, 2)}
-                    variant={PLATFORM_BADGE_VARIANT[post.platform] ?? 'muted'}
-                    size="sm"
-                  />
-                  <span className="text-[8px] font-mono text-nerv-text-muted ml-auto">
-                    {new Date(post.timestamp).toLocaleDateString()}
-                  </span>
+                <div
+                  key={post.id}
+                  className="px-2 py-1.5 bg-nerv-bg-elevated/40 border border-nerv-border/30 rounded-sm"
+                >
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className="text-[9px] font-mono text-nerv-text-secondary">
+                      @{post.authorHandle || post.authorName}
+                    </span>
+                    <NervBadge
+                      label={
+                        post.platform === 'twitter' ? 'X' : post.platform.toUpperCase().slice(0, 2)
+                      }
+                      variant={PLATFORM_BADGE_VARIANT[post.platform] ?? 'muted'}
+                      size="sm"
+                    />
+                    <span className="text-[8px] font-mono text-nerv-text-muted ml-auto">
+                      {new Date(post.timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-[10px] font-mono text-nerv-text leading-snug break-words whitespace-pre-wrap">
+                    {post.text}
+                  </p>
+                  {post.url && (
+                    <a
+                      href={post.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[9px] font-mono text-nerv-blue hover:underline mt-0.5 inline-block"
+                    >
+                      VIEW SOURCE
+                    </a>
+                  )}
                 </div>
-                <p className="text-[10px] font-mono text-nerv-text leading-snug break-words whitespace-pre-wrap">
-                  {post.text}
-                </p>
-                {post.url && (
-                  <a
-                    href={post.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[9px] font-mono text-nerv-blue hover:underline mt-0.5 inline-block"
-                  >
-                    VIEW SOURCE
-                  </a>
-                )}
-              </div>
               );
             })}
         </div>
       </div>
 
       {/* Primary action: ANALYZE NARRATIVE */}
-      {onInvestigate && (() => {
-        const isInvestigating = investigatingNarrativeId === narrative.id;
-        const isInvestigated = investigatedNarrativeIds?.includes(narrative.id);
-        const isOtherInvestigating = investigatingNarrativeId != null && investigatingNarrativeId !== narrative.id;
+      {onInvestigate &&
+        (() => {
+          const isInvestigating = investigatingNarrativeId === narrative.id;
+          const isInvestigated = investigatedNarrativeIds?.includes(narrative.id);
+          const isOtherInvestigating =
+            investigatingNarrativeId != null && investigatingNarrativeId !== narrative.id;
 
-        return (
-          <div className={`nerv-corners p-3 rounded-sm border ${
-            isInvestigating
-              ? 'bg-nerv-amber/10 border-nerv-amber/50 animate-pulse'
-              : isInvestigated
-                ? 'bg-nerv-green/5 border-nerv-green/30'
-                : 'bg-nerv-orange/5 border-nerv-orange/30'
-          }`}>
-            <button
-              onClick={() => onInvestigate(narrative.id)}
-              disabled={isInvestigating || isOtherInvestigating}
-              className={`w-full px-4 py-2.5 font-mono uppercase tracking-wider text-xs border rounded-sm transition-colors font-bold ${
+          return (
+            <div
+              className={`nerv-corners p-3 rounded-sm border ${
                 isInvestigating
-                  ? 'bg-nerv-amber/20 text-nerv-amber border-nerv-amber/50 cursor-wait'
-                  : isOtherInvestigating
-                    ? 'bg-nerv-bg-secondary text-nerv-text-muted border-nerv-border cursor-not-allowed'
-                    : isInvestigated
-                      ? 'bg-nerv-green/10 text-nerv-green border-nerv-green/50 hover:bg-nerv-green/20'
-                      : 'bg-nerv-orange/20 text-nerv-orange hover:bg-nerv-orange/30 border-nerv-orange/50'
+                  ? 'bg-nerv-amber/10 border-nerv-amber/50 animate-pulse'
+                  : isInvestigated
+                    ? 'bg-nerv-green/5 border-nerv-green/30'
+                    : 'bg-nerv-orange/5 border-nerv-orange/30'
               }`}
             >
-              {isInvestigating
-                ? '\u23F3 ANALYZING...'
-                : isInvestigated
-                  ? '\u2713 RE-ANALYZE NARRATIVE'
-                  : '\u25B6 DEEP DIVE \u2014 ANALYZE NARRATIVE'}
-            </button>
-            <p className="text-[10px] font-mono text-nerv-text-muted mt-2 leading-relaxed">
-              {isInvestigating
-                ? 'Investigating authors, analyzing propaganda techniques, correlating downstream effects...'
-                : isOtherInvestigating
-                  ? 'Another analysis is in progress. Wait for it to complete.'
-                  : `Investigate ${narrative.authors?.length ?? 0} authors, detect propaganda techniques, and trace downstream effects.`}
-            </p>
-          </div>
-        );
-      })()}
+              <button
+                type="button"
+                onClick={() => onInvestigate(narrative.id)}
+                disabled={isInvestigating || isOtherInvestigating}
+                className={`w-full px-4 py-2.5 font-mono uppercase tracking-wider text-xs border rounded-sm transition-colors font-bold ${
+                  isInvestigating
+                    ? 'bg-nerv-amber/20 text-nerv-amber border-nerv-amber/50 cursor-wait'
+                    : isOtherInvestigating
+                      ? 'bg-nerv-bg-secondary text-nerv-text-muted border-nerv-border cursor-not-allowed'
+                      : isInvestigated
+                        ? 'bg-nerv-green/10 text-nerv-green border-nerv-green/50 hover:bg-nerv-green/20'
+                        : 'bg-nerv-orange/20 text-nerv-orange hover:bg-nerv-orange/30 border-nerv-orange/50'
+                }`}
+              >
+                {isInvestigating
+                  ? '\u23F3 ANALYZING...'
+                  : isInvestigated
+                    ? '\u2713 RE-ANALYZE NARRATIVE'
+                    : '\u25B6 DEEP DIVE \u2014 ANALYZE NARRATIVE'}
+              </button>
+              <p className="text-[10px] font-mono text-nerv-text-muted mt-2 leading-relaxed">
+                {isInvestigating
+                  ? 'Investigating authors, analyzing propaganda techniques, correlating downstream effects...'
+                  : isOtherInvestigating
+                    ? 'Another analysis is in progress. Wait for it to complete.'
+                    : `Investigate ${narrative.authors?.length ?? 0} authors, detect propaganda techniques, and trace downstream effects.`}
+              </p>
+            </div>
+          );
+        })()}
 
       {/* Secondary action buttons */}
       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-nerv-border">
         {/* RE-INVESTIGATE is available from the main button above */}
         {onRunPropaganda && (
           <button
+            type="button"
             onClick={onRunPropaganda}
             className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-amber text-nerv-amber hover:bg-nerv-amber/10 rounded-sm transition-colors"
           >
@@ -403,6 +420,7 @@ function NarrativeDetail({
         )}
         {onVerifyClaims && (
           <button
+            type="button"
             onClick={onVerifyClaims}
             className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-blue text-nerv-blue hover:bg-nerv-blue/10 rounded-sm transition-colors"
           >
@@ -411,6 +429,7 @@ function NarrativeDetail({
         )}
         {onGenerateReport && (
           <button
+            type="button"
             onClick={onGenerateReport}
             className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-text-muted text-nerv-text-secondary hover:bg-nerv-bg-elevated rounded-sm transition-colors"
           >
@@ -419,6 +438,7 @@ function NarrativeDetail({
         )}
         {onRunIntelligence && (
           <button
+            type="button"
             onClick={() => onRunIntelligence('legitimacy')}
             className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-green text-nerv-green hover:bg-nerv-green/10 rounded-sm transition-colors"
           >
@@ -427,6 +447,7 @@ function NarrativeDetail({
         )}
         {onRunIntelligence && (
           <button
+            type="button"
             onClick={() => onRunIntelligence('campaign')}
             className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-red text-nerv-red hover:bg-nerv-red/10 rounded-sm transition-colors"
           >
@@ -507,16 +528,29 @@ function ActorDossier({
               <div className="flex-1">
                 <NervBar
                   value={user.botScore.botProbability}
-                  color={user.botScore.botProbability > 0.7 ? '#e94560' : user.botScore.botProbability > 0.4 ? '#f59e0b' : '#00FF41'}
+                  color={
+                    user.botScore.botProbability > 0.7
+                      ? '#e94560'
+                      : user.botScore.botProbability > 0.4
+                        ? '#f59e0b'
+                        : '#00FF41'
+                  }
                   height={5}
                   showLabel
                 />
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono text-nerv-text-secondary w-32">Structural</span>
+              <span className="text-[10px] font-mono text-nerv-text-secondary w-32">
+                Structural
+              </span>
               <div className="flex-1">
-                <NervBar value={user.botScore.structuralScore} color="#f59e0b" height={4} showLabel />
+                <NervBar
+                  value={user.botScore.structuralScore}
+                  color="#f59e0b"
+                  height={4}
+                  showLabel
+                />
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -526,9 +560,16 @@ function ActorDossier({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono text-nerv-text-secondary w-32">Behavioral</span>
+              <span className="text-[10px] font-mono text-nerv-text-secondary w-32">
+                Behavioral
+              </span>
               <div className="flex-1">
-                <NervBar value={user.botScore.behavioralScore} color="#f59e0b" height={4} showLabel />
+                <NervBar
+                  value={user.botScore.behavioralScore}
+                  color="#f59e0b"
+                  height={4}
+                  showLabel
+                />
               </div>
             </div>
           </div>
@@ -556,8 +597,11 @@ function ActorDossier({
             STANCE SHIFTS
           </div>
           <div className="space-y-1">
-            {user.user.narrativeEvolution.map((ev, i) => (
-              <div key={i} className="flex items-start gap-2 text-[10px] font-mono">
+            {user.user.narrativeEvolution.map((ev) => (
+              <div
+                key={`${ev.timestamp}:${ev.fromStance}:${ev.toStance}`}
+                className="flex items-start gap-2 text-[10px] font-mono"
+              >
                 <span className="text-nerv-text-muted shrink-0">
                   {new Date(ev.timestamp).toLocaleDateString()}
                 </span>
@@ -576,14 +620,16 @@ function ActorDossier({
           POSTS ({actorPosts.length})
         </div>
         <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
-          {actorPosts.slice(0, 15).map((post, idx) => (
+          {actorPosts.slice(0, 15).map((post) => (
             <div
-              key={`${post.id}-${idx}`}
+              key={post.id}
               className="px-2 py-1.5 bg-nerv-bg-elevated/40 border border-nerv-border/30 rounded-sm"
             >
               <div className="flex items-center gap-1.5 mb-0.5">
                 <NervBadge
-                  label={post.platform === 'twitter' ? 'X' : post.platform.toUpperCase().slice(0, 2)}
+                  label={
+                    post.platform === 'twitter' ? 'X' : post.platform.toUpperCase().slice(0, 2)
+                  }
                   variant={PLATFORM_BADGE_VARIANT[post.platform] ?? 'muted'}
                   size="sm"
                 />
@@ -666,9 +712,9 @@ function ClaimDetail({
             SUPPORTING EVIDENCE
           </div>
           <div className="space-y-1.5">
-            {verification.evidence.supporting.map((ev: EvidenceItem, i: number) => (
+            {verification.evidence.supporting.map((ev: EvidenceItem) => (
               <div
-                key={i}
+                key={`${ev.source}:${ev.url ?? ''}:${ev.excerpt}`}
                 className="px-2 py-1.5 bg-nerv-green/5 border border-nerv-green/20 rounded-sm"
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
@@ -679,8 +725,12 @@ function ClaimDetail({
                   {ev.excerpt}
                 </p>
                 {ev.url && (
-                  <a href={ev.url} target="_blank" rel="noopener noreferrer"
-                    className="text-[9px] font-mono text-nerv-blue hover:underline mt-0.5 inline-block">
+                  <a
+                    href={ev.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[9px] font-mono text-nerv-blue hover:underline mt-0.5 inline-block"
+                  >
                     SOURCE
                   </a>
                 )}
@@ -697,9 +747,9 @@ function ClaimDetail({
             CONTRADICTING EVIDENCE
           </div>
           <div className="space-y-1.5">
-            {verification.evidence.contradicting.map((ev: EvidenceItem, i: number) => (
+            {verification.evidence.contradicting.map((ev: EvidenceItem) => (
               <div
-                key={i}
+                key={`${ev.source}:${ev.url ?? ''}:${ev.excerpt}`}
                 className="px-2 py-1.5 bg-nerv-red/5 border border-nerv-red/20 rounded-sm"
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
@@ -736,8 +786,8 @@ function ClaimDetail({
             CAVEATS
           </div>
           <ul className="space-y-0.5">
-            {verification.caveats.map((c: string, i: number) => (
-              <li key={i} className="text-[10px] font-mono text-nerv-text-secondary leading-snug">
+            {verification.caveats.map((c: string) => (
+              <li key={c} className="text-[10px] font-mono text-nerv-text-secondary leading-snug">
                 {'\u25B8'} {c}
               </li>
             ))}
@@ -749,9 +799,8 @@ function ClaimDetail({
 }
 
 function InvestigationSummary({
-  posts,
-  narratives,
   summary,
+  narratives,
   investigationRecord,
   evidenceSeedSaving,
   projectDossier,
@@ -767,9 +816,8 @@ function InvestigationSummary({
   onBuildMentalModel,
   onRefreshMentalModel,
 }: {
-  posts: RawPost[];
-  narratives: AnalyzedNarrative[];
   summary: SearchSummary | null;
+  narratives: AnalyzedNarrative[];
   investigationRecord?: InvestigationRecord | null;
   evidenceSeedSaving?: boolean;
   projectDossier?: ProjectDossier | null;
@@ -798,7 +846,8 @@ function InvestigationSummary({
   const investigationActionPlugins = getPluginsForSlot(plugins, 'investigation-action');
 
   const platforms = Object.entries(summary?.byPlatform ?? {});
-  const selectedSeedOption = EVIDENCE_SEED_OPTIONS.find((option) => option.value === seedKind) ?? EVIDENCE_SEED_OPTIONS[0];
+  const selectedSeedOption =
+    EVIDENCE_SEED_OPTIONS.find((option) => option.value === seedKind) ?? EVIDENCE_SEED_OPTIONS[0];
   const sortedSeeds = useMemo(
     () =>
       [...(investigationRecord?.evidenceSeeds ?? [])].sort(
@@ -829,14 +878,18 @@ function InvestigationSummary({
     }
   };
 
-  const statusVariant: Record<InvestigationEvidenceSeed['status'], 'muted' | 'blue' | 'green' | 'red'> = {
+  const statusVariant: Record<
+    InvestigationEvidenceSeed['status'],
+    'muted' | 'blue' | 'green' | 'red'
+  > = {
     pending: 'muted',
     fetched: 'blue',
     processed: 'green',
     error: 'red',
   };
-  const groupedEntityEntries = Object.entries(investigationRecord?.evidenceDossier?.groupedEntities ?? {})
-    .sort((a, b) => (b[1]?.length ?? 0) - (a[1]?.length ?? 0));
+  const groupedEntityEntries = Object.entries(
+    investigationRecord?.evidenceDossier?.groupedEntities ?? {},
+  ).sort((a, b) => (b[1]?.length ?? 0) - (a[1]?.length ?? 0));
 
   return (
     <div className="space-y-3 p-3">
@@ -862,11 +915,7 @@ function InvestigationSummary({
           <div className="grid grid-cols-2 gap-0 border border-nerv-border rounded-sm overflow-hidden">
             <NervMetric label="Total Posts" value={summary.total} />
             <NervMetric label="Narratives" value={narratives.length} />
-            <NervMetric
-              label="Positive"
-              value={summary.positive}
-              severity="normal"
-            />
+            <NervMetric label="Positive" value={summary.positive} severity="normal" />
             <NervMetric
               label="Negative"
               value={summary.negative}
@@ -950,14 +999,17 @@ function InvestigationSummary({
           />
         </div>
         <p className="text-[10px] font-mono text-nerv-text-secondary leading-relaxed">
-          Attach explicit source material, wallet leads, domains, notes, or videos directly to this investigation.
+          Attach explicit source material, wallet leads, domains, notes, or videos directly to this
+          investigation.
         </p>
 
         <div className="space-y-2 border border-nerv-border rounded-sm p-2 bg-nerv-bg-elevated/30">
           <div className="grid grid-cols-[110px_1fr] gap-2">
             <select
               value={seedKind}
-              onChange={(event) => setSeedKind(event.target.value as InvestigationEvidenceSeed['kind'])}
+              onChange={(event) =>
+                setSeedKind(event.target.value as InvestigationEvidenceSeed['kind'])
+              }
               className="px-2 py-2 bg-nerv-bg border border-nerv-border text-[10px] font-mono text-nerv-text focus:outline-none focus:border-nerv-orange/50"
             >
               {EVIDENCE_SEED_OPTIONS.map((option) => (
@@ -980,12 +1032,9 @@ function InvestigationSummary({
             placeholder="Optional context, theory, or why this seed matters"
             className="w-full px-2 py-2 bg-nerv-bg border border-nerv-border text-[10px] font-mono text-nerv-text placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-orange/50"
           />
-          {seedError && (
-            <div className="text-[9px] font-mono text-nerv-red">
-              {seedError}
-            </div>
-          )}
+          {seedError && <div className="text-[9px] font-mono text-nerv-red">{seedError}</div>}
           <button
+            type="button"
             onClick={handleAttachSeed}
             disabled={evidenceSeedSaving || !onAddEvidenceSeed}
             className="w-full px-3 py-2 text-[9px] font-mono uppercase tracking-wider border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors disabled:opacity-40 disabled:cursor-wait"
@@ -1012,7 +1061,11 @@ function InvestigationSummary({
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <NervBadge label={seed.kind.toUpperCase()} variant="blue" size="sm" />
-                    <NervBadge label={seed.status.toUpperCase()} variant={statusVariant[seed.status]} size="sm" />
+                    <NervBadge
+                      label={seed.status.toUpperCase()}
+                      variant={statusVariant[seed.status]}
+                      size="sm"
+                    />
                   </div>
                 </div>
                 {seed.notes && (
@@ -1020,18 +1073,19 @@ function InvestigationSummary({
                     {seed.notes}
                   </div>
                 )}
-                {typeof seed.metadata?.contentPreview === 'string' && seed.metadata.contentPreview && (
-                  <div className="text-[9px] font-mono text-nerv-green/80 leading-relaxed whitespace-pre-wrap">
-                    {seed.metadata.contentPreview}
-                  </div>
-                )}
+                {typeof seed.metadata?.contentPreview === 'string' &&
+                  seed.metadata.contentPreview && (
+                    <div className="text-[9px] font-mono text-nerv-green/80 leading-relaxed whitespace-pre-wrap">
+                      {seed.metadata.contentPreview}
+                    </div>
+                  )}
                 <div className="flex flex-wrap gap-1">
                   {typeof seed.metadata?.host === 'string' && seed.metadata.host && (
                     <NervBadge label={String(seed.metadata.host)} variant="muted" size="sm" />
                   )}
-                  {seed.extractedEntities.slice(0, 8).map((entity, index) => (
+                  {seed.extractedEntities.slice(0, 8).map((entity) => (
                     <NervBadge
-                      key={`${seed.id}-${entity.type}-${entity.value}-${index}`}
+                      key={`${seed.id}-${entity.type}-${entity.value}`}
                       label={`${entity.type}:${entity.value}`}
                       variant="orange"
                       size="sm"
@@ -1070,7 +1124,10 @@ function InvestigationSummary({
         {groupedEntityEntries.length > 0 ? (
           <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
             {groupedEntityEntries.map(([group, entities]) => (
-              <div key={group} className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-1.5">
+              <div
+                key={group}
+                className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-1.5"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
                     {DOSSIER_GROUP_LABELS[group] ?? group}
@@ -1079,17 +1136,27 @@ function InvestigationSummary({
                 </div>
                 <div className="space-y-1">
                   {entities.slice(0, 6).map((entity: InvestigationEvidenceEntity) => (
-                    <div key={`${entity.type}:${entity.value}`} className="flex items-start justify-between gap-2 text-[9px] font-mono">
+                    <div
+                      key={`${entity.type}:${entity.value}`}
+                      className="flex items-start justify-between gap-2 text-[9px] font-mono"
+                    >
                       <div className="min-w-0">
                         <div className="text-nerv-text break-all">{entity.displayValue}</div>
                         <div className="text-nerv-text-muted break-words">
-                          {entity.sources.slice(0, 2).map((source) => source.label).join(' · ')}
+                          {entity.sources
+                            .slice(0, 2)
+                            .map((source) => source.label)
+                            .join(' · ')}
                           {entity.sources.length > 2 ? ` +${entity.sources.length - 2} more` : ''}
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <NervBadge label={`${entity.sourceCount} SRC`} variant="blue" size="sm" />
-                        <NervBadge label={`${entity.occurrenceCount} HIT`} variant="orange" size="sm" />
+                        <NervBadge
+                          label={`${entity.occurrenceCount} HIT`}
+                          variant="orange"
+                          size="sm"
+                        />
                       </div>
                     </div>
                   ))}
@@ -1111,16 +1178,25 @@ function InvestigationSummary({
           </div>
           <div className="flex items-center gap-1">
             {projectDossier && (
-              <NervBadge label={projectDossier.slug.toUpperCase().slice(0, 18)} variant="blue" size="sm" />
+              <NervBadge
+                label={projectDossier.slug.toUpperCase().slice(0, 18)}
+                variant="blue"
+                size="sm"
+              />
             )}
             <button
+              type="button"
               onClick={() => {
                 void onBuildProjectDossier?.();
               }}
               disabled={projectDossierSaving || !onBuildProjectDossier}
               className="px-2 py-1 text-[8px] font-mono uppercase tracking-wider border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors disabled:opacity-40 disabled:cursor-wait"
             >
-              {projectDossierSaving ? 'BUILDING...' : projectDossier ? 'REFRESH DOSSIER' : 'BUILD DOSSIER'}
+              {projectDossierSaving
+                ? 'BUILDING...'
+                : projectDossier
+                  ? 'REFRESH DOSSIER'
+                  : 'BUILD DOSSIER'}
             </button>
           </div>
         </div>
@@ -1130,9 +1206,21 @@ function InvestigationSummary({
             <div className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-1.5">
               <div className="text-[10px] font-mono text-nerv-text">{projectDossier.name}</div>
               <div className="flex flex-wrap gap-1">
-                <NervBadge label={`${projectDossier.summary.totalSeeds} SEEDS`} variant="muted" size="sm" />
-                <NervBadge label={`${projectDossier.summary.processedSeeds} PROCESSED`} variant="blue" size="sm" />
-                <NervBadge label={`${projectDossier.topEntities.length} TOP ENTITIES`} variant="orange" size="sm" />
+                <NervBadge
+                  label={`${projectDossier.summary.totalSeeds} SEEDS`}
+                  variant="muted"
+                  size="sm"
+                />
+                <NervBadge
+                  label={`${projectDossier.summary.processedSeeds} PROCESSED`}
+                  variant="blue"
+                  size="sm"
+                />
+                <NervBadge
+                  label={`${projectDossier.topEntities.length} TOP ENTITIES`}
+                  variant="orange"
+                  size="sm"
+                />
                 {projectDossier.onChainSummary && (
                   <NervBadge
                     label={`ONCHAIN ${projectDossier.onChainSummary.status.toUpperCase()}`}
@@ -1176,25 +1264,35 @@ function InvestigationSummary({
 
                 {projectDossier.onChainSummary.addressSummaries.length > 0 && (
                   <div className="space-y-1">
-                    {projectDossier.onChainSummary.addressSummaries.slice(0, 4).map((addressSummary) => (
-                      <div
-                        key={addressSummary.address}
-                        className="flex items-start justify-between gap-2 text-[9px] font-mono"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-nerv-text break-all">{addressSummary.address}</div>
-                          <div className="text-nerv-text-muted break-words">
-                            {addressSummary.tokenSymbols.length > 0
-                              ? addressSummary.tokenSymbols.join(' · ')
-                              : 'No token touches extracted'}
+                    {projectDossier.onChainSummary.addressSummaries
+                      .slice(0, 4)
+                      .map((addressSummary) => (
+                        <div
+                          key={addressSummary.address}
+                          className="flex items-start justify-between gap-2 text-[9px] font-mono"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-nerv-text break-all">{addressSummary.address}</div>
+                            <div className="text-nerv-text-muted break-words">
+                              {addressSummary.tokenSymbols.length > 0
+                                ? addressSummary.tokenSymbols.join(' · ')
+                                : 'No token touches extracted'}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <NervBadge
+                              label={`${addressSummary.txCount} TX`}
+                              variant="orange"
+                              size="sm"
+                            />
+                            <NervBadge
+                              label={`${addressSummary.uniqueCounterparties} CP`}
+                              variant="muted"
+                              size="sm"
+                            />
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <NervBadge label={`${addressSummary.txCount} TX`} variant="orange" size="sm" />
-                          <NervBadge label={`${addressSummary.uniqueCounterparties} CP`} variant="muted" size="sm" />
-                        </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 )}
 
@@ -1207,14 +1305,16 @@ function InvestigationSummary({
                           COMMON COUNTERPARTIES
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {projectDossier.onChainSummary.commonCounterparties.slice(0, 4).map((entry) => (
-                            <NervBadge
-                              key={entry.address}
-                              label={`${entry.address.slice(0, 10)}... (${entry.addressCount})`}
-                              variant="red"
-                              size="sm"
-                            />
-                          ))}
+                          {projectDossier.onChainSummary.commonCounterparties
+                            .slice(0, 4)
+                            .map((entry) => (
+                              <NervBadge
+                                key={entry.address}
+                                label={`${entry.address.slice(0, 10)}... (${entry.addressCount})`}
+                                variant="red"
+                                size="sm"
+                              />
+                            ))}
                         </div>
                       </div>
                     )}
@@ -1227,7 +1327,11 @@ function InvestigationSummary({
                           {projectDossier.onChainSummary.tokenContracts.slice(0, 4).map((entry) => (
                             <NervBadge
                               key={entry.address}
-                              label={entry.symbol ? `${entry.symbol} · ${entry.address.slice(0, 10)}...` : `${entry.address.slice(0, 10)}...`}
+                              label={
+                                entry.symbol
+                                  ? `${entry.symbol} · ${entry.address.slice(0, 10)}...`
+                                  : `${entry.address.slice(0, 10)}...`
+                              }
                               variant="orange"
                               size="sm"
                             />
@@ -1243,14 +1347,22 @@ function InvestigationSummary({
             <div className="space-y-1 max-h-[240px] overflow-y-auto pr-1">
               {projectDossierOverlaps && projectDossierOverlaps.length > 0 ? (
                 projectDossierOverlaps.slice(0, 5).map((overlap) => (
-                  <div key={overlap.dossierId} className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-1">
+                  <div
+                    key={overlap.dossierId}
+                    className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-1"
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-[10px] font-mono text-nerv-text">{overlap.name}</div>
                       <NervBadge label={`SCORE ${overlap.score}`} variant="red" size="sm" />
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {overlap.matchedTypes.map((type) => (
-                        <NervBadge key={`${overlap.dossierId}-${type}`} label={type} variant="orange" size="sm" />
+                        <NervBadge
+                          key={`${overlap.dossierId}-${type}`}
+                          label={type}
+                          variant="orange"
+                          size="sm"
+                        />
                       ))}
                     </div>
                     <div className="text-[9px] font-mono text-nerv-text-muted break-words">
@@ -1269,6 +1381,7 @@ function InvestigationSummary({
             </div>
             {projectDossier && onRefreshProjectDossier && (
               <button
+                type="button"
                 onClick={() => {
                   void onRefreshProjectDossier();
                 }}
@@ -1285,22 +1398,24 @@ function InvestigationSummary({
         )}
       </div>
 
-      {hasAtlas && (() => {
-        const AtlasInvestigationPanel = GENERATED_INVESTIGATION_PANEL_COMPONENTS['atlas-lenses'];
-        if (!AtlasInvestigationPanel) return null;
-        return (
-          <AtlasInvestigationPanel
-            mentalModel={mentalModel}
-            mentalModelSaving={mentalModelSaving}
-            onBuildMentalModel={onBuildMentalModel}
-            onRefreshMentalModel={onRefreshMentalModel}
-          />
-        );
-      })()}
+      {hasAtlas &&
+        (() => {
+          const AtlasInvestigationPanel = GENERATED_INVESTIGATION_PANEL_COMPONENTS['atlas-lenses'];
+          if (!AtlasInvestigationPanel) return null;
+          return (
+            <AtlasInvestigationPanel
+              mentalModel={mentalModel}
+              mentalModelSaving={mentalModelSaving}
+              onBuildMentalModel={onBuildMentalModel}
+              onRefreshMentalModel={onRefreshMentalModel}
+            />
+          );
+        })()}
 
       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-nerv-border">
         {onGenerateReport && (
           <button
+            type="button"
             onClick={onGenerateReport}
             className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-text-muted text-nerv-text-secondary hover:bg-nerv-bg-elevated rounded-sm transition-colors"
           >
@@ -1309,6 +1424,7 @@ function InvestigationSummary({
         )}
         {onRunPropaganda && (
           <button
+            type="button"
             onClick={onRunPropaganda}
             className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-amber text-nerv-amber hover:bg-nerv-amber/10 rounded-sm transition-colors"
           >
@@ -1392,29 +1508,20 @@ export function DetailPanel({
         onGenerateProfile={onGenerateProfile}
       />
     ) : (
-      <ActorDossier
-        handle={selectedActorHandle}
-        investigation={investigation}
-        posts={posts}
-      />
+      <ActorDossier handle={selectedActorHandle} investigation={investigation} posts={posts} />
     );
   } else if (selectedClaimIndex !== null) {
     title = 'CLAIM VERIFICATION';
     content = (
-      <ClaimDetail
-        claimIndex={selectedClaimIndex}
-        propaganda={propaganda}
-        claims={claims}
-      />
+      <ClaimDetail claimIndex={selectedClaimIndex} propaganda={propaganda} claims={claims} />
     );
   } else {
     title = 'INVESTIGATION SUMMARY';
     status = 'online';
     content = (
       <InvestigationSummary
-        posts={posts}
-        narratives={narratives}
         summary={summary}
+        narratives={narratives}
         investigationRecord={investigationRecord}
         evidenceSeedSaving={evidenceSeedSaving}
         projectDossier={projectDossier}

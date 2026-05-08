@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
 import { DatabaseService } from '@veritas/database';
+import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
 
 describe('InvestigationRepository', () => {
   let repository: InvestigationRepository;
@@ -108,12 +108,9 @@ describe('InvestigationRepository', () => {
     await repository.onModuleInit();
     expect(mockDatabaseService.registerModel).toHaveBeenCalledWith(
       'Investigation',
-      expect.anything()
+      expect.anything(),
     );
-    expect(mockDatabaseService.registerModel).toHaveBeenCalledWith(
-      'Snapshot',
-      expect.anything()
-    );
+    expect(mockDatabaseService.registerModel).toHaveBeenCalledWith('Snapshot', expect.anything());
   });
 
   describe('findOrCreateByQuery', () => {
@@ -132,10 +129,10 @@ describe('InvestigationRepository', () => {
     it('should create a new investigation if none exists', async () => {
       mockInvestigationRepo.findOne.mockResolvedValueOnce(null);
 
-      const result = await repository.findOrCreateByQuery(
-        'bitcoin regulation',
-        { platforms: ['twitter'], limit: 30 }
-      );
+      const result = await repository.findOrCreateByQuery('bitcoin regulation', {
+        platforms: ['twitter'],
+        limit: 30,
+      });
 
       expect(mockInvestigationRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -149,7 +146,7 @@ describe('InvestigationRepository', () => {
           lastSnapshotId: null,
           lastScanId: null,
           evidenceSeeds: [],
-        })
+        }),
       );
       expect(result).toEqual(mockInvestigation);
     });
@@ -166,7 +163,7 @@ describe('InvestigationRepository', () => {
             timeRange: '7d',
             limit: 50,
           }),
-        })
+        }),
       );
     });
   });
@@ -177,7 +174,7 @@ describe('InvestigationRepository', () => {
 
       expect(mockInvestigationRepo.find).toHaveBeenCalledWith(
         {},
-        expect.objectContaining({ sort: { updatedAt: -1 } })
+        expect.objectContaining({ sort: { updatedAt: -1 } }),
       );
       expect(result).toEqual([mockInvestigation]);
     });
@@ -187,7 +184,7 @@ describe('InvestigationRepository', () => {
 
       expect(mockInvestigationRepo.find).toHaveBeenCalledWith(
         { status: 'archived' },
-        expect.anything()
+        expect.anything(),
       );
     });
 
@@ -196,7 +193,7 @@ describe('InvestigationRepository', () => {
 
       expect(mockInvestigationRepo.find).toHaveBeenCalledWith(
         {},
-        expect.objectContaining({ limit: 10, skip: 5 })
+        expect.objectContaining({ limit: 10, skip: 5 }),
       );
     });
   });
@@ -223,9 +220,7 @@ describe('InvestigationRepository', () => {
         ...mockInvestigation,
         name: 'Renamed Investigation',
       };
-      mockInvestigationRepo.updateById.mockResolvedValueOnce(
-        updatedInvestigation
-      );
+      mockInvestigationRepo.updateById.mockResolvedValueOnce(updatedInvestigation);
 
       const result = await repository.update('inv-1', {
         name: 'Renamed Investigation',
@@ -240,9 +235,9 @@ describe('InvestigationRepository', () => {
     it('should throw when investigation not found', async () => {
       mockInvestigationRepo.updateById.mockResolvedValueOnce(null);
 
-      await expect(
-        repository.update('nonexistent', { name: 'test' } as any)
-      ).rejects.toThrow('Investigation not found: nonexistent');
+      await expect(repository.update('nonexistent', { name: 'test' } as any)).rejects.toThrow(
+        'Investigation not found: nonexistent',
+      );
     });
   });
 
@@ -252,7 +247,7 @@ describe('InvestigationRepository', () => {
 
       expect(mockInvestigationRepo.updateById).toHaveBeenCalledWith(
         'inv-1',
-        expect.objectContaining({ status: 'archived' })
+        expect.objectContaining({ status: 'archived' }),
       );
     });
   });
@@ -372,11 +367,11 @@ describe('InvestigationRepository', () => {
           summary: snapshotData.summary,
           posts: snapshotData.posts,
           narratives: snapshotData.narratives,
-        })
+        }),
       );
       expect(mockInvestigationRepo.updateById).toHaveBeenCalledWith(
         'inv-1',
-        expect.objectContaining({ lastSnapshotId: 'snap-1' })
+        expect.objectContaining({ lastSnapshotId: 'snap-1' }),
       );
       expect(result).toEqual(mockSnapshot);
     });
@@ -388,7 +383,7 @@ describe('InvestigationRepository', () => {
 
       expect(mockSnapshotRepo.find).toHaveBeenCalledWith(
         { investigationId: 'inv-1' },
-        expect.objectContaining({ sort: { timestamp: -1 } })
+        expect.objectContaining({ sort: { timestamp: -1 } }),
       );
       expect(result).toEqual([mockSnapshot]);
     });
@@ -398,7 +393,7 @@ describe('InvestigationRepository', () => {
 
       expect(mockSnapshotRepo.find).toHaveBeenCalledWith(
         { investigationId: 'inv-1' },
-        expect.objectContaining({ limit: 5 })
+        expect.objectContaining({ limit: 5 }),
       );
     });
   });
@@ -409,7 +404,7 @@ describe('InvestigationRepository', () => {
 
       expect(mockSnapshotRepo.find).toHaveBeenCalledWith(
         { investigationId: 'inv-1' },
-        expect.objectContaining({ limit: 5, sort: { timestamp: -1 } })
+        expect.objectContaining({ limit: 5, sort: { timestamp: -1 } }),
       );
       expect(result).toEqual(mockSnapshot);
     });

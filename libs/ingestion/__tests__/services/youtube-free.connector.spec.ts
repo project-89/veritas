@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
-import { YouTubeFreeConnector } from '../../src/lib/services/youtube-free.connector';
 import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
 import { SubprocessUtil } from '../../src/lib/services/utils/subprocess.util';
+import { YouTubeFreeConnector } from '../../src/lib/services/youtube-free.connector';
 
 describe('YouTubeFreeConnector', () => {
   let connector: YouTubeFreeConnector;
@@ -43,9 +43,7 @@ describe('YouTubeFreeConnector', () => {
     };
 
     transformService = {
-      transformBatch: jest.fn().mockResolvedValue([
-        { id: 'insight-1', contentHash: 'h1' },
-      ]),
+      transformBatch: jest.fn().mockResolvedValue([{ id: 'insight-1', contentHash: 'h1' }]),
     };
 
     subprocessUtil = {
@@ -61,7 +59,7 @@ describe('YouTubeFreeConnector', () => {
     connector = new YouTubeFreeConnector(
       configService as ConfigService,
       transformService as TransformOnIngestService,
-      subprocessUtil as SubprocessUtil
+      subprocessUtil as SubprocessUtil,
     );
   });
 
@@ -76,7 +74,7 @@ describe('YouTubeFreeConnector', () => {
       const custom = new YouTubeFreeConnector(
         configService as ConfigService,
         transformService as TransformOnIngestService,
-        subprocessUtil as SubprocessUtil
+        subprocessUtil as SubprocessUtil,
       );
 
       expect((custom as any).ytDlpPath).toBe('/usr/local/bin/yt-dlp');
@@ -94,15 +92,13 @@ describe('YouTubeFreeConnector', () => {
     it('should throw when yt-dlp is not available', async () => {
       (subprocessUtil.checkAvailability as jest.Mock).mockResolvedValue(false);
 
-      await expect(connector.connect()).rejects.toThrow(
-        'yt-dlp is not installed'
-      );
+      await expect(connector.connect()).rejects.toThrow('yt-dlp is not installed');
     });
   });
 
   describe('disconnect', () => {
     it('should clear all stream connections', async () => {
-      const fakeInterval = setInterval(() => {}, 10000);
+      const fakeInterval = setInterval(() => undefined, 10000);
       (connector as any).streamConnections.set('test', fakeInterval);
 
       await connector.disconnect();
@@ -124,7 +120,7 @@ describe('YouTubeFreeConnector', () => {
           '--no-download',
           '--flat-playlist',
         ]),
-        { timeout: 60000 }
+        { timeout: 60000 },
       );
 
       expect(transformService.transformBatch).toHaveBeenCalledWith(
@@ -134,7 +130,7 @@ describe('YouTubeFreeConnector', () => {
             platform: 'youtube',
             authorId: 'UC_channel_123',
           }),
-        ])
+        ]),
       );
 
       expect(insights).toHaveLength(1);
@@ -185,15 +181,12 @@ describe('YouTubeFreeConnector', () => {
     });
 
     it('should correctly transform video metadata to SocialMediaPost', async () => {
-      (subprocessUtil.execJsonLines as jest.Mock).mockResolvedValue([
-        mockVideoInfo,
-      ]);
+      (subprocessUtil.execJsonLines as jest.Mock).mockResolvedValue([mockVideoInfo]);
 
       // Access the private method indirectly through searchAndTransform
       await connector.searchAndTransform('test');
 
-      const posts = (transformService.transformBatch as jest.Mock).mock
-        .calls[0][0];
+      const posts = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
       const post = posts[0];
 
       expect(post.text).toContain('Test Video Title');
@@ -225,20 +218,17 @@ describe('YouTubeFreeConnector', () => {
 
       await connector.searchAndTransform('test');
 
-      const posts = (transformService.transformBatch as jest.Mock).mock
-        .calls[0][0];
+      const posts = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
       expect(posts[0].authorId).toBe('');
       expect(posts[0].engagementMetrics.viralityScore).toBe(0);
     });
 
     it('should propagate yt-dlp errors', async () => {
       (subprocessUtil.execJsonLines as jest.Mock).mockRejectedValue(
-        new Error('Command exited with code 1: yt-dlp error')
+        new Error('Command exited with code 1: yt-dlp error'),
       );
 
-      await expect(connector.searchAndTransform('test')).rejects.toThrow(
-        'yt-dlp error'
-      );
+      await expect(connector.searchAndTransform('test')).rejects.toThrow('yt-dlp error');
     });
   });
 
@@ -294,9 +284,7 @@ describe('YouTubeFreeConnector', () => {
     }, 10000);
 
     it('should emit error events on failure', async () => {
-      (subprocessUtil.execJsonLines as jest.Mock).mockRejectedValue(
-        new Error('yt-dlp crash')
-      );
+      (subprocessUtil.execJsonLines as jest.Mock).mockRejectedValue(new Error('yt-dlp crash'));
 
       const errorHandler = jest.fn();
       const emitter = connector.streamAndTransform(['test']);
@@ -347,9 +335,7 @@ describe('YouTubeFreeConnector', () => {
         exitCode: 1,
       });
 
-      await expect(
-        connector.getAuthorDetails('UC_nonexistent')
-      ).rejects.toThrow('yt-dlp failed');
+      await expect(connector.getAuthorDetails('UC_nonexistent')).rejects.toThrow('yt-dlp failed');
     });
 
     it('should throw when yt-dlp returns empty output', async () => {
@@ -359,9 +345,7 @@ describe('YouTubeFreeConnector', () => {
         exitCode: 0,
       });
 
-      await expect(connector.getAuthorDetails('UC_empty')).rejects.toThrow(
-        'No output from yt-dlp'
-      );
+      await expect(connector.getAuthorDetails('UC_empty')).rejects.toThrow('No output from yt-dlp');
     });
 
     it('should calculate credibility score based on followers', async () => {
@@ -402,9 +386,7 @@ describe('YouTubeFreeConnector', () => {
     });
 
     it('should return false when exec throws', async () => {
-      (subprocessUtil.exec as jest.Mock).mockRejectedValue(
-        new Error('not installed')
-      );
+      (subprocessUtil.exec as jest.Mock).mockRejectedValue(new Error('not installed'));
 
       const result = await connector.validateCredentials();
       expect(result).toBe(false);

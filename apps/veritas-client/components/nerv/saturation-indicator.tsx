@@ -36,18 +36,12 @@ export function SaturationIndicator({ saturation, onSuggestDeepScan }: Saturatio
 
       {/* Coverage bar */}
       <div className="w-20">
-        <NervBar
-          value={saturation.topicCoverage}
-          color={config.color}
-          height={4}
-          showLabel
-        />
+        <NervBar value={saturation.topicCoverage} color={config.color} height={4} showLabel />
       </div>
 
       {/* Metrics summary */}
       <span className="text-[9px] text-nerv-text-secondary tracking-wide">
-        {saturation.narrativeCount} narratives {'\u00B7'}{' '}
-        {saturation.postCount} posts {'\u00B7'}{' '}
+        {saturation.narrativeCount} narratives {'\u00B7'} {saturation.postCount} posts {'\u00B7'}{' '}
         {Math.round(saturation.unclusteredRatio * 100)}% unclustered
       </span>
 
@@ -61,6 +55,7 @@ export function SaturationIndicator({ saturation, onSuggestDeepScan }: Saturatio
       {/* Deep scan button */}
       {showDeepScan && (
         <button
+          type="button"
           onClick={onSuggestDeepScan}
           className="text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 border border-nerv-orange/40 text-nerv-orange rounded-sm hover:bg-nerv-orange/10 transition-colors"
         >

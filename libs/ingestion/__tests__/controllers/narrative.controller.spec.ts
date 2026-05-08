@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NarrativeController } from '../../src/lib/controllers/narrative.controller';
-import { NarrativeRepository } from '../../src/lib/repositories/narrative-insight.repository';
-import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
-import { IngestionService } from '../../src/lib/services/ingestion.service';
 import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
+import { NarrativeRepository } from '../../src/lib/repositories/narrative-insight.repository';
+import { IngestionService } from '../../src/lib/services/ingestion.service';
+import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../src/types/narrative-insight.interface';
 import { NarrativeTrend } from '../../src/types/narrative-trend.interface';
 
@@ -115,9 +115,7 @@ describe('NarrativeController', () => {
     it('should return a narrative insight by content hash', async () => {
       const result = await controller.getInsightByHash('hash-123');
       expect(result).toEqual(mockInsight);
-      expect(mockNarrativeRepository.findByContentHash).toHaveBeenCalledWith(
-        'hash-123'
-      );
+      expect(mockNarrativeRepository.findByContentHash).toHaveBeenCalledWith('hash-123');
     });
 
     it('should return error object when insight not found', async () => {
@@ -131,18 +129,18 @@ describe('NarrativeController', () => {
     it('should return insights for a timeframe', async () => {
       const result = await controller.getInsightsByTimeframe('2023-Q1');
       expect(result).toEqual([mockInsight, mockInsight2]);
-      expect(mockNarrativeRepository.findByTimeframe).toHaveBeenCalledWith(
-        '2023-Q1',
-        { limit: undefined, skip: undefined }
-      );
+      expect(mockNarrativeRepository.findByTimeframe).toHaveBeenCalledWith('2023-Q1', {
+        limit: undefined,
+        skip: undefined,
+      });
     });
 
     it('should apply pagination options', async () => {
       await controller.getInsightsByTimeframe('2023-Q1', 10, 20);
-      expect(mockNarrativeRepository.findByTimeframe).toHaveBeenCalledWith(
-        '2023-Q1',
-        { limit: 10, skip: 20 }
-      );
+      expect(mockNarrativeRepository.findByTimeframe).toHaveBeenCalledWith('2023-Q1', {
+        limit: 10,
+        skip: 20,
+      });
     });
   });
 
@@ -150,9 +148,7 @@ describe('NarrativeController', () => {
     it('should return trends for a timeframe', async () => {
       const result = await controller.getTrendsByTimeframe('2023-Q1');
       expect(result).toEqual([mockTrend]);
-      expect(mockNarrativeRepository.getTrendsByTimeframe).toHaveBeenCalledWith(
-        '2023-Q1'
-      );
+      expect(mockNarrativeRepository.getTrendsByTimeframe).toHaveBeenCalledWith('2023-Q1');
     });
   });
 
@@ -160,9 +156,7 @@ describe('NarrativeController', () => {
     it('should delete old insights', async () => {
       const result = await controller.deleteOldInsights('2023-01-01');
       expect(result).toEqual({ deletedCount: 1 });
-      expect(mockNarrativeRepository.deleteOlderThan).toHaveBeenCalledWith(
-        expect.any(Date)
-      );
+      expect(mockNarrativeRepository.deleteOlderThan).toHaveBeenCalledWith(expect.any(Date));
     });
 
     it('should handle invalid date', async () => {

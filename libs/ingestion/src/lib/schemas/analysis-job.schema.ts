@@ -138,7 +138,12 @@ export interface AnalysisJobInput {
   endDate?: Date | string | null;
 }
 
-export type AnalysisJobType = 'investigation' | 'propaganda' | 'claims' | 'downstream' | 'psychological-profile';
+export type AnalysisJobType =
+  | 'investigation'
+  | 'propaganda'
+  | 'claims'
+  | 'downstream'
+  | 'psychological-profile';
 export type AnalysisJobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 export interface AnalysisJob {

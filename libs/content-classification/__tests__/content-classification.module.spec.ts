@@ -4,13 +4,13 @@ jest.mock('franc-min', () => ({
   default: jest.fn().mockReturnValue('eng'),
 }));
 
-import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test } from '@nestjs/testing';
+import { DATABASE_PROVIDER_TOKEN } from '../src/lib/constants';
 import {
   ContentClassificationModule,
   ContentClassificationModuleOptions,
 } from '../src/lib/content-classification.module';
-import { DATABASE_PROVIDER_TOKEN } from '../src/lib/constants';
 import { EmbeddingsService } from '../src/lib/services/embeddings.service';
 
 // Mock the createDatabaseProvider method
@@ -121,9 +121,7 @@ describe('ContentClassificationModule', () => {
       expect(() => module.get(EmbeddingsService)).not.toThrow();
 
       // Verify environment variables were set
-      expect(process.env.EMBEDDING_SERVICE_ENDPOINT).toEqual(
-        'http://custom.api/embeddings'
-      );
+      expect(process.env.EMBEDDING_SERVICE_ENDPOINT).toEqual('http://custom.api/embeddings');
       expect(process.env.EMBEDDING_SERVICE_API_KEY).toEqual('custom-api-key');
       expect(process.env.EMBEDDING_DIMENSION).toEqual('768');
     });

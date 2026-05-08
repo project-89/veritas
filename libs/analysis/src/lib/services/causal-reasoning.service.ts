@@ -13,24 +13,25 @@
  * - Determine causal direction (narrative→effect, effect→narrative, bidirectional)
  */
 
-import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI, FunctionCallingMode } from '@google/generative-ai';
 import type { Part } from '@google/generative-ai';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
-import type { RawPost } from './deviation.service';
-import type {
-  ExternalSignal,
-  SignalAdapter,
-} from './signal-adapters/signal-adapter.interface';
-import type { TransmissionChain, TransmissionChainNode, NarrativeCorrelation } from './downstream-effects.service';
-import { SIGNAL_CACHE_STORE, type SignalCacheStore } from './downstream-effects.service';
+import { FunctionCallingMode, GoogleGenerativeAI } from '@google/generative-ai';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   CAUSAL_TOOLS,
-  ToolDispatcher,
   type CausalChainSubmission,
   type RejectedCorrelation,
+  ToolDispatcher,
 } from './causal-tool-definitions';
+import type { RawPost } from './deviation.service';
+import type {
+  NarrativeCorrelation,
+  TransmissionChain,
+  TransmissionChainNode,
+} from './downstream-effects.service';
+import { SIGNAL_CACHE_STORE, type SignalCacheStore } from './downstream-effects.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
+import type { ExternalSignal, SignalAdapter } from './signal-adapters/signal-adapter.interface';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -107,8 +108,7 @@ export class CausalReasoningService {
     @Optional() @Inject(SIGNAL_CACHE_STORE) private readonly signalCache?: SignalCacheStore,
   ) {
     const geminiKey =
-      this.configService.get<string>('GEMINI_API_KEY') ||
-      process.env['GEMINI_API_KEY'];
+      this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
 
     if (geminiKey) {
       this.genAI = new GoogleGenerativeAI(geminiKey);
@@ -149,10 +149,7 @@ export class CausalReasoningService {
       );
 
       // Combine initial + agent-fetched signals
-      const allSignals = [
-        ...params.initialSignals,
-        ...dispatcher.fetchedSignals,
-      ];
+      const allSignals = [...params.initialSignals, ...dispatcher.fetchedSignals];
 
       return {
         correlations,
@@ -184,7 +181,11 @@ export class CausalReasoningService {
     iterationsUsed: number;
     dispatcher: ToolDispatcher;
   }> {
-    const model = this.genAI!.getGenerativeModel({
+    if (!this.genAI) {
+      throw new Error('Gemini client is not initialized');
+    }
+
+    const model = this.genAI.getGenerativeModel({
       model: this.reasoningModel,
       systemInstruction: SYSTEM_PROMPT,
     });
@@ -238,7 +239,9 @@ export class CausalReasoningService {
       let doneReached = false;
 
       for (const call of functionCalls) {
-        this.logger.log(`Agent tool call: ${call.name}(${JSON.stringify(call.args).slice(0, 200)})`);
+        this.logger.log(
+          `Agent tool call: ${call.name}(${JSON.stringify(call.args).slice(0, 200)})`,
+        );
 
         // Handle terminal tools (submit, reject, done) — don't dispatch externally
         if (call.name === 'done') {
@@ -256,7 +259,7 @@ export class CausalReasoningService {
           chains.push(submission);
           this.logger.log(
             `Agent submitted chain: "${submission.narrative_summary}" ` +
-            `[${submission.direction}] confidence=${submission.overall_confidence}`,
+              `[${submission.direction}] confidence=${submission.overall_confidence}`,
           );
           functionResponses.push({
             functionResponse: {
@@ -309,7 +312,8 @@ export class CausalReasoningService {
 
     // If we exhausted iterations without done(), note it
     if (!summary) {
-      summary = `Analysis completed after ${iterationsUsed} rounds. ` +
+      summary =
+        `Analysis completed after ${iterationsUsed} rounds. ` +
         `Found ${chains.length} causal chain(s), rejected ${rejections.length} correlation(s).`;
     }
 
@@ -329,25 +333,30 @@ export class CausalReasoningService {
     signals: ExternalSignal[],
     keywords: string[],
   ): string {
-    const narrativeSections = narratives.map((n, i) => {
-      const postCount = n.postIndices.length;
-      const platforms = Object.entries(n.platforms ?? {})
-        .map(([k, v]) => `${k}: ${v}`)
-        .join(', ');
+    const narrativeSections = narratives
+      .map((n, i) => {
+        const postCount = n.postIndices.length;
+        const platforms = Object.entries(n.platforms ?? {})
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(', ');
 
-      return [
-        `### Narrative ${i + 1} [id: ${n.id}]`,
-        `Summary: "${n.summary}"`,
-        `Active: ${n.firstSeen} → ${n.lastSeen}`,
-        `Posts: ${postCount} | Trend: ${n.velocity?.trend ?? 'unknown'} | Platforms: ${platforms || 'unknown'}`,
-      ].join('\n');
-    }).join('\n\n');
+        return [
+          `### Narrative ${i + 1} [id: ${n.id}]`,
+          `Summary: "${n.summary}"`,
+          `Active: ${n.firstSeen} → ${n.lastSeen}`,
+          `Posts: ${postCount} | Trend: ${n.velocity?.trend ?? 'unknown'} | Platforms: ${platforms || 'unknown'}`,
+        ].join('\n');
+      })
+      .join('\n\n');
 
-    const signalSections = signals.map((s, i) =>
-      `${i + 1}. [${s.domain}] "${s.title}" (${s.source}, ${s.timestamp}, magnitude: ${s.magnitude.toFixed(2)})` +
-      `\n   ${s.description}` +
-      `\n   [id: ${s.id}]`,
-    ).join('\n\n');
+    const signalSections = signals
+      .map(
+        (s, i) =>
+          `${i + 1}. [${s.domain}] "${s.title}" (${s.source}, ${s.timestamp}, magnitude: ${s.magnitude.toFixed(2)})` +
+          `\n   ${s.description}` +
+          `\n   [id: ${s.id}]`,
+      )
+      .join('\n\n');
 
     return [
       '## Narratives Under Analysis',
@@ -385,9 +394,7 @@ export class CausalReasoningService {
     }
 
     // Build rejected signal set
-    const rejectedPairs = new Set(
-      rejections.map((r) => `${r.narrative_id}:${r.signal_id}`),
-    );
+    const rejectedPairs = new Set(rejections.map((r) => `${r.narrative_id}:${r.signal_id}`));
 
     const allSignals = [...initialSignals, ...fetchedSignals];
 
@@ -414,9 +421,7 @@ export class CausalReasoningService {
 
       // Build correlatedSignals — signals not rejected for this narrative
       const narrativeMidpoint =
-        (new Date(narrative.firstSeen).getTime() +
-          new Date(narrative.lastSeen).getTime()) /
-        2;
+        (new Date(narrative.firstSeen).getTime() + new Date(narrative.lastSeen).getTime()) / 2;
       const msPerDay = 24 * 60 * 60 * 1000;
 
       const correlatedSignals = allSignals
@@ -424,9 +429,10 @@ export class CausalReasoningService {
         .map((signal) => {
           // Find if this signal is referenced in any chain for this narrative
           const relatedChain = narrativeChains.find((c) =>
-            c.chain.some((link) =>
-              link.evidence.toLowerCase().includes(signal.title.toLowerCase().slice(0, 20)) ||
-              link.node.toLowerCase().includes(signal.title.toLowerCase().slice(0, 20)),
+            c.chain.some(
+              (link) =>
+                link.evidence.toLowerCase().includes(signal.title.toLowerCase().slice(0, 20)) ||
+                link.node.toLowerCase().includes(signal.title.toLowerCase().slice(0, 20)),
             ),
           );
 
@@ -437,7 +443,8 @@ export class CausalReasoningService {
           let possibleRelationship: 'caused_by' | 'caused' | 'coincident' | 'amplified';
           if (relatedChain) {
             if (relatedChain.direction === 'narrative_to_effect') possibleRelationship = 'caused';
-            else if (relatedChain.direction === 'effect_to_narrative') possibleRelationship = 'caused_by';
+            else if (relatedChain.direction === 'effect_to_narrative')
+              possibleRelationship = 'caused_by';
             else possibleRelationship = 'amplified';
           } else if (Math.abs(offsetDays) < 1) {
             possibleRelationship = 'coincident';

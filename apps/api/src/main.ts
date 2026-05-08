@@ -26,6 +26,7 @@ async function bootstrap() {
   });
 
   // Enable validation pipes globally
+  // biome-ignore lint/correctness/useHookAtTopLevel: Nest application bootstrap API, not a React hook.
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -35,6 +36,7 @@ async function bootstrap() {
   );
 
   // Use global exception filter
+  // biome-ignore lint/correctness/useHookAtTopLevel: Nest application bootstrap API, not a React hook.
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   // Register body parser with generous limit — analysis cache payloads can be large

@@ -1,4 +1,12 @@
-import { NarrativeFlowData } from '../types/narrative-flow-types';
+import {
+  NarrativeBranch,
+  NarrativeConnection,
+  NarrativeFlowData,
+} from '../types/narrative-flow-types';
+
+const connectionTypes = ['merge', 'split', 'influence', 'conflict'] as const;
+
+const getArrayItem = <T,>(values: T[], index: number, fallback: T): T => values[index] ?? fallback;
 
 /**
  * Generates sample data for the Narrative Flow visualization
@@ -10,7 +18,7 @@ import { NarrativeFlowData } from '../types/narrative-flow-types';
 export const generateSampleNarrativeFlowData = (
   startDate: Date = new Date(2020, 0, 1),
   endDate: Date = new Date(2023, 0, 1),
-  numBranches = 5
+  numBranches = 5,
 ): NarrativeFlowData => {
   // Generate time points (one per month)
   const timePoints: Date[] = [];
@@ -21,7 +29,7 @@ export const generateSampleNarrativeFlowData = (
   }
 
   // Generate consensus band data
-  const consensusStrengthValues = timePoints.map((_, i) => {
+  const consensusStrengthValues = timePoints.map(() => {
     // Consensus strength varies between 0.5 and 0.9 with some randomness
     const baseStrength = 0.7;
     const variation = 0.2;
@@ -30,7 +38,7 @@ export const generateSampleNarrativeFlowData = (
   });
 
   // Generate narrative branches
-  const branches = [];
+  const branches: NarrativeBranch[] = [];
   const branchColors = [
     '#4299e1', // blue
     '#48bb78', // green
@@ -44,24 +52,20 @@ export const generateSampleNarrativeFlowData = (
   ];
 
   // Generate connections between branches
-  const connections = [];
+  const connections: NarrativeConnection[] = [];
 
   for (let i = 0; i < numBranches; i++) {
     // Determine when this branch emerges
-    const emergenceIndex =
-      Math.floor(Math.random() * (timePoints.length / 3)) + 3;
-    const emergencePoint = timePoints[emergenceIndex]!;
+    const emergenceIndex = Math.floor(Math.random() * (timePoints.length / 3)) + 3;
+    const emergencePoint = timePoints[emergenceIndex] ?? endDate;
 
     // Determine if and when this branch terminates
     const hasTermination = Math.random() > 0.6;
     const terminationIndex = hasTermination
-      ? Math.floor(Math.random() * (timePoints.length - emergenceIndex - 5)) +
-        emergenceIndex +
-        5
+      ? Math.floor(Math.random() * (timePoints.length - emergenceIndex - 5)) + emergenceIndex + 5
       : null;
-    const terminationPoint = terminationIndex
-      ? timePoints[terminationIndex]!
-      : undefined;
+    const terminationPoint =
+      terminationIndex !== null ? (timePoints[terminationIndex] ?? endDate) : undefined;
 
     // Generate strength values for this branch
     const strengthValues = timePoints.map((_, timeIndex) => {
@@ -71,12 +75,10 @@ export const generateSampleNarrativeFlowData = (
       // Branch strength grows, peaks, then may decline
       const relativePosition =
         (timeIndex - emergenceIndex) /
-        (terminationIndex
-          ? terminationIndex - emergenceIndex
-          : timePoints.length - emergenceIndex);
+        (terminationIndex ? terminationIndex - emergenceIndex : timePoints.length - emergenceIndex);
 
       // Create a curve that peaks in the middle
-      let strength;
+      let strength = 0;
       if (relativePosition < 0.5) {
         // Growth phase
         strength = relativePosition * 2 * 0.7; // Max strength 0.7
@@ -101,20 +103,17 @@ export const generateSampleNarrativeFlowData = (
       // Divergence increases over time
       const relativePosition =
         (timeIndex - emergenceIndex) /
-        (terminationIndex
-          ? terminationIndex - emergenceIndex
-          : timePoints.length - emergenceIndex);
+        (terminationIndex ? terminationIndex - emergenceIndex : timePoints.length - emergenceIndex);
 
       // Create a curve that increases, then stabilizes
-      let divergence;
+      let divergence = 0;
       if (relativePosition < 0.3) {
         // Initial rapid divergence
         divergence = relativePosition * (1 / 0.3) * maxDivergence;
       } else {
         // Stabilized divergence with slight fluctuations
         const stabilizedDivergence = maxDivergence;
-        const fluctuation =
-          Math.sin(relativePosition * 10) * 0.1 * maxDivergence;
+        const fluctuation = Math.sin(relativePosition * 10) * 0.1 * maxDivergence;
         divergence = stabilizedDivergence + fluctuation;
       }
 
@@ -132,15 +131,17 @@ export const generateSampleNarrativeFlowData = (
           Math.random() *
             (terminationIndex
               ? terminationIndex - emergenceIndex
-              : timePoints.length - emergenceIndex)
+              : timePoints.length - emergenceIndex),
         );
 
       events.push({
         id: `event-${i}-${j}`,
-        timestamp: timePoints[eventIndex]!,
-        description: `Significant event in narrative "${
-          narrativeNames[i % narrativeNames.length]!
-        }"`,
+        timestamp: timePoints[eventIndex] ?? endDate,
+        description: `Significant event in narrative "${getArrayItem(
+          narrativeNames,
+          i % narrativeNames.length,
+          narrativeNames[0] ?? 'Narrative',
+        )}"`,
         impact: 0.3 + Math.random() * 0.7, // Between 0.3 and 1.0
       });
     }
@@ -150,19 +151,27 @@ export const generateSampleNarrativeFlowData = (
     const longevity =
       terminationIndex && terminationPoint
         ? Math.round(
-            (terminationPoint.getTime() - emergencePoint.getTime()) /
-              (1000 * 60 * 60 * 24)
+            (terminationPoint.getTime() - emergencePoint.getTime()) / (1000 * 60 * 60 * 24),
           )
-        : Math.round(
-            (endDate.getTime() - emergencePoint.getTime()) /
-              (1000 * 60 * 60 * 24)
-          );
+        : Math.round((endDate.getTime() - emergencePoint.getTime()) / (1000 * 60 * 60 * 24));
+
+    const branchName = getArrayItem(
+      narrativeNames,
+      i % narrativeNames.length,
+      narrativeNames[0] ?? 'Narrative',
+    );
+    const branchDescription = getArrayItem(
+      narrativeDescriptions,
+      i % narrativeDescriptions.length,
+      narrativeDescriptions[0] ?? 'Narrative description',
+    );
+    const branchColor = getArrayItem(branchColors, i % branchColors.length, branchColors[0] ?? '#4299e1');
 
     branches.push({
       id: `branch-${i}`,
-      name: narrativeNames[i % narrativeNames.length]!,
-      description: narrativeDescriptions[i % narrativeDescriptions.length]!,
-      color: branchColors[i % branchColors.length]!,
+      name: branchName,
+      description: branchDescription,
+      color: branchColor,
       parentId: null, // All branches emerge from consensus in this sample
       emergencePoint,
       terminationPoint,
@@ -182,9 +191,7 @@ export const generateSampleNarrativeFlowData = (
     // Potentially create connections to other branches
     if (i > 0 && Math.random() > 0.5) {
       const targetBranchIndex = Math.floor(Math.random() * i);
-      const connectionType = ['merge', 'split', 'influence', 'conflict'][
-        Math.floor(Math.random() * 4)
-      ]!;
+      const connectionType = getArrayItem(connectionTypes, Math.floor(Math.random() * 4), 'merge');
       const connectionIndex =
         emergenceIndex +
         Math.floor(
@@ -192,21 +199,25 @@ export const generateSampleNarrativeFlowData = (
             (terminationIndex
               ? terminationIndex - emergenceIndex
               : timePoints.length - emergenceIndex)) /
-            2
+            2,
         );
+
+      const targetBranchName = getArrayItem(
+        narrativeNames,
+        targetBranchIndex % narrativeNames.length,
+        narrativeNames[0] ?? 'Narrative',
+      );
 
       connections.push({
         id: `connection-${i}-${targetBranchIndex}`,
         sourceId: `branch-${i}`,
         targetId: `branch-${targetBranchIndex}`,
-        timestamp: timePoints[connectionIndex]!,
+        timestamp: timePoints[connectionIndex] ?? endDate,
         strength: 0.3 + Math.random() * 0.7,
-        type: connectionType as 'merge' | 'split' | 'influence' | 'conflict',
+        type: connectionType,
         description: `${
           connectionType.charAt(0).toUpperCase() + connectionType.slice(1)
-        } between "${narrativeNames[i % narrativeNames.length]!}" and "${
-          narrativeNames[targetBranchIndex % narrativeNames.length]!
-        }"`,
+        } between "${branchName}" and "${targetBranchName}"`,
       });
     }
   }
@@ -233,8 +244,7 @@ export const generateSampleNarrativeFlowData = (
     connections,
     metadata: {
       title: 'Sample Narrative Flow',
-      description:
-        'A demonstration of the Narrative Flow visualization with sample data',
+      description: 'A demonstration of the Narrative Flow visualization with sample data',
       topics: ['politics', 'health', 'technology', 'environment', 'economy'],
       sources: 25 + Math.floor(Math.random() * 50), // Random number of sources between 25 and 75
       timestamp: new Date(),
@@ -248,7 +258,11 @@ const generateRandomSources = (count: number) => {
   for (let i = 0; i < count; i++) {
     sources.push({
       id: `source-${i}`,
-      name: sourceNames[Math.floor(Math.random() * sourceNames.length)]!,
+      name: getArrayItem(
+        sourceNames,
+        Math.floor(Math.random() * sourceNames.length),
+        sourceNames[0] ?? 'Source',
+      ),
       weight: 0.2 + Math.random() * 0.8, // Between 0.2 and 1.0
     });
   }

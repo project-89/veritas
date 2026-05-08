@@ -6,8 +6,8 @@ import { useEffect, useState } from 'react';
 import { fetchUnreadAlertCount } from '../../lib/api';
 import { getTopNavItemsFromPlugins, usePluginManifest } from '../../lib/plugins';
 import { prefetchRecentEvents } from '../../lib/use-event-stream';
-import { NervStatus } from './nerv-status';
 import { NervBadge } from './nerv-badge';
+import { NervStatus } from './nerv-status';
 
 const DEFAULT_NAV_LINKS: ReadonlyArray<{ href: string; label: string }> = [
   { href: '/monitor', label: 'Monitor' },
@@ -21,9 +21,7 @@ function UtcClock() {
   useEffect(() => {
     const update = () => {
       const now = new Date();
-      setTime(
-        now.toISOString().slice(11, 19),
-      );
+      setTime(now.toISOString().slice(11, 19));
     };
     update();
     const interval = setInterval(update, 1000);
@@ -76,7 +74,7 @@ export function NervNav() {
         .then((count) => {
           if (mounted) setUnreadCount(count);
         })
-        .catch(() => {});
+        .catch(() => undefined);
     };
     poll();
     const interval = setInterval(poll, 60_000);
@@ -115,9 +113,7 @@ export function NervNav() {
       <div className="px-4 h-12 flex items-center justify-between gap-4">
         {/* Left: Logo */}
         <Link href="/" className="flex items-center gap-2 shrink-0 group">
-          <span className="text-[11px] font-mono text-nerv-orange/75 tracking-widest">
-            {'//'}
-          </span>
+          <span className="text-[11px] font-mono text-nerv-orange/75 tracking-widest">{'//'}</span>
           <span className="text-base font-mono font-bold tracking-[0.22em] text-nerv-text group-hover:text-nerv-orange transition-colors">
             VERITAS
           </span>
@@ -144,39 +140,48 @@ export function NervNav() {
               Investigation
             </span>
           )}
-          {!isInvestigating ? resolvedNavLinks.map((link) => {
-            const active = isActive(link.href);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onMouseEnter={link.href === '/worldmap' ? () => { void prefetchRecentEvents(); } : undefined}
-                className={[
-                  'relative px-3 py-1.5 text-[11px] font-mono uppercase tracking-[0.18em] transition-colors rounded-sm',
-                  active
-                    ? 'text-nerv-orange bg-nerv-orange/14 shadow-[0_0_14px_rgba(255,133,61,0.14)]'
-                    : 'text-nerv-text-secondary hover:text-nerv-text hover:bg-nerv-bg-panel/70',
-                ].join(' ')}
-              >
-                {link.label}
-                {link.href === '/monitor' && unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1">
-                    <NervBadge
-                      label={unreadCount > 99 ? '99+' : String(unreadCount)}
-                      variant="red"
-                      size="sm"
-                      pulse
-                    />
-                  </span>
-                )}
-              </Link>
-            );
-          }) : null}
+          {!isInvestigating
+            ? resolvedNavLinks.map((link) => {
+                const active = isActive(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onMouseEnter={
+                      link.href === '/worldmap'
+                        ? () => {
+                            void prefetchRecentEvents();
+                          }
+                        : undefined
+                    }
+                    className={[
+                      'relative px-3 py-1.5 text-[11px] font-mono uppercase tracking-[0.18em] transition-colors rounded-sm',
+                      active
+                        ? 'text-nerv-orange bg-nerv-orange/14 shadow-[0_0_14px_rgba(255,133,61,0.14)]'
+                        : 'text-nerv-text-secondary hover:text-nerv-text hover:bg-nerv-bg-panel/70',
+                    ].join(' ')}
+                  >
+                    {link.label}
+                    {link.href === '/monitor' && unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1">
+                        <NervBadge
+                          label={unreadCount > 99 ? '99+' : String(unreadCount)}
+                          variant="red"
+                          size="sm"
+                          pulse
+                        />
+                      </span>
+                    )}
+                  </Link>
+                );
+              })
+            : null}
         </div>
 
         {/* Right: Theme toggle + System status + time */}
         <div className="flex items-center gap-3 shrink-0">
           <button
+            type="button"
             onClick={toggleTheme}
             className="text-base px-2 py-1 rounded-sm transition-all text-nerv-text-secondary hover:text-nerv-orange hover:bg-nerv-bg-panel/50"
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}

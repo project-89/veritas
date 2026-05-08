@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.9/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.12/schema.json",
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "formatter": {
     "enabled": true,
@@ -8,6 +8,9 @@
     "lineWidth": 100
   },
   "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    },
     "formatter": {
       "quoteStyle": "single",
       "trailingCommas": "all",
@@ -19,7 +22,8 @@
     "rules": {
       "recommended": true,
       "suspicious": {
-        "noExplicitAny": "warn"
+        "noExplicitAny": "warn",
+        "noUnknownAtRules": "off"
       },
       "complexity": {
         "noForEach": "off"
@@ -30,6 +34,11 @@
       }
     }
   },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
   "files": {
     "includes": [
       "**",
@@ -37,8 +46,12 @@
       "!**/dist",
       "!**/tmp",
       "!**/.nx",
+      "!**/.next",
+      "!**/.cursor",
+      "!**/mongodb_data",
       "!**/coverage",
-      "!**/*.d.ts"
+      "!**/*.d.ts",
+      "!private-plugins"
     ]
   }
 }

@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   LandscapeData,
   LandscapeFeature,
-  NarrativePath,
   LandscapeVisualizationProps,
+  NarrativePath,
 } from '../types/landscape-types';
 
 // Generate sample data for demonstration purposes
@@ -60,14 +60,20 @@ export const generateSampleData = (): LandscapeData => {
 
   // Create features (peaks, valleys, etc.)
   const features: LandscapeFeature[] = [];
+  const getGridValue = (grid: number[][], x: number, y: number): number => grid[y]?.[x] ?? 0;
+  const setGridValue = (grid: number[][], x: number, y: number, value: number): void => {
+    const row = grid[y];
+    if (!row) {
+      return;
+    }
+    row[x] = value;
+  };
 
   narratives.forEach((narrative, i) => {
     // Create a peak for each narrative
     const peakX = 10 + Math.floor(Math.random() * (width - 20));
     const peakY = 10 + Math.floor(Math.random() * (height - 20));
     const peakRadius = 5 + Math.floor(Math.random() * 10);
-    const peakHeight = 0.5 + narrative.strength * 0.5;
-
     features.push({
       id: `peak-${i}`,
       type: 'peak',
@@ -85,14 +91,12 @@ export const generateSampleData = (): LandscapeData => {
 
     // Create a valley for some narratives
     if (Math.random() > 0.5) {
-      let valleyX, valleyY;
+      let valleyX = 0;
+      let valleyY = 0;
       do {
         valleyX = 10 + Math.floor(Math.random() * (width - 20));
         valleyY = 10 + Math.floor(Math.random() * (height - 20));
-      } while (
-        Math.sqrt(Math.pow(valleyX - peakX, 2) + Math.pow(valleyY - peakY, 2)) <
-        15
-      );
+      } while (Math.sqrt((valleyX - peakX) ** 2 + (valleyY - peakY) ** 2) < 15);
 
       const valleyRadius = 3 + Math.floor(Math.random() * 8);
 
@@ -128,11 +132,7 @@ export const generateSampleData = (): LandscapeData => {
           x: (ridgeStartX + ridgeEndX) / 2,
           y: (ridgeStartY + ridgeEndY) / 2,
         },
-        radius:
-          Math.sqrt(
-            Math.pow(ridgeEndX - ridgeStartX, 2) +
-              Math.pow(ridgeEndY - ridgeStartY, 2)
-          ) / 2,
+        radius: Math.sqrt((ridgeEndX - ridgeStartX) ** 2 + (ridgeEndY - ridgeStartY) ** 2) / 2,
         narrativeId: narrative.id,
         metrics: {
           prominence: 0.4 + Math.random() * 0.3,
@@ -151,34 +151,24 @@ export const generateSampleData = (): LandscapeData => {
 
       // Calculate elevation based on features
       features.forEach((feature) => {
-        const distance = Math.sqrt(
-          Math.pow(x - feature.center.x, 2) + Math.pow(y - feature.center.y, 2)
-        );
+        const distance = Math.sqrt((x - feature.center.x) ** 2 + (y - feature.center.y) ** 2);
 
         if (distance <= feature.radius) {
-          const narrative = narratives.find(
-            (n) => n.id === feature.narrativeId
-          );
+          const narrative = narratives.find((n) => n.id === feature.narrativeId);
           if (!narrative) return;
 
           let influence = 0;
+          const currentElevation = getGridValue(elevationData, x, y);
 
           if (feature.type === 'peak') {
-            influence =
-              (1 - distance / feature.radius) * feature.metrics.prominence;
-            elevationData[y]![x] = (elevationData[y]![x] ?? 0) + influence;
+            influence = (1 - distance / feature.radius) * feature.metrics.prominence;
+            setGridValue(elevationData, x, y, currentElevation + influence);
           } else if (feature.type === 'valley') {
-            influence =
-              (1 - distance / feature.radius) *
-              feature.metrics.prominence *
-              0.5;
-            elevationData[y]![x] = (elevationData[y]![x] ?? 0) - influence;
+            influence = (1 - distance / feature.radius) * feature.metrics.prominence * 0.5;
+            setGridValue(elevationData, x, y, currentElevation - influence);
           } else if (feature.type === 'ridge') {
-            influence =
-              (1 - distance / feature.radius) *
-              feature.metrics.prominence *
-              0.7;
-            elevationData[y]![x] = (elevationData[y]![x] ?? 0) + influence;
+            influence = (1 - distance / feature.radius) * feature.metrics.prominence * 0.7;
+            setGridValue(elevationData, x, y, currentElevation + influence);
           }
 
           // Determine dominant narrative for color
@@ -196,17 +186,21 @@ export const generateSampleData = (): LandscapeData => {
           const color = d3.color(narrative.color);
           if (color) {
             // Adjust color based on elevation
+            const cellElevation = getGridValue(elevationData, x, y);
             const adjustedColor =
-              elevationData[y]![x]! > 0
-                ? color.brighter(elevationData[y]![x]!)
-                : color.darker(Math.abs(elevationData[y]![x]!));
-            colorData[y]![x] = adjustedColor.toString();
+              cellElevation > 0
+                ? color.brighter(cellElevation)
+                : color.darker(Math.abs(cellElevation));
+            const row = colorData[y];
+            if (row) {
+              row[x] = adjustedColor.toString();
+            }
           }
         }
       }
 
       // Ensure elevation is within bounds
-      elevationData[y]![x] = Math.max(-1, Math.min(1, elevationData[y]![x]!));
+      setGridValue(elevationData, x, y, Math.max(-1, Math.min(1, getGridValue(elevationData, x, y))));
     }
   }
 
@@ -214,9 +208,7 @@ export const generateSampleData = (): LandscapeData => {
   const paths: NarrativePath[] = [];
 
   narratives.forEach((narrative, i) => {
-    const narrativeFeatures = features.filter(
-      (f) => f.narrativeId === narrative.id
-    );
+    const narrativeFeatures = features.filter((f) => f.narrativeId === narrative.id);
     if (narrativeFeatures.length < 2) return;
 
     // Create a path connecting features of this narrative
@@ -224,28 +216,27 @@ export const generateSampleData = (): LandscapeData => {
     const elevationProfile: number[] = [];
 
     // Sort features by x position to create a somewhat logical path
-    const sortedFeatures = [...narrativeFeatures].sort(
-      (a, b) => a.center.x - b.center.x
-    );
+    const sortedFeatures = [...narrativeFeatures].sort((a, b) => a.center.x - b.center.x);
 
     // Create path points
     sortedFeatures.forEach((feature) => {
       pathPoints.push({ x: feature.center.x, y: feature.center.y });
 
       // Add elevation at this point
-      const elevation =
-        elevationData[Math.floor(feature.center.y)]![
-          Math.floor(feature.center.x)
-        ]!;
+      const elevation = getGridValue(
+        elevationData,
+        Math.floor(feature.center.x),
+        Math.floor(feature.center.y),
+      );
       elevationProfile.push(elevation);
     });
 
     // Calculate gradient
+    const firstElevation = elevationProfile[0];
+    const lastElevation = elevationProfile[elevationProfile.length - 1];
     const gradient =
-      elevationProfile.length > 1
-        ? Math.abs(
-            elevationProfile[elevationProfile.length - 1]! - elevationProfile[0]!
-          ) / elevationProfile.length
+      elevationProfile.length > 1 && firstElevation !== undefined && lastElevation !== undefined
+        ? Math.abs(lastElevation - firstElevation) / elevationProfile.length
         : 0;
 
     paths.push({
@@ -283,9 +274,7 @@ export const generateSampleData = (): LandscapeData => {
   };
 };
 
-export const NarrativeLandscapeVisualization: React.FC<
-  LandscapeVisualizationProps
-> = ({
+export const NarrativeLandscapeVisualization: React.FC<LandscapeVisualizationProps> = ({
   data,
   width = 800,
   height = 600,
@@ -302,9 +291,10 @@ export const NarrativeLandscapeVisualization: React.FC<
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const [selectedFeature, setSelectedFeature] =
-    useState<LandscapeFeature | null>(null);
+  const [selectedFeature, setSelectedFeature] = useState<LandscapeFeature | null>(null);
   const [selectedPath, setSelectedPath] = useState<NarrativePath | null>(null);
+  void colorScheme;
+  void interactive;
 
   // Render the landscape on canvas
   useEffect(() => {
@@ -328,24 +318,21 @@ export const NarrativeLandscapeVisualization: React.FC<
     // Draw the landscape
     for (let y = 0; y < data.height; y++) {
       for (let x = 0; x < data.width; x++) {
-        const elevation = data.elevationData[y]![x]!;
-        const color = data.colorData[y]![x]!;
+        const color = data.colorData[y]?.[x] ?? '#cccccc';
 
         // Calculate shading based on elevation and neighbors
         let shading = 1.0;
         if (x > 0 && y > 0 && x < data.width - 1 && y < data.height - 1) {
-          const nx = data.elevationData[y]![x + 1]!;
-          const ny = data.elevationData[y + 1]![x]!;
+          const nx = data.elevationData[y]?.[x + 1] ?? 0;
+          const ny = data.elevationData[y + 1]?.[x] ?? 0;
 
           // Calculate normal vector
-          const normalX = (data.elevationData[y]![x - 1]! - nx) * exaggeration;
-          const normalY = (data.elevationData[y - 1]![x]! - ny) * exaggeration;
+          const normalX = ((data.elevationData[y]?.[x - 1] ?? 0) - nx) * exaggeration;
+          const normalY = ((data.elevationData[y - 1]?.[x] ?? 0) - ny) * exaggeration;
           const normalZ = 2.0;
 
           // Normalize
-          const length = Math.sqrt(
-            normalX * normalX + normalY * normalY + normalZ * normalZ
-          );
+          const length = Math.sqrt(normalX * normalX + normalY * normalY + normalZ * normalZ);
           const nx2 = normalX / length;
           const ny2 = normalY / length;
           const nz2 = normalZ / length;
@@ -366,9 +353,7 @@ export const NarrativeLandscapeVisualization: React.FC<
         if (!baseColor) continue;
 
         const shadedColor =
-          shading < 1.0
-            ? baseColor.darker(1 - shading)
-            : baseColor.brighter(shading - 1);
+          shading < 1.0 ? baseColor.darker(1 - shading) : baseColor.brighter(shading - 1);
 
         // Draw pixel
         ctx.fillStyle = shadedColor.toString();
@@ -403,14 +388,7 @@ export const NarrativeLandscapeVisualization: React.FC<
       ctx.clip();
 
       // Draw the transformed image
-      ctx.transform(
-        1,
-        0,
-        0,
-        1 - 0.2 * perspective,
-        0,
-        height * 0.1 * perspective
-      );
+      ctx.transform(1, 0, 0, 1 - 0.2 * perspective, 0, height * 0.1 * perspective);
       ctx.drawImage(tempCanvas, 0, 0);
       ctx.restore();
     }
@@ -429,10 +407,7 @@ export const NarrativeLandscapeVisualization: React.FC<
       .attr('width', width)
       .attr('height', height)
       .attr('viewBox', `0 0 ${width} ${height}`)
-      .attr(
-        'style',
-        'position: absolute; top: 0; left: 0; pointer-events: none;'
-      );
+      .attr('style', 'position: absolute; top: 0; left: 0; pointer-events: none;');
 
     // Calculate scaling factors
     const scaleX = width / data.width;
@@ -443,9 +418,7 @@ export const NarrativeLandscapeVisualization: React.FC<
       const pathGroup = svg.append('g').attr('class', 'paths');
 
       data.paths.forEach((path) => {
-        const narrative = data.narratives.find(
-          (n) => n.id === path.narrativeId
-        );
+        const narrative = data.narratives.find((n) => n.id === path.narrativeId);
         if (!narrative) return;
 
         // Create line generator
@@ -476,7 +449,7 @@ export const NarrativeLandscapeVisualization: React.FC<
               .attr('stroke-width', 2 + path.metrics.significance * 3)
               .attr('stroke-opacity', 0.7);
           })
-          .on('click', function () {
+          .on('click', () => {
             setSelectedPath(path);
             if (onPathClick) onPathClick(path);
           });
@@ -488,9 +461,7 @@ export const NarrativeLandscapeVisualization: React.FC<
       const featureGroup = svg.append('g').attr('class', 'features');
 
       data.features.forEach((feature) => {
-        const narrative = data.narratives.find(
-          (n) => n.id === feature.narrativeId
-        );
+        const narrative = data.narratives.find((n) => n.id === feature.narrativeId);
         if (!narrative) return;
 
         // Draw feature
@@ -499,24 +470,16 @@ export const NarrativeLandscapeVisualization: React.FC<
           .attr('class', `feature ${feature.type}`)
           .attr(
             'transform',
-            `translate(${feature.center.x * scaleX}, ${
-              feature.center.y * scaleY
-            })`
+            `translate(${feature.center.x * scaleX}, ${feature.center.y * scaleY})`,
           )
           .attr('style', 'pointer-events: all;')
           .on('mouseover', function () {
-            d3.select(this)
-              .select('circle')
-              .attr('stroke-width', 3)
-              .attr('stroke-opacity', 1);
+            d3.select(this).select('circle').attr('stroke-width', 3).attr('stroke-opacity', 1);
           })
           .on('mouseout', function () {
-            d3.select(this)
-              .select('circle')
-              .attr('stroke-width', 1)
-              .attr('stroke-opacity', 0.7);
+            d3.select(this).select('circle').attr('stroke-width', 1).attr('stroke-opacity', 0.7);
           })
-          .on('click', function () {
+          .on('click', () => {
             setSelectedFeature(feature);
             if (onFeatureClick) onFeatureClick(feature);
           });
@@ -601,37 +564,16 @@ export const NarrativeLandscapeVisualization: React.FC<
       .text('Narratives');
 
     data.narratives.forEach((narrative, i) => {
-      const g = legend
-        .append('g')
-        .attr('transform', `translate(10, ${35 + i * 20})`);
+      const g = legend.append('g').attr('transform', `translate(10, ${35 + i * 20})`);
 
-      g.append('rect')
-        .attr('width', 12)
-        .attr('height', 12)
-        .attr('fill', narrative.color);
+      g.append('rect').attr('width', 12).attr('height', 12).attr('fill', narrative.color);
 
-      g.append('text')
-        .attr('x', 20)
-        .attr('y', 10)
-        .attr('font-size', 10)
-        .text(narrative.name);
+      g.append('text').attr('x', 20).attr('y', 10).attr('font-size', 10).text(narrative.name);
     });
-  }, [
-    data,
-    width,
-    height,
-    showPaths,
-    showFeatures,
-    showLabels,
-    onFeatureClick,
-    onPathClick,
-  ]);
+  }, [data, width, height, showPaths, showFeatures, showLabels, onFeatureClick, onPathClick]);
 
   return (
-    <div
-      className="narrative-landscape-container"
-      style={{ position: 'relative', width, height }}
-    >
+    <div className="narrative-landscape-container" style={{ position: 'relative', width, height }}>
       <canvas ref={canvasRef} style={{ width, height }} />
       <svg ref={svgRef} />
 
@@ -651,9 +593,9 @@ export const NarrativeLandscapeVisualization: React.FC<
           <h3 style={{ margin: '0 0 5px 0' }}>{selectedFeature.name}</h3>
           <p style={{ margin: '0 0 5px 0' }}>{selectedFeature.description}</p>
           <p style={{ margin: 0 }}>
-            Prominence: {selectedFeature.metrics.prominence.toFixed(2)} |
-            Significance: {selectedFeature.metrics.significance.toFixed(2)} |
-            Stability: {selectedFeature.metrics.stability.toFixed(2)}
+            Prominence: {selectedFeature.metrics.prominence.toFixed(2)} | Significance:{' '}
+            {selectedFeature.metrics.significance.toFixed(2)} | Stability:{' '}
+            {selectedFeature.metrics.stability.toFixed(2)}
           </p>
         </div>
       )}

@@ -124,8 +124,11 @@ export class FredAdapter implements SignalAdapter {
 
     // Detect significant changes between consecutive observations
     for (let i = 1; i < valid.length; i++) {
-      const prev = valid[i - 1]!;
-      const curr = valid[i]!;
+      const prev = valid[i - 1];
+      const curr = valid[i];
+      if (!prev || !curr) {
+        continue;
+      }
       const change = curr.value - prev.value;
       const absChange = Math.abs(change);
 

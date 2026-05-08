@@ -18,8 +18,7 @@ export class OnChainCorrelationService {
 
   constructor(private readonly configService: ConfigService) {
     this.apiKey =
-      this.configService.get<string>('ETHERSCAN_API_KEY') ||
-      process.env['ETHERSCAN_API_KEY'];
+      this.configService.get<string>('ETHERSCAN_API_KEY') || process.env['ETHERSCAN_API_KEY'];
   }
 
   setFetchImplementation(fetchImpl: FetchLike): void {
@@ -27,7 +26,9 @@ export class OnChainCorrelationService {
   }
 
   async buildSummary(addresses: string[]): Promise<ProjectDossierOnChainSummary> {
-    const normalizedAddresses = [...new Set(addresses.map((address) => address.toLowerCase()))].slice(0, 6);
+    const normalizedAddresses = [
+      ...new Set(addresses.map((address) => address.toLowerCase())),
+    ].slice(0, 6);
     if (normalizedAddresses.length === 0) {
       return {
         status: 'unavailable',
@@ -94,7 +95,8 @@ export class OnChainCorrelationService {
         counterparties.set(otherParty, (counterparties.get(otherParty) ?? 0) + 1);
       }
 
-      for (const transaction of (tokenTx?.result as EtherscanTokenTransaction[] | undefined) ?? []) {
+      for (const transaction of (tokenTx?.result as EtherscanTokenTransaction[] | undefined) ??
+        []) {
         const from = transaction.from?.toLowerCase();
         const to = transaction.to?.toLowerCase();
         const otherParty = from === address ? to : from;
@@ -159,7 +161,12 @@ export class OnChainCorrelationService {
       .slice(0, 12);
 
     return {
-      status: completed === normalizedAddresses.length ? 'ready' : completed > 0 ? 'partial' : 'unavailable',
+      status:
+        completed === normalizedAddresses.length
+          ? 'ready'
+          : completed > 0
+            ? 'partial'
+            : 'unavailable',
       analyzedAddresses: normalizedAddresses,
       addressSummaries,
       commonCounterparties,
@@ -172,11 +179,15 @@ export class OnChainCorrelationService {
   }
 
   private async apiCall(queryParams: Record<string, string>): Promise<EtherscanResponse | null> {
+    if (!this.apiKey) {
+      this.logger.warn('ETHERSCAN_API_KEY not configured');
+      return null;
+    }
     const url = new URL(this.baseUrl);
     for (const [key, value] of Object.entries(queryParams)) {
       url.searchParams.set(key, value);
     }
-    url.searchParams.set('apikey', this.apiKey!);
+    url.searchParams.set('apikey', this.apiKey);
 
     for (let attempt = 0; attempt < 2; attempt++) {
       try {

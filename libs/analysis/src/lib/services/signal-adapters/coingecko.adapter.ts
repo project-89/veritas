@@ -20,11 +20,12 @@ export class CoinGeckoAdapter implements SignalAdapter {
   private readonly logger = new Logger(CoinGeckoAdapter.name);
   private readonly baseUrl = 'https://api.coingecko.com/api/v3';
 
-  async fetchSignals(_params: {
+  async fetchSignals(params: {
     keywords: string[];
     startDate: string;
     endDate: string;
   }): Promise<ExternalSignal[]> {
+    void params;
     const [marketSignals, trendingSignals] = await Promise.all([
       this.fetchMarkets(),
       this.fetchTrending(),

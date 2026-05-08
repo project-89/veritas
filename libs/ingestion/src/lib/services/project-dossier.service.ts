@@ -3,8 +3,8 @@ import { Investigation } from '../schemas/investigation.schema';
 import {
   ProjectDossier,
   ProjectDossierOnChainSummary,
-  ProjectEntity,
   ProjectDossierOverlap,
+  ProjectEntity,
 } from '../schemas/project-dossier.schema';
 import { InvestigationEvidenceDossier } from './investigation-evidence.service';
 
@@ -27,7 +27,11 @@ export class ProjectDossierService {
     onChainSummary: ProjectDossierOnChainSummary | null = null,
   ): Partial<ProjectDossier> {
     const name = investigation.name?.trim() || investigation.query.trim();
-    const aliases = Array.from(new Set([investigation.name, investigation.query].map((value) => value.trim()).filter(Boolean)));
+    const aliases = Array.from(
+      new Set(
+        [investigation.name, investigation.query].map((value) => value.trim()).filter(Boolean),
+      ),
+    );
 
     return {
       investigationId: investigation._id?.toString() ?? investigation.id,
@@ -46,10 +50,7 @@ export class ProjectDossierService {
     };
   }
 
-  compareAgainstMany(
-    source: ProjectDossier,
-    others: ProjectDossier[],
-  ): ProjectDossierOverlap[] {
+  compareAgainstMany(source: ProjectDossier, others: ProjectDossier[]): ProjectDossierOverlap[] {
     return others
       .filter((candidate) => candidate.investigationId !== source.investigationId)
       .map((candidate) => this.comparePair(source, candidate))
@@ -106,7 +107,10 @@ export class ProjectDossierService {
       return null;
     }
 
-    const score = sharedEntities.reduce((total, entity) => total + entity.weight * Math.max(entity.sourceCount, 1), 0);
+    const score = sharedEntities.reduce(
+      (total, entity) => total + entity.weight * Math.max(entity.sourceCount, 1),
+      0,
+    );
     const matchedTypes = Array.from(new Set(sharedEntities.map((entity) => entity.type)));
 
     return {
@@ -116,7 +120,10 @@ export class ProjectDossierService {
       score,
       matchedTypes,
       sharedEntities: sharedEntities
-        .sort((a, b) => b.weight - a.weight || b.sourceCount - a.sourceCount || a.value.localeCompare(b.value))
+        .sort(
+          (a, b) =>
+            b.weight - a.weight || b.sourceCount - a.sourceCount || a.value.localeCompare(b.value),
+        )
         .slice(0, 12),
     };
   }
@@ -149,6 +156,10 @@ export class ProjectDossierService {
 
   private intersectValues(a: string[], b: string[]): string[] {
     const right = new Set(b.map((value) => value.toLowerCase()));
-    return [...new Set(a.filter((value) => right.has(value.toLowerCase())).map((value) => value.toLowerCase()))];
+    return [
+      ...new Set(
+        a.filter((value) => right.has(value.toLowerCase())).map((value) => value.toLowerCase()),
+      ),
+    ];
   }
 }

@@ -56,6 +56,7 @@ function TypeProgressRow({
     <div>
       {/* Aggregated row */}
       <button
+        type="button"
         onClick={onToggle}
         className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-nerv-bg-elevated/30 transition-colors"
       >
@@ -122,15 +123,24 @@ function TypeProgressRow({
           {group.jobs.map((job) => {
             const jId = job._id ?? job.id;
             const duration = job.duration != null ? `${(job.duration / 1000).toFixed(1)}s` : '';
-            const label = job.input.narrativeSummaries?.[0]?.slice(0, 50) || job.narrativeIds[0]?.slice(0, 20) || 'batch';
+            const label =
+              job.input.narrativeSummaries?.[0]?.slice(0, 50) ||
+              job.narrativeIds[0]?.slice(0, 20) ||
+              'batch';
 
             return (
-              <div key={jId} className="flex items-center gap-2 px-3 py-1 pl-8 text-[9px] font-mono">
+              <div
+                key={jId}
+                className="flex items-center gap-2 px-3 py-1 pl-8 text-[9px] font-mono"
+              >
                 <span className="text-nerv-text-muted truncate flex-1">{label}</span>
                 <StatusDot status={job.status} />
-                <span className="text-nerv-text-muted w-10 text-right tabular-nums">{duration}</span>
+                <span className="text-nerv-text-muted w-10 text-right tabular-nums">
+                  {duration}
+                </span>
                 {job.status === 'failed' && onRetry && (
                   <button
+                    type="button"
                     onClick={() => onRetry(jId)}
                     className="text-[8px] px-1 py-0.5 border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm"
                   >
@@ -139,6 +149,7 @@ function TypeProgressRow({
                 )}
                 {(job.status === 'pending' || job.status === 'running') && onCancel && (
                   <button
+                    type="button"
                     onClick={() => onCancel(jId)}
                     className="text-nerv-text-muted hover:text-nerv-red"
                   >
@@ -162,7 +173,11 @@ function StatusDot({ status }: { status: string }) {
     failed: 'bg-nerv-red',
     cancelled: 'bg-yellow-500',
   };
-  return <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors[status] ?? 'bg-nerv-text-muted'}`} />;
+  return (
+    <span
+      className={`w-1.5 h-1.5 rounded-full shrink-0 ${colors[status] ?? 'bg-nerv-text-muted'}`}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +225,9 @@ export function AnalysisQueuePanel({ jobs, onCancel, onRetry }: AnalysisQueuePan
   const allDone = totalActive === 0;
 
   return (
-    <div className={`border border-nerv-border rounded-sm bg-nerv-bg overflow-hidden ${allDone ? 'opacity-80' : ''}`}>
+    <div
+      className={`border border-nerv-border rounded-sm bg-nerv-bg overflow-hidden ${allDone ? 'opacity-80' : ''}`}
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-nerv-border bg-nerv-bg-elevated/30">
         <div className="flex items-center gap-2">

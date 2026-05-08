@@ -1,11 +1,10 @@
+import { HttpException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ContentController } from '../../src/lib/controllers/content.controller';
 import { ContentService } from '../../src/lib/services/content.service';
-import { HttpException } from '@nestjs/common';
 
 describe('ContentController', () => {
   let controller: ContentController;
-  let contentService: ContentService;
 
   const mockContentService = {
     createContent: jest.fn(),
@@ -34,7 +33,6 @@ describe('ContentController', () => {
     }).compile();
 
     controller = module.get<ContentController>(ContentController);
-    contentService = module.get<ContentService>(ContentService);
   });
 
   it('should be defined', () => {
@@ -57,7 +55,7 @@ describe('ContentController', () => {
         semanticQuery,
         minScore as any,
         limit as any,
-        params
+        params,
       );
 
       expect(mockContentService.semanticSearchContent).toHaveBeenCalledWith(
@@ -67,7 +65,7 @@ describe('ContentController', () => {
           minScore: 0.7,
           limit: 10,
         },
-        true
+        true,
       );
       expect(result).toHaveLength(2);
       expect(result[0]!.id).toBe('result-1');
@@ -88,24 +86,23 @@ describe('ContentController', () => {
           minScore: undefined,
           limit: undefined,
         },
-        true
+        true,
       );
     });
 
     it('should throw an exception when service is not available', async () => {
       // Create controller without service
-      const moduleWithoutService: TestingModule =
-        await Test.createTestingModule({
-          controllers: [ContentController],
-          providers: [],
-        }).compile();
+      const moduleWithoutService: TestingModule = await Test.createTestingModule({
+        controllers: [ContentController],
+        providers: [],
+      }).compile();
 
       const controllerWithoutService =
         moduleWithoutService.get<ContentController>(ContentController);
 
-      await expect(
-        controllerWithoutService.semanticSearchContent('test query')
-      ).rejects.toThrow(HttpException);
+      await expect(controllerWithoutService.semanticSearchContent('test query')).rejects.toThrow(
+        HttpException,
+      );
     });
   });
 
@@ -125,7 +122,7 @@ describe('ContentController', () => {
         id,
         limit as any,
         minScore as any,
-        useExistingEmbedding
+        useExistingEmbedding,
       );
 
       expect(mockContentService.findSimilarContent).toHaveBeenCalledWith(id, {
@@ -159,9 +156,7 @@ describe('ContentController', () => {
         embedding: [0.1, 0.2, 0.3, 0.4],
       };
 
-      mockContentService.generateEmbedding.mockResolvedValue(
-        contentWithEmbedding
-      );
+      mockContentService.generateEmbedding.mockResolvedValue(contentWithEmbedding);
 
       const result = await controller.generateEmbedding(id);
 
@@ -173,9 +168,7 @@ describe('ContentController', () => {
       const id = 'non-existent-id';
       mockContentService.generateEmbedding.mockResolvedValue(null);
 
-      await expect(controller.generateEmbedding(id)).rejects.toThrow(
-        HttpException
-      );
+      await expect(controller.generateEmbedding(id)).rejects.toThrow(HttpException);
     });
   });
 
@@ -195,9 +188,7 @@ describe('ContentController', () => {
 
       await controller.generateAllEmbeddings();
 
-      expect(mockContentService.generateAllEmbeddings).toHaveBeenCalledWith(
-        undefined
-      );
+      expect(mockContentService.generateAllEmbeddings).toHaveBeenCalledWith(undefined);
     });
   });
 });

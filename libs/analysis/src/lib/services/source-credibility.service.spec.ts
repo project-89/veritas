@@ -1,6 +1,6 @@
-import { SourceCredibilityService } from './source-credibility.service';
-import { GraphDatabaseService } from './graph-database.service';
 import type { UserPost } from './deep-investigation.service';
+import { GraphDatabaseService } from './graph-database.service';
+import { SourceCredibilityService } from './source-credibility.service';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -91,9 +91,7 @@ describe('SourceCredibilityService', () => {
       const badPosts = Array.from({ length: 30 }, (_, i) =>
         makePost({
           text: 'Buy crypto now! Amazing opportunity!',
-          timestamp: new Date(
-            Date.now() - (30 - i) * 60 * 1000,
-          ).toISOString(), // all within 30 min
+          timestamp: new Date(Date.now() - (30 - i) * 60 * 1000).toISOString(), // all within 30 min
           engagement: { likes: 0, comments: 0, shares: 0 },
         }),
       );
@@ -188,12 +186,8 @@ describe('SourceCredibilityService', () => {
     });
 
     it('should return higher score for more engagement', () => {
-      const lowEngagement = [
-        makePost({ engagement: { likes: 0, comments: 0, shares: 0 } }),
-      ];
-      const highEngagement = [
-        makePost({ engagement: { likes: 500, comments: 100, shares: 50 } }),
-      ];
+      const lowEngagement = [makePost({ engagement: { likes: 0, comments: 0, shares: 0 } })];
+      const highEngagement = [makePost({ engagement: { likes: 500, comments: 100, shares: 50 } })];
 
       const low = service.computeEngagementRatio(lowEngagement);
       const high = service.computeEngagementRatio(highEngagement);
@@ -241,10 +235,7 @@ describe('SourceCredibilityService', () => {
     });
 
     it('should return 0.5 for two platforms', () => {
-      const posts = [
-        makePost({ platform: 'twitter' }),
-        makePost({ platform: 'reddit' }),
-      ];
+      const posts = [makePost({ platform: 'twitter' }), makePost({ platform: 'reddit' })];
       expect(service.computeCrossPlatformPresence(posts)).toBe(0.5);
     });
 
@@ -259,9 +250,9 @@ describe('SourceCredibilityService', () => {
 
     it('should count cross-platform accounts', () => {
       const posts = [makePost({ platform: 'twitter' })];
-      expect(
-        service.computeCrossPlatformPresence(posts, ['twitter', 'reddit', 'mastodon']),
-      ).toBe(1.0);
+      expect(service.computeCrossPlatformPresence(posts, ['twitter', 'reddit', 'mastodon'])).toBe(
+        1.0,
+      );
     });
   });
 
@@ -292,9 +283,7 @@ describe('SourceCredibilityService', () => {
         }),
       );
       const result = await service.scoreSource('alwayson', 'twitter', posts);
-      expect(
-        result.flags.some((f) => f.includes('Posts across nearly all hours')),
-      ).toBe(true);
+      expect(result.flags.some((f) => f.includes('Posts across nearly all hours'))).toBe(true);
     });
   });
 

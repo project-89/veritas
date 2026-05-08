@@ -123,6 +123,6 @@ export interface Repository<T> {
   vectorSearch?<R = T>(
     field: string,
     vector: number[],
-    options?: VectorSearchOptions
+    options?: VectorSearchOptions,
   ): Promise<VectorSearchResult<R>[]>;
 }

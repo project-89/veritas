@@ -21,16 +21,14 @@ export abstract class NarrativeRepository {
   /**
    * Find a narrative insight by its content hash
    */
-  abstract findByContentHash(
-    contentHash: string
-  ): Promise<NarrativeInsight | null>;
+  abstract findByContentHash(contentHash: string): Promise<NarrativeInsight | null>;
 
   /**
    * Find narrative insights by timeframe
    */
   abstract findByTimeframe(
     timeframe: string,
-    options?: { limit?: number; skip?: number }
+    options?: { limit?: number; skip?: number },
   ): Promise<NarrativeInsight[]>;
 
   /**
@@ -55,7 +53,7 @@ export abstract class NarrativeRepository {
    */
   abstract findSimilarContent(
     embedding: number[],
-    options?: { limit?: number; minScore?: number }
+    options?: { limit?: number; minScore?: number },
   ): Promise<Array<{ insight: NarrativeInsight; score: number }>>;
 }
 
@@ -85,16 +83,14 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
     this.logger.debug(`Saved ${insights.length} insights in batch`);
   }
 
-  async findByContentHash(
-    contentHash: string
-  ): Promise<NarrativeInsight | null> {
+  async findByContentHash(contentHash: string): Promise<NarrativeInsight | null> {
     const insight = this.insights.get(contentHash);
     return insight ? { ...insight } : null;
   }
 
   async findByTimeframe(
     timeframe: string,
-    options?: { limit?: number; skip?: number }
+    options?: { limit?: number; skip?: number },
   ): Promise<NarrativeInsight[]> {
     // Extract year and quarter from timeframe (e.g., "2023-Q2")
     const [year, quarter] = timeframe.split('-');
@@ -132,8 +128,7 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
       }
 
       // Count platforms
-      platformCounts[insight.platform] =
-        (platformCounts[insight.platform] || 0) + 1;
+      platformCounts[insight.platform] = (platformCounts[insight.platform] || 0) + 1;
 
       // Track unique sources
       sourceHashes.add(insight.sourceHash);
@@ -148,21 +143,15 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const trends: NarrativeTrend[] = sortedThemes.map(([theme, count]) => {
       // Filter insights related to this theme
-      const themeInsights = insights.filter((insight) =>
-        insight.themes.includes(theme)
-      );
+      const themeInsights = insights.filter((insight) => insight.themes.includes(theme));
 
       // Calculate average sentiment
       const avgSentiment =
-        themeInsights.reduce(
-          (sum, insight) => sum + insight.sentiment.score,
-          0
-        ) / themeInsights.length;
+        themeInsights.reduce((sum, insight) => sum + insight.sentiment.score, 0) /
+        themeInsights.length;
 
       // Calculate source diversity
-      const themeSourceHashes = new Set(
-        themeInsights.map((insight) => insight.sourceHash)
-      );
+      const themeSourceHashes = new Set(themeInsights.map((insight) => insight.sourceHash));
 
       return {
         id: `trend-${timeframe}-${theme}`,
@@ -191,9 +180,7 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
       }
     }
 
-    this.logger.log(
-      `Deleted ${deletedCount} insights older than ${cutoffDate.toISOString()}`
-    );
+    this.logger.log(`Deleted ${deletedCount} insights older than ${cutoffDate.toISOString()}`);
     return deletedCount;
   }
 
@@ -220,14 +207,11 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
   /**
    * Calculate distribution of insights across platforms
    */
-  private calculatePlatformDistribution(
-    insights: NarrativeInsight[]
-  ): Record<string, number> {
+  private calculatePlatformDistribution(insights: NarrativeInsight[]): Record<string, number> {
     const distribution: Record<string, number> = {};
 
     for (const insight of insights) {
-      distribution[insight.platform] =
-        (distribution[insight.platform] || 0) + 1;
+      distribution[insight.platform] = (distribution[insight.platform] || 0) + 1;
     }
 
     // Convert to percentages
@@ -247,8 +231,7 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
 
     // Average of individual narrativeScores
     const avgScore =
-      insights.reduce((sum, insight) => sum + insight.narrativeScore, 0) /
-      insights.length;
+      insights.reduce((sum, insight) => sum + insight.narrativeScore, 0) / insights.length;
 
     // Boost based on number of insights (logarithmic scale)
     const volumeBoost = Math.min(Math.log10(insights.length) / 2, 0.5);
@@ -259,7 +242,7 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
 
   async findSimilarContent(
     embedding: number[],
-    options?: { limit?: number; minScore?: number }
+    options?: { limit?: number; minScore?: number },
   ): Promise<Array<{ insight: NarrativeInsight; score: number }>> {
     // Default options
     const limit = options?.limit || 10;
@@ -267,7 +250,11 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
 
     // Filter insights that have embeddings
     const insightsWithEmbeddings = Array.from(this.insights.values()).filter(
-      (insight) => insight.embedding && insight.embedding.length > 0
+      (
+        insight,
+      ): insight is NarrativeInsight & {
+        embedding: number[];
+      } => Array.isArray(insight.embedding) && insight.embedding.length > 0,
     );
 
     if (insightsWithEmbeddings.length === 0) {
@@ -276,10 +263,10 @@ export class InMemoryNarrativeRepository implements NarrativeRepository {
 
     // Calculate cosine similarity for each insight
     const results = insightsWithEmbeddings
-      .map((insight) => ({
-        insight,
-        score: this.calculateCosineSimilarity(embedding, insight.embedding!),
-      }))
+        .map((insight) => ({
+          insight,
+          score: this.calculateCosineSimilarity(embedding, insight.embedding),
+        }))
       .filter((result) => result.score >= minScore)
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);

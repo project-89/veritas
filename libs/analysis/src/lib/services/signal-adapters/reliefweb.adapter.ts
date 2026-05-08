@@ -20,11 +20,12 @@ export class ReliefWebAdapter implements SignalAdapter {
   private readonly logger = new Logger(ReliefWebAdapter.name);
   private readonly baseUrl = 'https://api.reliefweb.int/v1/reports';
 
-  async fetchSignals(_params: {
+  async fetchSignals(params: {
     keywords: string[];
     startDate: string;
     endDate: string;
   }): Promise<ExternalSignal[]> {
+    void params;
     const url =
       `${this.baseUrl}?appname=veritas&limit=50&preset=latest` +
       '&fields[include][]=title' +
@@ -79,14 +80,12 @@ export class ReliefWebAdapter implements SignalAdapter {
         : new Date().toISOString();
 
       const countryArr = fields['country'] as Array<{ name?: string }> | undefined;
-      const country = Array.isArray(countryArr) && countryArr.length > 0
-        ? countryArr[0]?.name ?? ''
-        : '';
+      const country =
+        Array.isArray(countryArr) && countryArr.length > 0 ? (countryArr[0]?.name ?? '') : '';
 
       const sourceArr = fields['source'] as Array<{ name?: string }> | undefined;
-      const sourceName = Array.isArray(sourceArr) && sourceArr.length > 0
-        ? sourceArr[0]?.name ?? ''
-        : '';
+      const sourceName =
+        Array.isArray(sourceArr) && sourceArr.length > 0 ? (sourceArr[0]?.name ?? '') : '';
 
       const bodyHtml = (fields['body-html'] as string) ?? '';
       const description = this.stripHtml(bodyHtml).slice(0, 300) || title;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnalyzedNarrative, RawPost } from '../../lib/api';
 
 interface TemporalHeatmapProps {
@@ -58,7 +58,7 @@ export function TemporalHeatmap({
   const CELL_PADDING = 1;
 
   // Compute time buckets
-  const { buckets, bucketLabels, grid, postsByNarrativeBucket, windowLabel } = useMemo(() => {
+  const { buckets, bucketLabels, grid, windowLabel } = useMemo(() => {
     if (narratives.length === 0 || posts.length === 0) {
       return {
         buckets: [],
@@ -71,9 +71,10 @@ export function TemporalHeatmap({
 
     const allTimestamps = posts.map((p) => new Date(p.timestamp).getTime()).sort((a, b) => a - b);
     const relMatch = typeof timeRange === 'string' ? timeRange.match(/^(\d+)([dhm])$/) : null;
-    const absMatch = typeof timeRange === 'string'
-      ? timeRange.match(/^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/)
-      : null;
+    const absMatch =
+      typeof timeRange === 'string'
+        ? timeRange.match(/^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/)
+        : null;
 
     let minTime: number;
     let maxTime: number;
@@ -82,26 +83,27 @@ export function TemporalHeatmap({
       minTime = new Date(`${absMatch[1]}T00:00:00Z`).getTime();
       maxTime = new Date(`${absMatch[2]}T23:59:59Z`).getTime();
     } else if (relMatch) {
-      const value = parseInt(relMatch[1]!, 10);
-      const unit = relMatch[2]!;
+      const [, valueText, unit] = relMatch;
+      const value = Number.parseInt(valueText, 10);
       const durationMs =
-        unit === 'd' ? value * 86400000 :
-        unit === 'h' ? value * 3600000 :
-        value * 60000;
+        unit === 'd' ? value * 86400000 : unit === 'h' ? value * 3600000 : value * 60000;
+      const latestTimestamp = allTimestamps[allTimestamps.length - 1] ?? Date.now();
       const endTime = scanCreatedAt
         ? new Date(scanCreatedAt).getTime()
-        : allTimestamps[allTimestamps.length - 1]!;
+        : latestTimestamp;
       minTime = endTime - durationMs;
       maxTime = endTime;
     } else {
       // Fall back to the natural post range when no explicit scan window exists.
       const q1Idx = Math.floor(allTimestamps.length * 0.05);
       const q3Idx = Math.floor(allTimestamps.length * 0.95);
-      const q1 = allTimestamps[q1Idx]!;
-      const q3 = allTimestamps[q3Idx]!;
+      const firstTimestamp = allTimestamps[0] ?? Date.now();
+      const lastTimestamp = allTimestamps[allTimestamps.length - 1] ?? firstTimestamp;
+      const q1 = allTimestamps[q1Idx] ?? firstTimestamp;
+      const q3 = allTimestamps[q3Idx] ?? lastTimestamp;
       const iqr = q3 - q1;
-      minTime = Math.max(allTimestamps[0]!, q1 - iqr * 1.5);
-      maxTime = Math.min(allTimestamps[allTimestamps.length - 1]!, q3 + iqr * 1.5);
+      minTime = Math.max(firstTimestamp, q1 - iqr * 1.5);
+      maxTime = Math.min(lastTimestamp, q3 + iqr * 1.5);
     }
 
     const range = Math.max(maxTime - minTime, 3600000); // at least 1 hour
@@ -109,8 +111,10 @@ export function TemporalHeatmap({
 
     // Choose bucket count based on range
     let numBuckets: number;
-    if (range < 86400000) numBuckets = 12; // < 1 day: 2hr buckets
-    else if (range < 604800000) numBuckets = 14; // < 1 week: 12hr buckets
+    if (range < 86400000)
+      numBuckets = 12; // < 1 day: 2hr buckets
+    else if (range < 604800000)
+      numBuckets = 14; // < 1 week: 12hr buckets
     else numBuckets = Math.min(20, Math.ceil(range / 86400000)); // daily
 
     const bucketSize = range / numBuckets || 1;
@@ -135,10 +139,13 @@ export function TemporalHeatmap({
 
     for (const narrative of narratives) {
       const row: Array<{ count: number; avgSentiment: number; topAuthor: string }> = [];
-      const narrativePosts = narrative.postIndices.map((idx) => posts[idx]).filter((p): p is RawPost => Boolean(p));
+      const narrativePosts = narrative.postIndices
+        .map((idx) => posts[idx])
+        .filter((p): p is RawPost => Boolean(p));
 
       for (let bi = 0; bi < numBuckets; bi++) {
-        const bucket = bkts[bi]!;
+        const bucket = bkts[bi];
+        if (!bucket) continue;
         const cellPosts = narrativePosts.filter((p) => {
           const t = new Date(p.timestamp).getTime();
           return t >= bucket.start && t < bucket.end;
@@ -149,9 +156,7 @@ export function TemporalHeatmap({
 
         const count = cellPosts.length;
         const avgSentiment =
-          count > 0
-            ? cellPosts.reduce((s, p) => s + (p.sentiment?.score ?? 0), 0) / count
-            : 0;
+          count > 0 ? cellPosts.reduce((s, p) => s + (p.sentiment?.score ?? 0), 0) / count : 0;
 
         // top author
         const authorCounts = new Map<string, number>();
@@ -254,7 +259,9 @@ export function TemporalHeatmap({
 
     for (let ni = 0; ni < narratives.length; ni++) {
       const y = TOP_MARGIN + ni * ROW_HEIGHT + ROW_HEIGHT / 2;
-      const isSelected = narratives[ni]!.id === selectedNarrativeId;
+      const narrative = narratives[ni];
+      if (!narrative) continue;
+      const isSelected = narrative.id === selectedNarrativeId;
 
       // Selected row highlight
       if (isSelected) {
@@ -268,7 +275,7 @@ export function TemporalHeatmap({
       ctx.fillStyle = isSelected ? '#FF6B2B' : '#8888a0';
       // Short label: "N1 (52)" — narrative number + post count
       // Full summary is in the left panel
-      const postCount = narratives[ni]!.postIndices?.length ?? 0;
+      const postCount = narrative.postIndices?.length ?? 0;
       const shortLabel = `N${ni + 1} (${postCount})`;
       ctx.fillText(shortLabel, LABEL_WIDTH - 8, y);
     }
@@ -332,7 +339,8 @@ export function TemporalHeatmap({
       // Only render every other label if too dense
       if (bucketLabels.length > 12 && bi % 2 !== 0) continue;
       const x = LABEL_WIDTH + bi * cellWidth + cellWidth / 2;
-      ctx.fillText(bucketLabels[bi]!, x, labelY);
+      const label = bucketLabels[bi];
+      if (label) ctx.fillText(label, x, labelY);
     }
 
     // Title
@@ -372,12 +380,7 @@ export function TemporalHeatmap({
       const bi = Math.floor((mx - LABEL_WIDTH) / cellWidth);
       const ni = Math.floor((my - TOP_MARGIN) / ROW_HEIGHT);
 
-      if (
-        bi < 0 ||
-        bi >= buckets.length ||
-        ni < 0 ||
-        ni >= narratives.length
-      ) {
+      if (bi < 0 || bi >= buckets.length || ni < 0 || ni >= narratives.length) {
         setTooltip(null);
         return;
       }
@@ -391,8 +394,8 @@ export function TemporalHeatmap({
       setTooltip({
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
-        narrativeSummary: narratives[ni]!.summary,
-        timeLabel: bucketLabels[bi]!,
+        narrativeSummary: narratives[ni]?.summary ?? '',
+        timeLabel: bucketLabels[bi] ?? '',
         postCount: cell.count,
         avgSentiment: cell.avgSentiment,
         topAuthor: cell.topAuthor,
@@ -411,9 +414,9 @@ export function TemporalHeatmap({
       const ni = Math.floor((my - TOP_MARGIN) / ROW_HEIGHT);
 
       if (ni >= 0 && ni < narratives.length) {
-        onSelectNarrative(
-          narratives[ni]!.id === selectedNarrativeId ? null : narratives[ni]!.id,
-        );
+        const narrative = narratives[ni];
+        if (!narrative) return;
+        onSelectNarrative(narrative.id === selectedNarrativeId ? null : narrative.id);
       }
     },
     [narratives, selectedNarrativeId, onSelectNarrative],

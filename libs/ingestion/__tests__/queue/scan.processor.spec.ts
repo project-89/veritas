@@ -120,9 +120,11 @@ describe('ScanProcessor', () => {
   it('should fall back to searchAndTransform when searchWithRawData not available', async () => {
     const fallbackConnector = {
       platform: 'youtube',
-      searchAndTransform: jest.fn().mockResolvedValue([
-        { id: 'i1', sentiment: { score: 0, label: 'neutral', confidence: 0.5 } },
-      ]),
+      searchAndTransform: jest
+        .fn()
+        .mockResolvedValue([
+          { id: 'i1', sentiment: { score: 0, label: 'neutral', confidence: 0.5 } },
+        ]),
     };
     ingestionService.getConnector.mockReturnValue(fallbackConnector as any);
 
@@ -202,12 +204,15 @@ describe('ScanProcessor', () => {
   });
 
   it('should not suppress posts just because earlier scans for the same query already saw them', async () => {
-    scanJobRepo.getExistingPostKeys.mockResolvedValue([
-      'url:https://reddit.com/r/test/1',
-    ]);
+    scanJobRepo.getExistingPostKeys.mockResolvedValue(['url:https://reddit.com/r/test/1']);
 
     const job = {
-      data: { scanId: 'scan-1', connector: 'reddit', query: 'project89', options: { timeRange: '30d' } },
+      data: {
+        scanId: 'scan-1',
+        connector: 'reddit',
+        query: 'project89',
+        options: { timeRange: '30d' },
+      },
     } as any;
 
     const result = await processor.process(job);

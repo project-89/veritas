@@ -1,7 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import type { UserPost } from './deep-investigation.service';
 import { GraphDatabaseService } from './graph-database.service';
 import { PlatformCredibilityService } from './platform-credibility.service';
-import type { UserPost } from './deep-investigation.service';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -62,10 +62,7 @@ export class SourceCredibilityService {
     const postingConsistency = this.computePostingConsistency(posts);
     const engagementRatio = this.computeEngagementRatio(posts);
     const contentDiversity = this.computeContentDiversity(posts);
-    const crossPlatformPresence = this.computeCrossPlatformPresence(
-      posts,
-      crossPlatformAccounts,
-    );
+    const crossPlatformPresence = this.computeCrossPlatformPresence(posts, crossPlatformAccounts);
 
     // ------ Graph signals (when Memgraph available) ------
 
@@ -116,11 +113,12 @@ export class SourceCredibilityService {
 
     // ------ Compute flags ------
 
-    const flags = this.computeFlags(
-      handle,
-      posts,
-      { accountAge, postingConsistency, engagementRatio, contentDiversity },
-    );
+    const flags = this.computeFlags(handle, posts, {
+      accountAge,
+      postingConsistency,
+      engagementRatio,
+      contentDiversity,
+    });
 
     // ------ Overall score ------
 
@@ -148,8 +146,7 @@ export class SourceCredibilityService {
 
     // Apply platform credibility multiplier if available
     if (this.platformCredibility) {
-      const platformMultiplier =
-        this.platformCredibility.getCredibilityMultiplier(platform);
+      const platformMultiplier = this.platformCredibility.getCredibilityMultiplier(platform);
       overallScore = overallScore * platformMultiplier;
     }
 
@@ -183,9 +180,7 @@ export class SourceCredibilityService {
     }>,
   ): Promise<SourceCredibilityScore[]> {
     return Promise.all(
-      users.map((u) =>
-        this.scoreSource(u.handle, u.platform, u.posts, u.crossPlatformAccounts),
-      ),
+      users.map((u) => this.scoreSource(u.handle, u.platform, u.posts, u.crossPlatformAccounts)),
     );
   }
 
@@ -229,14 +224,16 @@ export class SourceCredibilityService {
     const WINDOW_MS = 5 * 60 * 1000;
     for (let i = 0; i < users.length; i++) {
       for (let j = i + 1; j < users.length; j++) {
-        const userA = users[i]!;
-        const userB = users[j]!;
+        const userA = users[i];
+        const userB = users[j];
+        if (!userA || !userB) {
+          continue;
+        }
 
         const hasCoTiming = userA.posts.some((postA) =>
           userB.posts.some((postB) => {
             const delta = Math.abs(
-              new Date(postA.timestamp).getTime() -
-                new Date(postB.timestamp).getTime(),
+              new Date(postA.timestamp).getTime() - new Date(postB.timestamp).getTime(),
             );
             return delta <= WINDOW_MS;
           }),
@@ -284,27 +281,25 @@ export class SourceCredibilityService {
       return [];
     }
 
-    const betweennessScores =
-      await this.graph.getBetweennessForNarrative(narrativeId);
-    const communities =
-      await this.graph.detectCommunities(narrativeId);
+    const betweennessScores = await this.graph.getBetweennessForNarrative(narrativeId);
+    const communities = await this.graph.detectCommunities(narrativeId);
 
     if (betweennessScores.size === 0) return [];
 
     // Build community sets for each user
     const userCommunities = new Map<string, Set<number>>();
     for (const [handle, communityId] of communities) {
-      if (!userCommunities.has(handle)) {
-        userCommunities.set(handle, new Set());
+      let communitySet = userCommunities.get(handle);
+      if (!communitySet) {
+        communitySet = new Set();
+        userCommunities.set(handle, communitySet);
       }
-      userCommunities.get(handle)!.add(communityId);
+      communitySet.add(communityId);
     }
 
     // Find bridge nodes: high betweenness + connected to multiple communities
     const results: BridgeNodeResult[] = [];
-    const sortedByBetweenness = Array.from(betweennessScores.entries()).sort(
-      (a, b) => b[1] - a[1],
-    );
+    const sortedByBetweenness = Array.from(betweennessScores.entries()).sort((a, b) => b[1] - a[1]);
 
     for (const [handle, bt] of sortedByBetweenness) {
       const comms = userCommunities.get(handle);
@@ -345,13 +340,15 @@ export class SourceCredibilityService {
   computeAccountAge(posts: UserPost[]): number {
     if (posts.length < 2) return 0.3; // Can't determine — give benefit of doubt
 
-    const timestamps = posts
-      .map((p) => new Date(p.timestamp).getTime())
-      .sort((a, b) => a - b);
+    const timestamps = posts.map((p) => new Date(p.timestamp).getTime()).sort((a, b) => a - b);
 
-    const spanDays =
-      (timestamps[timestamps.length - 1]! - timestamps[0]!) /
-      (1000 * 60 * 60 * 24);
+    const firstTimestamp = timestamps[0];
+    const lastTimestamp = timestamps[timestamps.length - 1];
+    if (firstTimestamp === undefined || lastTimestamp === undefined) {
+      return 0.3;
+    }
+
+    const spanDays = (lastTimestamp - firstTimestamp) / (1000 * 60 * 60 * 24);
 
     // Higher floor (0.3) since we only see a sample — don't penalize established accounts
     // Score: 0 days = 0.3, 30 days = 0.6, 180+ days = 1.0
@@ -367,21 +364,23 @@ export class SourceCredibilityService {
   computePostingConsistency(posts: UserPost[]): number {
     if (posts.length < 3) return 0.5; // Not enough data
 
-    const timestamps = posts
-      .map((p) => new Date(p.timestamp).getTime())
-      .sort((a, b) => a - b);
+    const timestamps = posts.map((p) => new Date(p.timestamp).getTime()).sort((a, b) => a - b);
 
     // Compute inter-post intervals
     const intervals: number[] = [];
     for (let i = 1; i < timestamps.length; i++) {
-      intervals.push(timestamps[i]! - timestamps[i - 1]!);
+      const previous = timestamps[i - 1];
+      const current = timestamps[i];
+      if (previous === undefined || current === undefined) {
+        continue;
+      }
+      intervals.push(current - previous);
     }
 
     const mean = intervals.reduce((s, v) => s + v, 0) / intervals.length;
     if (mean === 0) return 0.1; // All posts at same time = suspicious
 
-    const variance =
-      intervals.reduce((s, v) => s + (v - mean) ** 2, 0) / intervals.length;
+    const variance = intervals.reduce((s, v) => s + (v - mean) ** 2, 0) / intervals.length;
     const cv = Math.sqrt(variance) / mean; // Coefficient of variation
 
     // Low CV = consistent = higher score. CV > 2 = very bursty = low score
@@ -399,8 +398,7 @@ export class SourceCredibilityService {
     if (posts.length === 0) return 0;
 
     const totalEngagement = posts.reduce(
-      (s, p) =>
-        s + (p.engagement.likes + p.engagement.comments + p.engagement.shares),
+      (s, p) => s + (p.engagement.likes + p.engagement.comments + p.engagement.shares),
       0,
     );
     const avgEngagement = totalEngagement / posts.length;
@@ -439,13 +437,11 @@ export class SourceCredibilityService {
     const uniqueRatio = allBigrams.size / totalBigramCount.value;
 
     // Also check for near-duplicate posts
-    const uniqueTexts = new Set(
-      posts.map((p) => p.text.toLowerCase().trim().slice(0, 100)),
-    );
+    const uniqueTexts = new Set(posts.map((p) => p.text.toLowerCase().trim().slice(0, 100)));
     const textUniqueness = uniqueTexts.size / posts.length;
 
     // Combine both signals
-    const diversity = (uniqueRatio * 0.5 + textUniqueness * 0.5);
+    const diversity = uniqueRatio * 0.5 + textUniqueness * 0.5;
     return Math.min(1, diversity);
   }
 
@@ -453,10 +449,7 @@ export class SourceCredibilityService {
    * Cross-platform presence: accounts that exist on multiple platforms
    * are more likely to be real humans.
    */
-  computeCrossPlatformPresence(
-    posts: UserPost[],
-    crossPlatformAccounts?: string[],
-  ): number {
+  computeCrossPlatformPresence(posts: UserPost[], crossPlatformAccounts?: string[]): number {
     const platformsFromPosts = new Set(posts.map((p) => p.platform));
     const knownAccounts = crossPlatformAccounts?.length ?? 0;
 
@@ -488,9 +481,13 @@ export class SourceCredibilityService {
     // Only flag if we have enough posts AND they all fall within a very short window.
     if (posts.length >= 10) {
       const timestamps = posts.map((p) => new Date(p.timestamp).getTime()).sort((a, b) => a - b);
-      const spanDays = (timestamps[timestamps.length - 1]! - timestamps[0]!) / (1000 * 60 * 60 * 24);
-      if (spanDays < 3) {
-        flags.push('Limited history — all sampled posts within 3 days');
+      const earliestTimestamp = timestamps[0];
+      const latestTimestamp = timestamps[timestamps.length - 1];
+      if (earliestTimestamp !== undefined && latestTimestamp !== undefined) {
+        const spanDays = (latestTimestamp - earliestTimestamp) / (1000 * 60 * 60 * 24);
+        if (spanDays < 3) {
+          flags.push('Limited history — all sampled posts within 3 days');
+        }
       }
     }
 
@@ -523,9 +520,7 @@ export class SourceCredibilityService {
   // Utility
   // --------------------------------------------------------------------------
 
-  private weightedAverage(
-    items: Array<{ value: number; weight: number }>,
-  ): number {
+  private weightedAverage(items: Array<{ value: number; weight: number }>): number {
     const totalWeight = items.reduce((s, i) => s + i.weight, 0);
     if (totalWeight === 0) return 0;
     return items.reduce((s, i) => s + i.value * i.weight, 0) / totalWeight;

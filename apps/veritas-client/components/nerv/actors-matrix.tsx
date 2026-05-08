@@ -7,10 +7,10 @@ import type {
   RawPost,
   UserInvestigationResult,
 } from '../../lib/api';
-import { NervTable } from './nerv-table';
-import type { NervTableColumn } from './nerv-table';
 import { NervBadge } from './nerv-badge';
 import { NervBar } from './nerv-bar';
+import type { NervTableColumn } from './nerv-table';
+import { NervTable } from './nerv-table';
 
 interface ActorRow {
   handle: string;
@@ -44,17 +44,12 @@ export function ActorsMatrix({
       credibility: u.credibility?.overallScore ?? 0.5,
       botProbability: u.botScore?.botProbability ?? 0,
       influence: u.influenceScore,
-      postCount: posts.filter(
-        (p) => p.authorHandle === u.user.handle,
-      ).length,
+      postCount: posts.filter((p) => p.authorHandle === u.user.handle).length,
       flags: u.flags,
     }));
 
     // Derive from narrative authors
-    const authorMap = new Map<
-      string,
-      { handle: string; platform: string; postCount: number }
-    >();
+    const authorMap = new Map<string, { handle: string; platform: string; postCount: number }>();
     for (const narrative of narratives) {
       for (const author of narrative.authors) {
         const key = author.handle || author.name;
@@ -84,9 +79,7 @@ export function ActorsMatrix({
       authorMap.set(key, {
         handle: key,
         platform: post.platform ?? 'unknown',
-        postCount: posts.filter(
-          (p) => (p.authorHandle || p.authorName) === key,
-        ).length,
+        postCount: posts.filter((p) => (p.authorHandle || p.authorName) === key).length,
       });
     }
 
@@ -248,7 +241,9 @@ export function ActorsMatrix({
               </p>
               <p className="text-[10px] font-mono text-nerv-text-muted mt-1 leading-relaxed">
                 Credibility, bot detection, and influence scores require a deep investigation.
-                Select a narrative in the left panel, then click <span className="text-nerv-orange">INVESTIGATE THIS NARRATIVE</span> in the detail panel.
+                Select a narrative in the left panel, then click{' '}
+                <span className="text-nerv-orange">INVESTIGATE THIS NARRATIVE</span> in the detail
+                panel.
               </p>
             </div>
           </div>
@@ -259,9 +254,7 @@ export function ActorsMatrix({
         data={actors}
         getRowId={(row) => row.handle}
         selectedId={selectedHandle ?? undefined}
-        onRowClick={(row) =>
-          onSelectActor(row.handle === selectedHandle ? null : row.handle)
-        }
+        onRowClick={(row) => onSelectActor(row.handle === selectedHandle ? null : row.handle)}
         compact
       />
     </div>

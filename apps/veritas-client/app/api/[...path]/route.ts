@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-const API_URL = process.env['API_URL'] || 'http://localhost:3000';
+const API_URL = process.env.API_URL || 'http://localhost:3000';
 
 /**
  * Catch-all API proxy route. Replaces Next.js rewrites to give us
@@ -19,7 +19,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ path
   return proxy(req, await params);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> },
+) {
   return proxy(req, await params);
 }
 
@@ -40,9 +43,7 @@ async function proxy(req: NextRequest, params: { path: string[] }) {
     }
   });
 
-  const body = req.method !== 'GET' && req.method !== 'HEAD'
-    ? await req.text()
-    : undefined;
+  const body = req.method !== 'GET' && req.method !== 'HEAD' ? await req.text() : undefined;
 
   try {
     const response = await fetch(url.toString(), {

@@ -1,5 +1,6 @@
-import { Field, ObjectType, InputType, Float, Int } from '@nestjs/graphql';
+import { Field, Float, InputType, Int, ObjectType } from '@nestjs/graphql';
 import GraphQLJSON from 'graphql-type-json';
+
 // Use local ContentNode rather than importing from a problematic path
 // import { ContentNode } from '../../../shared/types/src/lib/types';
 

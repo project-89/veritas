@@ -1,6 +1,8 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import type { BotScore } from './graph-bot-detection.service';
+import type { SourceCredibilityScore } from './source-credibility.service';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,6 +70,10 @@ export interface UserInvestigationResult {
   influenceScore: number;
   /** Suspicious patterns detected */
   flags: string[];
+  /** Optional credibility enrichment added post-investigation */
+  credibility?: SourceCredibilityScore | null;
+  /** Optional bot-detection enrichment added post-investigation */
+  botScore?: BotScore | null;
 }
 
 /** Full investigation result */
@@ -116,8 +122,7 @@ export class DeepInvestigationService {
 
   constructor(private readonly configService: ConfigService) {
     const geminiKey =
-      this.configService.get<string>('GEMINI_API_KEY') ||
-      process.env['GEMINI_API_KEY'];
+      this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
 
     if (geminiKey) {
       this.genAI = new GoogleGenerativeAI(geminiKey);
@@ -136,9 +141,7 @@ export class DeepInvestigationService {
     topic: string,
     userTimelines: Map<string, { topicPosts: UserPost[]; historicalPosts: UserPost[] }>,
   ): Promise<DeepInvestigationResult> {
-    this.logger.log(
-      `Deep investigation: "${topic}" — ${userTimelines.size} users to analyze`,
-    );
+    this.logger.log(`Deep investigation: "${topic}" — ${userTimelines.size} users to analyze`);
 
     // Step 1: Analyze each user in parallel (up to 5 concurrent)
     const userEntries = Array.from(userTimelines.entries());
@@ -204,12 +207,7 @@ export class DeepInvestigationService {
     const patterns = this.analyzePostingPatterns(sortedHistory);
 
     // LLM profile analysis
-    const profile = await this.profileUser(
-      handle,
-      topic,
-      sortedTopic,
-      sortedHistory,
-    );
+    const profile = await this.profileUser(handle, topic, sortedTopic, sortedHistory);
 
     // Influence score based on engagement and reach
     const totalEngagement = topicPosts.reduce(
@@ -246,10 +244,13 @@ export class DeepInvestigationService {
     if (posts.length < 2) return [];
 
     const shifts: NarrativeShift[] = [];
-    let prevSentiment = posts[0]!.sentiment.label;
+    const firstPost = posts[0];
+    if (!firstPost) return [];
+    let prevSentiment = firstPost.sentiment.label;
 
     for (let i = 1; i < posts.length; i++) {
-      const post = posts[i]!;
+      const post = posts[i];
+      if (!post) continue;
       if (post.sentiment.label !== prevSentiment) {
         shifts.push({
           timestamp: post.timestamp,
@@ -265,15 +266,18 @@ export class DeepInvestigationService {
     return shifts;
   }
 
-  private analyzePostingPatterns(
-    posts: UserPost[],
-  ): UserProfile['patterns'] {
+  private analyzePostingPatterns(posts: UserPost[]): UserProfile['patterns'] {
     if (posts.length === 0) {
       return { avgPostsPerDay: 0, mostActiveHours: [], platformPresence: [] };
     }
 
-    const firstTs = new Date(posts[0]!.timestamp).getTime();
-    const lastTs = new Date(posts[posts.length - 1]!.timestamp).getTime();
+    const firstPost = posts[0];
+    const lastPost = posts[posts.length - 1];
+    if (!firstPost || !lastPost) {
+      return { avgPostsPerDay: 0, mostActiveHours: [], platformPresence: [] };
+    }
+    const firstTs = new Date(firstPost.timestamp).getTime();
+    const lastTs = new Date(lastPost.timestamp).getTime();
     const days = Math.max((lastTs - firstTs) / (1000 * 60 * 60 * 24), 1);
 
     // Hour distribution
@@ -318,7 +322,10 @@ export class DeepInvestigationService {
     // Flag: Burst posting (many posts in short window)
     const timestamps = topicPosts.map((p) => new Date(p.timestamp).getTime()).sort();
     for (let i = 0; i < timestamps.length - 4; i++) {
-      const window = (timestamps[i + 4]! - timestamps[i]!) / (1000 * 60);
+      const end = timestamps[i + 4];
+      const start = timestamps[i];
+      if (end == null || start == null) continue;
+      const window = (end - start) / (1000 * 60);
       if (window < 5) {
         flags.push('Burst posting — 5+ posts within 5 minutes');
         break;
@@ -410,16 +417,13 @@ Respond ONLY with a JSON object:
   // Origin tracing
   // ---------------------------------------------------------------------------
 
-  private traceOrigin(
-    users: UserInvestigationResult[],
-  ): DeepInvestigationResult['originAnalysis'] {
+  private traceOrigin(users: UserInvestigationResult[]): DeepInvestigationResult['originAnalysis'] {
     // Sort by adoption timestamp to find first mover
     const withAdoption = users
       .filter((u) => u.adoptionTimestamp)
       .sort(
         (a, b) =>
-          new Date(a.adoptionTimestamp!).getTime() -
-          new Date(b.adoptionTimestamp!).getTime(),
+          new Date(a.adoptionTimestamp ?? 0).getTime() - new Date(b.adoptionTimestamp ?? 0).getTime(),
       );
 
     if (withAdoption.length === 0) {
@@ -431,20 +435,32 @@ Respond ONLY with a JSON object:
       };
     }
 
-    const first = withAdoption[0]!;
+    const first = withAdoption[0];
+    if (!first) {
+      return {
+        firstMover: 'unknown',
+        firstPlatform: 'unknown',
+        firstTimestamp: '',
+        propagationChain: [],
+      };
+    }
 
     // Build propagation chain (ordered by adoption time)
     const chain = withAdoption.map((u) => u.user.handle);
 
     // Set likelySource for each user (the previous user in the chain)
     for (let i = 1; i < withAdoption.length; i++) {
-      withAdoption[i]!.likelySource = withAdoption[i - 1]!.user.handle;
+      const current = withAdoption[i];
+      const previous = withAdoption[i - 1];
+      if (current && previous) {
+        current.likelySource = previous.user.handle;
+      }
     }
 
     return {
       firstMover: first.user.handle,
       firstPlatform: first.user.platform,
-      firstTimestamp: first.adoptionTimestamp!,
+      firstTimestamp: first.adoptionTimestamp ?? '',
       propagationChain: chain,
     };
   }
@@ -463,25 +479,25 @@ Respond ONLY with a JSON object:
       .filter((u) => u.adoptionTimestamp)
       .sort(
         (a, b) =>
-          new Date(a.adoptionTimestamp!).getTime() -
-          new Date(b.adoptionTimestamp!).getTime(),
+          new Date(a.adoptionTimestamp ?? 0).getTime() - new Date(b.adoptionTimestamp ?? 0).getTime(),
       );
 
     // Sliding window: users who adopted within 30 minutes of each other
     const WINDOW_MS = 30 * 60 * 1000;
     let windowStart = 0;
     for (let i = 1; i < withTimestamps.length; i++) {
+      const current = withTimestamps[i];
+      const start = withTimestamps[windowStart];
+      if (!current || !start) continue;
       const gap =
-        new Date(withTimestamps[i]!.adoptionTimestamp!).getTime() -
-        new Date(withTimestamps[windowStart]!.adoptionTimestamp!).getTime();
+        new Date(current.adoptionTimestamp ?? 0).getTime() -
+        new Date(start.adoptionTimestamp ?? 0).getTime();
 
       if (gap > WINDOW_MS) {
         // Check if window had enough users for a cluster
         if (i - windowStart >= 3) {
           clusters.push({
-            users: withTimestamps
-              .slice(windowStart, i)
-              .map((u) => u.user.handle),
+            users: withTimestamps.slice(windowStart, i).map((u) => u.user.handle),
             pattern: `${i - windowStart} users adopted the narrative within ${Math.round(gap / 60000)} minutes`,
             confidence: Math.min(0.9, (i - windowStart) / 10),
           });
@@ -540,9 +556,9 @@ Respond ONLY with a JSON object:
     const topUsers = users.slice(0, 10);
     const samplePosts = topUsers
       .flatMap((u) =>
-        u.user.topicPosts.slice(0, 3).map(
-          (p) => `@${u.user.handle} (${u.user.platform}): ${p.text.slice(0, 200)}`,
-        ),
+        u.user.topicPosts
+          .slice(0, 3)
+          .map((p) => `@${u.user.handle} (${u.user.platform}): ${p.text.slice(0, 200)}`),
       )
       .join('\n');
 

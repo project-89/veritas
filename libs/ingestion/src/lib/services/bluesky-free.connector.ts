@@ -1,15 +1,10 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { EventEmitter } from 'events';
-import { DataConnector } from '../interfaces/data-connector.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
+import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
 
 interface SearchOptions {
   startDate?: Date;
@@ -74,9 +69,7 @@ const BSKY_PUBLIC_API = 'https://public.api.bsky.app/xrpc';
  * No authentication required for reading public posts.
  */
 @Injectable()
-export class BlueskyFreeConnector
-  implements DataConnector, OnModuleInit, OnModuleDestroy
-{
+export class BlueskyFreeConnector implements DataConnector, OnModuleInit, OnModuleDestroy {
   platform = 'bluesky' as const;
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 600000; // 10 minutes
@@ -97,19 +90,16 @@ export class BlueskyFreeConnector
   }
 
   async disconnect(): Promise<void> {
-    this.streamConnections.forEach((interval) => clearInterval(interval));
+    this.streamConnections.forEach((interval) => {
+      clearInterval(interval);
+    });
     this.streamConnections.clear();
   }
 
-  async searchAndTransform(
-    query: string,
-    options?: SearchOptions,
-  ): Promise<NarrativeInsight[]> {
+  async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     const posts = await this.searchContent(query, options);
     const insights = await this.transformService.transformBatch(posts);
-    this.logger.log(
-      `Transformed ${insights.length} Bluesky results into insights`,
-    );
+    this.logger.log(`Transformed ${insights.length} Bluesky results into insights`);
     return insights;
   }
 
@@ -120,9 +110,7 @@ export class BlueskyFreeConnector
     const posts = await this.searchContent(query, options);
     if (posts.length === 0) return { posts: [], insights: [] };
     const insights = await this.transformService.transformBatch(posts);
-    this.logger.log(
-      `Bluesky: ${posts.length} posts, ${insights.length} insights`,
-    );
+    this.logger.log(`Bluesky: ${posts.length} posts, ${insights.length} insights`);
     return { posts, insights };
   }
 
@@ -186,10 +174,7 @@ export class BlueskyFreeConnector
   /**
    * Fetch a user's timeline posts.
    */
-  async getUserTimeline(
-    handle: string,
-    options?: { limit?: number },
-  ): Promise<SocialMediaPost[]> {
+  async getUserTimeline(handle: string, options?: { limit?: number }): Promise<SocialMediaPost[]> {
     const limit = options?.limit ?? 50;
     const normalizedHandle = handle.trim().replace(/^@/, '');
     if (!normalizedHandle) return [];
@@ -218,10 +203,9 @@ export class BlueskyFreeConnector
   async validateCredentials(): Promise<boolean> {
     try {
       // Public API — just verify it's reachable
-      const response = await fetch(
-        `${BSKY_PUBLIC_API}/app.bsky.feed.searchPosts?q=test&limit=1`,
-        { signal: AbortSignal.timeout(10_000) },
-      );
+      const response = await fetch(`${BSKY_PUBLIC_API}/app.bsky.feed.searchPosts?q=test&limit=1`, {
+        signal: AbortSignal.timeout(10_000),
+      });
       if (response.ok) {
         this.logger.log('Bluesky public API connector validated');
         return true;
@@ -238,10 +222,7 @@ export class BlueskyFreeConnector
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  async searchContent(
-    query: string,
-    options?: SearchOptions,
-  ): Promise<SocialMediaPost[]> {
+  async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
     const limit = options?.maxResults || options?.limit || 25;
 
     try {
@@ -303,13 +284,15 @@ export class BlueskyFreeConnector
       try {
         const response = await fetch(url, {
           headers: {
-            'Accept': 'application/json',
+            Accept: 'application/json',
           },
           signal: AbortSignal.timeout(15_000),
         });
 
         if (!response.ok) {
-          const error = new Error(`HTTP ${response.status}: ${response.statusText}`) as Error & { status?: number };
+          const error = new Error(`HTTP ${response.status}: ${response.statusText}`) as Error & {
+            status?: number;
+          };
           error.status = response.status;
           throw error;
         }
@@ -331,10 +314,7 @@ export class BlueskyFreeConnector
   }
 
   private calculateViralityScore(post: BlueskyPost): number {
-    const total =
-      (post.likeCount ?? 0) +
-      (post.repostCount ?? 0) +
-      (post.replyCount ?? 0);
+    const total = (post.likeCount ?? 0) + (post.repostCount ?? 0) + (post.replyCount ?? 0);
     if (total === 0) return 0;
     return Math.min(Math.log10(total + 1) / 4, 1);
   }

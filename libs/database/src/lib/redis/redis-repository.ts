@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { Injectable, Logger } from '@nestjs/common';
 import type { RedisClientType } from 'redis';
 import type {
   FilterQuery,
@@ -13,15 +13,13 @@ import type {
  * Redis implementation of the Repository interface
  */
 @Injectable()
-export class RedisRepository<T extends { id: string }>
-  implements Repository<T>
-{
+export class RedisRepository<T extends { id: string }> implements Repository<T> {
   private readonly logger = new Logger(RedisRepository.name);
   private readonly prefix: string;
 
   constructor(
     private readonly client: RedisClientType,
-    private readonly entityName: string
+    private readonly entityName: string,
   ) {
     // Create a namespace prefix for keys
     this.prefix = `${entityName.toLowerCase()}:`;
@@ -40,10 +38,7 @@ export class RedisRepository<T extends { id: string }>
    * Note: Redis doesn't have native filtering capabilities, so this
    * performs a scan + client-side filtering
    */
-  async find(
-    filter: FilterQuery<T> = {},
-    options?: FindOptions
-  ): Promise<T[]> {
+  async find(filter: FilterQuery<T> = {}, options?: FindOptions): Promise<T[]> {
     try {
       // Get all keys with our prefix
       const keys = await this.client.keys(`${this.prefix}*`);
@@ -69,7 +64,7 @@ export class RedisRepository<T extends { id: string }>
 
             // Apply filter (simple client-side filtering)
             const matches = Object.entries(filter).every(
-              ([key, value]) => entity[key as keyof T] === value
+              ([key, value]) => entity[key as keyof T] === value,
             );
 
             if (matches) {
@@ -85,7 +80,11 @@ export class RedisRepository<T extends { id: string }>
       let filteredEntities = entities;
 
       if (options?.sort) {
-        const [sortKey, sortOrder] = Object.entries(options.sort)[0]!;
+        const sortEntry = Object.entries(options.sort)[0];
+        if (!sortEntry) {
+          return filteredEntities;
+        }
+        const [sortKey, sortOrder] = sortEntry;
         filteredEntities = filteredEntities.sort((a, b) => {
           if (sortOrder === 1) {
             return a[sortKey as keyof T] > b[sortKey as keyof T] ? 1 : -1;
@@ -126,10 +125,7 @@ export class RedisRepository<T extends { id: string }>
       return JSON.parse(data) as T;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error finding entity by ID: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error finding entity by ID: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -139,7 +135,7 @@ export class RedisRepository<T extends { id: string }>
    */
   async findOne(filter: FilterQuery<T>): Promise<T | null> {
     const entities = await this.find(filter, { limit: 1 });
-    return entities.length > 0 ? entities[0]! : null;
+    return entities.length > 0 ? (entities[0] ?? null) : null;
   }
 
   /**
@@ -227,10 +223,7 @@ export class RedisRepository<T extends { id: string }>
       return updated;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error updating entity by ID: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error updating entity by ID: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -238,10 +231,7 @@ export class RedisRepository<T extends { id: string }>
   /**
    * Update entities matching the given filter
    */
-  async updateMany(
-    filter: FilterQuery<T>,
-    data: Partial<T>
-  ): Promise<number> {
+  async updateMany(filter: FilterQuery<T>, data: Partial<T>): Promise<number> {
     try {
       // Find all matching entities
       const entities = await this.find(filter);
@@ -285,10 +275,7 @@ export class RedisRepository<T extends { id: string }>
       return existing;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error deleting entity by ID: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error deleting entity by ID: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -332,12 +319,12 @@ export class RedisRepository<T extends { id: string }>
   async vectorSearch<R = T>(
     field: string,
     vector: number[],
-    options: VectorSearchOptions = {}
+    options: VectorSearchOptions = {},
   ): Promise<VectorSearchResult<R>[]> {
     const { limit = 10, minScore = 0.7 } = options;
 
     this.logger.debug(
-      `Performing vector search on ${this.entityName} with field ${field}, limit ${limit}, minScore ${minScore}`
+      `Performing vector search on ${this.entityName} with field ${field}, limit ${limit}, minScore ${minScore}`,
     );
 
     try {
@@ -352,31 +339,20 @@ export class RedisRepository<T extends { id: string }>
         return this.performRedisVectorSearch<R>(field, vector, limit, minScore);
       } else {
         this.logger.warn(
-          `Redis Vector Search not available, falling back to in-memory search for ${this.entityName}`
+          `Redis Vector Search not available, falling back to in-memory search for ${this.entityName}`,
         );
-        return this.performInMemoryVectorSearch<R>(
-          field,
-          vector,
-          limit,
-          minScore
-        );
+        return this.performInMemoryVectorSearch<R>(field, vector, limit, minScore);
       }
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error(
         `Error during vector search on ${this.entityName}: ${errorMessage}`,
-        errorStack
+        errorStack,
       );
       // Fall back to in-memory search on error
-      return this.performInMemoryVectorSearch<R>(
-        field,
-        vector,
-        limit,
-        minScore
-      );
+      return this.performInMemoryVectorSearch<R>(field, vector, limit, minScore);
     }
   }
 
@@ -390,13 +366,9 @@ export class RedisRepository<T extends { id: string }>
       return true;
     } catch (error: unknown) {
       // If error includes "unknown command" or "unknown index", FT module is not available
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
-      if (
-        errorMessage.includes('unknown command') ||
-        errorMessage.includes('unknown index name')
-      ) {
+      if (errorMessage.includes('unknown command') || errorMessage.includes('unknown index name')) {
         return errorMessage.includes('unknown index name'); // If it's just unknown index, FT is available
       }
       throw error; // Rethrow other errors
@@ -416,8 +388,7 @@ export class RedisRepository<T extends { id: string }>
         return; // Index exists, nothing to do
       } catch (error: unknown) {
         // If error is not "unknown index", rethrow it
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
 
         if (!errorMessage.includes('unknown index name')) {
           throw error;
@@ -447,17 +418,14 @@ export class RedisRepository<T extends { id: string }>
       ];
 
       await this.client.sendCommand(createIndexCmd);
-      this.logger.debug(
-        `Created vector index ${indexName} for ${this.entityName}`
-      );
+      this.logger.debug(`Created vector index ${indexName} for ${this.entityName}`);
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error(
         `Failed to create vector index for ${this.entityName}: ${errorMessage}`,
-        errorStack
+        errorStack,
       );
       // Non-blocking error - we'll fall back to in-memory search
     }
@@ -470,7 +438,7 @@ export class RedisRepository<T extends { id: string }>
     field: string,
     vector: number[],
     limit: number,
-    minScore: number
+    minScore: number,
   ): Promise<VectorSearchResult<R>[]> {
     const indexName = `idx:${this.entityName.toLowerCase()}:${field}`;
     const query = `*=>[KNN ${limit} @${field} $vector AS score]`;
@@ -507,7 +475,6 @@ export class RedisRepository<T extends { id: string }>
 
     // Process each result pair (key and values)
     for (let i = 1; i < results.length; i += 2) {
-      const key = results[i] as string;
       const values = results[i + 1] as string[];
 
       // Find score in values array
@@ -547,7 +514,7 @@ export class RedisRepository<T extends { id: string }>
     field: string,
     vector: number[],
     limit: number,
-    minScore: number
+    minScore: number,
   ): Promise<VectorSearchResult<R>[]> {
     // Retrieve all entities
     const allEntities = await this.find();
@@ -556,7 +523,10 @@ export class RedisRepository<T extends { id: string }>
 
     // Compare each entity's vector with the query vector
     for (const entity of allEntities) {
-      const entityVector = this.getNestedProperty(entity as unknown as Record<string, unknown>, field);
+      const entityVector = this.getNestedProperty(
+        entity as unknown as Record<string, unknown>,
+        field,
+      );
 
       // Skip entities without the vector field
       if (!entityVector || !Array.isArray(entityVector)) {

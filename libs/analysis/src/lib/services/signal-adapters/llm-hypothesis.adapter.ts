@@ -1,6 +1,6 @@
-import { Logger } from '@nestjs/common';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { SignalAdapter, ExternalSignal } from './signal-adapter.interface';
+import { Logger } from '@nestjs/common';
+import type { ExternalSignal, SignalAdapter } from './signal-adapter.interface';
 
 /**
  * MVP signal adapter that uses Gemini to hypothesize downstream effects
@@ -105,7 +105,7 @@ No other text outside the JSON array.`;
       domain,
       source: 'Fallback Hypothesis',
       title: `Potential ${domain} effect of "${topic}" narrative`,
-      description: `Hypothesized ${domain} consequence if the "${topic}" narrative gains widespread traction. This is a placeholder signal generated without LLM analysis.`,
+      description: `Deterministic fallback estimate of a plausible ${domain} consequence if the "${topic}" narrative gains widespread traction.`,
       timestamp: new Date().toISOString(),
       magnitude: 0.3 + i * 0.15,
       metadata: { hypothesized: true, fallback: true },

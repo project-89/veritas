@@ -1,7 +1,19 @@
 import { Logger } from '@nestjs/common';
 import type { EvidenceAdapter, EvidenceSource } from './evidence-adapter.interface';
 
-const SEC_KEYWORDS = ['sec', 'filing', 'corporate', 'insider', 'securities', 'regulation', 'edgar', '10-k', '10-q', '8-k', 'proxy'];
+const SEC_KEYWORDS = [
+  'sec',
+  'filing',
+  'corporate',
+  'insider',
+  'securities',
+  'regulation',
+  'edgar',
+  '10-k',
+  '10-q',
+  '8-k',
+  'proxy',
+];
 
 export class SecEdgarEvidenceAdapter implements EvidenceAdapter {
   readonly name = 'SEC EDGAR';
@@ -80,7 +92,26 @@ export class SecEdgarEvidenceAdapter implements EvidenceAdapter {
     if (entityTerms.length > 0) return entityTerms.join(' ');
 
     // Fall back to extracting keywords from the claim
-    const stopwords = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'has', 'have', 'had', 'that', 'this', 'with', 'from', 'for', 'and', 'but', 'or']);
+    const stopwords = new Set([
+      'the',
+      'a',
+      'an',
+      'is',
+      'are',
+      'was',
+      'were',
+      'has',
+      'have',
+      'had',
+      'that',
+      'this',
+      'with',
+      'from',
+      'for',
+      'and',
+      'but',
+      'or',
+    ]);
     return claim
       .split(/\s+/)
       .filter((w) => w.length > 2 && !stopwords.has(w.toLowerCase()))

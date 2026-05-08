@@ -54,7 +54,10 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
 
   // Count events per category (from filtered events)
   const categoryCounts: Record<EventCategory, number> = {
-    environmental: 0, political: 0, economic: 0, media: 0,
+    environmental: 0,
+    political: 0,
+    economic: 0,
+    media: 0,
   };
   for (const ev of events) {
     if (categoryCounts[ev.category] !== undefined) {
@@ -77,10 +80,11 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
           Category
         </div>
         <div className="flex flex-col gap-1.5">
-          {CATEGORIES.map(cat => {
+          {CATEGORIES.map((cat) => {
             const active = filters.categories.has(cat);
             return (
               <button
+                type="button"
                 key={cat}
                 onClick={() => toggleCategory(cat)}
                 className={[
@@ -115,10 +119,11 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
           Severity
         </div>
         <div className="flex flex-wrap gap-1">
-          {SEVERITIES.map(sev => {
+          {SEVERITIES.map((sev) => {
             const active = filters.severities.has(sev);
             return (
               <button
+                type="button"
                 key={sev}
                 onClick={() => toggleSeverity(sev)}
                 className={[
@@ -142,10 +147,11 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
           Time Range
         </div>
         <div className="flex gap-1">
-          {TIME_RANGES.map(range => {
+          {TIME_RANGES.map((range) => {
             const active = filters.timeRange === range;
             return (
               <button
+                type="button"
                 key={range}
                 onClick={() => setTimeRange(range)}
                 className={[

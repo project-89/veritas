@@ -32,7 +32,9 @@ export class AcledAdapter implements SignalAdapter {
     if (!apiKey || !email) {
       if (!this.warnedMissingKey) {
         this.warnedMissingKey = true;
-        this.logger.log('ACLED_API_KEY and ACLED_EMAIL not set — conflict event data unavailable. Register free at acleddata.com');
+        this.logger.log(
+          'ACLED_API_KEY and ACLED_EMAIL not set — conflict event data unavailable. Register free at acleddata.com',
+        );
       }
       return [];
     }

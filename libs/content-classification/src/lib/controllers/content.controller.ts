@@ -1,20 +1,23 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
+  HttpException,
+  HttpStatus,
+  Optional,
+  Param,
   Post,
   Put,
-  Delete,
-  Body,
-  Param,
   Query,
-  Optional,
-  HttpStatus,
-  HttpException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { ContentService } from '../services/content.service';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { ContentSearchParams, ExtendedContentNode } from '../services/content.service';
-import type { ContentCreateInput, ContentUpdateInput } from '../services/content-validation.service';
+import { ContentService } from '../services/content.service';
+import type {
+  ContentCreateInput,
+  ContentUpdateInput,
+} from '../services/content-validation.service';
 
 @ApiTags('content')
 @Controller('content')
@@ -29,7 +32,7 @@ export class ContentController {
     if (!this.contentService) {
       throw new HttpException(
         'Content service not available - use ContentClassificationModule.forRoot() with databaseProvider',
-        HttpStatus.SERVICE_UNAVAILABLE
+        HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
   }
@@ -40,9 +43,7 @@ export class ContentController {
     status: 201,
     description: 'The content has been successfully created.',
   })
-  async createContent(
-    @Body() input: ContentCreateInput
-  ): Promise<ExtendedContentNode> {
+  async createContent(@Body() input: ContentCreateInput): Promise<ExtendedContentNode> {
     this.ensureContentService();
     return this.contentService.createContent(input);
   }
@@ -53,9 +54,7 @@ export class ContentController {
     status: 200,
     description: 'The content has been successfully retrieved.',
   })
-  async getContent(
-    @Param('id') id: string
-  ): Promise<ExtendedContentNode | null> {
+  async getContent(@Param('id') id: string): Promise<ExtendedContentNode | null> {
     this.ensureContentService();
     return this.contentService.getContentById(id);
   }
@@ -66,9 +65,7 @@ export class ContentController {
     status: 200,
     description: 'The content has been successfully retrieved.',
   })
-  async searchContent(
-    @Query() params: ContentSearchParams
-  ): Promise<ExtendedContentNode[]> {
+  async searchContent(@Query() params: ContentSearchParams): Promise<ExtendedContentNode[]> {
     this.ensureContentService();
     return this.contentService.searchContent(params);
   }
@@ -81,7 +78,7 @@ export class ContentController {
   })
   async updateContent(
     @Param('id') id: string,
-    @Body() input: ContentUpdateInput
+    @Body() input: ContentUpdateInput,
   ): Promise<ExtendedContentNode | null> {
     this.ensureContentService();
     return this.contentService.updateContent(id, input);
@@ -106,7 +103,7 @@ export class ContentController {
   })
   async getRelatedContent(
     @Param('id') id: string,
-    @Query('limit') limit?: number
+    @Query('limit') limit?: number,
   ): Promise<ExtendedContentNode[]> {
     this.ensureContentService();
     return this.contentService.getRelatedContent(id, limit);
@@ -120,7 +117,7 @@ export class ContentController {
   })
   async updateEngagementMetrics(
     @Param('id') id: string,
-    @Body() metrics: ContentUpdateInput['engagementMetrics']
+    @Body() metrics: ContentUpdateInput['engagementMetrics'],
   ): Promise<ExtendedContentNode | null> {
     this.ensureContentService();
     return this.contentService.updateContent(id, {
@@ -153,7 +150,7 @@ export class ContentController {
     @Query('semanticQuery') semanticQuery: string,
     @Query('minScore') minScore?: number,
     @Query('limit') limit?: number,
-    @Query() params?: ContentSearchParams
+    @Query() params?: ContentSearchParams,
   ): Promise<ExtendedContentNode[]> {
     this.ensureContentService();
 
@@ -193,7 +190,7 @@ export class ContentController {
     @Param('id') id: string,
     @Query('limit') limit?: number,
     @Query('minScore') minScore?: number,
-    @Query('useExistingEmbedding') useExistingEmbedding?: string
+    @Query('useExistingEmbedding') useExistingEmbedding?: string,
   ): Promise<ExtendedContentNode[]> {
     this.ensureContentService();
 
@@ -213,17 +210,12 @@ export class ContentController {
     status: 200,
     description: 'Embedding has been successfully generated.',
   })
-  async generateEmbedding(
-    @Param('id') id: string
-  ): Promise<ExtendedContentNode> {
+  async generateEmbedding(@Param('id') id: string): Promise<ExtendedContentNode> {
     this.ensureContentService();
 
     const result = await this.contentService.generateEmbedding(id);
     if (!result) {
-      throw new HttpException(
-        `Content with ID ${id} not found`,
-        HttpStatus.NOT_FOUND
-      );
+      throw new HttpException(`Content with ID ${id} not found`, HttpStatus.NOT_FOUND);
     }
 
     return result;
@@ -241,12 +233,12 @@ export class ContentController {
     description: 'Number of items to process in each batch',
   })
   async generateAllEmbeddings(
-    @Query('batchSize') batchSize?: number
+    @Query('batchSize') batchSize?: number,
   ): Promise<{ processedCount: number }> {
     this.ensureContentService();
 
     const count = await this.contentService.generateAllEmbeddings(
-      batchSize !== undefined ? Number(batchSize) : undefined
+      batchSize !== undefined ? Number(batchSize) : undefined,
     );
 
     return { processedCount: count };

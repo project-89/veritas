@@ -1,10 +1,10 @@
 import {
   deepClone,
-  getNestedProperty,
-  setNestedProperty,
   deepMerge,
-  removeEmptyValues,
   flattenObject,
+  getNestedProperty,
+  removeEmptyValues,
+  setNestedProperty,
 } from '../src/lib/object-utils';
 
 describe('object-utils', () => {
@@ -115,11 +115,15 @@ describe('object-utils', () => {
     });
 
     it('should return default value for null obj', () => {
-      expect(getNestedProperty(null as unknown as Record<string, unknown>, 'a.b', 'fallback')).toBe('fallback');
+      expect(getNestedProperty(null as unknown as Record<string, unknown>, 'a.b', 'fallback')).toBe(
+        'fallback',
+      );
     });
 
     it('should return default value for undefined obj', () => {
-      expect(getNestedProperty(undefined as unknown as Record<string, unknown>, 'a', 'fallback')).toBe('fallback');
+      expect(
+        getNestedProperty(undefined as unknown as Record<string, unknown>, 'a', 'fallback'),
+      ).toBe('fallback');
     });
 
     it('should return default value for empty path', () => {

@@ -35,4 +35,4 @@ export interface NarrativeLink extends Link {
 export interface NarrativeData extends GraphData {
   nodes: NarrativeNode[];
   links: NarrativeLink[];
-} 
+}

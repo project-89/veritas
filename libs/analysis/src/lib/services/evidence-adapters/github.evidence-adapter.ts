@@ -1,13 +1,31 @@
 import { Logger } from '@nestjs/common';
 import type { EvidenceAdapter, EvidenceSource } from './evidence-adapter.interface';
 
-const DEV_KEYWORDS = ['development', 'code', 'project', 'software', 'repository', 'repo', 'commit', 'open-source', 'github'];
+const DEV_KEYWORDS = [
+  'development',
+  'code',
+  'project',
+  'software',
+  'repository',
+  'repo',
+  'commit',
+  'open-source',
+  'github',
+];
 const REPO_PATTERN = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
 
 export class GitHubEvidenceAdapter implements EvidenceAdapter {
   readonly name = 'GitHub';
   readonly sourceType = 'social' as const;
-  readonly claimDomains = ['development', 'code', 'project', 'software', 'repository', 'commit', 'open-source'];
+  readonly claimDomains = [
+    'development',
+    'code',
+    'project',
+    'software',
+    'repository',
+    'commit',
+    'open-source',
+  ];
 
   private readonly logger = new Logger(GitHubEvidenceAdapter.name);
   private readonly baseUrl = 'https://api.github.com';
@@ -93,8 +111,17 @@ export class GitHubEvidenceAdapter implements EvidenceAdapter {
           sourceType: 'social',
           credibilityScore: 0.9,
           url: `https://github.com/${repo}/graphs/contributors`,
-          data: { repo, topContributors: contribs.map((c) => ({ login: c.login, contributions: c.contributions })) },
-          excerpt: `${repo} has ${contribs.length}+ contributors. Top: ${contribs.slice(0, 3).map((c) => `${c.login} (${c.contributions})`).join(', ')}`,
+          data: {
+            repo,
+            topContributors: contribs.map((c) => ({
+              login: c.login,
+              contributions: c.contributions,
+            })),
+          },
+          excerpt: `${repo} has ${contribs.length}+ contributors. Top: ${contribs
+            .slice(0, 3)
+            .map((c) => `${c.login} (${c.contributions})`)
+            .join(', ')}`,
           relevance: 0.7,
           freshness: 0.8,
           stance: 'neutral',
@@ -108,7 +135,9 @@ export class GitHubEvidenceAdapter implements EvidenceAdapter {
       .map((e) => e.replace(/^@/, ''))
       .filter((e) => e.length > 2 && !/^[0-9a-f]{40}$/i.test(e) && !/^0x/i.test(e));
     for (const entity of searchableEntities.slice(0, 2)) {
-      const searchData = await this.apiCall(`/search/repositories?q=${encodeURIComponent(entity)}&sort=stars&per_page=3`);
+      const searchData = await this.apiCall(
+        `/search/repositories?q=${encodeURIComponent(entity)}&sort=stars&per_page=3`,
+      );
       if (!searchData) continue;
 
       const items = (searchData as GitHubSearchResponse).items ?? [];

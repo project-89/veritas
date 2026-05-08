@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 import { RedditFreeConnector } from '../../src/lib/services/reddit-free.connector';
 import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
-import axios from 'axios';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -86,7 +86,7 @@ describe('RedditFreeConnector', () => {
 
     connector = new RedditFreeConnector(
       configService as ConfigService,
-      transformService as TransformOnIngestService
+      transformService as TransformOnIngestService,
     );
 
     // Reset the internal rate limit timer
@@ -102,7 +102,7 @@ describe('RedditFreeConnector', () => {
             'User-Agent': 'Veritas/1.0.0 (API-free connector)',
             Accept: 'application/json',
           }),
-        })
+        }),
       );
     });
 
@@ -111,7 +111,7 @@ describe('RedditFreeConnector', () => {
 
       new RedditFreeConnector(
         configService as ConfigService,
-        transformService as TransformOnIngestService
+        transformService as TransformOnIngestService,
       );
 
       expect(mockedAxios.create).toHaveBeenCalledWith(
@@ -119,7 +119,7 @@ describe('RedditFreeConnector', () => {
           headers: expect.objectContaining({
             'User-Agent': 'CustomBot/2.0',
           }),
-        })
+        }),
       );
     });
   });
@@ -141,7 +141,7 @@ describe('RedditFreeConnector', () => {
   describe('disconnect', () => {
     it('should clear all stream connections', async () => {
       // Set up a fake stream connection
-      const fakeInterval = setInterval(() => {}, 10000);
+      const fakeInterval = setInterval(() => undefined, 10000);
       (connector as any).streamConnections.set('test', fakeInterval);
 
       await connector.disconnect();
@@ -284,10 +284,9 @@ describe('RedditFreeConnector', () => {
         },
       });
 
-      const posts = await connector.searchContent(
-        'Chinese sent iran 500 DF-41 missiles to Iran',
-        { searchMode: 'claim' },
-      );
+      const posts = await connector.searchContent('Chinese sent iran 500 DF-41 missiles to Iran', {
+        searchMode: 'claim',
+      });
 
       expect(posts.map((post) => post.id)).toEqual(['match-1']);
     });
@@ -295,9 +294,7 @@ describe('RedditFreeConnector', () => {
     it('should throw on API errors', async () => {
       mockAxiosInstance.get.mockRejectedValue(new Error('429 Too Many Requests'));
 
-      await expect(connector.searchContent('test')).rejects.toThrow(
-        '429 Too Many Requests'
-      );
+      await expect(connector.searchContent('test')).rejects.toThrow('429 Too Many Requests');
     });
   });
 
@@ -308,9 +305,7 @@ describe('RedditFreeConnector', () => {
       const insights = await connector.searchAndTransform('climate change');
 
       expect(transformService.transformBatch).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ platform: 'reddit' }),
-        ])
+        expect.arrayContaining([expect.objectContaining({ platform: 'reddit' })]),
       );
       expect(insights).toHaveLength(2);
     });
@@ -318,9 +313,7 @@ describe('RedditFreeConnector', () => {
     it('should propagate errors from searchContent', async () => {
       mockAxiosInstance.get.mockRejectedValue(new Error('API error'));
 
-      await expect(connector.searchAndTransform('query')).rejects.toThrow(
-        'API error'
-      );
+      await expect(connector.searchAndTransform('query')).rejects.toThrow('API error');
     });
   });
 
@@ -378,9 +371,7 @@ describe('RedditFreeConnector', () => {
     });
 
     it('should emit error events on failure', async () => {
-      jest
-        .spyOn(connector, 'searchContent')
-        .mockRejectedValue(new Error('Network failure'));
+      jest.spyOn(connector, 'searchContent').mockRejectedValue(new Error('Network failure'));
 
       const emitter = connector.streamContent(['test']);
       const errorHandler = jest.fn();
@@ -454,9 +445,7 @@ describe('RedditFreeConnector', () => {
     it('should throw on API errors', async () => {
       mockAxiosInstance.get.mockRejectedValue(new Error('404 Not Found'));
 
-      await expect(connector.getAuthorDetails('deleted_user')).rejects.toThrow(
-        '404 Not Found'
-      );
+      await expect(connector.getAuthorDetails('deleted_user')).rejects.toThrow('404 Not Found');
     });
   });
 

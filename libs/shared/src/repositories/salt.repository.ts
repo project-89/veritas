@@ -48,16 +48,12 @@ export class SaltRepository {
     const salt = this.salts.get(key);
 
     if (!salt) {
-      this.logger.warn(
-        `Salt not found for ${purpose}/${platform}. Creating new salt.`
-      );
+      this.logger.warn(`Salt not found for ${purpose}/${platform}. Creating new salt.`);
       return this.createNewSalt(purpose, platform).value;
     }
 
     if (salt.status !== 'active') {
-      this.logger.warn(
-        `Salt for ${purpose}/${platform} is not active. Creating new salt.`
-      );
+      this.logger.warn(`Salt for ${purpose}/${platform} is not active. Creating new salt.`);
       return this.createNewSalt(purpose, platform).value;
     }
 
@@ -89,9 +85,7 @@ export class SaltRepository {
    * @returns Array of active salts
    */
   public getAllActiveSalts(): CryptographicSalt[] {
-    return Array.from(this.salts.values()).filter(
-      (salt) => salt.status === 'active'
-    );
+    return Array.from(this.salts.values()).filter((salt) => salt.status === 'active');
   }
 
   /**
@@ -101,10 +95,7 @@ export class SaltRepository {
    * @param platform - Platform identifier
    * @returns Array of historical salts
    */
-  public getHistoricalSalts(
-    purpose: SaltPurpose,
-    platform: string
-  ): CryptographicSalt[] {
+  public getHistoricalSalts(purpose: SaltPurpose, platform: string): CryptographicSalt[] {
     return Array.from(this.salts.values())
       .filter((salt) => salt.purpose === purpose && salt.platform === platform)
       .sort((a, b) => b.effectiveFrom.getTime() - a.effectiveFrom.getTime());
@@ -134,10 +125,7 @@ export class SaltRepository {
    * @param platform - Platform identifier
    * @returns Newly created salt
    */
-  private createNewSalt(
-    purpose: SaltPurpose,
-    platform: string
-  ): CryptographicSalt {
+  private createNewSalt(purpose: SaltPurpose, platform: string): CryptographicSalt {
     // Expire existing active salt if it exists
     this.expireCurrentSalt(purpose, platform);
 

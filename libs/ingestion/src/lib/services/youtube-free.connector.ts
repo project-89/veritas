@@ -1,24 +1,19 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
 import { readFile, unlink } from 'fs/promises';
-import { DataConnector } from '../interfaces/data-connector.interface';
-import { SocialMediaPost } from '../../types/social-media.types';
-import { SourceNode } from '../schemas';
-import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
-import { SubprocessUtil } from './utils/subprocess.util';
+import { SocialMediaPost } from '../../types/social-media.types';
+import { DataConnector } from '../interfaces/data-connector.interface';
+import { SourceNode } from '../schemas';
 import {
   buildClaimQueryPlan,
   looksLikeClaimQuery,
   normalizeSearchMode,
   type SearchMode,
 } from '../utils/query-intent.util';
+import { TransformOnIngestService } from './transform/transform-on-ingest.service';
+import { SubprocessUtil } from './utils/subprocess.util';
 
 interface SearchOptions {
   startDate?: Date;
@@ -93,9 +88,7 @@ interface YtDlpChannelInfo {
  * Requires yt-dlp to be installed: `pip install yt-dlp` or `brew install yt-dlp`
  */
 @Injectable()
-export class YouTubeFreeConnector
-  implements DataConnector, OnModuleInit, OnModuleDestroy
-{
+export class YouTubeFreeConnector implements DataConnector, OnModuleInit, OnModuleDestroy {
   platform = 'youtube' as const;
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 600000; // 10 minutes (slower than API)
@@ -105,7 +98,7 @@ export class YouTubeFreeConnector
   constructor(
     private configService: ConfigService,
     private transformService: TransformOnIngestService,
-    private subprocessUtil: SubprocessUtil
+    private subprocessUtil: SubprocessUtil,
   ) {
     this.ytDlpPath = this.configService.get<string>('YT_DLP_PATH') || 'yt-dlp';
   }
@@ -119,13 +112,11 @@ export class YouTubeFreeConnector
   }
 
   async connect(): Promise<void> {
-    const available = await this.subprocessUtil.checkAvailability(
-      this.ytDlpPath
-    );
+    const available = await this.subprocessUtil.checkAvailability(this.ytDlpPath);
     if (!available) {
       throw new Error(
         `yt-dlp is not installed or not found at "${this.ytDlpPath}". ` +
-          'Install it with: pip install yt-dlp (or brew install yt-dlp)'
+          'Install it with: pip install yt-dlp (or brew install yt-dlp)',
       );
     }
     this.logger.log('yt-dlp is available for YouTube API-free connector');
@@ -139,33 +130,25 @@ export class YouTubeFreeConnector
     this.logger.log('Disconnected YouTube API-free connector');
   }
 
-  async searchAndTransform(
-    query: string,
-    options?: SearchOptions
-  ): Promise<NarrativeInsight[]> {
+  async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     try {
       this.logger.log(`Searching YouTube (API-free) for: ${query}`);
 
       const posts = await this.searchContent(query, options);
       const insights = await this.transformService.transformBatch(posts);
 
-      this.logger.log(
-        `Transformed ${insights.length} YouTube results into anonymized insights`
-      );
+      this.logger.log(`Transformed ${insights.length} YouTube results into anonymized insights`);
 
       return insights;
     } catch (error) {
-      this.logger.error(
-        'Error searching and transforming YouTube content:',
-        error
-      );
+      this.logger.error('Error searching and transforming YouTube content:', error);
       throw error;
     }
   }
 
   async searchWithRawData(
     query: string,
-    options?: SearchOptions
+    options?: SearchOptions,
   ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> {
     try {
       this.logger.log(`Searching YouTube (with raw data) for: ${query}`);
@@ -197,9 +180,7 @@ export class YouTubeFreeConnector
             emitter.emit('data', insight);
           }
 
-          this.logger.debug(
-            `Emitted ${insights.length} anonymized insights from YouTube stream`
-          );
+          this.logger.debug(`Emitted ${insights.length} anonymized insights from YouTube stream`);
         }
       } catch (error) {
         emitter.emit('error', error);
@@ -238,7 +219,7 @@ export class YouTubeFreeConnector
           '0',
           '--no-download',
         ],
-        { timeout: 30000 }
+        { timeout: 30000 },
       );
 
       if (result.exitCode !== 0) {
@@ -273,15 +254,13 @@ export class YouTubeFreeConnector
 
   async validateCredentials(): Promise<boolean> {
     try {
-      const result = await this.subprocessUtil.exec(
-        this.ytDlpPath,
-        ['--version'],
-        { timeout: 10000 }
-      );
+      const result = await this.subprocessUtil.exec(this.ytDlpPath, ['--version'], {
+        timeout: 10000,
+      });
 
       if (result.exitCode === 0) {
         this.logger.log(
-          `YouTube API-free connector validated (yt-dlp version: ${result.stdout.trim()})`
+          `YouTube API-free connector validated (yt-dlp version: ${result.stdout.trim()})`,
         );
         return true;
       }
@@ -291,7 +270,7 @@ export class YouTubeFreeConnector
     } catch (error) {
       this.logger.error(
         'YouTube API-free connector validation failed. Is yt-dlp installed?',
-        error
+        error,
       );
       return false;
     }
@@ -299,10 +278,7 @@ export class YouTubeFreeConnector
 
   // --- Private helpers ---
 
-  private async searchContent(
-    query: string,
-    options?: SearchOptions
-  ): Promise<SocialMediaPost[]> {
+  private async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
     const limit = options?.maxResults || options?.limit || 25;
     const fetchTranscripts = options?.fetchTranscripts ?? true;
     const searchMode = normalizeSearchMode(
@@ -318,9 +294,7 @@ export class YouTubeFreeConnector
       if (videos.length === 0 && searchMode !== 'claim') {
         const compactQuery = this.buildCompactSearchQuery(query);
         if (compactQuery && compactQuery !== query) {
-          this.logger.debug(
-            `Retrying YouTube search with compact query: "${compactQuery}"`,
-          );
+          this.logger.debug(`Retrying YouTube search with compact query: "${compactQuery}"`);
           videos = await this.executeSearch(compactQuery, limit, options);
         }
       }
@@ -332,24 +306,26 @@ export class YouTubeFreeConnector
         for (let i = 0; i < videos.length; i += TRANSCRIPT_CONCURRENCY) {
           const batch = videos.slice(i, i + TRANSCRIPT_CONCURRENCY);
           const batchResults = await Promise.allSettled(
-            batch.map((video) => this.getVideoTranscript(video.id))
+            batch.map((video) => this.getVideoTranscript(video.id)),
           );
 
           for (let j = 0; j < batch.length; j++) {
-            const result = batchResults[j]!;
+            const result = batchResults[j];
+            const video = batch[j];
+            if (!result || !video) {
+              continue;
+            }
             if (result.status === 'fulfilled' && result.value) {
-              transcriptMap.set(batch[j]!.id, result.value);
+              transcriptMap.set(video.id, result.value);
             }
           }
         }
 
-        this.logger.log(
-          `Fetched transcripts for ${transcriptMap.size}/${videos.length} videos`
-        );
+        this.logger.log(`Fetched transcripts for ${transcriptMap.size}/${videos.length} videos`);
       }
 
       let posts = videos.map((video) =>
-        this.transformVideoToSocialMediaPost(video, transcriptMap.get(video.id))
+        this.transformVideoToSocialMediaPost(video, transcriptMap.get(video.id)),
       );
 
       // Post-fetch date filter — yt-dlp's --dateafter/--datebefore may not work
@@ -381,31 +357,18 @@ export class YouTubeFreeConnector
     limit: number,
     options?: SearchOptions,
   ): Promise<YtDlpVideoInfo[]> {
-    const args = [
-      `ytsearch${limit}:${query}`,
-      '--dump-json',
-      '--no-download',
-      '--flat-playlist',
-    ];
+    const args = [`ytsearch${limit}:${query}`, '--dump-json', '--no-download', '--flat-playlist'];
 
     if (options?.startDate) {
-      args.push(
-        '--dateafter',
-        this.formatYtDlpDate(options.startDate)
-      );
+      args.push('--dateafter', this.formatYtDlpDate(options.startDate));
     }
     if (options?.endDate) {
-      args.push(
-        '--datebefore',
-        this.formatYtDlpDate(options.endDate)
-      );
+      args.push('--datebefore', this.formatYtDlpDate(options.endDate));
     }
 
-    return this.subprocessUtil.execJsonLines<YtDlpVideoInfo>(
-      this.ytDlpPath,
-      args,
-      { timeout: 60000 }
-    );
+    return this.subprocessUtil.execJsonLines<YtDlpVideoInfo>(this.ytDlpPath, args, {
+      timeout: 60000,
+    });
   }
 
   private async executeClaimSearch(
@@ -415,11 +378,11 @@ export class YouTubeFreeConnector
   ): Promise<YtDlpVideoInfo[]> {
     const plan = buildClaimQueryPlan(query);
     const queries = Array.from(
-      new Set([
-        query,
-        plan.compactQuery,
-        this.buildCompactSearchQuery(query),
-      ].filter((value): value is string => Boolean(value && value.trim().length > 0))),
+      new Set(
+        [query, plan.compactQuery, this.buildCompactSearchQuery(query)].filter(
+          (value): value is string => Boolean(value && value.trim().length > 0),
+        ),
+      ),
     );
 
     const merged = new Map<string, YtDlpVideoInfo>();
@@ -446,11 +409,7 @@ export class YouTubeFreeConnector
           .replace(/[^a-z0-9\s-]+/g, ' ')
           .split(/\s+/)
           .map((term) => term.trim())
-          .filter(
-            (term) =>
-              term.length >= 3 &&
-              !YOUTUBE_QUERY_STOPWORDS.has(term),
-          ),
+          .filter((term) => term.length >= 3 && !YOUTUBE_QUERY_STOPWORDS.has(term)),
       ),
     );
 
@@ -463,7 +422,7 @@ export class YouTubeFreeConnector
 
   private transformVideoToSocialMediaPost(
     video: YtDlpVideoInfo,
-    transcript?: string
+    transcript?: string,
   ): SocialMediaPost {
     // Prefer transcript over description when available for richer content
     const body = transcript || video.description;
@@ -513,18 +472,19 @@ export class YouTubeFreeConnector
           '--skip-download',
           '--write-subs',
           '--write-auto-subs',
-          '--sub-lang', 'en',
-          '--sub-format', 'vtt',
-          '-o', outputTemplate,
+          '--sub-lang',
+          'en',
+          '--sub-format',
+          'vtt',
+          '-o',
+          outputTemplate,
           url,
         ],
-        { timeout: 30000 }
+        { timeout: 30000 },
       );
 
       if (result.exitCode !== 0) {
-        this.logger.debug(
-          `No subtitles available for video ${videoId}: ${result.stderr}`
-        );
+        this.logger.debug(`No subtitles available for video ${videoId}: ${result.stderr}`);
         return '';
       }
 
@@ -613,9 +573,7 @@ export class YouTubeFreeConnector
     return Math.min(engagementRate * 10, 1);
   }
 
-  private calculateCredibilityScore(
-    channelInfo: YtDlpChannelInfo
-  ): number {
+  private calculateCredibilityScore(channelInfo: YtDlpChannelInfo): number {
     const followers = channelInfo.channel_follower_count || 0;
 
     let score = 0.1;

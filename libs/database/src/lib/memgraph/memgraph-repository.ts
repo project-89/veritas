@@ -1,13 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  Driver,
-  Record as Neo4jRecord,
-  Session,
-  int,
-  isInt,
-  Integer,
-  Result,
-} from 'neo4j-driver';
+import { Driver, Integer, int, isInt, Record as Neo4jRecord, Session } from 'neo4j-driver';
 import {
   FilterQuery,
   FindOptions,
@@ -25,8 +17,21 @@ export class MemgraphRepository<T> implements Repository<T> {
 
   constructor(
     private readonly driver: Driver,
-    private readonly entityName: string
+    private readonly entityName: string,
   ) {}
+
+  private getFirstRecord(records: Neo4jRecord[]): Neo4jRecord | null {
+    return records.length > 0 ? (records[0] ?? null) : null;
+  }
+
+  private getNumericRecordValue(record: Neo4jRecord | null, key: string): number {
+    if (!record) {
+      return 0;
+    }
+
+    const value = record.get(key);
+    return isInt(value) ? value.toNumber() : (value as number);
+  }
 
   /**
    * Convert a Neo4j record to a domain entity
@@ -54,7 +59,7 @@ export class MemgraphRepository<T> implements Repository<T> {
    */
   private async executeQuery(
     query: string,
-    params?: Record<string, unknown>
+    params?: Record<string, unknown>,
   ): Promise<Neo4jRecord[]> {
     let session: Session | null = null;
     try {
@@ -73,10 +78,7 @@ export class MemgraphRepository<T> implements Repository<T> {
   /**
    * Find all entities matching the given filter
    */
-  async find(
-    filter: FilterQuery<T> = {},
-    options?: FindOptions
-  ): Promise<T[]> {
+  async find(filter: FilterQuery<T> = {}, options?: FindOptions): Promise<T[]> {
     try {
       // Build WHERE clause from filter
       const whereConditions = Object.entries(filter).map(([key]) => {
@@ -84,17 +86,12 @@ export class MemgraphRepository<T> implements Repository<T> {
       });
 
       const whereClause =
-        whereConditions.length > 0
-          ? `WHERE ${whereConditions.join(' AND ')}`
-          : '';
+        whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
       // Build ORDER BY clause for sorting
       const orderClause = options?.sort
         ? `ORDER BY ${Object.entries(options.sort)
-            .map(
-              ([field, direction]) =>
-                `n.${field} ${direction === 1 ? 'ASC' : 'DESC'}`
-            )
+            .map(([field, direction]) => `n.${field} ${direction === 1 ? 'ASC' : 'DESC'}`)
             .join(', ')}`
         : '';
 
@@ -132,13 +129,11 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, { id: int(id) });
-      return records.length > 0 ? this.recordToEntity(records[0]!) : null;
+      const record = this.getFirstRecord(records);
+      return record ? this.recordToEntity(record) : null;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error finding entity by ID: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error finding entity by ID: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -154,9 +149,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       });
 
       const whereClause =
-        whereConditions.length > 0
-          ? `WHERE ${whereConditions.join(' AND ')}`
-          : '';
+        whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
       const query = `
         MATCH (n:${this.entityName})
@@ -166,7 +159,8 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, filter);
-      return records.length > 0 ? this.recordToEntity(records[0]!) : null;
+      const record = this.getFirstRecord(records);
+      return record ? this.recordToEntity(record) : null;
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error finding entity: ${err.message}`, err.stack);
@@ -185,9 +179,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       });
 
       const whereClause =
-        whereConditions.length > 0
-          ? `WHERE ${whereConditions.join(' AND ')}`
-          : '';
+        whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
       const query = `
         MATCH (n:${this.entityName})
@@ -196,8 +188,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, filter);
-      const count = records[0]!.get('count');
-      return isInt(count) ? (count as Integer).toNumber() : (count as number);
+      return this.getNumericRecordValue(this.getFirstRecord(records), 'count');
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error counting entities: ${err.message}`, err.stack);
@@ -216,7 +207,11 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, { data });
-      return this.recordToEntity(records[0]!);
+      const record = this.getFirstRecord(records);
+      if (!record) {
+        throw new Error(`Create query for ${this.entityName} returned no records`);
+      }
+      return this.recordToEntity(record);
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error creating entity: ${err.message}`, err.stack);
@@ -241,10 +236,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       return records.map((record) => this.recordToEntity(record));
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error creating multiple entities: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error creating multiple entities: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -262,13 +254,11 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, { id: int(id), data });
-      return records.length > 0 ? this.recordToEntity(records[0]!) : null;
+      const record = this.getFirstRecord(records);
+      return record ? this.recordToEntity(record) : null;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error updating entity by ID: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error updating entity by ID: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -276,10 +266,7 @@ export class MemgraphRepository<T> implements Repository<T> {
   /**
    * Update entities matching the given filter
    */
-  async updateMany(
-    filter: FilterQuery<T>,
-    updateData: Partial<T>
-  ): Promise<number> {
+  async updateMany(filter: FilterQuery<T>, updateData: Partial<T>): Promise<number> {
     try {
       // Build WHERE clause from filter
       const whereConditions = Object.entries(filter).map(([key]) => {
@@ -287,9 +274,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       });
 
       const whereClause =
-        whereConditions.length > 0
-          ? `WHERE ${whereConditions.join(' AND ')}`
-          : '';
+        whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
       const query = `
         MATCH (n:${this.entityName})
@@ -300,14 +285,10 @@ export class MemgraphRepository<T> implements Repository<T> {
 
       const params = { ...filter, data: updateData };
       const records = await this.executeQuery(query, params);
-      const count = records[0]!.get('count');
-      return isInt(count) ? (count as Integer).toNumber() : (count as number);
+      return this.getNumericRecordValue(this.getFirstRecord(records), 'count');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error updating multiple entities: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error updating multiple entities: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -330,14 +311,16 @@ export class MemgraphRepository<T> implements Repository<T> {
         return null;
       }
 
-      const props = records[0]!.get('props');
+      const record = this.getFirstRecord(records);
+      if (!record) {
+        return null;
+      }
+
+      const props = record.get('props');
       return { ...props, id } as unknown as T;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error deleting entity by ID: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error deleting entity by ID: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -353,9 +336,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       });
 
       const whereClause =
-        whereConditions.length > 0
-          ? `WHERE ${whereConditions.join(' AND ')}`
-          : '';
+        whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
       const query = `
         MATCH (n:${this.entityName})
@@ -366,14 +347,10 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query, filter);
-      const count = records[0]!.get('count');
-      return isInt(count) ? (count as Integer).toNumber() : (count as number);
+      return this.getNumericRecordValue(this.getFirstRecord(records), 'count');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error deleting multiple entities: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error deleting multiple entities: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -391,15 +368,12 @@ export class MemgraphRepository<T> implements Repository<T> {
   async vectorSearch<R = T>(
     field: string,
     vector: number[],
-    options: VectorSearchOptions = {}
+    options: VectorSearchOptions = {},
   ): Promise<VectorSearchResult<R>[]> {
     const limit = options.limit || 10;
     const minScore = options.minScore || 0.7;
 
     try {
-      // Convert vector to string representation for Cypher
-      const vectorStr = JSON.stringify(vector);
-
       // Cypher query to find similar entities using cosine similarity
       // This uses a custom function that should be registered in Memgraph
       const query = `
@@ -426,9 +400,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       }));
     } catch (error) {
       this.logger.error(
-        `Vector search error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Vector search error: ${error instanceof Error ? error.message : String(error)}`,
       );
 
       // Fall back to in-memory vector search if the Memgraph query fails
@@ -444,7 +416,7 @@ export class MemgraphRepository<T> implements Repository<T> {
     field: string,
     vector: number[],
     limit: number,
-    minScore: number
+    minScore: number,
   ): Promise<VectorSearchResult<R>[]> {
     try {
       // Get all entities with the specified field
@@ -455,33 +427,27 @@ export class MemgraphRepository<T> implements Repository<T> {
       `;
 
       const records = await this.executeQuery(query);
-      const entities = records.map((record) =>
-        this.recordToEntity(record.get('n'))
-      );
+      const entities = records.map((record) => this.recordToEntity(record.get('n')));
 
       // Calculate similarity for each entity
       const results = entities
         .map((entity) => {
-          const entityVector = this.getNestedProperty(entity as unknown as Record<string, unknown>, field);
-          if (
-            !Array.isArray(entityVector) ||
-            entityVector.length !== vector.length
-          ) {
+          const entityVector = this.getNestedProperty(
+            entity as unknown as Record<string, unknown>,
+            field,
+          );
+          if (!Array.isArray(entityVector) || entityVector.length !== vector.length) {
             return null;
           }
 
-          const similarity = this.calculateCosineSimilarity(
-            vector,
-            entityVector
-          );
+          const similarity = this.calculateCosineSimilarity(vector, entityVector);
           return {
             item: entity as unknown as R,
             score: similarity,
           };
         })
         .filter(
-          (result): result is VectorSearchResult<R> =>
-            result !== null && result.score >= minScore
+          (result): result is VectorSearchResult<R> => result !== null && result.score >= minScore,
         )
         .sort((a, b) => b.score - a.score)
         .slice(0, limit);
@@ -489,9 +455,7 @@ export class MemgraphRepository<T> implements Repository<T> {
       return results;
     } catch (error) {
       this.logger.error(
-        `In-memory vector search error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `In-memory vector search error: ${error instanceof Error ? error.message : String(error)}`,
       );
       return [];
     }

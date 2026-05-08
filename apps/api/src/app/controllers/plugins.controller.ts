@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
-import { getInstalledPluginManifests } from '../../../../../libs/shared/src/lib/plugins/plugin-registry';
+/* eslint-disable-next-line @nx/enforce-module-boundaries -- plugin manifest endpoint reads the shared runtime registry */
+import { getInstalledPluginManifests } from '@veritas/shared/plugins';
 
 @Controller('plugins')
 export class PluginsController {

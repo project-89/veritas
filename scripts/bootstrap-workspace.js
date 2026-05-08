@@ -39,10 +39,14 @@ function printPrivatePluginHint() {
 }
 
 function runPluginSync() {
-  const result = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'generate-plugin-registry.js')], {
-    cwd: ROOT,
-    stdio: 'inherit',
-  });
+  const result = spawnSync(
+    process.execPath,
+    [path.join(ROOT, 'scripts', 'generate-plugin-registry.js')],
+    {
+      cwd: ROOT,
+      stdio: 'inherit',
+    },
+  );
 
   if (result.status !== 0) {
     process.exit(result.status ?? 1);

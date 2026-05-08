@@ -2,10 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = process.cwd();
-const PLUGIN_ROOTS = [
-  path.join(ROOT, 'packages'),
-  path.join(ROOT, 'private-plugins', 'packages'),
-];
+const PLUGIN_ROOTS = [path.join(ROOT, 'packages'), path.join(ROOT, 'private-plugins', 'packages')];
 const SHARED_OUTPUT = path.join(ROOT, 'libs/shared/src/lib/plugins/generated-plugin-manifests.ts');
 const CLIENT_OUTPUT = path.join(ROOT, 'apps/veritas-client/lib/generated-plugin-components.ts');
 const API_OUTPUT = path.join(ROOT, 'apps/api/src/app/generated-plugin-backend.ts');
@@ -18,6 +15,27 @@ function relativeImport(fromFile, toFile) {
   const rel = path.relative(path.dirname(fromFile), toFile);
   const withoutExt = rel.replace(/\.[^.]+$/, '');
   return toPosix(withoutExt.startsWith('.') ? withoutExt : `./${withoutExt}`);
+}
+
+function readPackageName(pluginRoot) {
+  const packageJsonPath = path.join(pluginRoot, 'package.json');
+  if (!fs.existsSync(packageJsonPath)) {
+    throw new Error(`Missing package.json for plugin at ${pluginRoot}`);
+  }
+
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  if (!packageJson.name || typeof packageJson.name !== 'string') {
+    throw new Error(`Plugin package at ${pluginRoot} is missing a valid package name`);
+  }
+
+  return packageJson.name;
+}
+
+function resolvePluginImport(plugin, entry) {
+  if (entry === 'src/backend/index.ts') {
+    return `${plugin.packageName}/backend`;
+  }
+  return plugin.packageName;
 }
 
 function readPluginConfigs() {
@@ -37,6 +55,7 @@ function readPluginConfigs() {
         return {
           name: entry.name,
           root: pluginRoot,
+          packageName: readPackageName(pluginRoot),
           ...config,
         };
       })
@@ -88,10 +107,7 @@ function buildClientOutput(plugins) {
     (client.routes ?? []).forEach((route, routeIndex) => {
       const alias = `pluginRoute${index}_${routeIndex}`;
       imports.push(
-        `import { ${route.symbol} as ${alias} } from '${relativeImport(
-          CLIENT_OUTPUT,
-          path.join(plugin.root, route.entry),
-        )}';`,
+        `import { ${route.symbol} as ${alias} } from '${resolvePluginImport(plugin, route.entry)}';`,
       );
       routeEntries.push(`  '${route.path}': ${alias},`);
     });
@@ -99,10 +115,7 @@ function buildClientOutput(plugins) {
     (client.investigationPanels ?? []).forEach((panel, panelIndex) => {
       const alias = `pluginInvestigationPanel${index}_${panelIndex}`;
       imports.push(
-        `import { ${panel.symbol} as ${alias} } from '${relativeImport(
-          CLIENT_OUTPUT,
-          path.join(plugin.root, panel.entry),
-        )}';`,
+        `import { ${panel.symbol} as ${alias} } from '${resolvePluginImport(plugin, panel.entry)}';`,
       );
       investigationPanelEntries.push(`  '${panel.capability}': ${alias},`);
     });
@@ -110,29 +123,62 @@ function buildClientOutput(plugins) {
     (client.identityPanels ?? []).forEach((panel, panelIndex) => {
       const alias = `pluginIdentityPanel${index}_${panelIndex}`;
       imports.push(
-        `import { ${panel.symbol} as ${alias} } from '${relativeImport(
-          CLIENT_OUTPUT,
-          path.join(plugin.root, panel.entry),
-        )}';`,
+        `import { ${panel.symbol} as ${alias} } from '${resolvePluginImport(plugin, panel.entry)}';`,
       );
       identityPanelEntries.push(`  '${panel.capability}': ${alias},`);
     });
   });
 
-  return `${imports.join('\n')}
+  return `/* eslint-disable @nx/enforce-module-boundaries -- generated plugin imports are intentionally resolved from installed plugin packages */
+${imports.join('\n')}
 
 import type { ComponentType } from 'react';
+import type { IdentityRecord, Investigation, InvestigationEvidenceSeed, MagiProfileMode, MentalModel } from './api';
 
-export const GENERATED_PAGE_ROUTE_COMPONENTS: Record<string, ComponentType<any>> = {
-${routeEntries.join('\n')}
+type GeneratedAtlasPageProps = {
+  api: {
+    fetchAtlasLenses: typeof import('./api').fetchAtlasLenses;
+    fetchInvestigation: typeof import('./api').fetchInvestigation;
+    createOrGetInvestigation: typeof import('./api').createOrGetInvestigation;
+    addInvestigationEvidenceSeed: typeof import('./api').addInvestigationEvidenceSeed;
+    buildMentalModel: typeof import('./api').buildMentalModel;
+  };
 };
 
-export const GENERATED_INVESTIGATION_PANEL_COMPONENTS: Record<string, ComponentType<any>> = {
-${investigationPanelEntries.join('\n')}
+type GeneratedInvestigationPanelProps = {
+  investigationRecord?: Investigation | null;
+  mentalModel?: MentalModel | null;
+  mentalModelSaving?: boolean;
+  onAddEvidenceSeed?: (seed: {
+    kind: InvestigationEvidenceSeed['kind'];
+    value: string;
+    notes?: string | null;
+  }) => Promise<void>;
+  onBuildMentalModel?: () => Promise<void>;
+  onRefreshMentalModel?: () => Promise<void>;
 };
 
-export const GENERATED_IDENTITY_PANEL_COMPONENTS: Record<string, ComponentType<any>> = {
-${identityPanelEntries.join('\n')}
+type GeneratedIdentityPanelProps = {
+  identity: IdentityRecord;
+  onGenerateProfile?: (id: string, mode: MagiProfileMode) => void;
+};
+
+export const GENERATED_PAGE_ROUTE_COMPONENTS: Record<string, ComponentType<GeneratedAtlasPageProps>> = {
+${routeEntries
+  .map((entry) => entry.replace(/,$/, ' as ComponentType<GeneratedAtlasPageProps>,'))
+  .join('\n')}
+};
+
+export const GENERATED_INVESTIGATION_PANEL_COMPONENTS: Record<string, ComponentType<GeneratedInvestigationPanelProps>> = {
+${investigationPanelEntries
+  .map((entry) => entry.replace(/,$/, ' as ComponentType<GeneratedInvestigationPanelProps>,'))
+  .join('\n')}
+};
+
+export const GENERATED_IDENTITY_PANEL_COMPONENTS: Record<string, ComponentType<GeneratedIdentityPanelProps>> = {
+${identityPanelEntries
+  .map((entry) => entry.replace(/,$/, ' as ComponentType<GeneratedIdentityPanelProps>,'))
+  .join('\n')}
 };
 `;
 }
@@ -145,34 +191,27 @@ function buildApiOutput(plugins) {
   plugins.forEach((plugin, index) => {
     if (!plugin.backend) return;
     const importNames = [];
-    if (plugin.backend.providersSymbol) {
-      const alias = `pluginProviders${index}`;
-      importNames.push(`${plugin.backend.providersSymbol} as ${alias}`);
-      providerSymbols.push(alias);
-    }
     if (plugin.backend.controllersSymbol) {
       const alias = `pluginControllers${index}`;
       importNames.push(`${plugin.backend.controllersSymbol} as ${alias}`);
       controllerSymbols.push(alias);
     }
+    if (plugin.backend.providersSymbol) {
+      const alias = `pluginProviders${index}`;
+      importNames.push(`${plugin.backend.providersSymbol} as ${alias}`);
+      providerSymbols.push(alias);
+    }
     if (importNames.length === 0) return;
     imports.push(
-      `import { ${importNames.join(', ')} } from '${relativeImport(
-        API_OUTPUT,
-        path.join(plugin.root, plugin.backend.entry),
-      )}';`,
+      `import { ${importNames.join(', ')} } from '${resolvePluginImport(plugin, plugin.backend.entry)}';`,
     );
   });
 
   return `${imports.join('\n')}
 
-export const GENERATED_PLUGIN_APP_PROVIDERS = [
-${providerSymbols.map((symbol) => `  ...${symbol},`).join('\n')}
-];
+export const GENERATED_PLUGIN_APP_PROVIDERS = [${providerSymbols.map((symbol) => `...${symbol}`).join(', ')}];
 
-export const GENERATED_PLUGIN_CONTROLLERS = [
-${controllerSymbols.map((symbol) => `  ...${symbol},`).join('\n')}
-];
+export const GENERATED_PLUGIN_CONTROLLERS = [${controllerSymbols.map((symbol) => `...${symbol}`).join(', ')}];
 `;
 }
 

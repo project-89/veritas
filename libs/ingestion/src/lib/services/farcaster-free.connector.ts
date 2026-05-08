@@ -1,16 +1,11 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
-import { DataConnector } from '../interfaces/data-connector.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
+import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
 
 interface SearchOptions {
   startDate?: Date;
@@ -77,9 +72,7 @@ const NEYNAR_BASE = 'https://api.neynar.com/v2/farcaster';
  * empty results gracefully — it will never throw.
  */
 @Injectable()
-export class FarcasterFreeConnector
-  implements DataConnector, OnModuleInit, OnModuleDestroy
-{
+export class FarcasterFreeConnector implements DataConnector, OnModuleInit, OnModuleDestroy {
   platform = 'farcaster' as const;
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 600000; // 10 minutes
@@ -104,18 +97,15 @@ export class FarcasterFreeConnector
 
   async connect(): Promise<void> {
     if (!this.neynarApiKey) {
-      this.logger.debug(
-        'NEYNAR_API_KEY not set — Farcaster connector unavailable',
-      );
+      this.logger.debug('NEYNAR_API_KEY not set — Farcaster connector unavailable');
       this.available = false;
       return;
     }
 
     try {
-      const response = await this.fetchWithTimeout(
-        `${NEYNAR_BASE}/cast/search?q=gm&limit=1`,
-        { headers: this.neynarHeaders() },
-      );
+      const response = await this.fetchWithTimeout(`${NEYNAR_BASE}/cast/search?q=gm&limit=1`, {
+        headers: this.neynarHeaders(),
+      });
       if (response.ok) {
         this.available = true;
         this.logger.log('Farcaster connector connected via Neynar v2 API');
@@ -125,27 +115,24 @@ export class FarcasterFreeConnector
           `Neynar API returned status ${response.status} — Farcaster connector unavailable`,
         );
       }
-    } catch (error) {
+    } catch {
       this.available = false;
       this.logger.warn('Neynar API unreachable — Farcaster connector unavailable');
     }
   }
 
   async disconnect(): Promise<void> {
-    this.streamConnections.forEach((interval) => clearInterval(interval));
+    this.streamConnections.forEach((interval) => {
+      clearInterval(interval);
+    });
     this.streamConnections.clear();
   }
 
-  async searchAndTransform(
-    query: string,
-    options?: SearchOptions,
-  ): Promise<NarrativeInsight[]> {
+  async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     const posts = await this.searchContent(query, options);
     if (posts.length === 0) return [];
     const insights = await this.transformService.transformBatch(posts);
-    this.logger.log(
-      `Transformed ${insights.length} Farcaster results into insights`,
-    );
+    this.logger.log(`Transformed ${insights.length} Farcaster results into insights`);
     return insights;
   }
 
@@ -156,9 +143,7 @@ export class FarcasterFreeConnector
     const posts = await this.searchContent(query, options);
     if (posts.length === 0) return { posts: [], insights: [] };
     const insights = await this.transformService.transformBatch(posts);
-    this.logger.log(
-      `Farcaster: ${posts.length} posts, ${insights.length} insights`,
-    );
+    this.logger.log(`Farcaster: ${posts.length} posts, ${insights.length} insights`);
     return { posts, insights };
   }
 
@@ -212,9 +197,7 @@ export class FarcasterFreeConnector
       });
 
       if (!response.ok) {
-        this.logger.debug(
-          `Neynar user lookup returned status ${response.status} for @${authorId}`,
-        );
+        this.logger.debug(`Neynar user lookup returned status ${response.status} for @${authorId}`);
         return {
           id: authorId,
           name: authorId,
@@ -289,16 +272,12 @@ export class FarcasterFreeConnector
       });
 
       if (!feedResponse.ok) {
-        this.logger.debug(
-          `Neynar feed failed for FID ${fid}: status ${feedResponse.status}`,
-        );
+        this.logger.debug(`Neynar feed failed for FID ${fid}: status ${feedResponse.status}`);
         return [];
       }
 
       const feedData = (await feedResponse.json()) as NeynarFeedResponse;
-      return (feedData.casts ?? [])
-        .slice(0, limit)
-        .map((c) => this.transformNeynarCast(c));
+      return (feedData.casts ?? []).slice(0, limit).map((c) => this.transformNeynarCast(c));
     } catch (error) {
       this.logger.debug(`Timeline fetch failed for @${username}:`, error);
       return [];
@@ -307,31 +286,24 @@ export class FarcasterFreeConnector
 
   async validateCredentials(): Promise<boolean> {
     this.neynarApiKey =
-      this.configService.get<string>('NEYNAR_API_KEY') ||
-      process.env['NEYNAR_API_KEY'] ||
-      null;
+      this.configService.get<string>('NEYNAR_API_KEY') || process.env['NEYNAR_API_KEY'] || null;
 
     if (!this.neynarApiKey) {
-      this.logger.debug(
-        'NEYNAR_API_KEY not set — Farcaster connector unavailable',
-      );
+      this.logger.debug('NEYNAR_API_KEY not set — Farcaster connector unavailable');
       this.available = false;
       return false;
     }
 
     try {
-      const response = await this.fetchWithTimeout(
-        `${NEYNAR_BASE}/cast/search?q=gm&limit=1`,
-        { headers: this.neynarHeaders() },
-      );
+      const response = await this.fetchWithTimeout(`${NEYNAR_BASE}/cast/search?q=gm&limit=1`, {
+        headers: this.neynarHeaders(),
+      });
       if (response.ok) {
         this.available = true;
         this.logger.log('Farcaster connector validated (Neynar v2 API reachable)');
         return true;
       }
-      this.logger.warn(
-        `Neynar API returned status ${response.status} during validation`,
-      );
+      this.logger.warn(`Neynar API returned status ${response.status} during validation`);
     } catch {
       this.logger.debug('Neynar API unreachable during validation');
     }
@@ -344,10 +316,7 @@ export class FarcasterFreeConnector
   // Private helpers — search
   // ---------------------------------------------------------------------------
 
-  private async searchContent(
-    query: string,
-    options?: SearchOptions,
-  ): Promise<SocialMediaPost[]> {
+  private async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
     if (!this.available || !this.neynarApiKey) return [];
 
     const limit = options?.maxResults || options?.limit || 25;
@@ -418,11 +387,7 @@ export class FarcasterFreeConnector
   // Private helpers — scoring & fetch utilities
   // ---------------------------------------------------------------------------
 
-  private calculateViralityScore(
-    likes: number,
-    recasts: number,
-    replies: number,
-  ): number {
+  private calculateViralityScore(likes: number, recasts: number, replies: number): number {
     const total = likes + recasts + replies;
     if (total === 0) return 0;
     return Math.min(Math.log10(total + 1) / 4, 1);
@@ -439,19 +404,19 @@ export class FarcasterFreeConnector
   }
 
   private neynarHeaders(): Record<string, string> {
+    if (!this.neynarApiKey) {
+      throw new Error('NEYNAR_API_KEY not configured');
+    }
     return {
       accept: 'application/json',
-      'x-api-key': this.neynarApiKey!,
+      'x-api-key': this.neynarApiKey,
     };
   }
 
   /**
    * Fetch with a 15s timeout (AbortController).
    */
-  private async fetchWithTimeout(
-    url: string,
-    init?: RequestInit,
-  ): Promise<Response> {
+  private async fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.fetchTimeout);
     try {
@@ -464,10 +429,7 @@ export class FarcasterFreeConnector
   /**
    * Fetch with timeout and retry once on failure.
    */
-  private async fetchWithRetry(
-    url: string,
-    init?: RequestInit,
-  ): Promise<Response> {
+  private async fetchWithRetry(url: string, init?: RequestInit): Promise<Response> {
     let lastError: Error | null = null;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import type { EntityAnalysisResponse, EntityDossier, AnalyzedNarrative } from '../../lib/api';
-import { NervPanel } from './nerv-panel';
-import { NervMetric } from './nerv-metric';
-import { NervSparkline } from './nerv-sparkline';
-import { NervBar } from './nerv-bar';
+import { useMemo, useState } from 'react';
+import type { EntityAnalysisResponse, EntityDossier } from '../../lib/api';
 import { NervBadge } from './nerv-badge';
+import { NervBar } from './nerv-bar';
+import { NervMetric } from './nerv-metric';
+import { NervPanel } from './nerv-panel';
+import { NervSparkline } from './nerv-sparkline';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,7 +14,6 @@ import { NervBadge } from './nerv-badge';
 
 export interface EntityPanelProps {
   entities: EntityAnalysisResponse | null;
-  narratives: AnalyzedNarrative[];
   selectedActorHandle?: string | null;
   onSelectActor?: (handle: string | null) => void;
 }
@@ -30,7 +29,10 @@ const ENTITY_TYPE_LABELS: Record<EntityTypeFilter, string> = {
   entity: 'Other Entities',
 };
 
-const TYPE_BADGE_VARIANT: Record<string, 'orange' | 'green' | 'red' | 'blue' | 'amber' | 'purple' | 'muted'> = {
+const TYPE_BADGE_VARIANT: Record<
+  string,
+  'orange' | 'green' | 'red' | 'blue' | 'amber' | 'purple' | 'muted'
+> = {
   person: 'blue',
   org: 'purple',
   organization: 'purple',
@@ -57,7 +59,6 @@ const PLATFORM_COLORS: Record<string, string> = {
 
 export function EntityPanel({
   entities,
-  narratives,
   selectedActorHandle,
   onSelectActor,
 }: EntityPanelProps) {
@@ -83,6 +84,10 @@ export function EntityPanel({
 
   // Auto-select first when filter changes
   const effectiveSelected = selected ?? filtered[0] ?? null;
+  const firstSentimentPoint = effectiveSelected?.sentimentTimeline[0];
+  const lastSentimentPoint = effectiveSelected
+    ? effectiveSelected.sentimentTimeline[effectiveSelected.sentimentTimeline.length - 1]
+    : undefined;
 
   if (!entities || dossiers.length === 0) {
     return (
@@ -102,7 +107,7 @@ export function EntityPanel({
 
   const maxMentions = Math.max(...dossiers.map((d) => d.totalMentions), 1);
   const maxCoOccurrence = effectiveSelected
-    ? Math.max(...(effectiveSelected.coOccurrences.map((c) => c.frequency)), 1)
+    ? Math.max(...effectiveSelected.coOccurrences.map((c) => c.frequency), 1)
     : 1;
   const maxPlatformCount = effectiveSelected
     ? Math.max(...Object.values(effectiveSelected.platformBreakdown), 1)
@@ -119,6 +124,7 @@ export function EntityPanel({
           {ENTITY_TYPES.map((t) => (
             <button
               key={t}
+              type="button"
               onClick={() => setTypeFilter(t)}
               className={[
                 'px-2 py-0.5 text-[8px] font-mono uppercase tracking-wider rounded-sm transition-colors',
@@ -136,12 +142,14 @@ export function EntityPanel({
         <div className="flex-1 overflow-y-auto nerv-scrollbar">
           {filtered.length === 0 && (
             <div className="px-3 py-4 text-[10px] font-mono leading-relaxed text-nerv-text-muted">
-              No {ENTITY_TYPE_LABELS[typeFilter].toLowerCase()} were extracted for this investigation.
+              No {ENTITY_TYPE_LABELS[typeFilter].toLowerCase()} were extracted for this
+              investigation.
             </div>
           )}
           {filtered.map((d) => (
             <button
               key={d.name}
+              type="button"
               onClick={() => setSelectedEntity(d.name)}
               className={[
                 'w-full text-left px-3 py-2 border-b border-nerv-border/50 transition-colors',
@@ -221,31 +229,29 @@ export function EntityPanel({
           </div>
 
           {/* Sentiment timeline */}
-          {effectiveSelected.sentimentTimeline.length > 1 && (
-            <NervPanel title="SENTIMENT TIMELINE">
-              <div className="p-3">
-                <NervSparkline
-                  data={effectiveSelected.sentimentTimeline.map((s) => s.score)}
-                  width={500}
-                  height={60}
-                  color="#00FF41"
-                  showEndDot
-                />
-                <div className="flex justify-between mt-1">
-                  <span className="text-[8px] font-mono text-nerv-text-muted">
-                    {new Date(effectiveSelected.sentimentTimeline[0]!.timestamp).toLocaleDateString()}
-                  </span>
-                  <span className="text-[8px] font-mono text-nerv-text-muted">
-                    {new Date(
-                      effectiveSelected.sentimentTimeline[
-                        effectiveSelected.sentimentTimeline.length - 1
-                      ]!.timestamp,
-                    ).toLocaleDateString()}
-                  </span>
+          {effectiveSelected.sentimentTimeline.length > 1 &&
+            firstSentimentPoint &&
+            lastSentimentPoint && (
+              <NervPanel title="SENTIMENT TIMELINE">
+                <div className="p-3">
+                  <NervSparkline
+                    data={effectiveSelected.sentimentTimeline.map((s) => s.score)}
+                    width={500}
+                    height={60}
+                    color="#00FF41"
+                    showEndDot
+                  />
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[8px] font-mono text-nerv-text-muted">
+                      {new Date(firstSentimentPoint.timestamp).toLocaleDateString()}
+                    </span>
+                    <span className="text-[8px] font-mono text-nerv-text-muted">
+                      {new Date(lastSentimentPoint.timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </NervPanel>
-          )}
+              </NervPanel>
+            )}
 
           {/* Platform breakdown */}
           <NervPanel title="PLATFORM BREAKDOWN">
@@ -292,7 +298,9 @@ export function EntityPanel({
                         <span className="text-[9px] font-mono text-nerv-text-muted">
                           {na.mentionCount} mentions
                         </span>
-                        <span className={['text-[9px] font-mono tabular-nums', sentColor].join(' ')}>
+                        <span
+                          className={['text-[9px] font-mono tabular-nums', sentColor].join(' ')}
+                        >
                           sentiment: {na.avgSentimentTowardEntity.toFixed(2)}
                         </span>
                       </div>
@@ -321,10 +329,7 @@ export function EntityPanel({
                         size="sm"
                       />
                       <div className="flex-1">
-                        <NervBar
-                          value={co.frequency / maxCoOccurrence}
-                          color="#FF6B2B"
-                        />
+                        <NervBar value={co.frequency / maxCoOccurrence} color="#FF6B2B" />
                       </div>
                       <span className="text-[9px] font-mono tabular-nums text-nerv-text-muted w-6 text-right">
                         {co.frequency}
@@ -345,7 +350,9 @@ export function EntityPanel({
                     type="button"
                     onClick={() =>
                       onSelectActor?.(
-                        normalizeHandle(a.handle) === selectedActorHandle ? null : normalizeHandle(a.handle),
+                        normalizeHandle(a.handle) === selectedActorHandle
+                          ? null
+                          : normalizeHandle(a.handle),
                       )
                     }
                     className={[
@@ -374,9 +381,7 @@ export function EntityPanel({
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center">
-          <span className="text-[10px] font-mono text-nerv-text-muted">
-            SELECT AN ENTITY
-          </span>
+          <span className="text-[10px] font-mono text-nerv-text-muted">SELECT AN ENTITY</span>
         </div>
       )}
     </div>

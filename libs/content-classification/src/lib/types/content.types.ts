@@ -1,6 +1,5 @@
-import { ObjectType, InputType, Field, ID, Float } from '@nestjs/graphql';
+import { Field, Float, ID, InputType, ObjectType } from '@nestjs/graphql';
 import GraphQLJSON from 'graphql-type-json';
-import { ContentClassification } from '../services/content-classification.service';
 
 /**
  * Interface defining the expected response structure from external NLP services

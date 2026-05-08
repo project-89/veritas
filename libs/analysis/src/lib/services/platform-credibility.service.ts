@@ -23,79 +23,78 @@ export interface RssSubProfile {
 // Defaults
 // ---------------------------------------------------------------------------
 
-const DEFAULT_PROFILES: ReadonlyMap<string, PlatformCredibilityProfile> =
-  new Map([
-    [
-      'twitter',
-      {
-        platform: 'twitter',
-        credibilityWeight: 0.4,
-        influenceWeight: 0.9,
-        manipulationRisk: 0.7,
-        botPrevalence: 0.6,
-      },
-    ],
-    [
-      'truthsocial',
-      {
-        platform: 'truthsocial',
-        credibilityWeight: 0.2,
-        influenceWeight: 0.7,
-        manipulationRisk: 0.9,
-        botPrevalence: 0.4,
-      },
-    ],
-    [
-      'reddit',
-      {
-        platform: 'reddit',
-        credibilityWeight: 0.5,
-        influenceWeight: 0.6,
-        manipulationRisk: 0.5,
-        botPrevalence: 0.3,
-      },
-    ],
-    [
-      'farcaster',
-      {
-        platform: 'farcaster',
-        credibilityWeight: 0.7,
-        influenceWeight: 0.3,
-        manipulationRisk: 0.2,
-        botPrevalence: 0.1,
-      },
-    ],
-    [
-      'youtube',
-      {
-        platform: 'youtube',
-        credibilityWeight: 0.5,
-        influenceWeight: 0.8,
-        manipulationRisk: 0.4,
-        botPrevalence: 0.2,
-      },
-    ],
-    [
-      'telegram',
-      {
-        platform: 'telegram',
-        credibilityWeight: 0.3,
-        influenceWeight: 0.5,
-        manipulationRisk: 0.8,
-        botPrevalence: 0.5,
-      },
-    ],
-    [
-      'rss',
-      {
-        platform: 'rss',
-        credibilityWeight: 0.7,
-        influenceWeight: 0.6,
-        manipulationRisk: 0.2,
-        botPrevalence: 0.0,
-      },
-    ],
-  ]);
+const DEFAULT_PROFILES: ReadonlyMap<string, PlatformCredibilityProfile> = new Map([
+  [
+    'twitter',
+    {
+      platform: 'twitter',
+      credibilityWeight: 0.4,
+      influenceWeight: 0.9,
+      manipulationRisk: 0.7,
+      botPrevalence: 0.6,
+    },
+  ],
+  [
+    'truthsocial',
+    {
+      platform: 'truthsocial',
+      credibilityWeight: 0.2,
+      influenceWeight: 0.7,
+      manipulationRisk: 0.9,
+      botPrevalence: 0.4,
+    },
+  ],
+  [
+    'reddit',
+    {
+      platform: 'reddit',
+      credibilityWeight: 0.5,
+      influenceWeight: 0.6,
+      manipulationRisk: 0.5,
+      botPrevalence: 0.3,
+    },
+  ],
+  [
+    'farcaster',
+    {
+      platform: 'farcaster',
+      credibilityWeight: 0.7,
+      influenceWeight: 0.3,
+      manipulationRisk: 0.2,
+      botPrevalence: 0.1,
+    },
+  ],
+  [
+    'youtube',
+    {
+      platform: 'youtube',
+      credibilityWeight: 0.5,
+      influenceWeight: 0.8,
+      manipulationRisk: 0.4,
+      botPrevalence: 0.2,
+    },
+  ],
+  [
+    'telegram',
+    {
+      platform: 'telegram',
+      credibilityWeight: 0.3,
+      influenceWeight: 0.5,
+      manipulationRisk: 0.8,
+      botPrevalence: 0.5,
+    },
+  ],
+  [
+    'rss',
+    {
+      platform: 'rss',
+      credibilityWeight: 0.7,
+      influenceWeight: 0.6,
+      manipulationRisk: 0.2,
+      botPrevalence: 0.0,
+    },
+  ],
+]);
 
 const NEUTRAL_DEFAULT: PlatformCredibilityProfile = {
   platform: 'unknown',
@@ -112,13 +111,7 @@ const RSS_SUB_PROFILES: ReadonlyMap<string, RssSubProfile> = new Map([
 ]);
 
 // Known tier-1 sources for automatic classification
-const TIER_1_DOMAINS = new Set([
-  'bbc.com',
-  'bbc.co.uk',
-  'reuters.com',
-  'apnews.com',
-  'ap.org',
-]);
+const TIER_1_DOMAINS = new Set(['bbc.com', 'bbc.co.uk', 'reuters.com', 'apnews.com', 'ap.org']);
 
 // ---------------------------------------------------------------------------
 // Service
@@ -135,9 +128,7 @@ export class PlatformCredibilityService {
     this.rssSubProfiles = new Map(RSS_SUB_PROFILES);
 
     // Allow override via environment variable
-    const overrideJson = this.config.get<string>(
-      'PLATFORM_CREDIBILITY_CONFIG',
-    );
+    const overrideJson = this.config.get<string>('PLATFORM_CREDIBILITY_CONFIG');
     if (overrideJson) {
       try {
         const overrides = JSON.parse(overrideJson) as Record<
@@ -155,9 +146,7 @@ export class PlatformCredibilityService {
           `Applied platform credibility overrides for: ${Object.keys(overrides).join(', ')}`,
         );
       } catch (err) {
-        this.logger.warn(
-          `Failed to parse PLATFORM_CREDIBILITY_CONFIG: ${err}`,
-        );
+        this.logger.warn(`Failed to parse PLATFORM_CREDIBILITY_CONFIG: ${err}`);
       }
     }
   }
@@ -172,9 +161,7 @@ export class PlatformCredibilityService {
    */
   getProfile(platform: string): PlatformCredibilityProfile {
     const normalized = platform.toLowerCase().trim();
-    return (
-      this.profiles.get(normalized) ?? { ...NEUTRAL_DEFAULT, platform: normalized }
-    );
+    return this.profiles.get(normalized) ?? { ...NEUTRAL_DEFAULT, platform: normalized };
   }
 
   /**
@@ -238,10 +225,7 @@ export class PlatformCredibilityService {
    * @param platforms - map of platform -> post count on that platform
    * @returns adjusted threat score (0-1)
    */
-  adjustNarrativeThreat(
-    threatScore: number,
-    platforms: Record<string, number>,
-  ): number {
+  adjustNarrativeThreat(threatScore: number, platforms: Record<string, number>): number {
     const entries = Object.entries(platforms);
     if (entries.length === 0) return threatScore;
 

@@ -14,6 +14,23 @@ export interface GenealogyPanelProps {
   refreshing?: boolean;
 }
 
+interface GenealogySnapshot {
+  id: string;
+  timestamp: string;
+}
+
+interface GenealogyNode {
+  snapshotId: string;
+  snapshotTimestamp: string;
+  narrativeId: string;
+  summary: string;
+  postCount: number;
+  avgSentiment: number;
+  similarity: number;
+  cx: number;
+  cy: number;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   active: '#0ea5e9',
   growing: '#00FF41',
@@ -58,29 +75,20 @@ function sentimentColor(s: number): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export function GenealogyPanel({ lineages, onRefresh, refreshing }: GenealogyPanelProps) {
+export function GenealogyPanel({
+  lineages,
+  onRefresh,
+  refreshing,
+}: GenealogyPanelProps) {
+  void onRefresh;
+  void refreshing;
+
   // Need multiple snapshots (at least 1 lineage with >1 history entries)
   const hasMultipleSnapshots = lineages.length > 0 && lineages.some((l) => l.history.length > 1);
 
-  if (!hasMultipleSnapshots) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="text-nerv-text-muted text-3xl mb-3">{'\u2394'}</div>
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
-            NARRATIVE GENEALOGY
-          </div>
-          <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed mb-4">
-            Genealogy tracks narrative evolution across multiple scans. Use the REFRESH button above to create another snapshot, then genealogy data will appear here.
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Compute timeline columns from all snapshots
-  const allSnapshots = useMemo(() => {
-    const snapshotMap = new Map<string, { id: string; timestamp: string }>();
+  const allSnapshots = useMemo<GenealogySnapshot[]>(() => {
+    const snapshotMap = new Map<string, GenealogySnapshot>();
     for (const l of lineages) {
       for (const h of l.history) {
         if (!snapshotMap.has(h.snapshotId)) {
@@ -107,6 +115,23 @@ export function GenealogyPanel({ lineages, onRefresh, refreshing }: GenealogyPan
   // Build a lookup: snapshotId -> column index
   const snapIndexMap = new Map(allSnapshots.map((s, i) => [s.id, i]));
 
+  if (!hasMultipleSnapshots) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="text-nerv-text-muted text-3xl mb-3">{'\u2394'}</div>
+          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
+            NARRATIVE GENEALOGY
+          </div>
+          <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed mb-4">
+            Genealogy tracks narrative evolution across multiple scans. Use the REFRESH button above
+            to create another snapshot, then genealogy data will appear here.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-auto nerv-scrollbar">
       <svg
@@ -114,7 +139,10 @@ export function GenealogyPanel({ lineages, onRefresh, refreshing }: GenealogyPan
         height={svgHeight}
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
         className="block"
+        role="img"
+        aria-label="Narrative genealogy timeline"
       >
+        <title>Narrative genealogy timeline</title>
         {/* Defs for glow */}
         <defs>
           <filter id="gen-glow">
@@ -158,7 +186,10 @@ export function GenealogyPanel({ lineages, onRefresh, refreshing }: GenealogyPan
                 fontSize={8}
                 fontFamily="monospace"
               >
-                {new Date(snap.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {new Date(snap.timestamp).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
               </text>
             </g>
           );
@@ -176,16 +207,7 @@ export function GenealogyPanel({ lineages, onRefresh, refreshing }: GenealogyPan
               if (ci === undefined) return null;
               return { ...h, cx: leftPadding + ci * colWidth + colWidth / 2, cy: laneY };
             })
-            .filter(Boolean) as Array<{
-            snapshotId: string;
-            narrativeId: string;
-            summary: string;
-            postCount: number;
-            avgSentiment: number;
-            similarity: number;
-            cx: number;
-            cy: number;
-          }>;
+            .filter((node): node is GenealogyNode => node != null);
 
           // Max post count for sizing
           const maxPost = Math.max(...nodes.map((n) => n.postCount), 1);
@@ -207,12 +229,13 @@ export function GenealogyPanel({ lineages, onRefresh, refreshing }: GenealogyPan
               {nodes.map((node, ni) => {
                 if (ni === 0) return null;
                 const prev = nodes[ni - 1];
+                if (!prev) return null;
                 const isSameNarrative = node.similarity > 0.7;
                 return (
                   <line
-                    key={`${prev!.snapshotId}-${node.snapshotId}`}
-                    x1={prev!.cx}
-                    y1={prev!.cy}
+                    key={`${prev.snapshotId}-${node.snapshotId}`}
+                    x1={prev.cx}
+                    y1={prev.cy}
                     x2={node.cx}
                     y2={node.cy}
                     stroke={statusColor}
@@ -278,7 +301,9 @@ export function GenealogyPanel({ lineages, onRefresh, refreshing }: GenealogyPan
             let bestDist = Infinity;
             const evtTime = new Date(evt.timestamp).getTime();
             for (const [, idx] of snapIndexMap) {
-              const snapTime = new Date(allSnapshots[idx]!.timestamp).getTime();
+              const snapshot = allSnapshots[idx];
+              if (!snapshot) continue;
+              const snapTime = new Date(snapshot.timestamp).getTime();
               const dist = Math.abs(snapTime - evtTime);
               if (dist < bestDist) {
                 bestDist = dist;
@@ -289,7 +314,7 @@ export function GenealogyPanel({ lineages, onRefresh, refreshing }: GenealogyPan
             const y = svgHeight - eventRowHeight + 12;
             const color = EVENT_COLORS[evt.type] ?? '#8888a0';
             return (
-              <g key={`${lineage.currentId}-${evt.type}-${ei}`}>
+              <g key={`${lineage.currentId}-${evt.type}-${evt.timestamp}`}>
                 <text
                   x={x}
                   y={y}
@@ -329,11 +354,7 @@ export function GenealogyPanel({ lineages, onRefresh, refreshing }: GenealogyPan
           EVENTS:
         </span>
         {Object.entries(EVENT_ICONS).map(([type, icon]) => (
-          <span
-            key={type}
-            className="text-[9px] font-mono"
-            style={{ color: EVENT_COLORS[type] }}
-          >
+          <span key={type} className="text-[9px] font-mono" style={{ color: EVENT_COLORS[type] }}>
             {icon} {type}
           </span>
         ))}

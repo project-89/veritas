@@ -1,12 +1,10 @@
-import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
 import { Inject } from '@nestjs/common';
-import {
-  ANALYSIS_SERVICE,
-} from './interfaces/analysis-service.interface';
-import type { AnalysisServiceInterface } from './interfaces/analysis-service.interface';
-import { DeviationMetrics, Pattern, TimeFrame, TimeFrameInput, ExtendedContentNode } from './analysis.types';
+import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { DeviationMetrics, Pattern, TimeFrameInput } from './analysis.types';
 import { ContentAnalysisInput } from './dto/content-analysis.input';
 import { ContentAnalysisResult, RelatedContent } from './dto/content-analysis.result';
+import type { AnalysisServiceInterface } from './interfaces/analysis-service.interface';
+import { ANALYSIS_SERVICE } from './interfaces/analysis-service.interface';
 
 @Resolver()
 export class AnalysisResolver {
@@ -16,14 +14,14 @@ export class AnalysisResolver {
   ) {}
 
   @Query(() => [Pattern])
-  async detectPatterns(@Args('timeframe', { type: () => TimeFrameInput }) timeframe: TimeFrameInput): Promise<Pattern[]> {
+  async detectPatterns(
+    @Args('timeframe', { type: () => TimeFrameInput }) timeframe: TimeFrameInput,
+  ): Promise<Pattern[]> {
     return this.analysisService.detectPatterns(timeframe);
   }
 
   @Query(() => DeviationMetrics)
-  async getRealityDeviation(
-    @Args('narrativeId') narrativeId: string,
-  ): Promise<DeviationMetrics> {
+  async getRealityDeviation(@Args('narrativeId') narrativeId: string): Promise<DeviationMetrics> {
     const metrics = await this.analysisService.measureRealityDeviation(narrativeId);
     return { ...metrics, timeframe: { start: new Date(), end: new Date() } };
   }
@@ -58,7 +56,7 @@ export class AnalysisResolver {
       sentiment: node.sentiment,
       categories: node.categories,
       topics: node.topics,
-      metadata: node.metadata,
+      metadata: node.metadata as unknown as Record<string, unknown> | undefined,
     }));
 
     const sourceCredibility = await this.analysisService.calculateSourceCredibility(

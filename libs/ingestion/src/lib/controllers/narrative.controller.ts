@@ -1,20 +1,11 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  Query,
-  Delete,
-  Logger,
-} from '@nestjs/common';
-import { NarrativeRepository } from '../repositories/narrative-insight.repository';
+import { Body, Controller, Delete, Get, Logger, Param, Post, Query } from '@nestjs/common';
 import type { NarrativeInsight } from '../../types/narrative-insight.interface';
 import type { NarrativeTrend } from '../../types/narrative-trend.interface';
-import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
-import { IngestionService } from '../services/ingestion.service';
-import { InvestigationRepository } from '../repositories/investigation.repository';
 import type { SocialMediaPost } from '../../types/social-media.types';
+import { InvestigationRepository } from '../repositories/investigation.repository';
+import { NarrativeRepository } from '../repositories/narrative-insight.repository';
+import { IngestionService } from '../services/ingestion.service';
+import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
 import { buildPostDedupKey } from '../utils/post-dedup.util';
 
 /**
@@ -29,7 +20,7 @@ export class NarrativeController {
     private readonly narrativeRepository: NarrativeRepository,
     private readonly transformService: TransformOnIngestService,
     private readonly ingestionService: IngestionService,
-    private readonly investigationRepository: InvestigationRepository
+    private readonly investigationRepository: InvestigationRepository,
   ) {}
 
   /**
@@ -45,9 +36,7 @@ export class NarrativeController {
    * Ingest multiple social media posts in a batch
    */
   @Post('ingest-batch')
-  async ingestBatch(
-    @Body() posts: SocialMediaPost[]
-  ): Promise<{ count: number }> {
+  async ingestBatch(@Body() posts: SocialMediaPost[]): Promise<{ count: number }> {
     this.logger.log(`Ingesting batch of ${posts.length} posts`);
     const insights = await this.transformService.transformBatch(posts);
     return { count: insights.length };
@@ -59,7 +48,7 @@ export class NarrativeController {
    */
   @Post('search')
   async searchNarratives(
-    @Body() body: { query: string; platforms?: string[]; limit?: number }
+    @Body() body: { query: string; platforms?: string[]; limit?: number },
   ): Promise<{
     posts: Array<{
       id: string;
@@ -91,13 +80,10 @@ export class NarrativeController {
 
     let rawResult: { posts: SocialMediaPost[]; insights: NarrativeInsight[] };
     try {
-      rawResult = await this.ingestionService.searchWithRawDataAll(
-        body.query,
-        {
-          platforms: body.platforms,
-          limit: body.limit,
-        }
-      );
+      rawResult = await this.ingestionService.searchWithRawDataAll(body.query, {
+        platforms: body.platforms,
+        limit: body.limit,
+      });
     } catch (error) {
       const err = error as Error;
       this.logger.error(`Search failed: ${err.message}`, err.stack);
@@ -110,7 +96,10 @@ export class NarrativeController {
     const dedupedPosts: SocialMediaPost[] = [];
     const dedupedInsights: NarrativeInsight[] = [];
     for (let i = 0; i < rawResult.posts.length; i++) {
-      const post = rawResult.posts[i]!;
+      const post = rawResult.posts[i];
+      if (!post) {
+        continue;
+      }
       const textKey = buildPostDedupKey(post);
       if (!seenTexts.has(textKey)) {
         seenTexts.add(textKey);
@@ -136,7 +125,8 @@ export class NarrativeController {
         authorName: post.authorName ?? 'Unknown',
         authorHandle: post.authorHandle ?? 'unknown',
         url: post.url ?? '',
-        timestamp: post.timestamp instanceof Date ? post.timestamp.toISOString() : String(post.timestamp),
+        timestamp:
+          post.timestamp instanceof Date ? post.timestamp.toISOString() : String(post.timestamp),
         sentiment: insight?.sentiment ?? { score: 0, label: 'neutral', confidence: 0 },
         themes: insight?.themes ?? [],
         engagement: {
@@ -163,25 +153,23 @@ export class NarrativeController {
     // Persist as investigation + snapshot
     let investigationId: string | null = null;
     try {
-      const investigation =
-        await this.investigationRepository.findOrCreateByQuery(body.query, {
-          platforms: body.platforms,
-          limit: body.limit,
-        });
-      investigationId =
-        investigation._id?.toString() ?? investigation.id ?? null;
-
-      await this.investigationRepository.addSnapshot(investigationId!, {
-        posts: serializedPosts,
-        narratives: [],
-        summary,
+      const investigation = await this.investigationRepository.findOrCreateByQuery(body.query, {
+        platforms: body.platforms,
+        limit: body.limit,
       });
+      investigationId = investigation._id?.toString() ?? investigation.id ?? null;
+
+      if (investigationId) {
+        await this.investigationRepository.addSnapshot(investigationId, {
+          posts: serializedPosts,
+          narratives: [],
+          summary,
+        });
+      }
     } catch (error) {
       // Non-fatal — log but still return search results
       const err = error as Error;
-      this.logger.warn(
-        `Failed to persist investigation: ${err.message}`
-      );
+      this.logger.warn(`Failed to persist investigation: ${err.message}`);
     }
 
     // Only send posts + summary to frontend — insights are heavy (embeddings, hashes)
@@ -196,7 +184,7 @@ export class NarrativeController {
   async getInsightsByTimeframe(
     @Param('timeframe') timeframe: string,
     @Query('limit') limit?: number,
-    @Query('skip') skip?: number
+    @Query('skip') skip?: number,
   ): Promise<NarrativeInsight[]> {
     this.logger.log(`Getting insights for timeframe: ${timeframe}`);
 
@@ -210,9 +198,7 @@ export class NarrativeController {
    * Get narrative trends by timeframe
    */
   @Get('trends/:timeframe')
-  async getTrendsByTimeframe(
-    @Param('timeframe') timeframe: string
-  ): Promise<NarrativeTrend[]> {
+  async getTrendsByTimeframe(@Param('timeframe') timeframe: string): Promise<NarrativeTrend[]> {
     this.logger.log(`Getting trends for timeframe: ${timeframe}`);
     return this.narrativeRepository.getTrendsByTimeframe(timeframe);
   }
@@ -222,13 +208,11 @@ export class NarrativeController {
    */
   @Get('insight/:contentHash')
   async getInsightByHash(
-    @Param('contentHash') contentHash: string
+    @Param('contentHash') contentHash: string,
   ): Promise<NarrativeInsight | { error: string }> {
     this.logger.log(`Looking up insight with hash: ${contentHash}`);
 
-    const insight = await this.narrativeRepository.findByContentHash(
-      contentHash
-    );
+    const insight = await this.narrativeRepository.findByContentHash(contentHash);
 
     if (!insight) {
       return { error: 'Insight not found' };
@@ -243,7 +227,7 @@ export class NarrativeController {
    */
   @Delete('cleanup')
   async deleteOldInsights(
-    @Query('olderThan') olderThan: string
+    @Query('olderThan') olderThan: string,
   ): Promise<{ deletedCount: number }> {
     const date = olderThan ? new Date(olderThan) : new Date();
 

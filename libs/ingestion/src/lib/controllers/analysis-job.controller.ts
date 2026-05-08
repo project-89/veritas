@@ -1,18 +1,18 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
+  Body,
   Controller,
   Get,
-  Post,
-  Body,
-  Param,
-  Logger,
   HttpException,
   HttpStatus,
+  Logger,
+  Param,
+  Post,
 } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import type { AnalysisJobData } from '../queue/analysis.processor';
 import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
 import type { AnalysisJob, AnalysisJobType } from '../schemas/analysis-job.schema';
-import type { AnalysisJobData } from '../queue/analysis.processor';
 
 interface BatchJobRequest {
   type: AnalysisJobType;

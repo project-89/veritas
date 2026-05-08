@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { RawPost } from './deviation.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,9 +91,9 @@ export class ComparisonService {
     postsA: RawPost[],
     postsB: RawPost[],
   ): NarrativeComparison {
-    this.logger.log(
-      `Comparing narratives ${narrativeA.id} vs ${narrativeB.id}`,
-    );
+    this.logger.log(`Comparing narratives ${narrativeA.id} vs ${narrativeB.id}`);
+    void postsA;
+    void postsB;
 
     const similarity = this.cosineSimilarity(
       narrativeA.centroidEmbedding,
@@ -119,12 +119,8 @@ export class ComparisonService {
     const platformsB = new Set(Object.keys(narrativeB.platforms));
     const platformOverlap = this.computeSetOverlap(platformsA, platformsB);
 
-    const authorsA = new Set(
-      narrativeA.authors.map((a) => a.handle || a.name),
-    );
-    const authorsB = new Set(
-      narrativeB.authors.map((a) => a.handle || a.name),
-    );
+    const authorsA = new Set(narrativeA.authors.map((a) => a.handle || a.name));
+    const authorsB = new Set(narrativeB.authors.map((a) => a.handle || a.name));
     const authorOverlap = this.computeSetOverlap(authorsA, authorsB);
 
     return {
@@ -154,9 +150,7 @@ export class ComparisonService {
       label: string;
     },
   ): TimePeriodComparison {
-    this.logger.log(
-      `Comparing time periods: "${periodA.label}" vs "${periodB.label}"`,
-    );
+    this.logger.log(`Comparing time periods: "${periodA.label}" vs "${periodB.label}"`);
 
     // Match narratives across periods by centroid similarity
     const matchedA = new Set<number>();
@@ -164,17 +158,20 @@ export class ComparisonService {
     const persistent: TimePeriodComparison['persistent'] = [];
 
     for (let i = 0; i < periodA.narratives.length; i++) {
-      const nA = periodA.narratives[i]!;
+      const nA = periodA.narratives[i];
+      if (!nA) {
+        continue;
+      }
       let bestJ = -1;
       let bestSim = -1;
 
       for (let j = 0; j < periodB.narratives.length; j++) {
         if (matchedB.has(j)) continue;
-        const nB = periodB.narratives[j]!;
-        const sim = this.cosineSimilarity(
-          nA.centroidEmbedding,
-          nB.centroidEmbedding,
-        );
+        const nB = periodB.narratives[j];
+        if (!nB) {
+          continue;
+        }
+        const sim = this.cosineSimilarity(nA.centroidEmbedding, nB.centroidEmbedding);
         if (sim > bestSim) {
           bestSim = sim;
           bestJ = j;
@@ -184,14 +181,16 @@ export class ComparisonService {
       if (bestJ >= 0 && bestSim >= MATCH_THRESHOLD) {
         matchedA.add(i);
         matchedB.add(bestJ);
-        const nB = periodB.narratives[bestJ]!;
+        const nB = periodB.narratives[bestJ];
+        if (!nB) {
+          continue;
+        }
         const aCount = nA.postIndices.length;
         const bCount = nB.postIndices.length;
         persistent.push({
           summary: nA.summary || nB.summary,
           sentimentShift: nB.avgSentiment - nA.avgSentiment,
-          volumeChange:
-            aCount > 0 ? ((bCount - aCount) / aCount) * 100 : bCount > 0 ? 100 : 0,
+          volumeChange: aCount > 0 ? ((bCount - aCount) / aCount) * 100 : bCount > 0 ? 100 : 0,
         });
       }
     }
@@ -199,7 +198,10 @@ export class ComparisonService {
     const emerged: TimePeriodComparison['emerged'] = [];
     for (let j = 0; j < periodB.narratives.length; j++) {
       if (!matchedB.has(j)) {
-        const n = periodB.narratives[j]!;
+        const n = periodB.narratives[j];
+        if (!n) {
+          continue;
+        }
         emerged.push({
           summary: n.summary,
           postCount: n.postIndices.length,
@@ -210,7 +212,10 @@ export class ComparisonService {
     const disappeared: TimePeriodComparison['disappeared'] = [];
     for (let i = 0; i < periodA.narratives.length; i++) {
       if (!matchedA.has(i)) {
-        const n = periodA.narratives[i]!;
+        const n = periodA.narratives[i];
+        if (!n) {
+          continue;
+        }
         disappeared.push({
           summary: n.summary,
           lastPostCount: n.postIndices.length,
@@ -223,8 +228,7 @@ export class ComparisonService {
 
     const totalA = periodA.posts.length;
     const totalB = periodB.posts.length;
-    const volumeChange =
-      totalA > 0 ? ((totalB - totalA) / totalA) * 100 : totalB > 0 ? 100 : 0;
+    const volumeChange = totalA > 0 ? ((totalB - totalA) / totalA) * 100 : totalB > 0 ? 100 : 0;
 
     return {
       periodA: {
@@ -249,22 +253,19 @@ export class ComparisonService {
   // Platform Comparison
   // -------------------------------------------------------------------------
 
-  comparePlatforms(
-    narratives: AnalyzedNarrative[],
-    posts: RawPost[],
-  ): PlatformComparison {
-    this.logger.log(
-      `Comparing platforms across ${narratives.length} narratives`,
-    );
+  comparePlatforms(narratives: AnalyzedNarrative[], posts: RawPost[]): PlatformComparison {
+    this.logger.log(`Comparing platforms across ${narratives.length} narratives`);
 
     // Group posts by platform
     const postsByPlatform = new Map<string, RawPost[]>();
     for (const post of posts) {
       const platform = post.platform.toLowerCase();
-      if (!postsByPlatform.has(platform)) {
-        postsByPlatform.set(platform, []);
+      const platformPosts = postsByPlatform.get(platform);
+      if (platformPosts) {
+        platformPosts.push(post);
+      } else {
+        postsByPlatform.set(platform, [post]);
       }
-      postsByPlatform.get(platform)!.push(post);
     }
 
     const platforms = Array.from(postsByPlatform.keys()).sort();
@@ -302,7 +303,8 @@ export class ComparisonService {
       let dominantNarrative = '';
       let maxPlatformPosts = 0;
       for (const n of platformNarratives) {
-        const count = n.platforms[platform] ?? n.platforms[this.findPlatformKey(n.platforms, platform)] ?? 0;
+        const platformKey = this.findPlatformKey(n.platforms, platform);
+        const count = n.platforms[platform] ?? (platformKey ? n.platforms[platformKey] ?? 0 : 0);
         if (count > maxPlatformPosts) {
           maxPlatformPosts = count;
           dominantNarrative = n.summary;
@@ -345,14 +347,8 @@ export class ComparisonService {
         const sentimentByPlatform: Record<string, number> = {};
         for (const platform of pSet) {
           // Approximate per-platform sentiment from posts in this narrative
-          const narrativePostIndices = new Set(narrative.postIndices);
-          const platformPosts = (postsByPlatform.get(platform) ?? []).filter(
-            (_, idx) => {
-              // We need to find posts that are both on this platform and in this narrative
-              // Posts array index won't match directly, so use a lookup
-              return true; // simplified — use narrative's platform breakdown for sentiment
-            },
-          );
+          void new Set(narrative.postIndices);
+          void (postsByPlatform.get(platform) ?? []).filter(() => true);
           // Use the narrative's overall sentiment as approximation per platform
           // A more precise version would cross-reference post indices
           sentimentByPlatform[platform] = narrative.avgSentiment;
@@ -416,17 +412,9 @@ export class ComparisonService {
 
   private avgSentiment(narratives: AnalyzedNarrative[]): number {
     if (narratives.length === 0) return 0;
-    const totalPosts = narratives.reduce(
-      (s, n) => s + n.postIndices.length,
-      0,
-    );
+    const totalPosts = narratives.reduce((s, n) => s + n.postIndices.length, 0);
     if (totalPosts === 0) return 0;
-    return (
-      narratives.reduce(
-        (s, n) => s + n.avgSentiment * n.postIndices.length,
-        0,
-      ) / totalPosts
-    );
+    return narratives.reduce((s, n) => s + n.avgSentiment * n.postIndices.length, 0) / totalPosts;
   }
 
   private avgPostSentiment(posts: RawPost[]): number {
@@ -437,10 +425,7 @@ export class ComparisonService {
   }
 
   /** Case-insensitive platform key lookup */
-  private findPlatformKey(
-    platforms: Record<string, number>,
-    target: string,
-  ): string {
+  private findPlatformKey(platforms: Record<string, number>, target: string): string {
     const lower = target.toLowerCase();
     for (const key of Object.keys(platforms)) {
       if (key.toLowerCase() === lower) return key;

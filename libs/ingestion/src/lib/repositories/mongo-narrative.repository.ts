@@ -2,15 +2,9 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { NarrativeTrend } from '../../types/narrative-trend.interface';
+import { NarrativeInsightModel } from '../schemas/narrative-insight.schema';
+import { NarrativeTrendModel } from '../schemas/narrative-trend.schema';
 import { NarrativeRepository } from './narrative-insight.repository';
-import {
-  NarrativeInsightModel,
-  NarrativeInsightSchema,
-} from '../schemas/narrative-insight.schema';
-import {
-  NarrativeTrendModel,
-  NarrativeTrendSchema,
-} from '../schemas/narrative-trend.schema';
 
 /**
  * MongoDB implementation of the NarrativeRepository
@@ -32,36 +26,21 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
   private initializeRepositories() {
     try {
       try {
-        this.databaseService.registerModel(
-          'NarrativeInsight',
-          NarrativeInsightModel
-        );
-        this.databaseService.registerModel(
-          'NarrativeTrend',
-          NarrativeTrendModel
-        );
+        this.databaseService.registerModel('NarrativeInsight', NarrativeInsightModel);
+        this.databaseService.registerModel('NarrativeTrend', NarrativeTrendModel);
       } catch (error) {
-        this.logger.warn(
-          'Models already registered or error registering models',
-          error
-        );
+        this.logger.warn('Models already registered or error registering models', error);
       }
 
       this.insightRepository =
-        this.databaseService.getRepository<NarrativeInsight>(
-          'NarrativeInsight'
-        );
-      this.trendRepository =
-        this.databaseService.getRepository<NarrativeTrend>('NarrativeTrend');
+        this.databaseService.getRepository<NarrativeInsight>('NarrativeInsight');
+      this.trendRepository = this.databaseService.getRepository<NarrativeTrend>('NarrativeTrend');
 
       this.initialized = true;
       this.logger.log('MongoDB narrative repository initialized');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Failed to initialize repositories: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Failed to initialize repositories: ${err.message}`, err.stack);
     }
   }
 
@@ -115,10 +94,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
         );
         return;
       }
-      this.logger.error(
-        `Error saving narrative insights batch: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error saving narrative insights batch: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -126,18 +102,13 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
   /**
    * Find a narrative insight by its content hash
    */
-  async findByContentHash(
-    contentHash: string
-  ): Promise<NarrativeInsight | null> {
+  async findByContentHash(contentHash: string): Promise<NarrativeInsight | null> {
     this.ensureInitialized();
     try {
       return await this.insightRepository.findOne({ contentHash });
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error finding insight by content hash: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error finding insight by content hash: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -147,7 +118,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
    */
   async findByTimeframe(
     timeframe: string,
-    options?: { limit?: number; skip?: number }
+    options?: { limit?: number; skip?: number },
   ): Promise<NarrativeInsight[]> {
     this.ensureInitialized();
     try {
@@ -160,19 +131,16 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
             $gte: startDate,
             $lte: endDate,
           },
-        } as any,
+        } as unknown as Partial<NarrativeInsight>,
         {
           limit: options?.limit,
           skip: options?.skip,
           sort: { timestamp: -1 },
-        }
+        },
       );
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error finding insights by timeframe: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error finding insights by timeframe: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -188,7 +156,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
 
       if (existingTrends.length > 0) {
         this.logger.debug(
-          `Found ${existingTrends.length} existing trends for timeframe ${timeframe}`
+          `Found ${existingTrends.length} existing trends for timeframe ${timeframe}`,
         );
         return existingTrends;
       }
@@ -202,7 +170,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
           $gte: startDate,
           $lte: endDate,
         },
-      } as any);
+      } as unknown as Partial<NarrativeInsight>);
 
       if (insights.length === 0) {
         return [];
@@ -217,10 +185,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
       return trends;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error getting trends by timeframe: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error getting trends by timeframe: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -234,15 +199,12 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
     try {
       const result = await this.insightRepository.deleteMany({
         expiresAt: { $lt: cutoffDate },
-      } as any);
+      } as unknown as Partial<NarrativeInsight>);
 
       return result;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error deleting old insights: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error deleting old insights: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -293,10 +255,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
       return { startDate, endDate };
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error parsing timeframe: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error parsing timeframe: ${err.message}`, err.stack);
 
       // Default to current day as fallback
       const now = new Date();
@@ -310,10 +269,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
   /**
    * Generate trend data from a collection of insights
    */
-  private generateTrends(
-    insights: NarrativeInsight[],
-    timeframe: string
-  ): NarrativeTrend[] {
+  private generateTrends(insights: NarrativeInsight[], timeframe: string): NarrativeTrend[] {
     // Group insights by primary theme
     const themeGroups = this.groupByTheme(insights);
     const trends: NarrativeTrend[] = [];
@@ -326,22 +282,16 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
       const relatedThemes = this.findRelatedThemes(theme, themeInsights);
 
       // Count unique sources
-      const uniqueSources = new Set(
-        themeInsights.map((insight) => insight.sourceHash)
-      );
+      const uniqueSources = new Set(themeInsights.map((insight) => insight.sourceHash));
 
       // Calculate average sentiment
       const sentimentTrend = this.calculateAverageSentiment(themeInsights);
 
       // Calculate platform distribution
-      const platformDistribution =
-        this.calculatePlatformDistribution(themeInsights);
+      const platformDistribution = this.calculatePlatformDistribution(themeInsights);
 
       // Calculate narrative score based on engagement, source diversity, etc.
-      const narrativeScore = this.calculateNarrativeScore(
-        themeInsights,
-        uniqueSources.size
-      );
+      const narrativeScore = this.calculateNarrativeScore(themeInsights, uniqueSources.size);
 
       // Create the trend object
       const trend: NarrativeTrend = {
@@ -367,9 +317,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
   /**
    * Group insights by their primary theme
    */
-  private groupByTheme(
-    insights: NarrativeInsight[]
-  ): Map<string, NarrativeInsight[]> {
+  private groupByTheme(insights: NarrativeInsight[]): Map<string, NarrativeInsight[]> {
     const themeGroups = new Map<string, NarrativeInsight[]>();
 
     for (const insight of insights) {
@@ -377,13 +325,17 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
       if (!insight.themes || insight.themes.length === 0) continue;
 
       // Use the first theme as the primary theme
-      const primaryTheme = insight.themes[0]!;
-
-      if (!themeGroups.has(primaryTheme)) {
-        themeGroups.set(primaryTheme, []);
+      const primaryTheme = insight.themes[0];
+      if (!primaryTheme) {
+        continue;
       }
 
-      themeGroups.get(primaryTheme)!.push(insight);
+      const themeInsights = themeGroups.get(primaryTheme);
+      if (themeInsights) {
+        themeInsights.push(insight);
+      } else {
+        themeGroups.set(primaryTheme, [insight]);
+      }
     }
 
     return themeGroups;
@@ -392,10 +344,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
   /**
    * Find themes that frequently appear together with the primary theme
    */
-  private findRelatedThemes(
-    primaryTheme: string,
-    insights: NarrativeInsight[]
-  ): string[] {
+  private findRelatedThemes(primaryTheme: string, insights: NarrativeInsight[]): string[] {
     const themeCounts = new Map<string, number>();
 
     // Count occurrences of each theme (except the primary)
@@ -421,10 +370,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
    * Calculate the average sentiment across insights
    */
   private calculateAverageSentiment(insights: NarrativeInsight[]): number {
-    const sum = insights.reduce(
-      (total, insight) => total + insight.sentiment.score,
-      0
-    );
+    const sum = insights.reduce((total, insight) => total + insight.sentiment.score, 0);
 
     return sum / insights.length;
   }
@@ -432,9 +378,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
   /**
    * Calculate the distribution of insights across platforms
    */
-  private calculatePlatformDistribution(
-    insights: NarrativeInsight[]
-  ): Record<string, number> {
+  private calculatePlatformDistribution(insights: NarrativeInsight[]): Record<string, number> {
     const platformCounts: Record<string, number> = {};
 
     for (const insight of insights) {
@@ -456,7 +400,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
    */
   private calculateNarrativeScore(
     insights: NarrativeInsight[],
-    uniqueSourcesCount: number
+    uniqueSourcesCount: number,
   ): number {
     // Factors that contribute to narrative score:
     // 1. Number of insights (volume)
@@ -466,19 +410,14 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
     const diversityScore = Math.min(uniqueSourcesCount / 10, 1); // Normalize to 0-1
 
     // 3. Average engagement
-    const totalEngagement = insights.reduce(
-      (sum, insight) => sum + insight.engagement.total,
-      0
-    );
+    const totalEngagement = insights.reduce((sum, insight) => sum + insight.engagement.total, 0);
     const avgEngagement = totalEngagement / insights.length;
     const engagementScore = Math.min(avgEngagement / 1000, 1); // Normalize to 0-1
 
     // 4. Sentiment intensity (absolute value of sentiment)
     const sentimentIntensity =
-      insights.reduce(
-        (sum, insight) => sum + Math.abs(insight.sentiment.score),
-        0
-      ) / insights.length;
+      insights.reduce((sum, insight) => sum + Math.abs(insight.sentiment.score), 0) /
+      insights.length;
     const sentimentScore = sentimentIntensity;
 
     // 5. Platform diversity
@@ -501,7 +440,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
    */
   async findSimilarContent(
     embedding: number[],
-    options?: { limit?: number; minScore?: number }
+    options?: { limit?: number; minScore?: number },
   ): Promise<Array<{ insight: NarrativeInsight; score: number }>> {
     this.ensureInitialized();
     try {
@@ -513,12 +452,11 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
         this.logger.debug('Using native database vector search');
 
         // Use native vector search capability
-        const results =
-          await this.insightRepository.vectorSearch<NarrativeInsight>(
-            'embedding',
-            embedding,
-            { limit, minScore }
-          );
+        const results = await this.insightRepository.vectorSearch<NarrativeInsight>(
+          'embedding',
+          embedding,
+          { limit, minScore },
+        );
 
         return results.map((result) => ({
           insight: result.item,
@@ -531,7 +469,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
         // Get all insights with embeddings
         const insights = await this.insightRepository.find({
           embedding: { $exists: true },
-        } as any);
+        } as unknown as Partial<NarrativeInsight>);
 
         if (insights.length === 0) {
           return [];
@@ -539,17 +477,18 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
 
         // Filter out insights without valid embeddings
         const insightsWithEmbeddings = insights.filter(
-          (insight) => insight.embedding && insight.embedding.length > 0
+          (
+            insight,
+          ): insight is NarrativeInsight & {
+            embedding: number[];
+          } => Array.isArray(insight.embedding) && insight.embedding.length > 0,
         );
 
         // Calculate cosine similarity for each insight
         const results = insightsWithEmbeddings
           .map((insight) => ({
             insight,
-            score: this.calculateCosineSimilarity(
-              embedding,
-              insight.embedding!
-            ),
+            score: this.calculateCosineSimilarity(embedding, insight.embedding),
           }))
           .filter((result) => result.score >= minScore)
           .sort((a, b) => b.score - a.score)
@@ -559,10 +498,7 @@ export class MongoNarrativeRepository implements NarrativeRepository, OnModuleIn
       }
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error finding similar content: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error finding similar content: ${err.message}`, err.stack);
       throw error;
     }
   }

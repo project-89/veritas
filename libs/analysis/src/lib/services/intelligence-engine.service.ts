@@ -1,12 +1,22 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import type { BotDetectionResult, BotScore, StructuralPattern } from './graph-bot-detection.service';
-import type { DeepInvestigationResult, UserInvestigationResult } from './deep-investigation.service';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
-import type { ClaimVerificationBatchResult, VerificationResult } from './claim-verification.service';
-import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
 import type { GlobalEvent } from '../types/global-event';
+import type {
+  ClaimVerificationBatchResult,
+  VerificationResult,
+} from './claim-verification.service';
+import type {
+  DeepInvestigationResult,
+  UserInvestigationResult,
+} from './deep-investigation.service';
 import type { InvestigativeLead } from './evidence-adapters/evidence-adapter.interface';
+import type {
+  BotDetectionResult,
+  BotScore,
+  StructuralPattern,
+} from './graph-bot-detection.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
 import { PlatformCredibilityService } from './platform-credibility.service';
+import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
 
 // ---------------------------------------------------------------------------
 // Types — Coordinated Campaign Detection
@@ -155,9 +165,7 @@ export type IntelligenceReport =
 export class IntelligenceEngineService {
   private readonly logger = new Logger(IntelligenceEngineService.name);
 
-  constructor(
-    @Optional() private readonly platformCredibility?: PlatformCredibilityService,
-  ) {}
+  constructor(@Optional() private readonly platformCredibility?: PlatformCredibilityService) {}
 
   // =========================================================================
   // 1. Coordinated Campaign Detection
@@ -203,13 +211,19 @@ export class IntelligenceEngineService {
     // --- Temporal clustering signal ---
     const adoptionTimestamps = actors
       .filter((a) => a.adoptionTimestamp)
-      .map((a) => ({ handle: a.handle, ts: new Date(a.adoptionTimestamp!).getTime() }))
+      .map((a) => ({
+        handle: a.handle,
+        ts: a.adoptionTimestamp ? new Date(a.adoptionTimestamp).getTime() : 0,
+      }))
       .sort((a, b) => a.ts - b.ts);
 
     if (adoptionTimestamps.length >= 3) {
       const gaps: number[] = [];
       for (let i = 1; i < adoptionTimestamps.length; i++) {
-        gaps.push(adoptionTimestamps[i]!.ts - adoptionTimestamps[i - 1]!.ts);
+        const current = adoptionTimestamps[i];
+        const previous = adoptionTimestamps[i - 1];
+        if (!current || !previous) continue;
+        gaps.push(current.ts - previous.ts);
       }
       const medianGap = gaps.sort((a, b) => a - b)[Math.floor(gaps.length / 2)] ?? 0;
       // If median gap is under 10 minutes, suspicious temporal clustering
@@ -219,7 +233,7 @@ export class IntelligenceEngineService {
         signals.push({
           type: 'temporal_cluster',
           description: `${clusteredActors.length} actors adopted the narrative within tight temporal window (median gap: ${Math.round(medianGap / 1000)}s)`,
-          confidence: Math.min(1, TEN_MINUTES / Math.max(medianGap, 1) * 0.1),
+          confidence: Math.min(1, (TEN_MINUTES / Math.max(medianGap, 1)) * 0.1),
           actors: clusteredActors,
           timestamp: adoptionTimestamps[0]?.ts
             ? new Date(adoptionTimestamps[0].ts).toISOString()
@@ -261,9 +275,10 @@ export class IntelligenceEngineService {
     }));
 
     // --- Calculate overall confidence ---
-    const campaignConfidence = signals.length > 0
-      ? Math.min(1, signals.reduce((sum, s) => sum + s.confidence, 0) / signals.length)
-      : 0;
+    const campaignConfidence =
+      signals.length > 0
+        ? Math.min(1, signals.reduce((sum, s) => sum + s.confidence, 0) / signals.length)
+        : 0;
 
     const campaignDetected = campaignConfidence >= 0.4 && signals.length >= 2;
 
@@ -280,7 +295,9 @@ export class IntelligenceEngineService {
         `Coordinated campaign detected with ${(campaignConfidence * 100).toFixed(0)}% confidence.`,
       ];
       if (orchestrators.length > 0) {
-        parts.push(`${orchestrators.length} likely orchestrator(s): ${orchestrators.map((o) => o.handle).join(', ')}.`);
+        parts.push(
+          `${orchestrators.length} likely orchestrator(s): ${orchestrators.map((o) => o.handle).join(', ')}.`,
+        );
       }
       if (bots.length > 0) {
         parts.push(`${bots.length} bot account(s) identified.`);
@@ -288,7 +305,9 @@ export class IntelligenceEngineService {
       if (amplifiers.length > 0) {
         parts.push(`${amplifiers.length} amplifier(s) spreading the narrative.`);
       }
-      parts.push(`${signals.length} coordination signal(s) detected across ${coordinationClusters.length} cluster(s).`);
+      parts.push(
+        `${signals.length} coordination signal(s) detected across ${coordinationClusters.length} cluster(s).`,
+      );
       summary = parts.join(' ');
     }
 
@@ -339,16 +358,22 @@ export class IntelligenceEngineService {
     const tickerPostTexts = new Map<string, string[]>();
 
     for (const post of posts) {
-      let match: RegExpExecArray | null;
       const regex = new RegExp(tickerRegex.source, tickerRegex.flags);
-      while ((match = regex.exec(post.text)) !== null) {
-        const ticker = match[1]!.toUpperCase();
+      let match = regex.exec(post.text);
+      while (match !== null) {
+        const rawTicker = match[1];
+        if (!rawTicker) {
+          match = regex.exec(post.text);
+          continue;
+        }
+        const ticker = rawTicker.toUpperCase();
         if (!tickerMentions.has(ticker)) {
           tickerMentions.set(ticker, new Set());
           tickerPostTexts.set(ticker, []);
         }
-        tickerMentions.get(ticker)!.add(post.authorHandle);
-        tickerPostTexts.get(ticker)!.push(post.text);
+        tickerMentions.get(ticker)?.add(post.authorHandle);
+        tickerPostTexts.get(ticker)?.push(post.text);
+        match = regex.exec(post.text);
       }
     }
 
@@ -358,12 +383,13 @@ export class IntelligenceEngineService {
     const marketSignalMap = new Map<string, ExternalSignal[]>();
     for (const signal of signals) {
       if (signal.domain !== 'market') continue;
-      const symbol = (signal.metadata['symbol'] as string)?.toUpperCase()
-        ?? signal.title.match(/\$([A-Z]{2,10})/)?.[1]?.toUpperCase()
-        ?? '';
+      const symbol =
+        (signal.metadata['symbol'] as string)?.toUpperCase() ??
+        signal.title.match(/\$([A-Z]{2,10})/)?.[1]?.toUpperCase() ??
+        '';
       if (symbol && tickerMentions.has(symbol)) {
         if (!marketSignalMap.has(symbol)) marketSignalMap.set(symbol, []);
-        marketSignalMap.get(symbol)!.push(signal);
+        marketSignalMap.get(symbol)?.push(signal);
       }
     }
 
@@ -384,7 +410,10 @@ export class IntelligenceEngineService {
       const priceDirection = this.determinePriceDirection(matchedSignals);
 
       // Correlate sentiment with price movement
-      const correlation = this.calculateSentimentPriceCorrelation(narrativeSentiment, priceDirection);
+      const correlation = this.calculateSentimentPriceCorrelation(
+        narrativeSentiment,
+        priceDirection,
+      );
 
       const actors = Array.from(tickerMentions.get(ticker) ?? []);
 
@@ -433,7 +462,10 @@ export class IntelligenceEngineService {
 
     const manipulationDetected = patterns.length > 0;
     const confidence = manipulationDetected
-      ? Math.min(1, patterns.reduce((max, p) => Math.max(max, p.confidence), 0))
+      ? Math.min(
+          1,
+          patterns.reduce((max, p) => Math.max(max, p.confidence), 0),
+        )
       : 0;
 
     let summary: string;
@@ -442,7 +474,9 @@ export class IntelligenceEngineService {
     } else {
       const fudCount = patterns.filter((p) => p.type === 'fud').length;
       const pumpCount = patterns.filter((p) => p.type === 'pump').length;
-      const parts: string[] = [`Market manipulation detected with ${(confidence * 100).toFixed(0)}% confidence.`];
+      const parts: string[] = [
+        `Market manipulation detected with ${(confidence * 100).toFixed(0)}% confidence.`,
+      ];
       if (pumpCount > 0) parts.push(`${pumpCount} pump pattern(s).`);
       if (fudCount > 0) parts.push(`${fudCount} FUD pattern(s).`);
       parts.push(`Tickers involved: ${patterns.map((p) => `$${p.ticker}`).join(', ')}.`);
@@ -474,9 +508,10 @@ export class IntelligenceEngineService {
     let signalCount = 0;
 
     for (const signal of signals) {
-      const change = (signal.metadata['priceChange'] as number)
-        ?? (signal.metadata['changePercent'] as number)
-        ?? 0;
+      const change =
+        (signal.metadata['priceChange'] as number) ??
+        (signal.metadata['changePercent'] as number) ??
+        0;
       totalChange += change;
       signalCount++;
     }
@@ -488,7 +523,10 @@ export class IntelligenceEngineService {
     return 'flat';
   }
 
-  private calculateSentimentPriceCorrelation(sentiment: number, direction: 'up' | 'down' | 'flat'): number {
+  private calculateSentimentPriceCorrelation(
+    sentiment: number,
+    direction: 'up' | 'down' | 'flat',
+  ): number {
     if (direction === 'flat') return 0;
     // Positive correlation: sentiment and price move same direction
     // Negative correlation (for FUD): both negative
@@ -502,10 +540,7 @@ export class IntelligenceEngineService {
   // 3. Crisis Risk Assessment
   // =========================================================================
 
-  assessCrisisRisk(
-    events: GlobalEvent[],
-    narratives: AnalyzedNarrative[],
-  ): CrisisWarningReport {
+  assessCrisisRisk(events: GlobalEvent[], narratives: AnalyzedNarrative[]): CrisisWarningReport {
     if (events.length === 0) {
       return {
         alerts: [],
@@ -521,7 +556,7 @@ export class IntelligenceEngineService {
     for (const event of events) {
       const region = event.location.region ?? event.location.countryCode ?? event.location.label;
       if (!regionMap.has(region)) regionMap.set(region, []);
-      regionMap.get(region)!.push(event);
+      regionMap.get(region)?.push(event);
     }
 
     // --- Build alerts per region ---
@@ -539,17 +574,24 @@ export class IntelligenceEngineService {
       else severity = 'watch';
 
       // Cross-reference with narrative velocity
-      const narrativeCorrelation = this.calculateNarrativeRegionCorrelation(region, regionEvents, narratives);
+      const narrativeCorrelation = this.calculateNarrativeRegionCorrelation(
+        region,
+        regionEvents,
+        narratives,
+      );
 
       // Boost severity if narratives are surging about this region
       if (narrativeCorrelation > 0.5 && severity === 'watch') {
         severity = 'warning';
       }
 
-      const highSeverityEvents = regionEvents.filter((e) => e.severity === 'high' || e.severity === 'critical');
-      const description = highSeverityEvents.length > 0
-        ? `${highSeverityEvents.length} high/critical event(s) in ${region} from ${sourceCount} source(s). ${narrativeCorrelation > 0.3 ? 'Narrative activity detected about this region.' : 'No significant narrative activity detected.'}`
-        : `${regionEvents.length} event(s) in ${region} from ${sourceCount} source(s).`;
+      const highSeverityEvents = regionEvents.filter(
+        (e) => e.severity === 'high' || e.severity === 'critical',
+      );
+      const description =
+        highSeverityEvents.length > 0
+          ? `${highSeverityEvents.length} high/critical event(s) in ${region} from ${sourceCount} source(s). ${narrativeCorrelation > 0.3 ? 'Narrative activity detected about this region.' : 'No significant narrative activity detected.'}`
+          : `${regionEvents.length} event(s) in ${region} from ${sourceCount} source(s).`;
 
       alerts.push({
         region,
@@ -566,7 +608,7 @@ export class IntelligenceEngineService {
     const severityOrder: Record<string, number> = { emergency: 3, warning: 2, watch: 1 };
     alerts.sort((a, b) => (severityOrder[b.severity] ?? 0) - (severityOrder[a.severity] ?? 0));
 
-    const highestSeverity = alerts.length > 0 ? alerts[0]!.severity : 'none' as const;
+    const highestSeverity = alerts[0]?.severity ?? ('none' as const);
     const regionsAffected = alerts.map((a) => a.region);
 
     const emergencyCount = alerts.filter((a) => a.severity === 'emergency').length;
@@ -577,13 +619,17 @@ export class IntelligenceEngineService {
     if (alerts.length === 0) {
       summary = `No crisis indicators detected from ${events.length} event(s).`;
     } else {
-      const parts: string[] = [`Crisis assessment: ${alerts.length} region(s) flagged from ${events.length} event(s).`];
+      const parts: string[] = [
+        `Crisis assessment: ${alerts.length} region(s) flagged from ${events.length} event(s).`,
+      ];
       if (emergencyCount > 0) parts.push(`${emergencyCount} emergency alert(s).`);
       if (warningCount > 0) parts.push(`${warningCount} warning(s).`);
       if (watchCount > 0) parts.push(`${watchCount} watch alert(s).`);
       const narrativeRegions = alerts.filter((a) => a.narrativeCorrelation > 0.3);
       if (narrativeRegions.length > 0) {
-        parts.push(`Narrative activity correlates with events in: ${narrativeRegions.map((a) => a.region).join(', ')}.`);
+        parts.push(
+          `Narrative activity correlates with events in: ${narrativeRegions.map((a) => a.region).join(', ')}.`,
+        );
       }
       summary = parts.join(' ');
     }
@@ -638,7 +684,6 @@ export class IntelligenceEngineService {
   attributeInfluenceOperation(
     investigation: DeepInvestigationResult,
     botResult: BotDetectionResult,
-    narratives: AnalyzedNarrative[],
   ): InfluenceOperationReport {
     const attributionChain: AttributionNode[] = [];
     const platformsInvolved = new Set<string>();
@@ -653,7 +698,8 @@ export class IntelligenceEngineService {
     const propagationChain = investigation.originAnalysis.propagationChain;
 
     for (let i = 0; i < propagationChain.length; i++) {
-      const handle = propagationChain[i]!;
+      const handle = propagationChain[i];
+      if (!handle) continue;
       const userResult = investigation.users.find(
         (u) => u.user.handle.toLowerCase() === handle.toLowerCase(),
       );
@@ -666,7 +712,9 @@ export class IntelligenceEngineService {
 
       if (i === 0) {
         role = 'originator';
-        evidence.push(`First mover on ${investigation.originAnalysis.firstPlatform} at ${investigation.originAnalysis.firstTimestamp}`);
+        evidence.push(
+          `First mover on ${investigation.originAnalysis.firstPlatform} at ${investigation.originAnalysis.firstTimestamp}`,
+        );
       } else if (i < propagationChain.length * 0.3) {
         role = 'amplifier';
         evidence.push(`Early amplifier — position ${i + 1} in propagation chain`);
@@ -690,7 +738,10 @@ export class IntelligenceEngineService {
         ? 1 - this.platformCredibility.getProfile(platform).manipulationRisk
         : 0.5;
 
-      const confidence = Math.min(1, (userResult?.influenceScore ?? 0.3) * 0.5 + credMultiplier * 0.3 + (i === 0 ? 0.2 : 0));
+      const confidence = Math.min(
+        1,
+        (userResult?.influenceScore ?? 0.3) * 0.5 + credMultiplier * 0.3 + (i === 0 ? 0.2 : 0),
+      );
 
       attributionChain.push({ handle, platform, role, confidence, evidence });
     }
@@ -729,14 +780,20 @@ export class IntelligenceEngineService {
     }
 
     // --- Overall assessment ---
-    const operationDetected = attributionChain.length >= 3 &&
+    const operationDetected =
+      attributionChain.length >= 3 &&
       attributionChain.some((n) => n.role === 'originator') &&
-      (attributionChain.some((n) => n.role === 'amplifier') || botResult.scores.some((s) => s.botProbability >= 0.6));
+      (attributionChain.some((n) => n.role === 'amplifier') ||
+        botResult.scores.some((s) => s.botProbability >= 0.6));
 
     const confidence = operationDetected
-      ? Math.min(1, attributionChain
-          .filter((n) => n.role !== 'target')
-          .reduce((sum, n) => sum + n.confidence, 0) / Math.max(attributionChain.filter((n) => n.role !== 'target').length, 1))
+      ? Math.min(
+          1,
+          attributionChain
+            .filter((n) => n.role !== 'target')
+            .reduce((sum, n) => sum + n.confidence, 0) /
+            Math.max(attributionChain.filter((n) => n.role !== 'target').length, 1),
+        )
       : 0;
 
     let summary: string;
@@ -754,9 +811,13 @@ export class IntelligenceEngineService {
         parts.push(`${amplifiers.length} amplifier(s) in the chain.`);
       }
       if (investigation.cuiBono.beneficiaries.length > 0) {
-        parts.push(`Likely beneficiaries: ${investigation.cuiBono.beneficiaries.map((b) => b.entity).join(', ')}.`);
+        parts.push(
+          `Likely beneficiaries: ${investigation.cuiBono.beneficiaries.map((b) => b.entity).join(', ')}.`,
+        );
       }
-      parts.push(`Spans ${platformsInvolved.size} platform(s): ${Array.from(platformsInvolved).join(', ')}.`);
+      parts.push(
+        `Spans ${platformsInvolved.size} platform(s): ${Array.from(platformsInvolved).join(', ')}.`,
+      );
       summary = parts.join(' ');
     }
 
@@ -809,7 +870,10 @@ export class IntelligenceEngineService {
 
     for (const result of results) {
       const weight = this.platformCredibility
-        ? this.platformCredibility.adjustClaimWeight(result.confidence, this.inferPlatformFromResult(result, platforms))
+        ? this.platformCredibility.adjustClaimWeight(
+            result.confidence,
+            this.inferPlatformFromResult(result, platforms),
+          )
         : result.confidence;
 
       if (result.status === 'verified') {
@@ -832,9 +896,7 @@ export class IntelligenceEngineService {
 
     // --- Calculate evidence balance (-1 to 1, positive = more supporting) ---
     const totalWeight = verifiedWeight + disputedWeight + unverifiedWeight;
-    const evidenceBalance = totalWeight > 0
-      ? (verifiedWeight - disputedWeight) / totalWeight
-      : 0;
+    const evidenceBalance = totalWeight > 0 ? (verifiedWeight - disputedWeight) / totalWeight : 0;
 
     // --- Score: 0-1 scale ---
     // Combine evidence balance with platform credibility
@@ -857,7 +919,9 @@ export class IntelligenceEngineService {
       const parts: string[] = [
         `Narrative legitimacy: ${verdict.replace('_', ' ')} (score: ${score.toFixed(2)}).`,
       ];
-      parts.push(`${verifiedCount} verified, ${disputedCount} disputed, ${unverifiedCount} unverified claim(s).`);
+      parts.push(
+        `${verifiedCount} verified, ${disputedCount} disputed, ${unverifiedCount} unverified claim(s).`,
+      );
       if (evidenceBalance > 0.3) {
         parts.push('Evidence strongly supports the narrative.');
       } else if (evidenceBalance < -0.3) {
@@ -890,6 +954,6 @@ export class IntelligenceEngineService {
     const entries = Object.entries(platforms);
     if (entries.length === 0) return 'unknown';
     entries.sort((a, b) => b[1] - a[1]);
-    return entries[0]![0];
+    return entries[0]?.[0] ?? 'unknown';
   }
 }

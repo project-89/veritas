@@ -1,9 +1,8 @@
-import React, { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  NarrativeFlowVisualizationProps,
   NarrativeBranch,
-  NarrativeConnection,
+  NarrativeFlowVisualizationProps,
 } from '../types/narrative-flow-types';
 
 export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
@@ -26,8 +25,10 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
     id: string;
   } | null>(null);
 
-  // Calculate the effective time window
-  const effectiveTimeWindow = timeWindow || data.timeframe;
+  const effectiveTimeWindow = timeWindow ?? data.timeframe;
+  const effectiveTimeWindowStart = effectiveTimeWindow.start;
+  const effectiveTimeWindowEnd = effectiveTimeWindow.end;
+  void colorScheme;
 
   useEffect(() => {
     if (!svgRef.current || !data) return;
@@ -36,8 +37,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
     svg.selectAll('*').remove(); // Clear previous rendering
 
     // Helper: check if a Date is valid
-    const isValidDate = (d: unknown): d is Date =>
-      d instanceof Date && !isNaN(d.getTime());
+    const isValidDate = (d: unknown): d is Date => d instanceof Date && !isNaN(d.getTime());
 
     // Helper: check if a number is finite
     const safeNum = (v: unknown, fallback = 0): number => {
@@ -46,7 +46,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
     };
 
     // Validate timeframe
-    if (!isValidDate(effectiveTimeWindow.start) || !isValidDate(effectiveTimeWindow.end)) return;
+    if (!isValidDate(effectiveTimeWindowStart) || !isValidDate(effectiveTimeWindowEnd)) return;
 
     // Create main container with margins
     const margin = { top: 40, right: 40, bottom: 60, left: 60 };
@@ -62,7 +62,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
     // Create scales
     const xScale = d3
       .scaleTime()
-      .domain([effectiveTimeWindow.start, effectiveTimeWindow.end])
+      .domain([effectiveTimeWindowStart, effectiveTimeWindowEnd])
       .range([0, innerWidth]);
 
     const yScale = d3
@@ -80,11 +80,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
     const yAxis = d3
       .axisLeft(yScale)
       .tickFormat((d) =>
-        Math.abs(Number(d)) === 1
-          ? 'Max Divergence'
-          : Number(d) === 0
-          ? 'Consensus'
-          : ''
+        Math.abs(Number(d)) === 1 ? 'Max Divergence' : Number(d) === 0 ? 'Consensus' : '',
       );
 
     container
@@ -107,19 +103,10 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
     container
       .append('text')
       .attr('class', 'y-axis-label')
-      .attr(
-        'transform',
-        `translate(${-margin.left + 20},${innerHeight / 2}) rotate(-90)`
-      )
+      .attr('transform', `translate(${-margin.left + 20},${innerHeight / 2}) rotate(-90)`)
       .text('Divergence from Consensus');
 
     // Create a line generator for the consensus band
-    const consensusLine = d3
-      .line<[Date, number]>()
-      .x((d) => xScale(d[0]))
-      .y((d) => yScale(0)) // Consensus is always at y=0
-      .curve(d3.curveBasis);
-
     // Create area generator for the consensus band
     const consensusArea = d3
       .area<[Date, number]>()
@@ -144,13 +131,13 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
       .attr('d', consensusArea)
       .attr('fill', data.consensus.color || '#888')
       .attr('opacity', 0.7)
-      .on('mouseover', function (event) {
+      .on('mouseover', function () {
         if (interactive) {
           setHoveredElement({ type: 'consensus', id: data.consensus.id });
           d3.select(this).attr('opacity', 0.9);
         }
       })
-      .on('mouseout', function (event) {
+      .on('mouseout', function () {
         if (interactive) {
           setHoveredElement(null);
           d3.select(this).attr('opacity', 0.7);
@@ -160,11 +147,14 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
     // Function to generate path for a narrative branch
     const generateBranchPath = (branch: NarrativeBranch) => {
       const branchPoints: [Date, number, number][] = (branch.timePoints ?? [])
-        .map((time, i) => [
-          time,
-          safeNum(branch.strengthValues?.[i], 0),
-          safeNum(branch.divergenceValues?.[i], 0),
-        ] as [Date, number, number])
+        .map(
+          (time, i) =>
+            [
+              time,
+              safeNum(branch.strengthValues?.[i], 0),
+              safeNum(branch.divergenceValues?.[i], 0),
+            ] as [Date, number, number],
+        )
         .filter(([time]) => isValidDate(time));
 
       // Create a line generator for this branch
@@ -205,26 +195,30 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
         .attr('d', paths.area)
         .attr('fill', branch.color || '#5a67d8')
         .attr('opacity', isHighlighted ? 0.9 : 0.6)
-        .on('mouseover', function (event) {
+        .on('mouseover', function () {
           if (interactive) {
             setHoveredElement({ type: 'branch', id: branch.id });
             d3.select(this).attr('opacity', 0.9);
           }
         })
-        .on('mouseout', function (event) {
+        .on('mouseout', function () {
           if (interactive) {
             setHoveredElement(null);
             d3.select(this).attr('opacity', isHighlighted ? 0.9 : 0.6);
           }
         })
-        .on('click', function (event) {
+        .on('click', () => {
           if (interactive && onBranchClick) {
             onBranchClick(branch);
           }
         });
 
       // Add labels if enabled
-      if (showLabels && (branch.strengthValues ?? []).length > 0 && (branch.timePoints ?? []).length > 0) {
+      if (
+        showLabels &&
+        (branch.strengthValues ?? []).length > 0 &&
+        (branch.timePoints ?? []).length > 0
+      ) {
         // Find the point with maximum strength for label placement
         let maxStrengthIndex = 0;
         let maxStrength = 0;
@@ -263,26 +257,23 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
       if (showEvents && branch.events && branch.events.length > 0) {
         // Filter to events with valid timestamps and finite impact
         const validEvents = branch.events.filter(
-          (evt) => isValidDate(evt.timestamp) && Number.isFinite(safeNum(evt.impact))
+          (evt) => isValidDate(evt.timestamp) && Number.isFinite(safeNum(evt.impact)),
         );
         const validTimePoints = (branch.timePoints ?? []).filter((t) => isValidDate(t));
 
         validEvents.forEach((evt) => {
           // Find the closest time point to this event
-          const closestTimeIndex = validTimePoints.length > 0
-            ? validTimePoints.reduce(
-                (closest, time, index) => {
-                  const currentDiff = Math.abs(
-                    time.getTime() - evt.timestamp.getTime()
-                  );
+          const closestTimeIndex =
+            validTimePoints.length > 0
+              ? validTimePoints.reduce((closest, time, index) => {
+                  const currentDiff = Math.abs(time.getTime() - evt.timestamp.getTime());
+                  const closestTime = validTimePoints[closest];
                   const closestDiff = Math.abs(
-                    validTimePoints[closest]!.getTime() - evt.timestamp.getTime()
+                    (closestTime?.getTime() ?? evt.timestamp.getTime()) - evt.timestamp.getTime(),
                   );
                   return currentDiff < closestDiff ? index : closest;
-                },
-                0
-              )
-            : 0;
+                }, 0)
+              : 0;
 
           const eventX = safeNum(xScale(evt.timestamp));
           const eventY = safeNum(yScale(branch.divergenceValues?.[closestTimeIndex] ?? 0));
@@ -311,10 +302,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
                 const tooltip = container
                   .append('g')
                   .attr('class', 'tooltip')
-                  .attr(
-                    'transform',
-                    `translate(${eventX + 10},${eventY - 10})`
-                  );
+                  .attr('transform', `translate(${eventX + 10},${eventY - 10})`);
 
                 tooltip
                   .append('rect')
@@ -329,7 +317,11 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
                   .attr('x', 10)
                   .attr('y', 20)
                   .attr('font-weight', 'bold')
-                  .text(isValidDate(evt.timestamp) ? evt.timestamp.toLocaleDateString() : 'Unknown date');
+                  .text(
+                    isValidDate(evt.timestamp)
+                      ? evt.timestamp.toLocaleDateString()
+                      : 'Unknown date',
+                  );
 
                 tooltip
                   .append('text')
@@ -337,7 +329,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
                   .attr('y', 40)
                   .text(
                     (evt.description ?? '').substring(0, 30) +
-                      ((evt.description ?? '').length > 30 ? '...' : '')
+                      ((evt.description ?? '').length > 30 ? '...' : ''),
                   );
               }
             })
@@ -359,48 +351,34 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
       // Skip connections with invalid timestamps
       if (!isValidDate(connection.timestamp)) return;
       // Find the source and target branches
-      const sourceBranch = data.branches.find(
-        (b) => b.id === connection.sourceId
-      );
-      const targetBranch = data.branches.find(
-        (b) => b.id === connection.targetId
-      );
+      const sourceBranch = data.branches.find((b) => b.id === connection.sourceId);
+      const targetBranch = data.branches.find((b) => b.id === connection.targetId);
 
       if (!sourceBranch || !targetBranch) return;
 
       // Find the closest time points to the connection timestamp
-      const sourceTimeIndex = sourceBranch.timePoints.reduce(
-        (closest, time, index) => {
-          const currentDiff = Math.abs(
-            time.getTime() - connection.timestamp.getTime()
-          );
-          const closestDiff = Math.abs(
-            sourceBranch.timePoints[closest]!.getTime() -
-              connection.timestamp.getTime()
-          );
-          return currentDiff < closestDiff ? index : closest;
-        },
-        0
-      );
+      const sourceTimeIndex = sourceBranch.timePoints.reduce((closest, time, index) => {
+        const currentDiff = Math.abs(time.getTime() - connection.timestamp.getTime());
+        const closestTime = sourceBranch.timePoints[closest];
+        const closestDiff = Math.abs(
+          (closestTime?.getTime() ?? connection.timestamp.getTime()) - connection.timestamp.getTime(),
+        );
+        return currentDiff < closestDiff ? index : closest;
+      }, 0);
 
-      const targetTimeIndex = targetBranch.timePoints.reduce(
-        (closest, time, index) => {
-          const currentDiff = Math.abs(
-            time.getTime() - connection.timestamp.getTime()
-          );
-          const closestDiff = Math.abs(
-            targetBranch.timePoints[closest]!.getTime() -
-              connection.timestamp.getTime()
-          );
-          return currentDiff < closestDiff ? index : closest;
-        },
-        0
-      );
+      const targetTimeIndex = targetBranch.timePoints.reduce((closest, time, index) => {
+        const currentDiff = Math.abs(time.getTime() - connection.timestamp.getTime());
+        const closestTime = targetBranch.timePoints[closest];
+        const closestDiff = Math.abs(
+          (closestTime?.getTime() ?? connection.timestamp.getTime()) - connection.timestamp.getTime(),
+        );
+        return currentDiff < closestDiff ? index : closest;
+      }, 0);
 
       const sourceX = xScale(connection.timestamp);
-      const sourceY = yScale(sourceBranch.divergenceValues[sourceTimeIndex]!);
+      const sourceY = yScale(sourceBranch.divergenceValues[sourceTimeIndex] ?? 0);
       const targetX = xScale(connection.timestamp);
-      const targetY = yScale(targetBranch.divergenceValues[targetTimeIndex]!);
+      const targetY = yScale(targetBranch.divergenceValues[targetTimeIndex] ?? 0);
 
       // Draw connection line
       container
@@ -415,15 +393,15 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
           connection.type === 'conflict'
             ? '#e53e3e'
             : connection.type === 'merge'
-            ? '#38a169'
-            : connection.type === 'split'
-            ? '#d69e2e'
-            : '#4299e1'
+              ? '#38a169'
+              : connection.type === 'split'
+                ? '#d69e2e'
+                : '#4299e1',
         )
         .attr('stroke-width', connection.strength * 5)
         .attr('stroke-dasharray', connection.type === 'influence' ? '5,5' : '0')
         .attr('opacity', 0.7)
-        .on('mouseover', function (event) {
+        .on('mouseover', function () {
           if (interactive) {
             setHoveredElement({ type: 'connection', id: connection.id });
             d3.select(this)
@@ -431,7 +409,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
               .attr('stroke-width', connection.strength * 7);
           }
         })
-        .on('mouseout', function (event) {
+        .on('mouseout', function () {
           if (interactive) {
             setHoveredElement(null);
             d3.select(this)
@@ -439,7 +417,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
               .attr('stroke-width', connection.strength * 5);
           }
         })
-        .on('click', function (event) {
+        .on('click', () => {
           if (interactive && onConnectionClick) {
             onConnectionClick(connection);
           }
@@ -460,12 +438,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
       .attr('stroke', '#ccc')
       .attr('rx', 5);
 
-    legend
-      .append('text')
-      .attr('x', 10)
-      .attr('y', 20)
-      .attr('font-weight', 'bold')
-      .text('Legend');
+    legend.append('text').attr('x', 10).attr('y', 20).attr('font-weight', 'bold').text('Legend');
 
     // Consensus legend item
     legend
@@ -528,7 +501,7 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
         .duration(1000)
         .attr('opacity', function () {
           const branchClass = d3.select(this).attr('class');
-          const branchId = branchClass.split('branch-')[1]!;
+          const branchId = branchClass.split('branch-')[1] ?? '';
           return highlightBranchIds.includes(branchId) ? 0.9 : 0.6;
         });
 
@@ -547,10 +520,12 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
     showLabels,
     showEvents,
     animate,
-    timeWindow,
     highlightBranchIds,
-    colorScheme,
     interactive,
+    effectiveTimeWindowStart,
+    effectiveTimeWindowEnd,
+    onBranchClick,
+    onConnectionClick,
   ]);
 
   // Render tooltip for hovered element
@@ -565,16 +540,13 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
           <h3>{data.consensus.name}</h3>
           <p>{data.consensus.description}</p>
           <div>
-            <strong>Stability:</strong>{' '}
-            {data.consensus.metrics.stability.toFixed(2)}
+            <strong>Stability:</strong> {data.consensus.metrics.stability.toFixed(2)}
           </div>
           <div>
-            <strong>Confidence:</strong>{' '}
-            {data.consensus.metrics.confidence.toFixed(2)}
+            <strong>Confidence:</strong> {data.consensus.metrics.confidence.toFixed(2)}
           </div>
           <div>
-            <strong>Diversity:</strong>{' '}
-            {data.consensus.metrics.diversity.toFixed(2)}
+            <strong>Diversity:</strong> {data.consensus.metrics.diversity.toFixed(2)}
           </div>
         </div>
       );
@@ -586,18 +558,15 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
             <h3>{branch.name}</h3>
             <p>{branch.description}</p>
             <div>
-              <strong>Emerged:</strong>{' '}
-              {branch.emergencePoint.toLocaleDateString()}
+              <strong>Emerged:</strong> {branch.emergencePoint.toLocaleDateString()}
             </div>
             {branch.terminationPoint && (
               <div>
-                <strong>Ended:</strong>{' '}
-                {branch.terminationPoint.toLocaleDateString()}
+                <strong>Ended:</strong> {branch.terminationPoint.toLocaleDateString()}
               </div>
             )}
             <div>
-              <strong>Peak Strength:</strong>{' '}
-              {branch.metrics.peakStrength.toFixed(2)}
+              <strong>Peak Strength:</strong> {branch.metrics.peakStrength.toFixed(2)}
             </div>
             <div>
               <strong>Longevity:</strong> {branch.metrics.longevity} days
@@ -606,24 +575,14 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
         );
       }
     } else if (hoveredElement.type === 'connection') {
-      const connection = data.connections.find(
-        (c) => c.id === hoveredElement.id
-      );
+      const connection = data.connections.find((c) => c.id === hoveredElement.id);
       if (connection) {
-        const sourceBranch = data.branches.find(
-          (b) => b.id === connection.sourceId
-        );
-        const targetBranch = data.branches.find(
-          (b) => b.id === connection.targetId
-        );
+        const sourceBranch = data.branches.find((b) => b.id === connection.sourceId);
+        const targetBranch = data.branches.find((b) => b.id === connection.targetId);
 
         tooltipContent = (
           <div>
-            <h3>
-              {connection.type.charAt(0).toUpperCase() +
-                connection.type.slice(1)}{' '}
-              Connection
-            </h3>
+            <h3>{connection.type.charAt(0).toUpperCase() + connection.type.slice(1)} Connection</h3>
             <p>{connection.description}</p>
             <div>
               <strong>From:</strong> {sourceBranch?.name || 'Unknown'}
@@ -642,16 +601,11 @@ export const NarrativeFlow: React.FC<NarrativeFlowVisualizationProps> = ({
       }
     }
 
-    return tooltipContent ? (
-      <div className="narrative-flow-tooltip">{tooltipContent}</div>
-    ) : null;
+    return tooltipContent ? <div className="narrative-flow-tooltip">{tooltipContent}</div> : null;
   };
 
   return (
-    <div
-      className="narrative-flow-container"
-      style={{ position: 'relative', width, height }}
-    >
+    <div className="narrative-flow-container" style={{ position: 'relative', width, height }}>
       <svg ref={svgRef} />
       {interactive && renderTooltip()}
     </div>

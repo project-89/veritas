@@ -143,7 +143,10 @@ describe('GdeltAdapter', () => {
     });
 
     it('returns empty array when GDELT responds with plain text instead of JSON', async () => {
-      mockFetch(async () => new Response('Queries containing too many terms are not valid JSON', { status: 200 }));
+      mockFetch(
+        async () =>
+          new Response('Queries containing too many terms are not valid JSON', { status: 200 }),
+      );
 
       const signals = await adapter.fetchSignals(defaultParams);
       expect(signals).toEqual([]);

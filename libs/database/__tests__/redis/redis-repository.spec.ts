@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { RedisRepository } from '../../src/lib/redis/redis-repository';
 
 // Mock randomUUID to return a predictable value
@@ -66,9 +64,7 @@ describe('RedisRepository', () => {
     it('should return all entities when no filter is provided', async () => {
       const keys = testEntities.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        testEntities.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(testEntities.map((e) => JSON.stringify(e)));
 
       const result = await repository.find();
 
@@ -79,9 +75,7 @@ describe('RedisRepository', () => {
     it('should filter entities client-side', async () => {
       const keys = testEntities.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        testEntities.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(testEntities.map((e) => JSON.stringify(e)));
 
       const result = await repository.find({ name: 'Entity 1' } as any);
 
@@ -91,9 +85,7 @@ describe('RedisRepository', () => {
     it('should apply skip option', async () => {
       const keys = testEntities.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        testEntities.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(testEntities.map((e) => JSON.stringify(e)));
 
       const result = await repository.find({}, { skip: 1 });
 
@@ -104,9 +96,7 @@ describe('RedisRepository', () => {
     it('should apply limit option', async () => {
       const keys = testEntities.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        testEntities.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(testEntities.map((e) => JSON.stringify(e)));
 
       const result = await repository.find({}, { limit: 2 });
 
@@ -119,7 +109,7 @@ describe('RedisRepository', () => {
       mockClient.keys.mockResolvedValue(keys);
       // Return in reverse order to verify sorting works
       mockPipeline.exec.mockResolvedValue(
-        [...testEntities].reverse().map((e) => JSON.stringify(e))
+        [...testEntities].reverse().map((e) => JSON.stringify(e)),
       );
 
       const result = await repository.find({}, { sort: { value: 1 } });
@@ -130,9 +120,7 @@ describe('RedisRepository', () => {
     it('should apply sort option descending', async () => {
       const keys = testEntities.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        testEntities.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(testEntities.map((e) => JSON.stringify(e)));
 
       const result = await repository.find({}, { sort: { value: -1 } });
 
@@ -142,10 +130,7 @@ describe('RedisRepository', () => {
     it('should skip null results from pipeline', async () => {
       const keys = ['testentity:entity-1', 'testentity:entity-2'];
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue([
-        JSON.stringify(testEntities[0]),
-        null,
-      ]);
+      mockPipeline.exec.mockResolvedValue([JSON.stringify(testEntities[0]), null]);
 
       const result = await repository.find();
 
@@ -193,9 +178,7 @@ describe('RedisRepository', () => {
       const error = new Error('Get failed');
       mockClient.get.mockRejectedValue(error);
 
-      await expect(repository.findById('entity-1')).rejects.toThrow(
-        'Get failed'
-      );
+      await expect(repository.findById('entity-1')).rejects.toThrow('Get failed');
     });
   });
 
@@ -203,9 +186,7 @@ describe('RedisRepository', () => {
     it('should return the first matching entity', async () => {
       const keys = testEntities.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        testEntities.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(testEntities.map((e) => JSON.stringify(e)));
 
       const result = await repository.findOne({ name: 'Entity 2' } as any);
 
@@ -227,9 +208,7 @@ describe('RedisRepository', () => {
     it('should return count of all entities with no filter', async () => {
       const keys = testEntities.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        testEntities.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(testEntities.map((e) => JSON.stringify(e)));
 
       const result = await repository.count();
 
@@ -239,9 +218,7 @@ describe('RedisRepository', () => {
     it('should return count of filtered entities', async () => {
       const keys = testEntities.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        testEntities.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(testEntities.map((e) => JSON.stringify(e)));
 
       const result = await repository.count({ value: 1 } as any);
 
@@ -276,7 +253,7 @@ describe('RedisRepository', () => {
 
       expect(mockClient.set).toHaveBeenCalledWith(
         'testentity:custom-id',
-        JSON.stringify({ ...data })
+        JSON.stringify({ ...data }),
       );
       expect(result.id).toBe('custom-id');
       expect(result.name).toBe('New Entity');
@@ -291,19 +268,14 @@ describe('RedisRepository', () => {
       const result = await repository.create(data);
 
       expect(result.id).toBe('mock-uuid-1234');
-      expect(mockClient.set).toHaveBeenCalledWith(
-        'testentity:mock-uuid-1234',
-        expect.any(String)
-      );
+      expect(mockClient.set).toHaveBeenCalledWith('testentity:mock-uuid-1234', expect.any(String));
     });
 
     it('should throw and log error on failure', async () => {
       const error = new Error('Set failed');
       mockClient.set.mockRejectedValue(error);
 
-      await expect(
-        repository.create({ name: 'Fail', value: 0 })
-      ).rejects.toThrow('Set failed');
+      await expect(repository.create({ name: 'Fail', value: 0 })).rejects.toThrow('Set failed');
     });
   });
 
@@ -340,9 +312,9 @@ describe('RedisRepository', () => {
       const error = new Error('Pipeline exec failed');
       mockPipeline.exec.mockRejectedValue(error);
 
-      await expect(
-        repository.createMany([{ name: 'Fail', value: 0 }])
-      ).rejects.toThrow('Pipeline exec failed');
+      await expect(repository.createMany([{ name: 'Fail', value: 0 }])).rejects.toThrow(
+        'Pipeline exec failed',
+      );
     });
   });
 
@@ -357,7 +329,7 @@ describe('RedisRepository', () => {
       expect(mockClient.get).toHaveBeenCalledWith('testentity:entity-1');
       expect(mockClient.set).toHaveBeenCalledWith(
         'testentity:entity-1',
-        JSON.stringify({ ...testEntity, name: 'Updated' })
+        JSON.stringify({ ...testEntity, name: 'Updated' }),
       );
       expect(result).toEqual({ ...testEntity, name: 'Updated' });
     });
@@ -377,9 +349,9 @@ describe('RedisRepository', () => {
       const error = new Error('Get failed during update');
       mockClient.get.mockRejectedValue(error);
 
-      await expect(
-        repository.updateById('entity-1', { name: 'Fail' })
-      ).rejects.toThrow('Get failed during update');
+      await expect(repository.updateById('entity-1', { name: 'Fail' })).rejects.toThrow(
+        'Get failed during update',
+      );
     });
   });
 
@@ -387,14 +359,9 @@ describe('RedisRepository', () => {
     it('should update matching entities and return count', async () => {
       const keys = testEntities.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        testEntities.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(testEntities.map((e) => JSON.stringify(e)));
 
-      const result = await repository.updateMany(
-        { value: 1 } as any,
-        { name: 'Bulk Updated' }
-      );
+      const result = await repository.updateMany({ value: 1 } as any, { name: 'Bulk Updated' });
 
       // Only entity-1 has value: 1
       expect(result).toBe(1);
@@ -403,10 +370,7 @@ describe('RedisRepository', () => {
     it('should return 0 when no entities match', async () => {
       mockClient.keys.mockResolvedValue([]);
 
-      const result = await repository.updateMany(
-        { value: 999 } as any,
-        { name: 'None' }
-      );
+      const result = await repository.updateMany({ value: 999 } as any, { name: 'None' });
 
       expect(result).toBe(0);
     });
@@ -429,9 +393,9 @@ describe('RedisRepository', () => {
       const error = new Error('UpdateMany failed');
       mockClient.keys.mockRejectedValue(error);
 
-      await expect(
-        repository.updateMany({ value: 1 } as any, { name: 'Fail' })
-      ).rejects.toThrow('UpdateMany failed');
+      await expect(repository.updateMany({ value: 1 } as any, { name: 'Fail' })).rejects.toThrow(
+        'UpdateMany failed',
+      );
     });
   });
 
@@ -459,9 +423,7 @@ describe('RedisRepository', () => {
       const error = new Error('Delete failed');
       mockClient.get.mockRejectedValue(error);
 
-      await expect(repository.deleteById('entity-1')).rejects.toThrow(
-        'Delete failed'
-      );
+      await expect(repository.deleteById('entity-1')).rejects.toThrow('Delete failed');
     });
   });
 
@@ -505,9 +467,7 @@ describe('RedisRepository', () => {
       const error = new Error('DeleteMany failed');
       mockClient.keys.mockRejectedValue(error);
 
-      await expect(
-        repository.deleteMany({ value: 1 } as any)
-      ).rejects.toThrow('DeleteMany failed');
+      await expect(repository.deleteMany({ value: 1 } as any)).rejects.toThrow('DeleteMany failed');
     });
   });
 
@@ -516,9 +476,7 @@ describe('RedisRepository', () => {
 
     it('should fall back to in-memory search when vector search is not available', async () => {
       // sendCommand rejects with "unknown command" - no FT module
-      mockClient.sendCommand.mockRejectedValue(
-        new Error('unknown command')
-      );
+      mockClient.sendCommand.mockRejectedValue(new Error('unknown command'));
 
       const entitiesWithVectors: TestEntity[] = [
         { id: 'v1', name: 'A', value: 1, embedding: [0.1, 0.2, 0.3] },
@@ -527,15 +485,9 @@ describe('RedisRepository', () => {
 
       const keys = entitiesWithVectors.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        entitiesWithVectors.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(entitiesWithVectors.map((e) => JSON.stringify(e)));
 
-      const results = await repository.vectorSearch(
-        'embedding',
-        queryVector,
-        { minScore: 0.0 }
-      );
+      const results = await repository.vectorSearch('embedding', queryVector, { minScore: 0.0 });
 
       expect(results.length).toBeGreaterThan(0);
       // First result should be the most similar
@@ -543,23 +495,16 @@ describe('RedisRepository', () => {
     });
 
     it('should return empty array when no entities have vectors', async () => {
-      mockClient.sendCommand.mockRejectedValue(
-        new Error('unknown command')
-      );
+      mockClient.sendCommand.mockRejectedValue(new Error('unknown command'));
       mockClient.keys.mockResolvedValue([]);
 
-      const results = await repository.vectorSearch(
-        'embedding',
-        queryVector
-      );
+      const results = await repository.vectorSearch('embedding', queryVector);
 
       expect(results).toEqual([]);
     });
 
     it('should filter results below minScore', async () => {
-      mockClient.sendCommand.mockRejectedValue(
-        new Error('unknown command')
-      );
+      mockClient.sendCommand.mockRejectedValue(new Error('unknown command'));
 
       const entitiesWithVectors: TestEntity[] = [
         { id: 'v1', name: 'A', value: 1, embedding: [0.1, 0.2, 0.3] },
@@ -568,26 +513,16 @@ describe('RedisRepository', () => {
 
       const keys = entitiesWithVectors.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        entitiesWithVectors.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(entitiesWithVectors.map((e) => JSON.stringify(e)));
 
-      const results = await repository.vectorSearch(
-        'embedding',
-        queryVector,
-        { minScore: 0.9 }
-      );
+      const results = await repository.vectorSearch('embedding', queryVector, { minScore: 0.9 });
 
       expect(results.length).toBe(1);
-      expect(results[0]!.item).toEqual(
-        expect.objectContaining({ id: 'v1' })
-      );
+      expect(results[0]!.item).toEqual(expect.objectContaining({ id: 'v1' }));
     });
 
     it('should respect limit option', async () => {
-      mockClient.sendCommand.mockRejectedValue(
-        new Error('unknown command')
-      );
+      mockClient.sendCommand.mockRejectedValue(new Error('unknown command'));
 
       const entitiesWithVectors: TestEntity[] = [
         { id: 'v1', name: 'A', value: 1, embedding: [0.1, 0.2, 0.3] },
@@ -597,23 +532,18 @@ describe('RedisRepository', () => {
 
       const keys = entitiesWithVectors.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        entitiesWithVectors.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(entitiesWithVectors.map((e) => JSON.stringify(e)));
 
-      const results = await repository.vectorSearch(
-        'embedding',
-        queryVector,
-        { limit: 1, minScore: 0.0 }
-      );
+      const results = await repository.vectorSearch('embedding', queryVector, {
+        limit: 1,
+        minScore: 0.0,
+      });
 
       expect(results.length).toBe(1);
     });
 
     it('should skip entities without the vector field', async () => {
-      mockClient.sendCommand.mockRejectedValue(
-        new Error('unknown command')
-      );
+      mockClient.sendCommand.mockRejectedValue(new Error('unknown command'));
 
       const mixedEntities: TestEntity[] = [
         { id: 'v1', name: 'A', value: 1, embedding: [0.1, 0.2, 0.3] },
@@ -622,34 +552,20 @@ describe('RedisRepository', () => {
 
       const keys = mixedEntities.map((e) => `testentity:${e.id}`);
       mockClient.keys.mockResolvedValue(keys);
-      mockPipeline.exec.mockResolvedValue(
-        mixedEntities.map((e) => JSON.stringify(e))
-      );
+      mockPipeline.exec.mockResolvedValue(mixedEntities.map((e) => JSON.stringify(e)));
 
-      const results = await repository.vectorSearch(
-        'embedding',
-        queryVector,
-        { minScore: 0.0 }
-      );
+      const results = await repository.vectorSearch('embedding', queryVector, { minScore: 0.0 });
 
       expect(results.length).toBe(1);
-      expect(results[0]!.item).toEqual(
-        expect.objectContaining({ id: 'v1' })
-      );
+      expect(results[0]!.item).toEqual(expect.objectContaining({ id: 'v1' }));
     });
 
     it('should return empty array when no entities have vectors', async () => {
-      mockClient.sendCommand.mockImplementation(() =>
-        Promise.reject(new Error('unknown command'))
-      );
+      mockClient.sendCommand.mockImplementation(() => Promise.reject(new Error('unknown command')));
 
       mockClient.keys.mockResolvedValue([]);
 
-      const results = await repository.vectorSearch(
-        'embedding',
-        queryVector,
-        { minScore: 0.0 }
-      );
+      const results = await repository.vectorSearch('embedding', queryVector, { minScore: 0.0 });
 
       expect(results).toEqual([]);
     });

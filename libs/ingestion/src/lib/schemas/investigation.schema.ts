@@ -55,7 +55,16 @@ class EvidenceSeedEmbed {
     type: String,
     enum: ['url', 'youtube', 'article', 'post', 'wallet', 'contract', 'domain', 'document', 'note'],
   })
-  kind!: 'url' | 'youtube' | 'article' | 'post' | 'wallet' | 'contract' | 'domain' | 'document' | 'note';
+  kind!:
+    | 'url'
+    | 'youtube'
+    | 'article'
+    | 'post'
+    | 'wallet'
+    | 'contract'
+    | 'domain'
+    | 'document'
+    | 'note';
 
   @Prop({ required: true, type: String })
   value!: string;
@@ -135,8 +144,7 @@ export class InvestigationSchema extends Document {
   sessionState!: Record<string, unknown> | null;
 }
 
-export const InvestigationModel =
-  SchemaFactory.createForClass(InvestigationSchema);
+export const InvestigationModel = SchemaFactory.createForClass(InvestigationSchema);
 
 // Indices for common queries
 InvestigationModel.index({ updatedAt: -1 });
@@ -216,7 +224,16 @@ export interface ExtractedEntity {
 
 export interface EvidenceSeed {
   id: string;
-  kind: 'url' | 'youtube' | 'article' | 'post' | 'wallet' | 'contract' | 'domain' | 'document' | 'note';
+  kind:
+    | 'url'
+    | 'youtube'
+    | 'article'
+    | 'post'
+    | 'wallet'
+    | 'contract'
+    | 'domain'
+    | 'document'
+    | 'note';
   value: string;
   label: string;
   status: 'pending' | 'fetched' | 'processed' | 'error';

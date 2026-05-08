@@ -499,7 +499,12 @@ export interface Investigation {
   createdAt: string;
   updatedAt: string;
   status: 'active' | 'archived';
-  settings: { platforms: string[]; timeRange: string; limit: number; searchMode?: 'topic' | 'claim' };
+  settings: {
+    platforms: string[];
+    timeRange: string;
+    limit: number;
+    searchMode?: 'topic' | 'claim';
+  };
   lastSnapshotId: string | null;
   lastScanId: string | null;
   linkedProjectDossierId: string | null;
@@ -509,7 +514,16 @@ export interface Investigation {
 
 export interface InvestigationEvidenceSeed {
   id: string;
-  kind: 'url' | 'youtube' | 'article' | 'post' | 'wallet' | 'contract' | 'domain' | 'document' | 'note';
+  kind:
+    | 'url'
+    | 'youtube'
+    | 'article'
+    | 'post'
+    | 'wallet'
+    | 'contract'
+    | 'domain'
+    | 'document'
+    | 'note';
   value: string;
   label: string;
   status: 'pending' | 'fetched' | 'processed' | 'error';
@@ -670,9 +684,7 @@ export async function fetchInvestigations(): Promise<Investigation[]> {
 /**
  * Fetch a single investigation with its latest snapshot.
  */
-export async function fetchInvestigation(
-  id: string,
-): Promise<{
+export async function fetchInvestigation(id: string): Promise<{
   investigation: Investigation;
   snapshot: Snapshot | null;
   projectDossier: ProjectDossier | null;
@@ -690,9 +702,7 @@ export async function fetchInvestigation(
     projectDossier?: ProjectDossier | null;
     mentalModel?: MentalModel | null;
     dossierOverlaps?: ProjectDossierOverlap[];
-  }>(
-    `/api/investigations/${encodeURIComponent(normalizedId)}`,
-  );
+  }>(`/api/investigations/${encodeURIComponent(normalizedId)}`);
   // Backend returns "latestSnapshot", normalize to "snapshot"
   return {
     investigation: normalizeInvestigation(result.investigation, normalizedId),
@@ -734,7 +744,10 @@ export async function renameInvestigation(id: string, name: string): Promise<voi
 /**
  * Save UI session state for an investigation.
  */
-export async function saveSessionState(id: string, sessionState: Record<string, unknown>): Promise<void> {
+export async function saveSessionState(
+  id: string,
+  sessionState: Record<string, unknown>,
+): Promise<void> {
   await request<void>(`/api/investigations/${encodeURIComponent(id)}/session`, {
     method: 'PATCH',
     body: JSON.stringify({ sessionState }),
@@ -779,9 +792,7 @@ export async function addInvestigationEvidenceSeed(
   return normalizeInvestigation(result.investigation, id);
 }
 
-export async function buildProjectDossier(
-  id: string,
-): Promise<{
+export async function buildProjectDossier(id: string): Promise<{
   investigation: Investigation;
   projectDossier: ProjectDossier;
   dossierOverlaps: ProjectDossierOverlap[];
@@ -805,14 +816,13 @@ export async function buildProjectDossier(
 export async function fetchProjectDossier(
   id: string,
 ): Promise<{ projectDossier: ProjectDossier | null; dossierOverlaps: ProjectDossierOverlap[] }> {
-  return request<{ projectDossier: ProjectDossier | null; dossierOverlaps: ProjectDossierOverlap[] }>(
-    `/api/investigations/${encodeURIComponent(id)}/project-dossier`,
-  );
+  return request<{
+    projectDossier: ProjectDossier | null;
+    dossierOverlaps: ProjectDossierOverlap[];
+  }>(`/api/investigations/${encodeURIComponent(id)}/project-dossier`);
 }
 
-export async function buildMentalModel(
-  id: string,
-): Promise<{
+export async function buildMentalModel(id: string): Promise<{
   investigation: Investigation;
   mentalModel: MentalModel;
 }> {
@@ -830,9 +840,7 @@ export async function buildMentalModel(
   };
 }
 
-export async function fetchMentalModel(
-  id: string,
-): Promise<{ mentalModel: MentalModel | null }> {
+export async function fetchMentalModel(id: string): Promise<{ mentalModel: MentalModel | null }> {
   return request<{ mentalModel: MentalModel | null }>(
     `/api/investigations/${encodeURIComponent(id)}/mental-model`,
   );
@@ -910,10 +918,9 @@ export async function fetchUnreadAlertCount(): Promise<number> {
  * Mark a single alert as read.
  */
 export async function markAlertRead(alertId: string): Promise<void> {
-  await request<{ success: boolean }>(
-    `/api/monitor/alerts/${encodeURIComponent(alertId)}/read`,
-    { method: 'PUT' },
-  );
+  await request<{ success: boolean }>(`/api/monitor/alerts/${encodeURIComponent(alertId)}/read`, {
+    method: 'PUT',
+  });
 }
 
 /**
@@ -923,10 +930,9 @@ export async function markAllAlertsRead(investigationId?: string): Promise<void>
   const params = new URLSearchParams();
   if (investigationId) params.set('investigationId', investigationId);
   const qs = params.toString();
-  await request<{ count: number }>(
-    `/api/monitor/alerts/read-all${qs ? `?${qs}` : ''}`,
-    { method: 'PUT' },
-  );
+  await request<{ count: number }>(`/api/monitor/alerts/read-all${qs ? `?${qs}` : ''}`, {
+    method: 'PUT',
+  });
 }
 
 /**
@@ -944,12 +950,8 @@ export async function refreshInvestigation(
 /**
  * Fetch the monitor config for an investigation.
  */
-export async function fetchMonitorConfig(
-  investigationId: string,
-): Promise<MonitorConfig> {
-  return request<MonitorConfig>(
-    `/api/monitor/config/${encodeURIComponent(investigationId)}`,
-  );
+export async function fetchMonitorConfig(investigationId: string): Promise<MonitorConfig> {
+  return request<MonitorConfig>(`/api/monitor/config/${encodeURIComponent(investigationId)}`);
 }
 
 /**
@@ -959,10 +961,10 @@ export async function updateMonitorConfig(
   investigationId: string,
   config: Partial<Pick<MonitorConfig, 'enabled' | 'intervalMinutes' | 'alertThresholds'>>,
 ): Promise<void> {
-  await request<MonitorConfig>(
-    `/api/monitor/config/${encodeURIComponent(investigationId)}`,
-    { method: 'PUT', body: JSON.stringify(config) },
-  );
+  await request<MonitorConfig>(`/api/monitor/config/${encodeURIComponent(investigationId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(config),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1169,6 +1171,14 @@ export interface EntityAnalysisResponse {
   coOccurrenceNetwork: { nodes: EntityNetworkNode[]; edges: EntityNetworkEdge[] };
 }
 
+export interface EntityAnalysisInsight {
+  id: string;
+  platform: string;
+  timestamp: string;
+  entities: Array<{ name: string; type: string; relevance: number }>;
+  sentiment: { score: number; label: string; confidence: number };
+}
+
 // ---------------------------------------------------------------------------
 // Entity Analysis API
 // ---------------------------------------------------------------------------
@@ -1178,7 +1188,7 @@ export interface EntityAnalysisResponse {
  */
 export async function analyzeEntities(
   posts: RawPost[],
-  insights: NarrativeInsight[],
+  insights: EntityAnalysisInsight[],
   narratives: AnalyzedNarrative[],
 ): Promise<EntityAnalysisResponse> {
   return request<EntityAnalysisResponse>('/api/narratives/entities', {
@@ -1461,19 +1471,15 @@ export async function getScanPosts(
  * Cancel a running scan.
  */
 export async function cancelScan(scanId: string): Promise<void> {
-  await request<{ success: boolean }>(
-    `/api/scan/${encodeURIComponent(scanId)}/cancel`,
-    { method: 'POST' },
-  );
+  await request<{ success: boolean }>(`/api/scan/${encodeURIComponent(scanId)}/cancel`, {
+    method: 'POST',
+  });
 }
 
 /**
  * Retry a failed connector within a scan.
  */
-export async function retryScanConnector(
-  scanId: string,
-  connector: string,
-): Promise<void> {
+export async function retryScanConnector(scanId: string, connector: string): Promise<void> {
   await request<{ success: boolean }>(
     `/api/scan/${encodeURIComponent(scanId)}/retry/${encodeURIComponent(connector)}`,
     { method: 'POST' },
@@ -1506,18 +1512,16 @@ export async function saveAnalysisCache(
   scanId: string,
   cache: Record<string, unknown>,
 ): Promise<void> {
-  await request<{ success: boolean }>(
-    `/api/scan/${encodeURIComponent(scanId)}/analysis-cache`,
-    { method: 'PUT', body: JSON.stringify(cache) },
-  );
+  await request<{ success: boolean }>(`/api/scan/${encodeURIComponent(scanId)}/analysis-cache`, {
+    method: 'PUT',
+    body: JSON.stringify(cache),
+  });
 }
 
 /**
  * Get cached analysis results from a scan job.
  */
-export async function getAnalysisCache(
-  scanId: string,
-): Promise<Record<string, unknown> | null> {
+export async function getAnalysisCache(scanId: string): Promise<Record<string, unknown> | null> {
   return request<Record<string, unknown> | null>(
     `/api/scan/${encodeURIComponent(scanId)}/analysis-cache`,
   );
@@ -1571,44 +1575,33 @@ export async function startAnalysisJobs(
   scanId: string,
   jobs: StartAnalysisJobRequest[],
 ): Promise<{ jobIds: string[] }> {
-  return request<{ jobIds: string[] }>(
-    '/api/analysis-jobs/batch',
-    { method: 'POST', body: JSON.stringify({ scanId, jobs }) },
-  );
+  return request<{ jobIds: string[] }>('/api/analysis-jobs/batch', {
+    method: 'POST',
+    body: JSON.stringify({ scanId, jobs }),
+  });
 }
 
 /**
  * Get all analysis jobs for a scan.
  */
-export async function getAnalysisJobsByScan(
-  scanId: string,
-): Promise<AnalysisJob[]> {
-  return request<AnalysisJob[]>(
-    `/api/analysis-jobs/by-scan/${encodeURIComponent(scanId)}`,
-  );
+export async function getAnalysisJobsByScan(scanId: string): Promise<AnalysisJob[]> {
+  return request<AnalysisJob[]>(`/api/analysis-jobs/by-scan/${encodeURIComponent(scanId)}`);
 }
 
 /**
  * Get a single analysis job.
  */
-export async function getAnalysisJob(
-  jobId: string,
-): Promise<AnalysisJob> {
-  return request<AnalysisJob>(
-    `/api/analysis-jobs/${encodeURIComponent(jobId)}`,
-  );
+export async function getAnalysisJob(jobId: string): Promise<AnalysisJob> {
+  return request<AnalysisJob>(`/api/analysis-jobs/${encodeURIComponent(jobId)}`);
 }
 
 /**
  * Cancel an analysis job.
  */
-export async function cancelAnalysisJob(
-  jobId: string,
-): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>(
-    `/api/analysis-jobs/${encodeURIComponent(jobId)}/cancel`,
-    { method: 'POST' },
-  );
+export async function cancelAnalysisJob(jobId: string): Promise<{ success: boolean }> {
+  return request<{ success: boolean }>(`/api/analysis-jobs/${encodeURIComponent(jobId)}/cancel`, {
+    method: 'POST',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1774,19 +1767,14 @@ export async function generateMagiProfile(
     endDate?: string | null;
   },
 ): Promise<{ status: string }> {
-  return request<{ status: string }>(
-    `/api/identity/${encodeURIComponent(id)}/generate-profile`,
-    {
-      method: 'POST',
-      body: JSON.stringify(options ?? {}),
-    },
-  );
+  return request<{ status: string }>(`/api/identity/${encodeURIComponent(id)}/generate-profile`, {
+    method: 'POST',
+    body: JSON.stringify(options ?? {}),
+  });
 }
 
 export async function searchIdentities(query: string): Promise<IdentityRecord[]> {
-  return request<IdentityRecord[]>(
-    `/api/identity/search?q=${encodeURIComponent(query)}`,
-  );
+  return request<IdentityRecord[]>(`/api/identity/search?q=${encodeURIComponent(query)}`);
 }
 
 export async function getRecentIdentities(limit = 20): Promise<IdentityRecord[]> {
@@ -1828,7 +1816,12 @@ export interface CoordinatedCampaignReport {
   signals: CampaignSignal[];
   timeline: CampaignTimeline[];
   coordinationClusters: Array<{ users: string[]; pattern: string; confidence: number }>;
-  structuralPatterns: Array<{ type: string; members: string[]; description: string; confidence: number }>;
+  structuralPatterns: Array<{
+    type: string;
+    members: string[];
+    description: string;
+    confidence: number;
+  }>;
   summary: string;
 }
 
@@ -1885,7 +1878,12 @@ export interface InfluenceOperationReport {
   propagationPath: string[];
   beneficiaries: Array<{ entity: string; howTheyBenefit: string; confidence: number }>;
   platformsInvolved: string[];
-  investigativeLeads: Array<{ question: string; dataSources: string[]; priority: string; automatable: boolean }>;
+  investigativeLeads: Array<{
+    question: string;
+    dataSources: string[];
+    priority: string;
+    automatable: boolean;
+  }>;
   summary: string;
 }
 

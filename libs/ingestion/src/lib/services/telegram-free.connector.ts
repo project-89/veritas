@@ -1,16 +1,11 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
-import { DataConnector } from '../interfaces/data-connector.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
+import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
 
 interface SearchOptions {
   startDate?: Date;
@@ -70,9 +65,7 @@ const CURATED_CHANNELS = [
  * API for richer metadata (subscriber counts, channel descriptions).
  */
 @Injectable()
-export class TelegramFreeConnector
-  implements DataConnector, OnModuleInit, OnModuleDestroy
-{
+export class TelegramFreeConnector implements DataConnector, OnModuleInit, OnModuleDestroy {
   platform = 'telegram' as const;
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 600000; // 10 minutes
@@ -87,8 +80,7 @@ export class TelegramFreeConnector
     private transformService: TransformOnIngestService,
   ) {
     this.botToken =
-      this.configService.get<string>('TELEGRAM_BOT_TOKEN') ||
-      process.env['TELEGRAM_BOT_TOKEN'];
+      this.configService.get<string>('TELEGRAM_BOT_TOKEN') || process.env['TELEGRAM_BOT_TOKEN'];
   }
 
   async onModuleInit() {
@@ -120,19 +112,16 @@ export class TelegramFreeConnector
   }
 
   async disconnect(): Promise<void> {
-    this.streamConnections.forEach((interval) => clearInterval(interval));
+    this.streamConnections.forEach((interval) => {
+      clearInterval(interval);
+    });
     this.streamConnections.clear();
   }
 
-  async searchAndTransform(
-    query: string,
-    options?: SearchOptions,
-  ): Promise<NarrativeInsight[]> {
+  async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     const posts = await this.searchContent(query, options);
     const insights = await this.transformService.transformBatch(posts);
-    this.logger.log(
-      `Transformed ${insights.length} Telegram results into insights`,
-    );
+    this.logger.log(`Transformed ${insights.length} Telegram results into insights`);
     return insights;
   }
 
@@ -143,9 +132,7 @@ export class TelegramFreeConnector
     const posts = await this.searchContent(query, options);
     if (posts.length === 0) return { posts: [], insights: [] };
     const insights = await this.transformService.transformBatch(posts);
-    this.logger.log(
-      `Telegram: ${posts.length} posts, ${insights.length} insights`,
-    );
+    this.logger.log(`Telegram: ${posts.length} posts, ${insights.length} insights`);
     return { posts, insights };
   }
 
@@ -219,9 +206,7 @@ export class TelegramFreeConnector
 
     try {
       const messages = await this.fetchChannelMessages(channel);
-      return messages
-        .slice(0, limit)
-        .map((m) => this.transformToSocialMediaPost(m));
+      return messages.slice(0, limit).map((m) => this.transformToSocialMediaPost(m));
     } catch (error) {
       this.logger.debug(`Timeline fetch failed for @${channel}:`, error);
       return [];
@@ -236,14 +221,10 @@ export class TelegramFreeConnector
 
       if (res.ok) {
         this.available = true;
-        this.logger.log(
-          'Telegram connector validated (web preview reachable)',
-        );
+        this.logger.log('Telegram connector validated (web preview reachable)');
 
         if (this.botToken) {
-          this.logger.log(
-            'TELEGRAM_BOT_TOKEN is set — enhanced metadata available',
-          );
+          this.logger.log('TELEGRAM_BOT_TOKEN is set — enhanced metadata available');
         } else {
           this.logger.debug(
             'No TELEGRAM_BOT_TOKEN — using web preview only (still fully functional)',
@@ -253,14 +234,10 @@ export class TelegramFreeConnector
         return true;
       }
 
-      this.logger.debug(
-        'Telegram web preview unreachable — connector disabled',
-      );
+      this.logger.debug('Telegram web preview unreachable — connector disabled');
       return false;
     } catch {
-      this.logger.debug(
-        'Cannot reach Telegram — connector disabled',
-      );
+      this.logger.debug('Cannot reach Telegram — connector disabled');
       return false;
     }
   }
@@ -269,10 +246,7 @@ export class TelegramFreeConnector
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private async searchContent(
-    query: string,
-    options?: SearchOptions,
-  ): Promise<SocialMediaPost[]> {
+  private async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
     if (!this.available) return [];
 
     const limit = options?.maxResults || options?.limit || 20;
@@ -310,14 +284,9 @@ export class TelegramFreeConnector
       }
 
       // Sort by date descending
-      allMessages.sort(
-        (a, b) =>
-          new Date(b.datetime).getTime() - new Date(a.datetime).getTime(),
-      );
+      allMessages.sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime());
 
-      return allMessages
-        .slice(0, limit)
-        .map((m) => this.transformToSocialMediaPost(m));
+      return allMessages.slice(0, limit).map((m) => this.transformToSocialMediaPost(m));
     } catch (error) {
       this.logger.error('Error searching Telegram:', error);
       return [];
@@ -328,9 +297,7 @@ export class TelegramFreeConnector
    * Fetch recent messages from a Telegram channel's public web preview.
    * Parses HTML from `https://t.me/s/{channel}`.
    */
-  private async fetchChannelMessages(
-    channel: string,
-  ): Promise<TelegramMessage[]> {
+  private async fetchChannelMessages(channel: string): Promise<TelegramMessage[]> {
     const url = `https://t.me/s/${channel}`;
 
     try {
@@ -339,9 +306,7 @@ export class TelegramFreeConnector
       });
 
       if (!res.ok) {
-        this.logger.debug(
-          `Failed to fetch channel ${channel}: HTTP ${res.status}`,
-        );
+        this.logger.debug(`Failed to fetch channel ${channel}: HTTP ${res.status}`);
         return [];
       }
 
@@ -363,27 +328,12 @@ export class TelegramFreeConnector
    * - `.tgme_widget_message_views` for view count
    * - Page title contains channel name
    */
-  private parseChannelHtml(
-    html: string,
-    channel: string,
-  ): TelegramMessage[] {
+  private parseChannelHtml(html: string, channel: string): TelegramMessage[] {
     const messages: TelegramMessage[] = [];
 
     // Extract channel title from page
-    const titleMatch = html.match(
-      /<meta\s+property="og:title"\s+content="([^"]*)"[^>]*>/i,
-    );
-    const channelTitle = titleMatch
-      ? this.decodeHtmlEntities(titleMatch[1] ?? '')
-      : channel;
-
-    // Match each message widget block
-    const messageBlockRegex =
-      /class="tgme_widget_message_wrap[^"]*"[^>]*>[\s\S]*?data-post="([^"]*)"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/g;
-
-    // Simpler approach: find all data-post attributes and extract surrounding content
-    const postRegex =
-      /data-post="([^"]+)"[\s\S]*?(?:tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>)?[\s\S]*?(?:<time[^>]*datetime="([^"]*)")?[\s\S]*?(?:tgme_widget_message_views[^>]*>([\s\S]*?)<\/span>)?/g;
+    const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"[^>]*>/i);
+    const channelTitle = titleMatch ? this.decodeHtmlEntities(titleMatch[1] ?? '') : channel;
 
     // Use a more reliable chunked approach
     const chunks = html.split('tgme_widget_message_wrap');
@@ -400,9 +350,7 @@ export class TelegramFreeConnector
       const msgId = parts[parts.length - 1] ?? '';
 
       // Extract text content
-      const textMatch = chunk.match(
-        /tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/,
-      );
+      const textMatch = chunk.match(/tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/);
       const rawText = textMatch ? (textMatch[1] ?? '') : '';
       const text = this.stripHtml(rawText);
 
@@ -413,9 +361,7 @@ export class TelegramFreeConnector
       const datetime = dateMatch ? (dateMatch[1] ?? '') : new Date().toISOString();
 
       // Extract view count
-      const viewMatch = chunk.match(
-        /tgme_widget_message_views[^>]*>([\s\S]*?)<\/span>/,
-      );
+      const viewMatch = chunk.match(/tgme_widget_message_views[^>]*>([\s\S]*?)<\/span>/);
       const viewStr = viewMatch ? (viewMatch[1] ?? '').trim() : '0';
       const views = this.parseViewCount(viewStr);
 
@@ -436,17 +382,13 @@ export class TelegramFreeConnector
    * Fetch channel info. Uses Bot API if token is available, otherwise
    * scrapes the web preview for basic metadata.
    */
-  private async fetchChannelInfo(
-    channel: string,
-  ): Promise<TelegramChannelInfo> {
+  private async fetchChannelInfo(channel: string): Promise<TelegramChannelInfo> {
     // Try Bot API first if token is available
     if (this.botToken) {
       try {
         return await this.fetchChannelInfoFromBotApi(channel);
       } catch {
-        this.logger.debug(
-          `Bot API failed for ${channel}, falling back to web preview`,
-        );
+        this.logger.debug(`Bot API failed for ${channel}, falling back to web preview`);
       }
     }
 
@@ -454,9 +396,7 @@ export class TelegramFreeConnector
     return this.fetchChannelInfoFromWeb(channel);
   }
 
-  private async fetchChannelInfoFromBotApi(
-    channel: string,
-  ): Promise<TelegramChannelInfo> {
+  private async fetchChannelInfoFromBotApi(channel: string): Promise<TelegramChannelInfo> {
     const url = `https://api.telegram.org/bot${this.botToken}/getChat?chat_id=@${channel}`;
     const res = await this.fetchWithRetry(url, { timeout: this.fetchTimeout });
 
@@ -506,9 +446,7 @@ export class TelegramFreeConnector
     };
   }
 
-  private async fetchChannelInfoFromWeb(
-    channel: string,
-  ): Promise<TelegramChannelInfo> {
+  private async fetchChannelInfoFromWeb(channel: string): Promise<TelegramChannelInfo> {
     const url = `https://t.me/s/${channel}`;
     const res = await this.fetchWithRetry(url, { timeout: this.fetchTimeout });
 
@@ -524,20 +462,12 @@ export class TelegramFreeConnector
 
     const html = await res.text();
 
-    const titleMatch = html.match(
-      /<meta\s+property="og:title"\s+content="([^"]*)"[^>]*>/i,
-    );
-    const descMatch = html.match(
-      /<meta\s+property="og:description"\s+content="([^"]*)"[^>]*>/i,
-    );
-    const imgMatch = html.match(
-      /<meta\s+property="og:image"\s+content="([^"]*)"[^>]*>/i,
-    );
+    const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"[^>]*>/i);
+    const descMatch = html.match(/<meta\s+property="og:description"\s+content="([^"]*)"[^>]*>/i);
+    const imgMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]*)"[^>]*>/i);
 
     // Try to extract subscriber count from the page
-    const subsMatch = html.match(
-      /tgme_page_extra[^>]*>([\s\S]*?)<\/div>/,
-    );
+    const subsMatch = html.match(/tgme_page_extra[^>]*>([\s\S]*?)<\/div>/);
     let subscriberCount = 0;
     if (subsMatch) {
       const subsText = (subsMatch[1] ?? '').trim();
@@ -548,12 +478,8 @@ export class TelegramFreeConnector
     }
 
     return {
-      title: titleMatch
-        ? this.decodeHtmlEntities(titleMatch[1] ?? '')
-        : channel,
-      description: descMatch
-        ? this.decodeHtmlEntities(descMatch[1] ?? '')
-        : '',
+      title: titleMatch ? this.decodeHtmlEntities(titleMatch[1] ?? '') : channel,
+      description: descMatch ? this.decodeHtmlEntities(descMatch[1] ?? '') : '',
       subscriberCount,
       photoUrl: imgMatch ? (imgMatch[1] ?? '') : '',
       username: channel,
@@ -587,10 +513,7 @@ export class TelegramFreeConnector
   /**
    * fetch() wrapper with timeout and retry.
    */
-  private async fetchWithRetry(
-    url: string,
-    options?: { timeout?: number },
-  ): Promise<Response> {
+  private async fetchWithRetry(url: string, options?: { timeout?: number }): Promise<Response> {
     const timeout = options?.timeout ?? this.fetchTimeout;
     let lastError: Error | undefined;
 
@@ -604,8 +527,7 @@ export class TelegramFreeConnector
           headers: {
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            Accept:
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
           },
         });

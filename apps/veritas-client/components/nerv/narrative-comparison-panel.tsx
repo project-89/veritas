@@ -36,7 +36,16 @@ export function NarrativeComparisonPanel({
 
   if (!comparison) return null;
 
-  const { narrativeA, narrativeB, similarity, sentimentDelta, velocityComparison, platformOverlap, authorOverlap, differenceAnalysis } = comparison;
+  const {
+    narrativeA,
+    narrativeB,
+    similarity,
+    sentimentDelta,
+    velocityComparison,
+    platformOverlap,
+    authorOverlap,
+    differenceAnalysis,
+  } = comparison;
 
   const faster = velocityComparison.fasterNarrative;
   const fasterLabel = faster === 'a' ? 'A faster' : faster === 'b' ? 'B faster' : 'Equal';
@@ -51,6 +60,7 @@ export function NarrativeComparisonPanel({
           </span>
           {onClose && (
             <button
+              type="button"
               onClick={onClose}
               className="text-[10px] font-mono text-nerv-text-muted hover:text-nerv-text-secondary transition-colors px-2 py-0.5 border border-nerv-border rounded-sm hover:border-nerv-text-muted"
             >
@@ -64,9 +74,7 @@ export function NarrativeComparisonPanel({
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-nerv-bg-panel border border-nerv-border rounded-sm p-3">
               <div className="flex items-center gap-2 mb-2">
-                <span
-                  className="inline-block w-3 h-1 rounded-sm shrink-0 bg-nerv-orange"
-                />
+                <span className="inline-block w-3 h-1 rounded-sm shrink-0 bg-nerv-orange" />
                 <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
                   NARRATIVE A
                 </span>
@@ -77,9 +85,7 @@ export function NarrativeComparisonPanel({
             </div>
             <div className="bg-nerv-bg-panel border border-nerv-border rounded-sm p-3">
               <div className="flex items-center gap-2 mb-2">
-                <span
-                  className="inline-block w-3 h-1 rounded-sm shrink-0 bg-nerv-blue"
-                />
+                <span className="inline-block w-3 h-1 rounded-sm shrink-0 bg-nerv-blue" />
                 <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
                   NARRATIVE B
                 </span>
@@ -115,7 +121,11 @@ export function NarrativeComparisonPanel({
                 showLabel
               />
               <span className="text-[10px] font-mono text-nerv-text-secondary shrink-0">
-                {sentimentDelta > 0 ? 'A more positive' : sentimentDelta < 0 ? 'B more positive' : 'Similar'}
+                {sentimentDelta > 0
+                  ? 'A more positive'
+                  : sentimentDelta < 0
+                    ? 'B more positive'
+                    : 'Similar'}
               </span>
             </div>
           </div>

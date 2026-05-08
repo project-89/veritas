@@ -1,8 +1,8 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { RawPost } from './deviation.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -81,16 +81,13 @@ export class PropagandaAnalysisService {
 
   constructor(private readonly configService: ConfigService) {
     const geminiKey =
-      this.configService.get<string>('GEMINI_API_KEY') ||
-      process.env['GEMINI_API_KEY'];
+      this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
 
     if (geminiKey) {
       this.genAI = new GoogleGenerativeAI(geminiKey);
       this.logger.log('PropagandaAnalysisService initialized with Gemini');
     } else {
-      this.logger.warn(
-        'GEMINI_API_KEY not set -- propaganda analysis will return empty results',
-      );
+      this.logger.warn('GEMINI_API_KEY not set -- propaganda analysis will return empty results');
     }
   }
 
@@ -223,9 +220,7 @@ Rules for the JSON:
     }
   }
 
-  private validateAndNormalize(
-    raw: Record<string, unknown>,
-  ): PropagandaAnalysisResult {
+  private validateAndNormalize(raw: Record<string, unknown>): PropagandaAnalysisResult {
     const techniques = this.validateTechniques(raw['techniques']);
     const claims = this.validateClaims(raw['claims']);
     const frames = this.validateFrames(raw['frames']);
@@ -237,46 +232,27 @@ Rules for the JSON:
   private validateTechniques(raw: unknown): PropagandaTechnique[] {
     if (!Array.isArray(raw)) return [];
     return raw
-      .filter(
-        (t): t is Record<string, unknown> =>
-          typeof t === 'object' && t !== null,
-      )
+      .filter((t): t is Record<string, unknown> => typeof t === 'object' && t !== null)
       .map((t, i) => ({
         id: typeof t['id'] === 'string' ? t['id'] : `technique-${i}`,
         name: typeof t['name'] === 'string' ? t['name'] : 'Unknown',
-        description:
-          typeof t['description'] === 'string' ? t['description'] : '',
+        description: typeof t['description'] === 'string' ? t['description'] : '',
         confidence: this.clamp(Number(t['confidence']) || 0, 0, 1),
         examples: Array.isArray(t['examples'])
           ? t['examples'].filter((e): e is string => typeof e === 'string')
           : [],
-        educationalNote:
-          typeof t['educationalNote'] === 'string'
-            ? t['educationalNote']
-            : '',
+        educationalNote: typeof t['educationalNote'] === 'string' ? t['educationalNote'] : '',
       }))
       .filter((t) => t.confidence >= 0.3);
   }
 
   private validateClaims(raw: unknown): ExtractedClaim[] {
-    const validTypes = new Set([
-      'factual',
-      'interpretive',
-      'predictive',
-      'normative',
-    ]);
-    const validVerifiability = new Set([
-      'verifiable',
-      'subjective',
-      'unfalsifiable',
-    ]);
+    const validTypes = new Set(['factual', 'interpretive', 'predictive', 'normative']);
+    const validVerifiability = new Set(['verifiable', 'subjective', 'unfalsifiable']);
 
     if (!Array.isArray(raw)) return [];
     return raw
-      .filter(
-        (c): c is Record<string, unknown> =>
-          typeof c === 'object' && c !== null,
-      )
+      .filter((c): c is Record<string, unknown> => typeof c === 'object' && c !== null)
       .map((c) => ({
         claim: typeof c['claim'] === 'string' ? c['claim'] : '',
         type: validTypes.has(c['type'] as string)
@@ -285,8 +261,7 @@ Rules for the JSON:
         sources: Array.isArray(c['sources'])
           ? c['sources'].filter((s): s is string => typeof s === 'string')
           : [],
-        firstSeen:
-          typeof c['firstSeen'] === 'string' ? c['firstSeen'] : '',
+        firstSeen: typeof c['firstSeen'] === 'string' ? c['firstSeen'] : '',
         frequency: Math.max(Math.round(Number(c['frequency']) || 0), 0),
         verifiability: validVerifiability.has(c['verifiability'] as string)
           ? (c['verifiability'] as ExtractedClaim['verifiability'])
@@ -298,30 +273,20 @@ Rules for the JSON:
   private validateFrames(raw: unknown): NarrativeFrame[] {
     if (!Array.isArray(raw)) return [];
     return raw
-      .filter(
-        (f): f is Record<string, unknown> =>
-          typeof f === 'object' && f !== null,
-      )
+      .filter((f): f is Record<string, unknown> => typeof f === 'object' && f !== null)
       .map((f) => ({
         frame: typeof f['frame'] === 'string' ? f['frame'] : '',
-        description:
-          typeof f['description'] === 'string' ? f['description'] : '',
+        description: typeof f['description'] === 'string' ? f['description'] : '',
         narrativeIds: Array.isArray(f['narrativeIds'])
-          ? f['narrativeIds'].filter(
-              (id): id is string => typeof id === 'string',
-            )
+          ? f['narrativeIds'].filter((id): id is string => typeof id === 'string')
           : [],
         emotionalAppeal:
-          typeof f['emotionalAppeal'] === 'string'
-            ? f['emotionalAppeal']
-            : 'neutral',
+          typeof f['emotionalAppeal'] === 'string' ? f['emotionalAppeal'] : 'neutral',
       }))
       .filter((f) => f.frame.length > 0);
   }
 
-  private validateAssessment(
-    raw: unknown,
-  ): PropagandaAnalysisResult['overallAssessment'] {
+  private validateAssessment(raw: unknown): PropagandaAnalysisResult['overallAssessment'] {
     const defaults: PropagandaAnalysisResult['overallAssessment'] = {
       manipulationLikelihood: 'low',
       confidence: 0,
@@ -338,18 +303,13 @@ Rules for the JSON:
     const validLikelihood = new Set(['low', 'medium', 'high']);
 
     return {
-      manipulationLikelihood: validLikelihood.has(
-        obj['manipulationLikelihood'] as string,
-      )
+      manipulationLikelihood: validLikelihood.has(obj['manipulationLikelihood'] as string)
         ? (obj[
             'manipulationLikelihood'
           ] as PropagandaAnalysisResult['overallAssessment']['manipulationLikelihood'])
         : 'low',
       confidence: this.clamp(Number(obj['confidence']) || 0, 0, 1),
-      reasoning:
-        typeof obj['reasoning'] === 'string'
-          ? obj['reasoning']
-          : defaults.reasoning,
+      reasoning: typeof obj['reasoning'] === 'string' ? obj['reasoning'] : defaults.reasoning,
       caveats: Array.isArray(obj['caveats'])
         ? obj['caveats'].filter((c): c is string => typeof c === 'string')
         : defaults.caveats,
@@ -372,8 +332,7 @@ Rules for the JSON:
       overallAssessment: {
         manipulationLikelihood: 'low',
         confidence: 0,
-        reasoning:
-          'Analysis could not be completed (no Gemini API key or no narratives provided).',
+        reasoning: 'Analysis could not be completed (no Gemini API key or no narratives provided).',
         caveats: [
           'No analysis was performed. Configure GEMINI_API_KEY for full propaganda technique detection.',
         ],

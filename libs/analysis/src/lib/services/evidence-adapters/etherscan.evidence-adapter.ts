@@ -2,7 +2,16 @@ import { Logger } from '@nestjs/common';
 import type { EvidenceAdapter, EvidenceSource } from './evidence-adapter.interface';
 
 const ETH_ADDRESS_RE = /0x[a-fA-F0-9]{40}/g;
-const CRYPTO_KEYWORDS = ['crypto', 'ethereum', 'eth', 'wallet', 'token', 'contract', 'transfer', '0x'];
+const CRYPTO_KEYWORDS = [
+  'crypto',
+  'ethereum',
+  'eth',
+  'wallet',
+  'token',
+  'contract',
+  'transfer',
+  '0x',
+];
 
 export class EtherscanEvidenceAdapter implements EvidenceAdapter {
   readonly name = 'Etherscan';
@@ -48,8 +57,24 @@ export class EtherscanEvidenceAdapter implements EvidenceAdapter {
     for (const address of unique.slice(0, 3)) {
       const [balance, txList, tokenTx] = await Promise.all([
         this.apiCall({ module: 'account', action: 'balance', address }),
-        this.apiCall({ module: 'account', action: 'txlist', address, startblock: '0', endblock: '99999999', page: '1', offset: '10', sort: 'desc' }),
-        this.apiCall({ module: 'account', action: 'tokentx', address, page: '1', offset: '10', sort: 'desc' }),
+        this.apiCall({
+          module: 'account',
+          action: 'txlist',
+          address,
+          startblock: '0',
+          endblock: '99999999',
+          page: '1',
+          offset: '10',
+          sort: 'desc',
+        }),
+        this.apiCall({
+          module: 'account',
+          action: 'tokentx',
+          address,
+          page: '1',
+          offset: '10',
+          sort: 'desc',
+        }),
       ]);
 
       if (balance?.result) {
@@ -111,11 +136,15 @@ export class EtherscanEvidenceAdapter implements EvidenceAdapter {
   // ---------------------------------------------------------------------------
 
   private async apiCall(queryParams: Record<string, string>): Promise<EtherscanResponse | null> {
+    if (!this.apiKey) {
+      return null;
+    }
+
     const url = new URL(this.baseUrl);
     for (const [key, value] of Object.entries(queryParams)) {
       url.searchParams.set(key, value);
     }
-    url.searchParams.set('apikey', this.apiKey!);
+    url.searchParams.set('apikey', this.apiKey);
 
     for (let attempt = 0; attempt < 2; attempt++) {
       try {

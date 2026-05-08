@@ -1,9 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { Test } from '@nestjs/testing';
-import { MongoDBProvider } from '../../src/lib/mongodb/mongodb-provider';
-import { DatabaseProviderOptions } from '../../src/lib/interfaces/database-provider.interface';
-import { MongoDBRepository } from '../../src/lib/mongodb/mongodb-repository';
 import { Logger } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { DatabaseProviderOptions } from '../../src/lib/interfaces/database-provider.interface';
+import { MongoDBProvider } from '../../src/lib/mongodb/mongodb-provider';
+import { MongoDBRepository } from '../../src/lib/mongodb/mongodb-repository';
 
 // Mock mongoose module using factories
 jest.mock('mongoose', () => {
@@ -84,10 +83,7 @@ describe('MongoDBProvider', () => {
   describe('connect', () => {
     it('should connect to the MongoDB database', async () => {
       await provider.connect();
-      expect(mongoose.createConnection).toHaveBeenCalledWith(
-        mockOptions.uri,
-        expect.any(Object)
-      );
+      expect(mongoose.createConnection).toHaveBeenCalledWith(mockOptions.uri, expect.any(Object));
     });
 
     it('should establish a valid connection', async () => {

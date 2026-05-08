@@ -1,5 +1,5 @@
-import { MemgraphProvider } from '../../src/lib/memgraph/memgraph-provider';
 import { DatabaseProviderOptions } from '../../src/lib/interfaces/database-provider.interface';
+import { MemgraphProvider } from '../../src/lib/memgraph/memgraph-provider';
 import { MemgraphRepository } from '../../src/lib/memgraph/memgraph-repository';
 
 // Mock the neo4j-driver module
@@ -52,7 +52,7 @@ describe('MemgraphProvider', () => {
       expect(neo4j.driver).toHaveBeenCalledWith(
         mockOptions.uri,
         neo4j.auth.basic(mockOptions.username, mockOptions.password),
-        expect.any(Object)
+        expect.any(Object),
       );
 
       // Verify connectivity
@@ -75,7 +75,7 @@ describe('MemgraphProvider', () => {
       expect(neo4j.driver).toHaveBeenCalledWith(
         optionsWithoutAuth.uri,
         undefined,
-        expect.any(Object)
+        expect.any(Object),
       );
     });
   });
@@ -128,7 +128,7 @@ describe('MemgraphProvider', () => {
 
     it('should throw an error if not connected', () => {
       expect(() => provider.getRepository('TestEntity')).toThrow(
-        'Cannot get repository: Memgraph is not connected'
+        'Cannot get repository: Memgraph is not connected',
       );
     });
   });
@@ -140,7 +140,7 @@ describe('MemgraphProvider', () => {
       const query = 'MATCH (n) RETURN n LIMIT 10';
       const params = { param1: 'value1' };
 
-      const result = await provider.query(query, params);
+      await provider.query(query, params);
 
       // Verify that session was created and run was called
       const neo4j = require('neo4j-driver');
@@ -157,7 +157,7 @@ describe('MemgraphProvider', () => {
       const query = 'MATCH (n) RETURN n';
 
       await expect(provider.query(query)).rejects.toThrow(
-        'Cannot execute query: Memgraph is not connected'
+        'Cannot execute query: Memgraph is not connected',
       );
     });
   });

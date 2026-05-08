@@ -1,25 +1,17 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  OnModuleInit,
-  Optional,
-} from '@nestjs/common';
-import {
-  ContentCreateInput,
-  ContentUpdateInput,
-} from './content-validation.service';
-import { ContentModel } from '../schemas/content.schema';
-import { DATABASE_PROVIDER_TOKEN } from '../constants';
-import {
-  EmbeddingsService,
-  EmbeddingVector,
-  VectorSearchOptions,
-} from './embeddings.service';
-import { VectorSearchResult } from '../../index';
-import { CONTENT_COLLECTION_NAME } from '../models/content.model';
+import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import type { DatabaseProvider, Repository } from '@veritas/database';
-import { ContentClassification } from './content-classification.service';
+import { DATABASE_PROVIDER_TOKEN } from '../constants';
+import { ContentModel } from '../schemas/content.schema';
+import type { ContentClassification } from './content-classification.service';
+import { ContentCreateInput, ContentUpdateInput } from './content-validation.service';
+import type { EmbeddingVector } from './embeddings.service';
+import { EmbeddingsService } from './embeddings.service';
+
+type RepositoryVectorSearchResult<T> = {
+  item?: T;
+  document?: T;
+  score: number;
+};
 
 // Content node with classification data
 export interface ExtendedContentNode {
@@ -70,6 +62,13 @@ export class ContentService implements OnModuleInit {
   private contentRepository!: Repository<ExtendedContentNode>;
   private initialized = false;
 
+  private getEmbeddingsService(): EmbeddingsService {
+    if (!this.embeddingsService) {
+      throw new Error('EmbeddingsService not available');
+    }
+    return this.embeddingsService;
+  }
+
   constructor(
     @Inject('ContentClassificationService')
     private readonly classificationService: {
@@ -79,7 +78,7 @@ export class ContentService implements OnModuleInit {
     @Inject(DATABASE_PROVIDER_TOKEN)
     private readonly databaseService?: DatabaseProvider,
     @Optional()
-    private readonly embeddingsService?: EmbeddingsService
+    private readonly embeddingsService?: EmbeddingsService,
   ) {}
 
   /**
@@ -114,7 +113,7 @@ export class ContentService implements OnModuleInit {
       } catch (error) {
         this.logger.warn(
           'Content model registration issue',
-          error instanceof Error ? error.message : String(error)
+          error instanceof Error ? error.message : String(error),
         );
         // Continue as the model might already be registered
       }
@@ -124,14 +123,10 @@ export class ContentService implements OnModuleInit {
       this.initialized = true;
       this.logger.log('Content repository initialized successfully');
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
-      this.logger.error(
-        `Failed to initialize content repository: ${errorMessage}`,
-        errorStack
-      );
+      this.logger.error(`Failed to initialize content repository: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -142,7 +137,7 @@ export class ContentService implements OnModuleInit {
   private ensureInitialized(): void {
     if (!this.initialized || !this.databaseService) {
       throw new Error(
-        'ContentService not initialized with database - use ContentClassificationModule.forRoot() with a database configuration'
+        'ContentService not initialized with database - use ContentClassificationModule.forRoot() with a database configuration',
       );
     }
   }
@@ -151,7 +146,7 @@ export class ContentService implements OnModuleInit {
    * Adapt the ContentClassification object to the format expected by ExtendedContentNode
    */
   private adaptClassification(
-    classification: ContentClassification
+    classification: ContentClassification,
   ): ExtendedContentNode['classification'] {
     return {
       categories: classification.categories,
@@ -173,12 +168,8 @@ export class ContentService implements OnModuleInit {
 
     try {
       // Classify the content
-      this.logger.debug(
-        `Classifying content: "${input.text.substring(0, 50)}..."`
-      );
-      const classification = await this.classificationService.classifyContent(
-        input.text
-      );
+      this.logger.debug(`Classifying content: "${input.text.substring(0, 50)}..."`);
+      const classification = await this.classificationService.classifyContent(input.text);
 
       // Prepare the content object
       const content: Partial<ExtendedContentNode> = {
@@ -201,8 +192,7 @@ export class ContentService implements OnModuleInit {
       this.logger.debug(`Created content with ID: ${createdContent.id}`);
       return createdContent;
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error(`Error creating content: ${errorMessage}`, errorStack);
@@ -225,14 +215,10 @@ export class ContentService implements OnModuleInit {
       }
       return content;
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
-      this.logger.error(
-        `Error finding content by ID ${id}: ${errorMessage}`,
-        errorStack
-      );
+      this.logger.error(`Error finding content by ID ${id}: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -241,15 +227,11 @@ export class ContentService implements OnModuleInit {
    * Search for content based on various parameters
    * @param params Search parameters
    */
-  async searchContent(
-    params: ContentSearchParams
-  ): Promise<ExtendedContentNode[]> {
+  async searchContent(params: ContentSearchParams): Promise<ExtendedContentNode[]> {
     this.ensureInitialized();
 
     try {
-      this.logger.debug(
-        `Searching content with params: ${JSON.stringify(params)}`
-      );
+      this.logger.debug(`Searching content with params: ${JSON.stringify(params)}`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const filter: any = {};
 
@@ -284,13 +266,10 @@ export class ContentService implements OnModuleInit {
         sort: { timestamp: -1 },
       });
 
-      this.logger.debug(
-        `Found ${contents.length} content items matching search criteria`
-      );
+      this.logger.debug(`Found ${contents.length} content items matching search criteria`);
       return contents;
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
       this.logger.error(`Error searching content: ${errorMessage}`, errorStack);
@@ -303,10 +282,7 @@ export class ContentService implements OnModuleInit {
    * @param id Content ID
    * @param input Update data
    */
-  async updateContent(
-    id: string,
-    input: ContentUpdateInput
-  ): Promise<ExtendedContentNode | null> {
+  async updateContent(id: string, input: ContentUpdateInput): Promise<ExtendedContentNode | null> {
     this.ensureInitialized();
 
     try {
@@ -315,24 +291,17 @@ export class ContentService implements OnModuleInit {
       // Get existing content to update metrics correctly
       const existingContent = await this.getContentById(id);
       if (!existingContent) {
-        this.logger.warn(
-          `Attempted to update non-existent content with ID: ${id}`
-        );
+        this.logger.warn(`Attempted to update non-existent content with ID: ${id}`);
         return null;
       }
 
       // If text is updated, reclassify
-      let classificationUpdate: ExtendedContentNode['classification'] | undefined = undefined;
+      let classificationUpdate: ExtendedContentNode['classification'] | undefined;
       if (input.text) {
         this.logger.debug(
-          `Reclassifying updated content text: "${input.text.substring(
-            0,
-            50
-          )}..."`
+          `Reclassifying updated content text: "${input.text.substring(0, 50)}..."`,
         );
-        const classification = await this.classificationService.classifyContent(
-          input.text
-        );
+        const classification = await this.classificationService.classifyContent(input.text);
         classificationUpdate = this.adaptClassification(classification);
       }
 
@@ -351,39 +320,24 @@ export class ContentService implements OnModuleInit {
       if (input.engagementMetrics) {
         // Create a complete engagementMetrics object by merging with existing values
         update.engagementMetrics = {
-          likes:
-            input.engagementMetrics.likes ??
-            existingContent.engagementMetrics.likes,
-          shares:
-            input.engagementMetrics.shares ??
-            existingContent.engagementMetrics.shares,
-          comments:
-            input.engagementMetrics.comments ??
-            existingContent.engagementMetrics.comments,
-          reach:
-            input.engagementMetrics.reach ??
-            existingContent.engagementMetrics.reach,
+          likes: input.engagementMetrics.likes ?? existingContent.engagementMetrics.likes,
+          shares: input.engagementMetrics.shares ?? existingContent.engagementMetrics.shares,
+          comments: input.engagementMetrics.comments ?? existingContent.engagementMetrics.comments,
+          reach: input.engagementMetrics.reach ?? existingContent.engagementMetrics.reach,
         };
       }
 
       this.logger.debug(`Applying update to content ID: ${id}`);
-      const updatedContent = await this.contentRepository.updateById(
-        id,
-        update
-      );
+      const updatedContent = await this.contentRepository.updateById(id, update);
       if (updatedContent) {
         this.logger.debug(`Successfully updated content with ID: ${id}`);
       }
       return updatedContent;
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
-      this.logger.error(
-        `Error updating content ${id}: ${errorMessage}`,
-        errorStack
-      );
+      this.logger.error(`Error updating content ${id}: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -405,14 +359,10 @@ export class ContentService implements OnModuleInit {
       this.logger.debug(`Content with ID ${id} not found for deletion`);
       return false;
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
-      this.logger.error(
-        `Error deleting content ${id}: ${errorMessage}`,
-        errorStack
-      );
+      this.logger.error(`Error deleting content ${id}: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -422,10 +372,7 @@ export class ContentService implements OnModuleInit {
    * @param id Content ID
    * @param limit Maximum number of results to return
    */
-  async getRelatedContent(
-    id: string,
-    limit = 5
-  ): Promise<ExtendedContentNode[]> {
+  async getRelatedContent(id: string, limit = 5): Promise<ExtendedContentNode[]> {
     this.ensureInitialized();
 
     try {
@@ -434,9 +381,7 @@ export class ContentService implements OnModuleInit {
       // Get the source content
       const content = await this.getContentById(id);
       if (!content) {
-        this.logger.warn(
-          `Attempted to find related content for non-existent ID: ${id}`
-        );
+        this.logger.warn(`Attempted to find related content for non-existent ID: ${id}`);
         return [];
       }
 
@@ -451,19 +396,13 @@ export class ContentService implements OnModuleInit {
         sort: { timestamp: -1 },
       });
 
-      this.logger.debug(
-        `Found ${relatedContent.length} related content items for ID: ${id}`
-      );
+      this.logger.debug(`Found ${relatedContent.length} related content items for ID: ${id}`);
       return relatedContent;
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
-      this.logger.error(
-        `Error finding related content for ${id}: ${errorMessage}`,
-        errorStack
-      );
+      this.logger.error(`Error finding related content for ${id}: ${errorMessage}`, errorStack);
       throw error;
     }
   }
@@ -473,15 +412,11 @@ export class ContentService implements OnModuleInit {
    * @param contentId ID of the content to generate embedding for
    * @returns The updated content with embedding
    */
-  async generateEmbedding(
-    contentId: string
-  ): Promise<ExtendedContentNode | null> {
+  async generateEmbedding(contentId: string): Promise<ExtendedContentNode | null> {
     this.ensureInitialized();
 
     if (!this.embeddingsService) {
-      this.logger.warn(
-        'EmbeddingsService not available, cannot generate embeddings'
-      );
+      this.logger.warn('EmbeddingsService not available, cannot generate embeddings');
       return null;
     }
 
@@ -494,9 +429,7 @@ export class ContentService implements OnModuleInit {
       }
 
       // Generate embedding
-      const embedding = await this.embeddingsService.generateEmbedding(
-        content.text
-      );
+      const embedding = await this.embeddingsService.generateEmbedding(content.text);
 
       // Update content with embedding
       return this.updateEmbedding(contentId, embedding);
@@ -505,7 +438,7 @@ export class ContentService implements OnModuleInit {
         `Error generating embedding for content ${contentId}: ${
           error instanceof Error ? error.message : String(error)
         }`,
-        error instanceof Error ? error.stack : undefined
+        error instanceof Error ? error.stack : undefined,
       );
       return null;
     }
@@ -519,7 +452,7 @@ export class ContentService implements OnModuleInit {
    */
   private async updateEmbedding(
     contentId: string,
-    embedding: EmbeddingVector
+    embedding: EmbeddingVector,
   ): Promise<ExtendedContentNode | null> {
     try {
       // Update directly in the repository to avoid classification logic
@@ -533,7 +466,7 @@ export class ContentService implements OnModuleInit {
         `Error updating embedding for content ${contentId}: ${
           error instanceof Error ? error.message : String(error)
         }`,
-        error instanceof Error ? error.stack : undefined
+        error instanceof Error ? error.stack : undefined,
       );
       return null;
     }
@@ -551,7 +484,7 @@ export class ContentService implements OnModuleInit {
       limit?: number;
       minScore?: number;
       useExistingEmbedding?: boolean;
-    } = {}
+    } = {},
   ): Promise<Array<{ content: ExtendedContentNode; score: number }>> {
     try {
       const content = await this.getContentById(contentId);
@@ -563,46 +496,43 @@ export class ContentService implements OnModuleInit {
       // Use existing embedding if available and requested, otherwise generate new one
       let embedding: number[] | undefined = content.embedding;
       if (!embedding || !options.useExistingEmbedding) {
-        embedding = await this.embeddingsService!.generateEmbedding(
-          content.text
-        );
+        embedding = await this.getEmbeddingsService().generateEmbedding(content.text);
       }
 
       // Return empty array if no embedding could be generated
       if (!embedding || embedding.length === 0) {
-        this.logger.warn(
-          `Unable to generate embedding for content ${contentId}`
-        );
+        this.logger.warn(`Unable to generate embedding for content ${contentId}`);
         return [];
       }
 
       // Check if repository has vectorSearch capability
       if (typeof this.contentRepository.vectorSearch === 'function') {
         // Perform vector search using the repository
-        const searchResults = await this.contentRepository.vectorSearch(
-          'embedding',
-          embedding,
-          {
-            limit: options.limit || 10,
-            minScore: options.minScore || 0.7,
-          } as any
-        );
+        const searchResults = await this.contentRepository.vectorSearch('embedding', embedding, {
+          limit: options.limit || 10,
+          minScore: options.minScore || 0.7,
+        });
 
         // Transform results to match expected format with "content" property
-        return searchResults.map((result: any) => ({
-          content: result.item || result.document,
-          score: result.score,
-        }));
+        return (searchResults as Array<RepositoryVectorSearchResult<ExtendedContentNode>>)
+          .map((result) => ({
+            content: result.item ?? result.document,
+            score: result.score,
+          }))
+          .filter(
+            (result): result is { content: ExtendedContentNode; score: number } =>
+              result.content !== undefined,
+          );
       } else {
         // Fallback when vectorSearch is not available
         this.logger.warn(
-          'Repository does not support vectorSearch, using manual similarity calculation'
+          'Repository does not support vectorSearch, using manual similarity calculation',
         );
 
         // Get all content (with a reasonable limit)
         const allContent = await this.contentRepository.find(
-          { id: { $ne: contentId } } as any, // Exclude the source content
-          { limit: options.limit || 50 }
+          { id: { $ne: contentId } } as Record<string, unknown>, // Exclude the source content
+          { limit: options.limit || 50 },
         );
 
         // Filter content items that have embeddings, or generate on the fly
@@ -617,12 +547,10 @@ export class ContentService implements OnModuleInit {
           // Generate embedding if needed
           if (!itemEmbedding) {
             try {
-              itemEmbedding = await this.embeddingsService!.generateEmbedding(
-                item.text
-              );
+              itemEmbedding = await this.getEmbeddingsService().generateEmbedding(item.text);
             } catch (error: unknown) {
               this.logger.debug(
-                `Error generating embedding for content ${item.id}: ${error instanceof Error ? error.message : String(error)}`
+                `Error generating embedding for content ${item.id}: ${error instanceof Error ? error.message : String(error)}`,
               );
               continue; // Skip this item
             }
@@ -631,10 +559,7 @@ export class ContentService implements OnModuleInit {
           if (!itemEmbedding || itemEmbedding.length === 0) continue;
 
           // Calculate similarity
-          const score = this.embeddingsService!.calculateSimilarity(
-            embedding,
-            itemEmbedding
-          );
+          const score = this.getEmbeddingsService().calculateSimilarity(embedding, itemEmbedding);
 
           // Add if above threshold
           if (score >= (options.minScore || 0.7)) {
@@ -651,7 +576,7 @@ export class ContentService implements OnModuleInit {
     } catch (error: unknown) {
       this.logger.error(
         `Error finding similar content for ${contentId}: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined
+        error instanceof Error ? error.stack : undefined,
       );
       return []; // Return empty array on error instead of throwing
     }
@@ -665,7 +590,7 @@ export class ContentService implements OnModuleInit {
    */
   async semanticSearchContent(
     params: ContentSearchParams,
-    useEmbeddings = true
+    useEmbeddings = true,
   ): Promise<ExtendedContentNode[]> {
     try {
       // If embeddings are not enabled or requested, fall back to regular search
@@ -676,19 +601,15 @@ export class ContentService implements OnModuleInit {
       // Use semanticQuery if provided, otherwise use regular query
       const queryText = params.semanticQuery || params.query;
       if (!queryText) {
-        this.logger.warn(
-          `No query provided for semantic search, falling back to regular search`
-        );
+        this.logger.warn(`No query provided for semantic search, falling back to regular search`);
         return this.searchContent(params);
       }
 
       // Generate embedding for the search query text
-      const queryEmbedding = await this.embeddingsService.generateEmbedding(
-        queryText
-      );
+      const queryEmbedding = await this.embeddingsService.generateEmbedding(queryText);
       if (!queryEmbedding || queryEmbedding.length === 0) {
         this.logger.warn(
-          `Could not generate embedding for search query, falling back to regular search`
+          `Could not generate embedding for search query, falling back to regular search`,
         );
         return this.searchContent(params);
       }
@@ -702,22 +623,21 @@ export class ContentService implements OnModuleInit {
           {
             limit: params.limit || 20,
             minScore: params.minScore || 0.6, // Lower threshold for search queries
-          } as any
+          },
         );
 
         // Extract just the documents from the search results
-        return searchResults.map((result: any) => result.item || result.document);
+        return (searchResults as Array<RepositoryVectorSearchResult<ExtendedContentNode>>)
+          .map((result) => result.item ?? result.document)
+          .filter((result): result is ExtendedContentNode => result !== undefined);
       } else {
         // Fallback: Manual similarity calculation when vectorSearch is not available
         this.logger.warn(
-          'Repository does not support vector search, using manual similarity calculation'
+          'Repository does not support vector search, using manual similarity calculation',
         );
 
         // Get all content (with a reasonable limit)
-        const allContent = await this.contentRepository.find(
-          {},
-          { limit: params.limit || 100 }
-        );
+        const allContent = await this.contentRepository.find({}, { limit: params.limit || 100 });
 
         // Calculate similarity for each item
         const contentWithSimilarity: Array<{
@@ -729,16 +649,11 @@ export class ContentService implements OnModuleInit {
           // Skip content without embeddings
           if (!content.embedding) {
             // Try to generate embedding on the fly
-            const embedding = await this.embeddingsService.generateEmbedding(
-              content.text
-            );
+            const embedding = await this.embeddingsService.generateEmbedding(content.text);
             if (!embedding || embedding.length === 0) continue;
 
             // Calculate similarity
-            const score = this.embeddingsService.calculateSimilarity(
-              queryEmbedding,
-              embedding
-            );
+            const score = this.embeddingsService.calculateSimilarity(queryEmbedding, embedding);
             if (score >= (params.minScore || 0.6)) {
               contentWithSimilarity.push({ content, score });
             }
@@ -746,7 +661,7 @@ export class ContentService implements OnModuleInit {
             // Calculate similarity
             const score = this.embeddingsService.calculateSimilarity(
               queryEmbedding,
-              content.embedding
+              content.embedding,
             );
             if (score >= (params.minScore || 0.6)) {
               contentWithSimilarity.push({ content, score });
@@ -758,10 +673,7 @@ export class ContentService implements OnModuleInit {
         contentWithSimilarity.sort((a, b) => b.score - a.score);
 
         // Limit results
-        const limitedResults = contentWithSimilarity.slice(
-          0,
-          params.limit || 20
-        );
+        const limitedResults = contentWithSimilarity.slice(0, params.limit || 20);
 
         // Return just the content
         return limitedResults.map((item) => item.content);
@@ -769,7 +681,7 @@ export class ContentService implements OnModuleInit {
     } catch (error: unknown) {
       this.logger.error(
         `Error in semantic search: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined
+        error instanceof Error ? error.stack : undefined,
       );
       // Fall back to regular search on error
       return this.searchContent(params);
@@ -786,15 +698,13 @@ export class ContentService implements OnModuleInit {
     this.ensureInitialized();
 
     if (!this.embeddingsService) {
-      this.logger.warn(
-        'EmbeddingsService not available, cannot generate embeddings'
-      );
+      this.logger.warn('EmbeddingsService not available, cannot generate embeddings');
       return 0;
     }
 
     try {
       // Find content without embeddings
-      const filter = { embedding: { $exists: false } } as any;
+      const filter: Record<string, unknown> = { embedding: { $exists: false } };
       const totalCount = await this.contentRepository.count(filter);
 
       this.logger.log(`Found ${totalCount} content items without embeddings`);
@@ -819,14 +729,12 @@ export class ContentService implements OnModuleInit {
         }
 
         // Generate embeddings for batch
-        const textBatch = contentBatch.map((item: any) => item.text);
-        const embeddings = await this.embeddingsService!.batchGenerateEmbeddings(
-          textBatch
-        );
+        const textBatch = contentBatch.map((item) => item.text);
+        const embeddings = await this.getEmbeddingsService().batchGenerateEmbeddings(textBatch);
 
         // Update each item with its embedding
-        const updatePromises = contentBatch.map((item: any, index: number) =>
-          this.updateEmbedding(item.id, embeddings[index]!)
+        const updatePromises = contentBatch.map((item, index) =>
+          this.updateEmbedding(item.id, embeddings[index] ?? []),
         );
 
         await Promise.all(updatePromises);
@@ -834,9 +742,7 @@ export class ContentService implements OnModuleInit {
         processedCount += contentBatch.length;
         currentOffset += batchSize;
 
-        this.logger.log(
-          `Processed ${processedCount}/${totalCount} content items`
-        );
+        this.logger.log(`Processed ${processedCount}/${totalCount} content items`);
       }
 
       return processedCount;
@@ -845,7 +751,7 @@ export class ContentService implements OnModuleInit {
         `Error generating all embeddings: ${
           error instanceof Error ? error.message : String(error)
         }`,
-        error instanceof Error ? error.stack : undefined
+        error instanceof Error ? error.stack : undefined,
       );
       return 0;
     }

@@ -2,8 +2,8 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
 import { randomUUID } from 'crypto';
 import {
-  IdentityRecordModel,
   type IdentityRecord,
+  IdentityRecordModel,
   type InvestigationSnapshot,
   type ObservedPost,
   type PlatformAccount,
@@ -42,7 +42,11 @@ export class IdentityRecordRepository implements OnModuleInit {
 
   private ensureInitialized() {
     if (!this.initialized) {
-      try { this.initializeRepositories(); } catch { /* swallow */ }
+      try {
+        this.initializeRepositories();
+      } catch {
+        /* swallow */
+      }
     }
     if (!this.initialized) {
       throw new Error('IdentityRecordRepository not initialized');
@@ -57,7 +61,10 @@ export class IdentityRecordRepository implements OnModuleInit {
     this.ensureInitialized();
     try {
       const results = await this.repo.find(
-        { primaryHandle: handle.toLowerCase(), primaryPlatform: platform } as Record<string, unknown>,
+        { primaryHandle: handle.toLowerCase(), primaryPlatform: platform } as Record<
+          string,
+          unknown
+        >,
         { limit: 1 },
       );
       return results[0] ?? null;
@@ -77,27 +84,24 @@ export class IdentityRecordRepository implements OnModuleInit {
 
   async findByClusterId(clusterId: string): Promise<IdentityRecord[]> {
     this.ensureInitialized();
-    return this.repo.find(
-      { identityClusterId: clusterId } as Record<string, unknown>,
-      {},
-    );
+    return this.repo.find({ identityClusterId: clusterId } as Record<string, unknown>, {});
   }
 
   async search(query: string, limit = 20): Promise<IdentityRecord[]> {
     this.ensureInitialized();
     const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    return this.repo.find(
-      { primaryHandle: { $regex: regex } } as Record<string, unknown>,
-      { limit, sort: { lastInvestigatedAt: -1 } },
-    );
+    return this.repo.find({ primaryHandle: { $regex: regex } } as Record<string, unknown>, {
+      limit,
+      sort: { lastInvestigatedAt: -1 },
+    });
   }
 
   async getRecentlyInvestigated(limit = 20): Promise<IdentityRecord[]> {
     this.ensureInitialized();
-    return this.repo.find(
-      {} as Record<string, unknown>,
-      { limit, sort: { lastInvestigatedAt: -1 } },
-    );
+    return this.repo.find({} as Record<string, unknown>, {
+      limit,
+      sort: { lastInvestigatedAt: -1 },
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -169,12 +173,22 @@ export class IdentityRecordRepository implements OnModuleInit {
 
     const profileImages: ProfileImage[] = [];
     if (params.profileImageUrl) {
-      profileImages.push({ url: params.profileImageUrl, platform: params.platform, capturedAt: now, isCurrent: true });
+      profileImages.push({
+        url: params.profileImageUrl,
+        platform: params.platform,
+        capturedAt: now,
+        isCurrent: true,
+      });
     }
 
     const bannerImages: ProfileImage[] = [];
     if (params.bannerImageUrl) {
-      bannerImages.push({ url: params.bannerImageUrl, platform: params.platform, capturedAt: now, isCurrent: true });
+      bannerImages.push({
+        url: params.bannerImageUrl,
+        platform: params.platform,
+        capturedAt: now,
+        isCurrent: true,
+      });
     }
 
     const record = await this.repo.create({
@@ -184,17 +198,31 @@ export class IdentityRecordRepository implements OnModuleInit {
       platformAccounts,
       identityClusterId: null,
       linkedIdentityIds: [],
-      authorProfile: params.authorProfile as IdentityRecord['authorProfile'] ?? null,
+      authorProfile: (params.authorProfile as IdentityRecord['authorProfile']) ?? null,
       profileImages,
       bannerImages,
       currentCredibility: params.credibilityScore ?? null,
       currentBotProbability: params.botProbability ?? null,
-      credibilityHistory: params.credibilityScore != null
-        ? [{ value: params.credibilityScore, timestamp: now, investigationQuery: params.snapshot.query }]
-        : [],
-      botProbabilityHistory: params.botProbability != null
-        ? [{ value: params.botProbability, timestamp: now, investigationQuery: params.snapshot.query }]
-        : [],
+      credibilityHistory:
+        params.credibilityScore != null
+          ? [
+              {
+                value: params.credibilityScore,
+                timestamp: now,
+                investigationQuery: params.snapshot.query,
+              },
+            ]
+          : [],
+      botProbabilityHistory:
+        params.botProbability != null
+          ? [
+              {
+                value: params.botProbability,
+                timestamp: now,
+                investigationQuery: params.snapshot.query,
+              },
+            ]
+          : [],
       investigations: [params.snapshot],
       totalInvestigations: 1,
       firstInvestigatedAt: now,
@@ -241,19 +269,37 @@ export class IdentityRecordRepository implements OnModuleInit {
     // Update profile images (mark old as not current, add new)
     const profileImages = [...existing.profileImages];
     if (params.profileImageUrl) {
-      const existingUrl = profileImages.find((img) => img.isCurrent && img.platform === params.platform);
+      const existingUrl = profileImages.find(
+        (img) => img.isCurrent && img.platform === params.platform,
+      );
       if (!existingUrl || existingUrl.url !== params.profileImageUrl) {
-        profileImages.forEach((img) => { if (img.platform === params.platform) img.isCurrent = false; });
-        profileImages.push({ url: params.profileImageUrl, platform: params.platform, capturedAt: now, isCurrent: true });
+        profileImages.forEach((img) => {
+          if (img.platform === params.platform) img.isCurrent = false;
+        });
+        profileImages.push({
+          url: params.profileImageUrl,
+          platform: params.platform,
+          capturedAt: now,
+          isCurrent: true,
+        });
       }
     }
 
     const bannerImages = [...existing.bannerImages];
     if (params.bannerImageUrl) {
-      const existingBanner = bannerImages.find((img) => img.isCurrent && img.platform === params.platform);
+      const existingBanner = bannerImages.find(
+        (img) => img.isCurrent && img.platform === params.platform,
+      );
       if (!existingBanner || existingBanner.url !== params.bannerImageUrl) {
-        bannerImages.forEach((img) => { if (img.platform === params.platform) img.isCurrent = false; });
-        bannerImages.push({ url: params.bannerImageUrl, platform: params.platform, capturedAt: now, isCurrent: true });
+        bannerImages.forEach((img) => {
+          if (img.platform === params.platform) img.isCurrent = false;
+        });
+        bannerImages.push({
+          url: params.bannerImageUrl,
+          platform: params.platform,
+          capturedAt: now,
+          isCurrent: true,
+        });
       }
     }
 
@@ -263,27 +309,49 @@ export class IdentityRecordRepository implements OnModuleInit {
     const update: Partial<IdentityRecord> = {
       displayName: params.displayName ?? existing.displayName,
       platformAccounts: [...existing.platformAccounts, ...newAccounts],
-      authorProfile: params.authorProfile as IdentityRecord['authorProfile'] ?? existing.authorProfile,
+      authorProfile:
+        (params.authorProfile as IdentityRecord['authorProfile']) ?? existing.authorProfile,
       profileImages,
       bannerImages,
       currentCredibility: params.credibilityScore ?? existing.currentCredibility,
       currentBotProbability: params.botProbability ?? existing.currentBotProbability,
-      credibilityHistory: params.credibilityScore != null
-        ? [...existing.credibilityHistory, { value: params.credibilityScore, timestamp: now, investigationQuery: params.snapshot.query }]
-        : existing.credibilityHistory,
-      botProbabilityHistory: params.botProbability != null
-        ? [...existing.botProbabilityHistory, { value: params.botProbability, timestamp: now, investigationQuery: params.snapshot.query }]
-        : existing.botProbabilityHistory,
+      credibilityHistory:
+        params.credibilityScore != null
+          ? [
+              ...existing.credibilityHistory,
+              {
+                value: params.credibilityScore,
+                timestamp: now,
+                investigationQuery: params.snapshot.query,
+              },
+            ]
+          : existing.credibilityHistory,
+      botProbabilityHistory:
+        params.botProbability != null
+          ? [
+              ...existing.botProbabilityHistory,
+              {
+                value: params.botProbability,
+                timestamp: now,
+                investigationQuery: params.snapshot.query,
+              },
+            ]
+          : existing.botProbabilityHistory,
       investigations: [...existing.investigations, params.snapshot],
       totalInvestigations: existing.totalInvestigations + 1,
       lastInvestigatedAt: now,
-      observedPosts: this.mergeObservedPostLists(existing.observedPosts ?? [], params.observedPosts ?? []),
+      observedPosts: this.mergeObservedPostLists(
+        existing.observedPosts ?? [],
+        params.observedPosts ?? [],
+      ),
       aggregatedFlags: Array.from(allFlags),
       totalPostsAnalyzed: existing.totalPostsAnalyzed + params.snapshot.postCount,
     };
 
     await this.repo.updateById(id, update);
-    this.logger.log(`Enriched identity record for @${params.handle} (investigation #${existing.totalInvestigations + 1})`);
+    this.logger.log(
+      `Enriched identity record for @${params.handle} (investigation #${existing.totalInvestigations + 1})`,
+    );
 
     return { ...existing, ...update } as IdentityRecord;
   }
@@ -292,10 +360,7 @@ export class IdentityRecordRepository implements OnModuleInit {
   // Profile management
   // -------------------------------------------------------------------------
 
-  async updatePsychologicalProfile(
-    id: string,
-    profile: PsychologicalProfile,
-  ): Promise<void> {
+  async updatePsychologicalProfile(id: string, profile: PsychologicalProfile): Promise<void> {
     this.ensureInitialized();
     await this.repo.updateById(id, {
       psychologicalProfile: profile,
@@ -342,7 +407,9 @@ export class IdentityRecordRepository implements OnModuleInit {
     await this.repo.updateById(id, {
       platformAccounts: accounts,
     } as Partial<IdentityRecord>);
-    this.logger.debug(`Updated platform accounts for identity ${id} (${accounts.length} total, Sherlock at ${sherlockResolvedAt.toISOString()})`);
+    this.logger.debug(
+      `Updated platform accounts for identity ${id} (${accounts.length} total, Sherlock at ${sherlockResolvedAt.toISOString()})`,
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -386,7 +453,9 @@ export class IdentityRecordRepository implements OnModuleInit {
         return null;
       }
 
-      this.logger.debug(`Timeline cache hit for @${handle} (${record.cachedTimeline.posts.length} posts)`);
+      this.logger.debug(
+        `Timeline cache hit for @${handle} (${record.cachedTimeline.posts.length} posts)`,
+      );
       return record.cachedTimeline.posts as Array<{
         text: string;
         timestamp: string;
@@ -508,7 +577,8 @@ export class IdentityRecordRepository implements OnModuleInit {
     return {
       text: typeof post.text === 'string' ? post.text : '',
       timestamp: typeof post.timestamp === 'string' ? post.timestamp : new Date().toISOString(),
-      platform: typeof post.platform === 'string' && post.platform.length > 0 ? post.platform : 'unknown',
+      platform:
+        typeof post.platform === 'string' && post.platform.length > 0 ? post.platform : 'unknown',
       url: typeof post.url === 'string' && post.url.length > 0 ? post.url : null,
       engagement: {
         likes: post.engagement?.likes ?? 0,

@@ -1,37 +1,34 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Patch,
-  Delete,
-  Param,
-  Query,
+  BadRequestException,
   Body,
+  Controller,
+  Delete,
+  Get,
   Logger,
   NotFoundException,
-  BadRequestException,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { AlertRepository } from '../repositories/alert.repository';
+import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
 import { InvestigationRepository } from '../repositories/investigation.repository';
+import { MentalModelRepository } from '../repositories/mental-model.repository';
+import { ProjectDossierRepository } from '../repositories/project-dossier.repository';
+import { ScanJobRepository } from '../repositories/scan-job.repository';
 import { EvidenceSeed, Investigation, Snapshot } from '../schemas/investigation.schema';
+import { MentalModel } from '../schemas/mental-model.schema';
+import { ProjectDossier, ProjectDossierOverlap } from '../schemas/project-dossier.schema';
 import {
   InvestigationEvidenceDossier,
   InvestigationEvidenceService,
 } from '../services/investigation-evidence.service';
-import { ProjectDossierRepository } from '../repositories/project-dossier.repository';
-import { MentalModelRepository } from '../repositories/mental-model.repository';
-import { ScanJobRepository } from '../repositories/scan-job.repository';
-import { AlertRepository } from '../repositories/alert.repository';
-import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
-import {
-  ProjectDossier,
-  ProjectDossierOverlap,
-} from '../schemas/project-dossier.schema';
-import { MentalModel } from '../schemas/mental-model.schema';
-import { ProjectDossierService } from '../services/project-dossier.service';
-import { OnChainCorrelationService } from '../services/onchain-correlation.service';
 import { MentalModelService } from '../services/mental-model.service';
+import { OnChainCorrelationService } from '../services/onchain-correlation.service';
+import { ProjectDossierService } from '../services/project-dossier.service';
 
 type InvestigationWithDossier = Investigation & {
   evidenceDossier: InvestigationEvidenceDossier;
@@ -65,7 +62,7 @@ export class InvestigationController {
   async listInvestigations(
     @Query('status') status?: string,
     @Query('limit') limit?: string,
-    @Query('skip') skip?: string
+    @Query('skip') skip?: string,
   ): Promise<Investigation[]> {
     this.logger.log('Listing investigations');
     return this.investigationRepository.findAll({
@@ -88,9 +85,12 @@ export class InvestigationController {
       skip: skip ? Number(skip) : undefined,
     });
 
-    const records: Array<{ investigation: InvestigationWithDossier; mentalModel: MentalModel }> = [];
+    const records: Array<{ investigation: InvestigationWithDossier; mentalModel: MentalModel }> =
+      [];
     for (const mentalModel of mentalModels) {
-      const investigation = await this.investigationRepository.findById(mentalModel.investigationId);
+      const investigation = await this.investigationRepository.findById(
+        mentalModel.investigationId,
+      );
       if (!investigation) continue;
       const projectDossier = await this.projectDossierRepository.findByInvestigationId(
         mentalModel.investigationId,
@@ -109,7 +109,13 @@ export class InvestigationController {
    */
   @Put()
   async createOrGet(
-    @Body() body: { query: string; name?: string; platforms?: string[]; timeRange?: string; limit?: number },
+    @Body() body: {
+      query: string;
+      name?: string;
+      platforms?: string[];
+      timeRange?: string;
+      limit?: number;
+    },
   ): Promise<Investigation> {
     const { query, name, platforms, timeRange, limit } = body;
     if (!query?.trim()) {
@@ -137,9 +143,7 @@ export class InvestigationController {
    * GET /investigations/:id — get a single investigation with its latest snapshot.
    */
   @Get(':id')
-  async getInvestigation(
-    @Param('id') id: string
-  ): Promise<{
+  async getInvestigation(@Param('id') id: string): Promise<{
     investigation: InvestigationWithDossier;
     latestSnapshot: Snapshot | null;
     projectDossier: ProjectDossier | null;
@@ -153,14 +157,11 @@ export class InvestigationController {
       throw new NotFoundException(`Investigation not found: ${id}`);
     }
 
-    const latestSnapshot =
-      await this.investigationRepository.getLatestSnapshot(id);
+    const latestSnapshot = await this.investigationRepository.getLatestSnapshot(id);
 
     const projectDossier = await this.projectDossierRepository.findByInvestigationId(id);
     const mentalModel = await this.mentalModelRepository.findByInvestigationId(id);
-    const dossierOverlaps = projectDossier
-      ? await this.getDossierOverlaps(projectDossier)
-      : [];
+    const dossierOverlaps = projectDossier ? await this.getDossierOverlaps(projectDossier) : [];
 
     return {
       investigation: this.withEvidenceDossier(investigation, projectDossier),
@@ -177,7 +178,7 @@ export class InvestigationController {
   @Put(':id')
   async updateInvestigation(
     @Param('id') id: string,
-    @Body() body: Partial<Pick<Investigation, 'name' | 'status' | 'settings'>>
+    @Body() body: Partial<Pick<Investigation, 'name' | 'status' | 'settings'>>,
   ): Promise<InvestigationWithDossier> {
     this.logger.log(`Updating investigation: ${id}`);
 
@@ -195,9 +196,7 @@ export class InvestigationController {
    * PATCH /investigations/:id/archive — archive (soft delete) an investigation.
    */
   @Patch(':id/archive')
-  async archiveInvestigation(
-    @Param('id') id: string
-  ): Promise<{ success: boolean }> {
+  async archiveInvestigation(@Param('id') id: string): Promise<{ success: boolean }> {
     this.logger.log(`Archiving investigation: ${id}`);
 
     const existing = await this.investigationRepository.findById(id);
@@ -213,9 +212,7 @@ export class InvestigationController {
    * DELETE /investigations/:id/permanent — permanently delete an investigation and related records.
    */
   @Delete(':id/permanent')
-  async deleteInvestigationPermanent(
-    @Param('id') id: string,
-  ): Promise<{ success: boolean }> {
+  async deleteInvestigationPermanent(@Param('id') id: string): Promise<{ success: boolean }> {
     this.logger.log(`Deleting investigation permanently: ${id}`);
 
     const existing = await this.investigationRepository.findById(id);
@@ -269,7 +266,7 @@ export class InvestigationController {
     if (!existing) {
       throw new NotFoundException(`Investigation not found: ${id}`);
     }
-    await this.investigationRepository.update(id, { name: body.name } as any);
+    await this.investigationRepository.update(id, { name: body.name });
     return { success: true };
   }
 
@@ -313,16 +310,17 @@ export class InvestigationController {
 
     const investigation = await this.investigationRepository.addEvidenceSeed(id, seed);
     const projectDossier = await this.projectDossierRepository.findByInvestigationId(id);
-    return { success: true, investigation: this.withEvidenceDossier(investigation, projectDossier) };
+    return {
+      success: true,
+      investigation: this.withEvidenceDossier(investigation, projectDossier),
+    };
   }
 
   /**
    * POST /investigations/:id/project-dossier — create or refresh a durable project dossier.
    */
   @Post(':id/project-dossier')
-  async buildProjectDossier(
-    @Param('id') id: string,
-  ): Promise<{
+  async buildProjectDossier(@Param('id') id: string): Promise<{
     success: boolean;
     investigation: InvestigationWithDossier;
     projectDossier: ProjectDossier;
@@ -333,7 +331,9 @@ export class InvestigationController {
       throw new NotFoundException(`Investigation not found: ${id}`);
     }
 
-    const evidenceDossier = this.investigationEvidenceService.buildDossier(investigation.evidenceSeeds ?? []);
+    const evidenceDossier = this.investigationEvidenceService.buildDossier(
+      investigation.evidenceSeeds ?? [],
+    );
     const onChainSummary = await this.onChainCorrelationService.buildSummary(
       this.projectDossierService.extractAddressCandidates(evidenceDossier),
     );
@@ -389,9 +389,7 @@ export class InvestigationController {
    * POST /investigations/:id/mental-model — create or refresh a mental model dossier.
    */
   @Post(':id/mental-model')
-  async buildMentalModel(
-    @Param('id') id: string,
-  ): Promise<{
+  async buildMentalModel(@Param('id') id: string): Promise<{
     success: boolean;
     investigation: InvestigationWithDossier;
     mentalModel: MentalModel;
@@ -402,7 +400,9 @@ export class InvestigationController {
     }
 
     const projectDossier = await this.projectDossierRepository.findByInvestigationId(id);
-    const evidenceDossier = this.investigationEvidenceService.buildDossier(investigation.evidenceSeeds ?? []);
+    const evidenceDossier = this.investigationEvidenceService.buildDossier(
+      investigation.evidenceSeeds ?? [],
+    );
     const mentalModelData = await this.mentalModelService.buildFromInvestigation({
       investigation,
       evidenceDossier,
@@ -421,9 +421,7 @@ export class InvestigationController {
    * GET /investigations/:id/mental-model — fetch the current mental model dossier.
    */
   @Get(':id/mental-model')
-  async getMentalModel(
-    @Param('id') id: string,
-  ): Promise<{ mentalModel: MentalModel | null }> {
+  async getMentalModel(@Param('id') id: string): Promise<{ mentalModel: MentalModel | null }> {
     const investigation = await this.investigationRepository.findById(id);
     if (!investigation) {
       throw new NotFoundException(`Investigation not found: ${id}`);
@@ -440,7 +438,7 @@ export class InvestigationController {
   @Get(':id/snapshots')
   async listSnapshots(
     @Param('id') id: string,
-    @Query('limit') limit?: string
+    @Query('limit') limit?: string,
   ): Promise<Snapshot[]> {
     this.logger.log(`Listing snapshots for investigation: ${id}`);
 
@@ -460,18 +458,13 @@ export class InvestigationController {
   @Get(':id/snapshots/:snapshotId')
   async getSnapshot(
     @Param('id') id: string,
-    @Param('snapshotId') snapshotId: string
+    @Param('snapshotId') snapshotId: string,
   ): Promise<Snapshot> {
-    this.logger.log(
-      `Getting snapshot ${snapshotId} for investigation: ${id}`
-    );
+    this.logger.log(`Getting snapshot ${snapshotId} for investigation: ${id}`);
 
-    const snapshot =
-      await this.investigationRepository.getSnapshotById(snapshotId);
+    const snapshot = await this.investigationRepository.getSnapshotById(snapshotId);
     if (!snapshot || snapshot.investigationId !== id) {
-      throw new NotFoundException(
-        `Snapshot not found: ${snapshotId} for investigation ${id}`
-      );
+      throw new NotFoundException(`Snapshot not found: ${snapshotId} for investigation ${id}`);
     }
 
     return snapshot;
@@ -488,11 +481,15 @@ export class InvestigationController {
         projectDossier?._id?.toString() ??
         projectDossier?.id ??
         null,
-      evidenceDossier: this.investigationEvidenceService.buildDossier(investigation.evidenceSeeds ?? []),
+      evidenceDossier: this.investigationEvidenceService.buildDossier(
+        investigation.evidenceSeeds ?? [],
+      ),
     };
   }
 
-  private async getDossierOverlaps(projectDossier: ProjectDossier): Promise<ProjectDossierOverlap[]> {
+  private async getDossierOverlaps(
+    projectDossier: ProjectDossier,
+  ): Promise<ProjectDossierOverlap[]> {
     const allDossiers = await this.projectDossierRepository.findAll(100);
     return this.projectDossierService.compareAgainstMany(projectDossier, allDossiers).slice(0, 10);
   }

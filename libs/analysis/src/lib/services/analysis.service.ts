@@ -1,15 +1,10 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { AnalysisServiceInterface } from '../interfaces/analysis-service.interface';
-import {
-  DeviationMetrics,
-  Pattern,
-  TimeFrame,
-  ExtendedContentNode,
-} from '../analysis.types';
-import { DeviationService } from './deviation.service';
-import { SourceCredibilityService } from './source-credibility.service';
-import { GraphBotDetectionService } from './graph-bot-detection.service';
 import { DatabaseService } from '@veritas/database';
+import { DeviationMetrics, ExtendedContentNode, Pattern, TimeFrame } from '../analysis.types';
+import { AnalysisServiceInterface } from '../interfaces/analysis-service.interface';
+import { DeviationService } from './deviation.service';
+import { GraphBotDetectionService } from './graph-bot-detection.service';
+import { SourceCredibilityService } from './source-credibility.service';
 
 /**
  * Core analysis service for narrative tracking and reality deviation detection.
@@ -29,9 +24,7 @@ export class AnalysisService implements AnalysisServiceInterface {
     @Optional() private readonly databaseService?: DatabaseService,
   ) {}
 
-  async measureRealityDeviation(
-    narrativeId: string,
-  ): Promise<Omit<DeviationMetrics, 'timeframe'>> {
+  async measureRealityDeviation(narrativeId: string): Promise<Omit<DeviationMetrics, 'timeframe'>> {
     this.logger.log(`Measuring reality deviation for narrative: ${narrativeId}`);
 
     if (this.deviationService) {

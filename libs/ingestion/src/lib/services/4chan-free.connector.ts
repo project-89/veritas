@@ -1,15 +1,10 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { EventEmitter } from 'events';
-import { DataConnector } from '../interfaces/data-connector.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
+import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
 
 interface SearchOptions {
   startDate?: Date;
@@ -46,9 +41,7 @@ const INTEL_BOARDS = ['pol', 'biz', 'news', 'int'] as const;
  * API docs: https://github.com/4chan/4chan-API
  */
 @Injectable()
-export class FourChanFreeConnector
-  implements DataConnector, OnModuleInit, OnModuleDestroy
-{
+export class FourChanFreeConnector implements DataConnector, OnModuleInit, OnModuleDestroy {
   platform = '4chan' as const;
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 600000; // 10 minutes
@@ -70,19 +63,16 @@ export class FourChanFreeConnector
   }
 
   async disconnect(): Promise<void> {
-    this.streamConnections.forEach((interval) => clearInterval(interval));
+    this.streamConnections.forEach((interval) => {
+      clearInterval(interval);
+    });
     this.streamConnections.clear();
   }
 
-  async searchAndTransform(
-    query: string,
-    options?: SearchOptions,
-  ): Promise<NarrativeInsight[]> {
+  async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     const posts = await this.searchContent(query, options);
     const insights = await this.transformService.transformBatch(posts);
-    this.logger.log(
-      `Transformed ${insights.length} 4chan results into insights`,
-    );
+    this.logger.log(`Transformed ${insights.length} 4chan results into insights`);
     return insights;
   }
 
@@ -93,9 +83,7 @@ export class FourChanFreeConnector
     const posts = await this.searchContent(query, options);
     if (posts.length === 0) return { posts: [], insights: [] };
     const insights = await this.transformService.transformBatch(posts);
-    this.logger.log(
-      `4chan: ${posts.length} posts, ${insights.length} insights`,
-    );
+    this.logger.log(`4chan: ${posts.length} posts, ${insights.length} insights`);
     return { posts, insights };
   }
 
@@ -130,7 +118,8 @@ export class FourChanFreeConnector
     return emitter;
   }
 
-  async getAuthorDetails(_authorId: string): Promise<Partial<SourceNode>> {
+  async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
+    void authorId;
     // 4chan is anonymous — no author details available
     return {
       name: 'Anonymous',
@@ -161,10 +150,7 @@ export class FourChanFreeConnector
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  async searchContent(
-    query: string,
-    options?: SearchOptions,
-  ): Promise<SocialMediaPost[]> {
+  async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
     const limit = options?.maxResults || options?.limit || 25;
     const keywords = query.toLowerCase().split(/\s+/).filter(Boolean);
 
@@ -211,15 +197,10 @@ export class FourChanFreeConnector
       });
     }
 
-    return filtered
-      .slice(0, limit)
-      .map((t) => this.transformToSocialMediaPost(t.thread, t.board));
+    return filtered.slice(0, limit).map((t) => this.transformToSocialMediaPost(t.thread, t.board));
   }
 
-  private transformToSocialMediaPost(
-    thread: ChanThread,
-    board: string,
-  ): SocialMediaPost {
+  private transformToSocialMediaPost(thread: ChanThread, board: string): SocialMediaPost {
     const text = thread.sub
       ? `${thread.sub}\n${this.stripHtml(thread.com ?? '')}`
       : this.stripHtml(thread.com ?? '');
@@ -245,7 +226,7 @@ export class FourChanFreeConnector
 
   private async fetchJson<T>(url: string): Promise<T> {
     const response = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
+      headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(10_000),
     });
 

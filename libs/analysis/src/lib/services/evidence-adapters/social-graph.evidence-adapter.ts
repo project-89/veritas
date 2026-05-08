@@ -1,8 +1,40 @@
 import { Logger } from '@nestjs/common';
-import type { IdentityRecordRepository } from '@veritas/ingestion';
 import type { EvidenceAdapter, EvidenceSource } from './evidence-adapter.interface';
 
 const HANDLE_RE = /@?([a-zA-Z0-9_]{1,50})/g;
+
+export interface IdentityRecordLookup {
+  findByHandle(
+    handle: string,
+    platform: string,
+  ): Promise<{
+    primaryHandle: string;
+    primaryPlatform: string;
+    currentCredibility?: number | null;
+    currentBotProbability?: number | null;
+    totalInvestigations: number;
+    aggregatedFlags: string[];
+    totalPostsAnalyzed: number;
+    platformAccounts: { platform: string; handle: string }[];
+    lastInvestigatedAt?: Date | null;
+  } | null>;
+  search(
+    handle: string,
+    limit?: number,
+  ): Promise<
+    Array<{
+      primaryHandle: string;
+      primaryPlatform: string;
+      currentCredibility?: number | null;
+      currentBotProbability?: number | null;
+      totalInvestigations: number;
+      aggregatedFlags: string[];
+      totalPostsAnalyzed: number;
+      platformAccounts: { platform: string; handle: string }[];
+      lastInvestigatedAt?: Date | null;
+    }>
+  >;
+}
 
 export class SocialGraphEvidenceAdapter implements EvidenceAdapter {
   readonly name = 'Social Graph (Internal)';
@@ -11,9 +43,9 @@ export class SocialGraphEvidenceAdapter implements EvidenceAdapter {
 
   private readonly logger = new Logger(SocialGraphEvidenceAdapter.name);
 
-  constructor(private readonly identityRepo: IdentityRecordRepository) {}
+  constructor(private readonly identityRepo: IdentityRecordLookup) {}
 
-  canVerify(_claim: string, _entities: string[]): boolean {
+  canVerify(): boolean {
     // Can always check claim author's history
     return true;
   }
@@ -34,8 +66,8 @@ export class SocialGraphEvidenceAdapter implements EvidenceAdapter {
         if (!record) {
           // Try other platforms
           const altRecord = await this.identityRepo.search(handle, 1);
-          if (altRecord.length === 0) continue;
-          const found = altRecord[0]!;
+          const found = altRecord[0];
+          if (!found) continue;
           results.push(this.buildEvidence(found, handle));
           continue;
         }
@@ -66,17 +98,20 @@ export class SocialGraphEvidenceAdapter implements EvidenceAdapter {
     return [...handles];
   }
 
-  private buildEvidence(record: {
-    primaryHandle: string;
-    primaryPlatform: string;
-    currentCredibility?: number | null;
-    currentBotProbability?: number | null;
-    totalInvestigations: number;
-    aggregatedFlags: string[];
-    totalPostsAnalyzed: number;
-    platformAccounts: { platform: string; handle: string }[];
-    lastInvestigatedAt?: Date | null;
-  }, queryHandle: string): EvidenceSource {
+  private buildEvidence(
+    record: {
+      primaryHandle: string;
+      primaryPlatform: string;
+      currentCredibility?: number | null;
+      currentBotProbability?: number | null;
+      totalInvestigations: number;
+      aggregatedFlags: string[];
+      totalPostsAnalyzed: number;
+      platformAccounts: { platform: string; handle: string }[];
+      lastInvestigatedAt?: Date | null;
+    },
+    queryHandle: string,
+  ): EvidenceSource {
     const flags = record.aggregatedFlags;
     const credibility = record.currentCredibility;
     const botProb = record.currentBotProbability;

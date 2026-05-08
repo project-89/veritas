@@ -20,10 +20,14 @@ describe('FacebookJinaConnector', () => {
     description: 'A page about climate action',
   };
 
-  const pageUrls = [
-    'https://www.facebook.com/climateaction',
-    'https://www.facebook.com/techpage',
-  ];
+  const pageUrls = ['https://www.facebook.com/climateaction', 'https://www.facebook.com/techpage'];
+
+  function getConnectorState() {
+    return connector as unknown as {
+      pageUrls: string[];
+      streamConnections: Map<string, ReturnType<typeof setInterval>>;
+    };
+  }
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -52,7 +56,7 @@ describe('FacebookJinaConnector', () => {
     connector = new FacebookJinaConnector(
       configService as ConfigService,
       transformService as TransformOnIngestService,
-      jinaReader as JinaReaderService
+      jinaReader as JinaReaderService,
     );
   });
 
@@ -66,7 +70,7 @@ describe('FacebookJinaConnector', () => {
     it('should parse page URLs from config', async () => {
       await connector.connect();
 
-      expect((connector as any).pageUrls).toEqual(pageUrls);
+      expect(getConnectorState().pageUrls).toEqual(pageUrls);
     });
 
     it('should handle invalid JSON in FACEBOOK_PAGE_URLS gracefully', async () => {
@@ -74,7 +78,7 @@ describe('FacebookJinaConnector', () => {
 
       await connector.connect();
 
-      expect((connector as any).pageUrls).toEqual([]);
+      expect(getConnectorState().pageUrls).toEqual([]);
     });
 
     it('should handle missing FACEBOOK_PAGE_URLS config', async () => {
@@ -82,7 +86,7 @@ describe('FacebookJinaConnector', () => {
 
       await connector.connect();
 
-      expect((connector as any).pageUrls).toEqual([]);
+      expect(getConnectorState().pageUrls).toEqual([]);
     });
 
     it('should warn when no page URLs are configured', async () => {
@@ -90,18 +94,18 @@ describe('FacebookJinaConnector', () => {
 
       await connector.connect();
 
-      expect((connector as any).pageUrls).toEqual([]);
+      expect(getConnectorState().pageUrls).toEqual([]);
     });
   });
 
   describe('disconnect', () => {
     it('should clear all stream connections', async () => {
-      const fakeInterval = setInterval(() => {}, 10000);
-      (connector as any).streamConnections.set('test', fakeInterval);
+      const fakeInterval = setInterval(() => undefined, 10000);
+      getConnectorState().streamConnections.set('test', fakeInterval);
 
       await connector.disconnect();
 
-      expect((connector as any).streamConnections.size).toBe(0);
+      expect(getConnectorState().streamConnections.size).toBe(0);
       clearInterval(fakeInterval);
     });
   });
@@ -125,8 +129,7 @@ describe('FacebookJinaConnector', () => {
 
       await connector.searchAndTransform('climate');
 
-      const posts = (transformService.transformBatch as jest.Mock).mock
-        .calls[0][0];
+      const posts = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
 
       // Only blocks containing "climate" should be included
       for (const post of posts) {
@@ -137,16 +140,14 @@ describe('FacebookJinaConnector', () => {
     it('should respect limit option', async () => {
       await connector.searchAndTransform('climate', { limit: 1 });
 
-      const posts = (transformService.transformBatch as jest.Mock).mock
-        .calls[0][0];
+      const posts = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
       expect(posts.length).toBeLessThanOrEqual(1);
     });
 
     it('should set platform to facebook on extracted posts', async () => {
       await connector.searchAndTransform('climate');
 
-      const posts = (transformService.transformBatch as jest.Mock).mock
-        .calls[0][0];
+      const posts = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
       for (const post of posts) {
         expect(post.platform).toBe('facebook');
       }
@@ -155,8 +156,7 @@ describe('FacebookJinaConnector', () => {
     it('should extract page ID from URL as authorId', async () => {
       await connector.searchAndTransform('climate');
 
-      const posts = (transformService.transformBatch as jest.Mock).mock
-        .calls[0][0];
+      const posts = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
       expect(posts[0].authorId).toBe('climateaction');
     });
 
@@ -173,33 +173,31 @@ describe('FacebookJinaConnector', () => {
 
     it('should ignore short content blocks (< 20 chars)', async () => {
       // Only set one page URL to make the test predictable
-      (connector as any).pageUrls = ['https://www.facebook.com/testpage'];
+      getConnectorState().pageUrls = ['https://www.facebook.com/testpage'];
 
       (jinaReader.readUrl as jest.Mock).mockResolvedValue({
-        content: 'Short\n\nAlso short\n\nThis is a much longer block about climate change that should be included in results',
+        content:
+          'Short\n\nAlso short\n\nThis is a much longer block about climate change that should be included in results',
         title: 'Test',
         url: 'https://www.facebook.com/testpage',
       });
 
       await connector.searchAndTransform('climate');
 
-      const posts = (transformService.transformBatch as jest.Mock).mock
-        .calls[0][0];
+      const posts = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
       // Only the long block should pass
       expect(posts).toHaveLength(1);
     });
 
     it('should generate deterministic IDs for the same content', async () => {
       await connector.searchAndTransform('climate');
-      const posts1 = (transformService.transformBatch as jest.Mock).mock
-        .calls[0][0];
+      const posts1 = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
 
       (jinaReader.readUrl as jest.Mock).mockResolvedValue(mockPageContent);
       (transformService.transformBatch as jest.Mock).mockResolvedValue([]);
 
       await connector.searchAndTransform('climate');
-      const posts2 = (transformService.transformBatch as jest.Mock).mock
-        .calls[0][0];
+      const posts2 = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
 
       // Same content should produce same IDs
       if (posts1.length > 0 && posts2.length > 0) {
@@ -208,7 +206,7 @@ describe('FacebookJinaConnector', () => {
     });
 
     it('should truncate post text to 2000 characters', async () => {
-      const longContent = 'climate ' + 'x'.repeat(3000);
+      const longContent = `climate ${'x'.repeat(3000)}`;
       (jinaReader.readUrl as jest.Mock).mockResolvedValue({
         content: longContent,
         title: 'Test',
@@ -217,20 +215,18 @@ describe('FacebookJinaConnector', () => {
 
       await connector.searchAndTransform('climate');
 
-      const posts = (transformService.transformBatch as jest.Mock).mock
-        .calls[0][0];
+      const posts = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
       if (posts.length > 0) {
         expect(posts[0].text.length).toBeLessThanOrEqual(2000);
       }
     });
 
     it('should return empty array when no page URLs configured', async () => {
-      (connector as any).pageUrls = [];
+      getConnectorState().pageUrls = [];
 
       await connector.searchAndTransform('climate');
 
-      const posts = (transformService.transformBatch as jest.Mock).mock
-        .calls[0][0];
+      const posts = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
       expect(posts).toHaveLength(0);
     });
   });
@@ -269,7 +265,7 @@ describe('FacebookJinaConnector', () => {
     it('should emit error events on failure', async () => {
       // transformBatch throwing will cause the error to be emitted
       (transformService.transformBatch as jest.Mock).mockRejectedValue(
-        new Error('transform error')
+        new Error('transform error'),
       );
 
       const errorHandler = jest.fn();
@@ -286,11 +282,11 @@ describe('FacebookJinaConnector', () => {
       const emitter = connector.streamAndTransform(['test']);
       await jest.advanceTimersByTimeAsync(0);
 
-      expect((connector as any).streamConnections.size).toBe(1);
+      expect(getConnectorState().streamConnections.size).toBe(1);
 
       emitter.emit('end');
 
-      expect((connector as any).streamConnections.size).toBe(0);
+      expect(getConnectorState().streamConnections.size).toBe(0);
     });
   });
 
@@ -329,13 +325,9 @@ describe('FacebookJinaConnector', () => {
     });
 
     it('should throw when Jina Reader fails', async () => {
-      (jinaReader.readUrl as jest.Mock).mockRejectedValue(
-        new Error('Page blocked')
-      );
+      (jinaReader.readUrl as jest.Mock).mockRejectedValue(new Error('Page blocked'));
 
-      await expect(
-        connector.getAuthorDetails('blockedpage')
-      ).rejects.toThrow('Page blocked');
+      await expect(connector.getAuthorDetails('blockedpage')).rejects.toThrow('Page blocked');
     });
   });
 
@@ -357,9 +349,7 @@ describe('FacebookJinaConnector', () => {
     });
 
     it('should return false on unexpected errors', async () => {
-      (jinaReader.isAvailable as jest.Mock).mockRejectedValue(
-        new Error('unexpected')
-      );
+      (jinaReader.isAvailable as jest.Mock).mockRejectedValue(new Error('unexpected'));
 
       const result = await connector.validateCredentials();
 

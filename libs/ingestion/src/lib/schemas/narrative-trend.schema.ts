@@ -43,8 +43,7 @@ export class NarrativeTrendSchema extends Document {
   detectedAt!: Date;
 }
 
-export const NarrativeTrendModel =
-  SchemaFactory.createForClass(NarrativeTrendSchema);
+export const NarrativeTrendModel = SchemaFactory.createForClass(NarrativeTrendSchema);
 
 // Create indices for common queries
 // primaryTheme already indexed via @Prop({ index: true })

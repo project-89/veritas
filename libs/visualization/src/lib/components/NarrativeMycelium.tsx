@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  MyceliumBranch,
   MyceliumData,
   MyceliumNode,
-  MyceliumBranch,
-  NarrativeCluster,
   MyceliumVisualizationProps,
+  NarrativeCluster,
 } from '../types/mycelium-types';
 
 // Generate sample data for demonstration purposes
@@ -17,13 +17,12 @@ export const generateSampleData = (): MyceliumData => {
   // Create clusters
   const clusterColors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#8F44AD'];
   for (let i = 0; i < 5; i++) {
+    const clusterColor = clusterColors[i] ?? clusterColors[0];
     clusters.push({
       id: `cluster-${i}`,
       name: `Narrative Cluster ${i + 1}`,
-      description: `A cluster of related narrative elements about topic ${
-        i + 1
-      }`,
-      color: clusterColors[i]!,
+      description: `A cluster of related narrative elements about topic ${i + 1}`,
+      color: clusterColor,
       nodes: [],
       centralNodeId: `node-${i}-0`,
       metrics: {
@@ -42,9 +41,7 @@ export const generateSampleData = (): MyceliumData => {
       id: `node-${clusterIndex}-${nodeId}`,
       narrativeId: cluster.id,
       content: `Root narrative point for ${cluster.name}`,
-      timestamp: new Date(
-        Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000
-      ),
+      timestamp: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
       strength: 0.8 + Math.random() * 0.2,
       connections: [],
       type: 'root',
@@ -62,25 +59,28 @@ export const generateSampleData = (): MyceliumData => {
     const branchCount = Math.floor(Math.random() * 10) + 5;
     for (let i = 0; i < branchCount; i++) {
       const parentIndex = i === 0 ? 0 : Math.floor(Math.random() * i);
-      const parentId = cluster.nodes[parentIndex]!;
+      const parentId = cluster.nodes[parentIndex];
+      if (!parentId) {
+        continue;
+      }
+      const brightenedColor =
+        d3
+          .color(cluster.color)
+          ?.brighter(Math.random() * 0.5)
+          .toString() ?? cluster.color;
 
       const branchNode: MyceliumNode = {
         id: `node-${clusterIndex}-${nodeId}`,
         narrativeId: cluster.id,
         content: `Branch narrative point ${i + 1} for ${cluster.name}`,
-        timestamp: new Date(
-          Date.now() - Math.random() * 20 * 24 * 60 * 60 * 1000
-        ),
+        timestamp: new Date(Date.now() - Math.random() * 20 * 24 * 60 * 60 * 1000),
         strength: 0.4 + Math.random() * 0.4,
         connections: [parentId],
         type: i < branchCount / 2 ? 'branch' : 'leaf',
         metrics: {
           influence: 0.3 + Math.random() * 0.4,
           growth: 0.05 + Math.random() * 0.15,
-          color: d3
-            .color(cluster.color)!
-            .brighter(Math.random() * 0.5)
-            .toString(),
+          color: brightenedColor,
         },
       };
       nodes.push(branchNode);
@@ -93,11 +93,7 @@ export const generateSampleData = (): MyceliumData => {
         targetId: branchNode.id,
         strength: 0.3 + Math.random() * 0.7,
         type:
-          i < branchCount / 3
-            ? 'primary'
-            : i < (2 * branchCount) / 3
-            ? 'secondary'
-            : 'tertiary',
+          i < branchCount / 3 ? 'primary' : i < (2 * branchCount) / 3 ? 'secondary' : 'tertiary',
         metrics: {
           width: 1 + Math.random() * 3,
           color: cluster.color,
@@ -118,20 +114,25 @@ export const generateSampleData = (): MyceliumData => {
   // Create some cross-cluster connections
   for (let i = 0; i < 10; i++) {
     const sourceClusterIndex = Math.floor(Math.random() * clusters.length);
-    let targetClusterIndex;
+    let targetClusterIndex = sourceClusterIndex;
     do {
       targetClusterIndex = Math.floor(Math.random() * clusters.length);
     } while (targetClusterIndex === sourceClusterIndex);
 
-    const sourceNodeIndex = Math.floor(
-      Math.random() * clusters[sourceClusterIndex]!.nodes.length
-    );
-    const targetNodeIndex = Math.floor(
-      Math.random() * clusters[targetClusterIndex]!.nodes.length
-    );
+    const sourceCluster = clusters[sourceClusterIndex];
+    const targetCluster = clusters[targetClusterIndex];
+    if (!sourceCluster || !targetCluster) {
+      continue;
+    }
 
-    const sourceId = clusters[sourceClusterIndex]!.nodes[sourceNodeIndex]!;
-    const targetId = clusters[targetClusterIndex]!.nodes[targetNodeIndex]!;
+    const sourceNodeIndex = Math.floor(Math.random() * sourceCluster.nodes.length);
+    const targetNodeIndex = Math.floor(Math.random() * targetCluster.nodes.length);
+
+    const sourceId = sourceCluster.nodes[sourceNodeIndex];
+    const targetId = targetCluster.nodes[targetNodeIndex];
+    if (!sourceId || !targetId) {
+      continue;
+    }
 
     branches.push({
       id: `cross-branch-${i}`,
@@ -162,9 +163,8 @@ export const generateSampleData = (): MyceliumData => {
     metadata: {
       timestamp: new Date(),
       totalStrength: nodes.reduce((sum, node) => sum + node.strength, 0),
-      dominantClusterId: clusters.sort(
-        (a, b) => b.metrics.influence - a.metrics.influence
-      )[0]!.id,
+      dominantClusterId:
+        clusters.sort((a, b) => b.metrics.influence - a.metrics.influence)[0]?.id ?? 'cluster-0',
       timeframe: {
         start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
         end: new Date(),
@@ -173,9 +173,7 @@ export const generateSampleData = (): MyceliumData => {
   };
 };
 
-export const NarrativeMyceliumVisualization: React.FC<
-  MyceliumVisualizationProps
-> = ({
+export const NarrativeMyceliumVisualization: React.FC<MyceliumVisualizationProps> = ({
   data,
   width = 800,
   height = 600,
@@ -189,8 +187,9 @@ export const NarrativeMyceliumVisualization: React.FC<
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedNode, setSelectedNode] = useState<MyceliumNode | null>(null);
-  const [selectedCluster, setSelectedCluster] =
-    useState<NarrativeCluster | null>(null);
+  void depth;
+  void perspective;
+  void colorScheme;
 
   useEffect(() => {
     if (!svgRef.current || !data) return undefined;
@@ -237,29 +236,24 @@ export const NarrativeMyceliumVisualization: React.FC<
     }));
 
     const links: SimulationLink[] = data.branches
-      .map((branch) => {
+      .flatMap((branch) => {
         const source = nodes.find((n) => n.id === branch.sourceId);
         const target = nodes.find((n) => n.id === branch.targetId);
 
         if (!source || !target) {
-          console.error(`Could not find nodes for branch: ${branch.id}`);
-          // Return a placeholder to avoid breaking the visualization
-          return {
-            source: nodes[0]!,
-            target: nodes[0]!,
+          console.warn(`Could not find nodes for branch: ${branch.id}`);
+          return [];
+        }
+
+        return [
+          {
+            source,
+            target,
             index: 0,
             metrics: branch.metrics,
             strength: branch.strength,
-          };
-        }
-
-        return {
-          source,
-          target,
-          index: 0,
-          metrics: branch.metrics,
-          strength: branch.strength,
-        };
+          },
+        ];
       })
       .filter((link) => link.source !== link.target);
 
@@ -273,7 +267,7 @@ export const NarrativeMyceliumVisualization: React.FC<
         d3
           .forceLink<SimulationNode, SimulationLink>(links)
           .id((d) => d.id)
-          .distance(70)
+          .distance(70),
       )
       .alphaTarget(0);
 
@@ -287,7 +281,7 @@ export const NarrativeMyceliumVisualization: React.FC<
       .attr('stroke', (d) => d.metrics?.color || '#999')
       .attr('stroke-width', (d) => d.metrics?.width || 1)
       .attr('opacity', (d) => d.strength || 0.5)
-      .on('mouseover', function (event, d: SimulationLink) {
+      .on('mouseover', function (_event, d: SimulationLink) {
         // Highlight the link
         d3.select(this)
           .attr('stroke-width', String((d.metrics?.width || 1) * 2))
@@ -383,7 +377,7 @@ export const NarrativeMyceliumVisualization: React.FC<
           .attr('fill', '#000')
           .text(`To: ${targetNode.content.substring(0, 15)}...`);
       })
-      .on('mouseout', function (event, d: SimulationLink) {
+      .on('mouseout', function (_event, d: SimulationLink) {
         // Restore original link style
         d3.select(this)
           .attr('stroke-width', String(d.metrics?.width || 1))
@@ -405,7 +399,7 @@ export const NarrativeMyceliumVisualization: React.FC<
           .drag<SVGGElement, SimulationNode>()
           .on('start', dragstarted)
           .on('drag', dragged)
-          .on('end', dragended)
+          .on('end', dragended),
       );
 
     // Add circles to nodes
@@ -414,7 +408,7 @@ export const NarrativeMyceliumVisualization: React.FC<
       .attr('r', (d) => 5 + d.strength * 15)
       .attr('fill', (d) => d.metrics.color)
       .attr('opacity', (d) => 0.7 + d.strength * 0.3)
-      .attr('stroke', (d) => d3.color(d.metrics.color)!.darker().toString())
+      .attr('stroke', (d) => d3.color(d.metrics.color)?.darker().toString() ?? d.metrics.color)
       .attr('stroke-width', 1);
 
     // Add labels if enabled
@@ -452,11 +446,8 @@ export const NarrativeMyceliumVisualization: React.FC<
 
     // Add hover effects
     node
-      .on('mouseover', function (event, d: SimulationNode) {
-        d3.select(this)
-          .select('circle')
-          .attr('stroke-width', 2)
-          .attr('stroke', '#fff');
+      .on('mouseover', function (_event, d: SimulationNode) {
+        d3.select(this).select('circle').attr('stroke-width', 2).attr('stroke', '#fff');
 
         // Show tooltip with text outline
         const tooltip = svg
@@ -469,7 +460,7 @@ export const NarrativeMyceliumVisualization: React.FC<
           .append('rect')
           .attr('x', -5)
           .attr('y', -15)
-          .attr('width', function () {
+          .attr('width', () => {
             const textLength = d.content.substring(0, 30).length * 7;
             return Math.max(textLength, 100);
           })
@@ -490,9 +481,7 @@ export const NarrativeMyceliumVisualization: React.FC<
           .attr('stroke-width', 4)
           .attr('stroke-linejoin', 'round')
           .attr('paint-order', 'stroke')
-          .text(
-            d.content.substring(0, 30) + (d.content.length > 30 ? '...' : '')
-          );
+          .text(d.content.substring(0, 30) + (d.content.length > 30 ? '...' : ''));
 
         // Add the main text on top
         tooltip
@@ -500,22 +489,22 @@ export const NarrativeMyceliumVisualization: React.FC<
           .attr('font-size', '12px')
           .attr('dy', 0)
           .attr('fill', '#000')
-          .text(
-            d.content.substring(0, 30) + (d.content.length > 30 ? '...' : '')
-          );
+          .text(d.content.substring(0, 30) + (d.content.length > 30 ? '...' : ''));
       })
       .on('mouseout', function () {
         const circleElement = d3.select(this).select('circle');
         const parentData = d3.select(this).datum() as SimulationNode;
 
         circleElement.attr('stroke-width', 1).attr('stroke', () => {
-          return d3.color(parentData.metrics.color)!.darker().toString();
+          return (
+            d3.color(parentData.metrics.color)?.darker().toString() ?? parentData.metrics.color
+          );
         });
 
         // Remove tooltip
         svg.selectAll('.tooltip').remove();
       })
-      .on('click', function (event, d: SimulationNode) {
+      .on('click', (_event, d: SimulationNode) => {
         setSelectedNode(d);
         if (onNodeClick) onNodeClick(d);
       });
@@ -532,12 +521,10 @@ export const NarrativeMyceliumVisualization: React.FC<
     });
 
     // Connect links to the simulation
-    simulation
-      .force<d3.ForceLink<SimulationNode, SimulationLink>>('link')!
-      .links(links);
+    simulation.force<d3.ForceLink<SimulationNode, SimulationLink>>('link')?.links(links);
 
     // Add cluster labels
-    const clusterLabels = svg
+    svg
       .append('g')
       .selectAll('.cluster-label')
       .data(data.clusters)
@@ -545,19 +532,16 @@ export const NarrativeMyceliumVisualization: React.FC<
       .append('text')
       .attr('class', 'cluster-label')
       .attr('x', 20)
-      .attr('y', (d, i) => 30 + i * 20)
+      .attr('y', (_d, i) => 30 + i * 20)
       .attr('font-size', '14px')
       .attr('fill', (d) => d.color)
       .text((d) => d.name)
-      .on('click', function (event, d) {
-        setSelectedCluster(d);
+      .on('click', (_event, d) => {
         if (onClusterClick) onClusterClick(d);
       });
 
     // Add legend
-    const legend = svg
-      .append('g')
-      .attr('transform', `translate(${width - 150}, 20)`);
+    const legend = svg.append('g').attr('transform', `translate(${width - 150}, 20)`);
 
     legend
       .append('text')
@@ -574,41 +558,37 @@ export const NarrativeMyceliumVisualization: React.FC<
     ];
 
     nodeTypes.forEach((type, i) => {
-      const g = legend
-        .append('g')
-        .attr('transform', `translate(0, ${20 + i * 20})`);
+      const g = legend.append('g').attr('transform', `translate(0, ${20 + i * 20})`);
 
       g.append('circle')
         .attr('r', 5)
-        .attr(
-          'fill',
-          type.type === 'root'
-            ? '#333'
-            : type.type === 'branch'
-            ? '#666'
-            : '#999'
-        );
+        .attr('fill', type.type === 'root' ? '#333' : type.type === 'branch' ? '#666' : '#999');
 
-      g.append('text')
-        .attr('x', 15)
-        .attr('y', 5)
-        .attr('font-size', '12px')
-        .text(type.label);
+      g.append('text').attr('x', 15).attr('y', 5).attr('font-size', '12px').text(type.label);
     });
 
     // Drag functions
-    function dragstarted(event: d3.D3DragEvent<SVGGElement, SimulationNode, SimulationNode>, d: SimulationNode) {
+    function dragstarted(
+      event: d3.D3DragEvent<SVGGElement, SimulationNode, SimulationNode>,
+      d: SimulationNode,
+    ) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
       d.fx = d.x;
       d.fy = d.y;
     }
 
-    function dragged(event: d3.D3DragEvent<SVGGElement, SimulationNode, SimulationNode>, d: SimulationNode) {
+    function dragged(
+      event: d3.D3DragEvent<SVGGElement, SimulationNode, SimulationNode>,
+      d: SimulationNode,
+    ) {
       d.fx = event.x;
       d.fy = event.y;
     }
 
-    function dragended(event: d3.D3DragEvent<SVGGElement, SimulationNode, SimulationNode>, d: SimulationNode) {
+    function dragended(
+      event: d3.D3DragEvent<SVGGElement, SimulationNode, SimulationNode>,
+      d: SimulationNode,
+    ) {
       if (!event.active) simulation.alphaTarget(0);
       d.fx = null;
       d.fy = null;
@@ -635,17 +615,7 @@ export const NarrativeMyceliumVisualization: React.FC<
     return () => {
       simulation.stop();
     };
-  }, [
-    data,
-    width,
-    height,
-    depth,
-    showLabels,
-    animate,
-    perspective,
-    onNodeClick,
-    onClusterClick,
-  ]);
+  }, [data, width, height, showLabels, animate, onNodeClick, onClusterClick]);
 
   return (
     <div className="narrative-mycelium-container">

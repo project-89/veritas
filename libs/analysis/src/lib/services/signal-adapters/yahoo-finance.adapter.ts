@@ -1,8 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type { ExternalSignal, SignalAdapter } from './signal-adapter.interface';
 
-const USER_AGENT =
-  'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
+const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
 
 /** Human-readable names for tracked symbols. */
 const SYMBOL_NAMES: Record<string, string> = {

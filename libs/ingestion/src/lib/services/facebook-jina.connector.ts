@@ -1,16 +1,11 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
-import { DataConnector } from '../interfaces/data-connector.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
+import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { JinaReaderService } from './utils/jina-reader.service';
 
 interface SearchOptions {
@@ -31,9 +26,7 @@ interface SearchOptions {
  * Configure monitored pages via FACEBOOK_PAGE_URLS env var (JSON array of URLs).
  */
 @Injectable()
-export class FacebookJinaConnector
-  implements DataConnector, OnModuleInit, OnModuleDestroy
-{
+export class FacebookJinaConnector implements DataConnector, OnModuleInit, OnModuleDestroy {
   platform = 'facebook' as const;
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 300000; // 5 minutes
@@ -43,7 +36,7 @@ export class FacebookJinaConnector
   constructor(
     private configService: ConfigService,
     private transformService: TransformOnIngestService,
-    private jinaReader: JinaReaderService
+    private jinaReader: JinaReaderService,
   ) {}
 
   async onModuleInit() {
@@ -55,30 +48,24 @@ export class FacebookJinaConnector
   }
 
   async connect(): Promise<void> {
-    const pageUrlsConfig = this.configService.get<string>(
-      'FACEBOOK_PAGE_URLS'
-    );
+    const pageUrlsConfig = this.configService.get<string>('FACEBOOK_PAGE_URLS');
 
     if (pageUrlsConfig) {
       try {
         this.pageUrls = JSON.parse(pageUrlsConfig);
       } catch {
-        this.logger.warn(
-          'Failed to parse FACEBOOK_PAGE_URLS config. Expected JSON array of URLs.'
-        );
+        this.logger.warn('Failed to parse FACEBOOK_PAGE_URLS config. Expected JSON array of URLs.');
         this.pageUrls = [];
       }
     }
 
     if (this.pageUrls.length === 0) {
       this.logger.warn(
-        'No Facebook page URLs configured. Set FACEBOOK_PAGE_URLS env var with a JSON array of URLs to monitor.'
+        'No Facebook page URLs configured. Set FACEBOOK_PAGE_URLS env var with a JSON array of URLs to monitor.',
       );
     }
 
-    this.logger.log(
-      `Facebook Jina connector initialized with ${this.pageUrls.length} page URLs`
-    );
+    this.logger.log(`Facebook Jina connector initialized with ${this.pageUrls.length} page URLs`);
   }
 
   async disconnect(): Promise<void> {
@@ -88,26 +75,18 @@ export class FacebookJinaConnector
     this.streamConnections.clear();
   }
 
-  async searchAndTransform(
-    query: string,
-    options?: SearchOptions
-  ): Promise<NarrativeInsight[]> {
+  async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     try {
       this.logger.log(`Reading Facebook pages (API-free) for: ${query}`);
 
       const posts = await this.searchContent(query, options);
       const insights = await this.transformService.transformBatch(posts);
 
-      this.logger.log(
-        `Transformed ${insights.length} Facebook results into anonymized insights`
-      );
+      this.logger.log(`Transformed ${insights.length} Facebook results into anonymized insights`);
 
       return insights;
     } catch (error) {
-      this.logger.error(
-        'Error searching and transforming Facebook content:',
-        error
-      );
+      this.logger.error('Error searching and transforming Facebook content:', error);
       throw error;
     }
   }
@@ -129,9 +108,7 @@ export class FacebookJinaConnector
             emitter.emit('data', insight);
           }
 
-          this.logger.debug(
-            `Emitted ${insights.length} anonymized insights from Facebook stream`
-          );
+          this.logger.debug(`Emitted ${insights.length} anonymized insights from Facebook stream`);
         }
       } catch (error) {
         emitter.emit('error', error);
@@ -183,14 +160,12 @@ export class FacebookJinaConnector
       const jinaAvailable = await this.jinaReader.isAvailable();
       if (!jinaAvailable) {
         this.logger.warn(
-          'Jina Reader service is not accessible. Facebook Jina connector may not work.'
+          'Jina Reader service is not accessible. Facebook Jina connector may not work.',
         );
         return false;
       }
 
-      this.logger.log(
-        'Facebook Jina connector validated (no API credentials needed)'
-      );
+      this.logger.log('Facebook Jina connector validated (no API credentials needed)');
       return true;
     } catch (error) {
       this.logger.error('Facebook Jina connector validation failed:', error);
@@ -200,28 +175,19 @@ export class FacebookJinaConnector
 
   // --- Private helpers ---
 
-  async searchContent(
-    query: string,
-    options?: SearchOptions
-  ): Promise<SocialMediaPost[]> {
+  async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
     const allPosts: SocialMediaPost[] = [];
     const limit = options?.limit || 50;
 
     for (const pageUrl of this.pageUrls) {
       try {
         const result = await this.jinaReader.readUrl(pageUrl);
-        const posts = this.extractPostsFromContent(
-          result.content,
-          pageUrl,
-          query
-        );
+        const posts = this.extractPostsFromContent(result.content, pageUrl, query);
         allPosts.push(...posts);
 
         if (allPosts.length >= limit) break;
       } catch (error) {
-        this.logger.warn(
-          `Failed to read Facebook page ${pageUrl}: ${(error as Error).message}`
-        );
+        this.logger.warn(`Failed to read Facebook page ${pageUrl}: ${(error as Error).message}`);
       }
     }
 
@@ -231,7 +197,7 @@ export class FacebookJinaConnector
   private extractPostsFromContent(
     content: string,
     sourceUrl: string,
-    query: string
+    query: string,
   ): SocialMediaPost[] {
     const posts: SocialMediaPost[] = [];
     const queryLower = query.toLowerCase();

@@ -1,14 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { EmbeddingsService } from '../../src/lib/services/embeddings.service';
+import { Test, TestingModule } from '@nestjs/testing';
 import { DATABASE_PROVIDER_TOKEN } from '../../src/lib/constants';
+import { EmbeddingsService } from '../../src/lib/services/embeddings.service';
 
 // We'll use global fetch instead of axios
 global.fetch = jest.fn();
 
 describe('EmbeddingsService', () => {
   let service: EmbeddingsService;
-  let configService: ConfigService;
 
   // Mock repository with vectorSearch method
   const mockRepository = {
@@ -51,7 +50,6 @@ describe('EmbeddingsService', () => {
     }).compile();
 
     service = module.get<EmbeddingsService>(EmbeddingsService);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   it('should be defined', () => {
@@ -125,11 +123,7 @@ describe('EmbeddingsService', () => {
       const texts = ['text 1', 'text 2', 'text 3'];
 
       // Mock the batchGenerateWithExternalService method
-      const mockEmbeddings = [
-        Array(384).fill(0.1),
-        Array(384).fill(0.2),
-        Array(384).fill(0.3),
-      ];
+      const mockEmbeddings = [Array(384).fill(0.1), Array(384).fill(0.2), Array(384).fill(0.3)];
 
       // We need to mock the implementation of batchGenerateEmbeddings
       // instead of trying to mock generateEmbedding
@@ -141,9 +135,7 @@ describe('EmbeddingsService', () => {
 
       expect(results.length).toBe(3);
       expect(results).toEqual(mockEmbeddings);
-      expect(
-        (service as any).batchGenerateWithExternalService
-      ).toHaveBeenCalledWith(texts);
+      expect((service as any).batchGenerateWithExternalService).toHaveBeenCalledWith(texts);
     });
 
     it('should return an empty array for empty input', async () => {
@@ -197,11 +189,10 @@ describe('EmbeddingsService', () => {
       expect(results).toHaveLength(1);
       expect(results[0]!.score).toBe(0.95);
       expect(mockDatabaseService.getRepository).toHaveBeenCalledWith('Content');
-      expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
-        'embedding',
-        embedding,
-        { limit: 5, minScore: 0.8 }
-      );
+      expect(mockRepository.vectorSearch).toHaveBeenCalledWith('embedding', embedding, {
+        limit: 5,
+        minScore: 0.8,
+      });
     });
   });
 });

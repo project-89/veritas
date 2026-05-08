@@ -1,32 +1,5 @@
 import { EventEmitter } from 'events';
 
-// Mock interfaces
-interface MockSourceNode {
-  id: string;
-  name: string;
-  platform: string;
-  verificationStatus?: string;
-  [key: string]: any;
-}
-
-interface SocialMediaPost {
-  id: string;
-  text: string;
-  timestamp: Date;
-  platform: string;
-  authorId: string;
-  authorName?: string;
-  authorHandle?: string;
-  url?: string;
-  engagementMetrics: {
-    likes: number;
-    shares: number;
-    comments: number;
-    reach: number;
-    viralityScore: number;
-  };
-}
-
 interface NarrativeInsight {
   id: string;
   contentHash: string;
@@ -110,7 +83,7 @@ class TransformOnIngestService {
   constructor(
     private readonly twitterConnector: ModernPlatformConnector,
     private readonly facebookConnector: ModernPlatformConnector,
-    private readonly redditConnector: ModernPlatformConnector
+    private readonly redditConnector: ModernPlatformConnector,
   ) {
     this.connectors = [twitterConnector, facebookConnector, redditConnector];
   }
@@ -121,12 +94,9 @@ class TransformOnIngestService {
         try {
           await connector.validateCredentials();
         } catch (error: unknown) {
-          console.error(
-            `Failed to validate credentials for ${connector.platform}:`,
-            error
-          );
+          console.error(`Failed to validate credentials for ${connector.platform}:`, error);
         }
-      })
+      }),
     );
   }
 
@@ -136,12 +106,9 @@ class TransformOnIngestService {
         try {
           await connector.disconnect();
         } catch (error: unknown) {
-          console.error(
-            `Failed to disconnect from ${connector.platform}:`,
-            error
-          );
+          console.error(`Failed to disconnect from ${connector.platform}:`, error);
         }
-      })
+      }),
     );
   }
 
@@ -156,12 +123,10 @@ class TransformOnIngestService {
       endDate?: Date;
       limit?: number;
       platforms?: string[];
-    }
+    },
   ): Promise<NarrativeInsight[]> {
     const targetConnectors = options?.platforms
-      ? this.connectors.filter((connector) =>
-          options.platforms!.includes(connector.platform)
-        )
+      ? this.connectors.filter((connector) => options.platforms!.includes(connector.platform))
       : this.connectors;
 
     const searchPromises = targetConnectors.map((connector) =>
@@ -172,12 +137,9 @@ class TransformOnIngestService {
           limit: options?.limit,
         })
         .catch((error: unknown) => {
-          console.error(
-            `Error searching content on ${connector.platform}:`,
-            error
-          );
+          console.error(`Error searching content on ${connector.platform}:`, error);
           return [];
-        })
+        }),
     );
 
     const results = await Promise.all(searchPromises);
@@ -192,14 +154,12 @@ class TransformOnIngestService {
     keywords: string[],
     options?: {
       platforms?: string[];
-    }
+    },
   ): EventEmitter {
     const outputEmitter = new EventEmitter();
 
     const targetConnectors = options?.platforms
-      ? this.connectors.filter((connector) =>
-          options.platforms!.includes(connector.platform)
-        )
+      ? this.connectors.filter((connector) => options.platforms!.includes(connector.platform))
       : this.connectors;
 
     for (const connector of targetConnectors) {
@@ -232,16 +192,12 @@ describe('TransformOnIngestService', () => {
   let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     twitterConnector = new ModernPlatformConnector('twitter');
     facebookConnector = new ModernPlatformConnector('facebook');
     redditConnector = new ModernPlatformConnector('reddit');
 
-    service = new TransformOnIngestService(
-      twitterConnector,
-      facebookConnector,
-      redditConnector
-    );
+    service = new TransformOnIngestService(twitterConnector, facebookConnector, redditConnector);
   });
 
   afterEach(() => {
@@ -260,9 +216,7 @@ describe('TransformOnIngestService', () => {
 
       it('should handle validation failures gracefully', async () => {
         const validationError = new Error('Invalid credentials');
-        jest
-          .spyOn(twitterConnector, 'validateCredentials')
-          .mockRejectedValueOnce(validationError);
+        jest.spyOn(twitterConnector, 'validateCredentials').mockRejectedValueOnce(validationError);
 
         // Should not throw
         await service.onModuleInit();
@@ -280,9 +234,7 @@ describe('TransformOnIngestService', () => {
 
       it('should handle disconnection errors gracefully', async () => {
         const disconnectError = new Error('Disconnect failed');
-        jest
-          .spyOn(twitterConnector, 'disconnect')
-          .mockRejectedValueOnce(disconnectError);
+        jest.spyOn(twitterConnector, 'disconnect').mockRejectedValueOnce(disconnectError);
 
         // Should not throw
         await service.onModuleDestroy();
@@ -302,7 +254,7 @@ describe('TransformOnIngestService', () => {
         expect.objectContaining({
           startDate,
           endDate,
-        })
+        }),
       );
     });
 
@@ -313,7 +265,7 @@ describe('TransformOnIngestService', () => {
 
       expect(twitterConnector.searchAndTransform).toHaveBeenCalledWith(
         'test',
-        expect.objectContaining({ limit })
+        expect.objectContaining({ limit }),
       );
     });
 
@@ -349,12 +301,8 @@ describe('TransformOnIngestService', () => {
       jest.spyOn(redditConnector, 'searchAndTransform').mockReset();
 
       // Now set specific behaviors
-      jest
-        .spyOn(twitterConnector, 'searchAndTransform')
-        .mockRejectedValue(new Error('API Error'));
-      jest
-        .spyOn(facebookConnector, 'searchAndTransform')
-        .mockResolvedValue([mockInsight]);
+      jest.spyOn(twitterConnector, 'searchAndTransform').mockRejectedValue(new Error('API Error'));
+      jest.spyOn(facebookConnector, 'searchAndTransform').mockResolvedValue([mockInsight]);
       jest.spyOn(redditConnector, 'searchAndTransform').mockResolvedValue([]);
 
       const results = await service.searchAllAndTransform('test');
@@ -375,18 +323,9 @@ describe('TransformOnIngestService', () => {
 
       const results = await service.searchAllAndTransform(query, options);
 
-      expect(twitterConnector.searchAndTransform).toHaveBeenCalledWith(
-        query,
-        options
-      );
-      expect(facebookConnector.searchAndTransform).toHaveBeenCalledWith(
-        query,
-        options
-      );
-      expect(redditConnector.searchAndTransform).toHaveBeenCalledWith(
-        query,
-        options
-      );
+      expect(twitterConnector.searchAndTransform).toHaveBeenCalledWith(query, options);
+      expect(facebookConnector.searchAndTransform).toHaveBeenCalledWith(query, options);
+      expect(redditConnector.searchAndTransform).toHaveBeenCalledWith(query, options);
       expect(results.length).toBeGreaterThan(0);
     });
 
@@ -418,12 +357,8 @@ describe('TransformOnIngestService', () => {
     it('should set up streams for all platforms', () => {
       service.streamAllAndTransform(['test']);
 
-      expect(twitterConnector.streamAndTransform).toHaveBeenCalledWith([
-        'test',
-      ]);
-      expect(facebookConnector.streamAndTransform).toHaveBeenCalledWith([
-        'test',
-      ]);
+      expect(twitterConnector.streamAndTransform).toHaveBeenCalledWith(['test']);
+      expect(facebookConnector.streamAndTransform).toHaveBeenCalledWith(['test']);
       expect(redditConnector.streamAndTransform).toHaveBeenCalledWith(['test']);
     });
 
@@ -458,9 +393,7 @@ describe('TransformOnIngestService', () => {
       };
 
       // Mock the Twitter connector to use our mock emitter
-      jest
-        .spyOn(facebookConnector, 'streamAndTransform')
-        .mockReturnValue(mockEmitter);
+      jest.spyOn(facebookConnector, 'streamAndTransform').mockReturnValue(mockEmitter);
 
       // Set up the stream with just the 'facebook' platform to avoid cross-platform issues
       const stream = service.streamAllAndTransform(['test'], {
@@ -484,9 +417,7 @@ describe('TransformOnIngestService', () => {
 
       // Create a mock emitter that will emit our test error
       const mockEmitter = new EventEmitter();
-      jest
-        .spyOn(twitterConnector, 'streamAndTransform')
-        .mockReturnValue(mockEmitter);
+      jest.spyOn(twitterConnector, 'streamAndTransform').mockReturnValue(mockEmitter);
 
       // Set up the stream
       const stream = service.streamAllAndTransform(['test']);

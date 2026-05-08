@@ -1,9 +1,9 @@
 import {
   DeviationMetrics,
+  ExtendedContentNode,
   Pattern,
   TimeFrame,
   TimeFrameInput,
-  ExtendedContentNode,
 } from '../analysis.types';
 
 export const ANALYSIS_SERVICE = Symbol('ANALYSIS_SERVICE');

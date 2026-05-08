@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import neo4j, { Driver, Session } from 'neo4j-driver';
 
 /**
@@ -22,17 +22,13 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     const host = process.env['MEMGRAPH_HOST'] || 'localhost';
     const port = process.env['MEMGRAPH_PORT'] || '7687';
-    const uri =
-      process.env['MEMGRAPH_URI'] || `bolt://${host}:${port}`;
+    const uri = process.env['MEMGRAPH_URI'] || `bolt://${host}:${port}`;
 
     const username = process.env['MEMGRAPH_USERNAME'];
     const password = process.env['MEMGRAPH_PASSWORD'];
 
     try {
-      const auth =
-        username && password
-          ? neo4j.auth.basic(username, password)
-          : undefined;
+      const auth = username && password ? neo4j.auth.basic(username, password) : undefined;
 
       this.driver = neo4j.driver(uri, auth, {
         maxConnectionLifetime: 60 * 1000,
@@ -107,7 +103,7 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
           this.mageWarningLogged = true;
           this.logger.log(
             'Memgraph MAGE not installed — graph algorithms (pagerank, betweenness, community detection) unavailable. ' +
-            'Use memgraph/memgraph-mage Docker image to enable. System continues with heuristic scoring.',
+              'Use memgraph/memgraph-mage Docker image to enable. System continues with heuristic scoring.',
           );
         }
       } else {
@@ -203,9 +199,7 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
    * Get PageRank scores for all users connected to a narrative.
    * Memgraph has built-in MAGE PageRank.
    */
-  async getPageRankForNarrative(
-    narrativeId: string,
-  ): Promise<Map<string, number>> {
+  async getPageRankForNarrative(narrativeId: string): Promise<Map<string, number>> {
     const records = await this.runQuery(
       `MATCH (u:User)-[:AMPLIFIED]->(n:Narrative {narrativeId: $narrativeId})
        WITH COLLECT(u) AS users
@@ -226,9 +220,7 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
   /**
    * Get betweenness centrality for users in the narrative subgraph.
    */
-  async getBetweennessForNarrative(
-    narrativeId: string,
-  ): Promise<Map<string, number>> {
+  async getBetweennessForNarrative(narrativeId: string): Promise<Map<string, number>> {
     const records = await this.runQuery(
       `MATCH (u:User)-[:AMPLIFIED]->(n:Narrative {narrativeId: $narrativeId})
        WITH COLLECT(u) AS users
@@ -250,9 +242,7 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
    * Detect communities using Memgraph's built-in community detection.
    * Returns a map of handle -> communityId.
    */
-  async detectCommunities(
-    narrativeId: string,
-  ): Promise<Map<string, number>> {
+  async detectCommunities(narrativeId: string): Promise<Map<string, number>> {
     const records = await this.runQuery(
       `MATCH (u:User)-[:AMPLIFIED]->(n:Narrative {narrativeId: $narrativeId})
        WITH COLLECT(u) AS users
@@ -273,7 +263,7 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
   /**
    * Find structural patterns: stars, chains, cliques.
    */
-  async detectStarPatterns(minSpokes: number = 5): Promise<Array<{ center: string; spokeCount: number }>> {
+  async detectStarPatterns(minSpokes = 5): Promise<Array<{ center: string; spokeCount: number }>> {
     const records = await this.runQuery(
       `MATCH (center:User)<-[r]-(spoke:User)
        WITH center, COUNT(DISTINCT spoke) AS spokeCount
@@ -292,7 +282,7 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
   /**
    * Detect chain patterns: linear amplification paths.
    */
-  async detectChainPatterns(minLength: number = 3): Promise<Array<{ chain: string[]; length: number }>> {
+  async detectChainPatterns(minLength = 3): Promise<Array<{ chain: string[]; length: number }>> {
     const records = await this.runQuery(
       `MATCH path = (start:User)-[:REPOSTED|CO_TIMED*${minLength}..6]->(end:User)
        WHERE start <> end
@@ -312,7 +302,7 @@ export class GraphDatabaseService implements OnModuleInit, OnModuleDestroy {
   /**
    * Detect clique patterns: fully-connected subgraphs.
    */
-  async detectCliquePatterns(minSize: number = 3): Promise<Array<{ members: string[] }>> {
+  async detectCliquePatterns(minSize = 3): Promise<Array<{ members: string[] }>> {
     // Find triangles as a proxy for cliques (exact clique finding is expensive)
     const records = await this.runQuery(
       `MATCH (a:User)-[r1]->(b:User)-[r2]->(c:User)-[r3]->(a)

@@ -82,15 +82,11 @@ export class UsgsAdapter implements SignalAdapter {
         description: [
           props.type ?? 'earthquake',
           tsunami ? 'Tsunami warning' : null,
-          coords.length >= 2
-            ? `[${coords[1]?.toFixed(2)}, ${coords[0]?.toFixed(2)}]`
-            : null,
+          coords.length >= 2 ? `[${coords[1]?.toFixed(2)}, ${coords[0]?.toFixed(2)}]` : null,
         ]
           .filter(Boolean)
           .join(' | '),
-        timestamp: props.time
-          ? new Date(props.time).toISOString()
-          : new Date().toISOString(),
+        timestamp: props.time ? new Date(props.time).toISOString() : new Date().toISOString(),
         magnitude: this.quakeMagnitude(mag),
         metadata: {
           mag,

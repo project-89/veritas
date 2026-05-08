@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NervBadge, NervPanel } from '../../components/nerv';
 import type { Investigation } from '../../lib/api';
-import { fetchInvestigations, createOrGetInvestigation } from '../../lib/api';
+import { createOrGetInvestigation, fetchInvestigations } from '../../lib/api';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -43,7 +43,12 @@ const DEPTH_PRESETS = [
   { id: 'quick', label: 'Quick', limit: 25, description: 'Fast overview (~100 posts)' },
   { id: 'standard', label: 'Standard', limit: 100, description: 'Good coverage (~400 posts)' },
   { id: 'deep', label: 'Deep', limit: 250, description: 'Comprehensive (~1000 posts)' },
-  { id: 'exhaustive', label: 'Exhaustive', limit: 500, description: 'Maximum coverage (~2000+ posts)' },
+  {
+    id: 'exhaustive',
+    label: 'Exhaustive',
+    limit: 500,
+    description: 'Maximum coverage (~2000+ posts)',
+  },
 ] as const;
 
 const TIPS = [
@@ -75,7 +80,13 @@ export default function SearchPage() {
   const [searchMode, setSearchMode] = useState<'topic' | 'claim'>('topic');
   const [caseTitle, setCaseTitle] = useState('');
   const [query, setQuery] = useState('');
-  const [platforms, setPlatforms] = useState<string[]>(['twitter', 'reddit', 'youtube', 'rss', 'farcaster']);
+  const [platforms, setPlatforms] = useState<string[]>([
+    'twitter',
+    'reddit',
+    'youtube',
+    'rss',
+    'farcaster',
+  ]);
   const [timeRange, setTimeRange] = useState('7d');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -99,16 +110,22 @@ export default function SearchPage() {
   useEffect(() => {
     let cancelled = false;
     fetchInvestigations()
-      .then((data) => { if (!cancelled) setInvestigations(data.slice(0, 8)); })
-      .catch(() => { if (!cancelled) setInvestigations([]); })
-      .finally(() => { if (!cancelled) setLoadingInv(false); });
-    return () => { cancelled = true; };
+      .then((data) => {
+        if (!cancelled) setInvestigations(data.slice(0, 8));
+      })
+      .catch(() => {
+        if (!cancelled) setInvestigations([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingInv(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const togglePlatform = useCallback((id: string) => {
-    setPlatforms((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
-    );
+    setPlatforms((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
   }, []);
 
   const handleScan = useCallback(async () => {
@@ -160,7 +177,23 @@ export default function SearchPage() {
       // Fallback to results page if investigation creation fails
       router.push(`/results?${params.toString()}`);
     }
-  }, [query, caseTitle, caseMode, selectedInvestigationId, platforms, limit, timeRange, customStart, customEnd, usernames, hashtags, wallets, subreddits, router, searchMode]);
+  }, [
+    query,
+    caseTitle,
+    caseMode,
+    selectedInvestigationId,
+    platforms,
+    limit,
+    timeRange,
+    customStart,
+    customEnd,
+    usernames,
+    hashtags,
+    wallets,
+    subreddits,
+    router,
+    searchMode,
+  ]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleScan();
@@ -182,6 +215,7 @@ export default function SearchPage() {
                   return (
                     <button
                       key={mode.id}
+                      type="button"
                       onClick={() => setCaseMode(mode.id as 'new' | 'existing')}
                       className={[
                         'px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest border rounded-sm transition-all',
@@ -198,10 +232,14 @@ export default function SearchPage() {
 
               {caseMode === 'new' ? (
                 <div>
-                  <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5">
+                  <label
+                    htmlFor="case-title"
+                    className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5"
+                  >
                     Case Title
                   </label>
                   <input
+                    id="case-title"
                     type="text"
                     value={caseTitle}
                     onChange={(e) => setCaseTitle(e.target.value)}
@@ -209,16 +247,21 @@ export default function SearchPage() {
                     className="w-full px-3 py-2.5 font-mono text-sm bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-orange/50 transition-all"
                   />
                   <span className="block mt-1 text-[8px] font-mono text-nerv-text-muted">
-                    Case title for the investigation container. The query below is just the first scan inside that case.
+                    Case title for the investigation container. The query below is just the first
+                    scan inside that case.
                   </span>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <div>
-                    <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5">
+                    <label
+                      htmlFor="target-case"
+                      className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5"
+                    >
                       Target Case
                     </label>
                     <select
+                      id="target-case"
                       value={selectedInvestigationId}
                       onChange={(e) => setSelectedInvestigationId(e.target.value)}
                       className="w-full px-3 py-2.5 font-mono text-sm bg-nerv-bg border border-nerv-border text-nerv-text focus:outline-none focus:border-nerv-blue/50 transition-all"
@@ -258,12 +301,17 @@ export default function SearchPage() {
               <div className="flex items-center gap-2 mb-2">
                 {[
                   { id: 'topic', label: 'Topic Search', hint: 'Campaign or entity discovery' },
-                  { id: 'claim', label: 'Claim Search', hint: 'Anchored allegation or factual claim' },
+                  {
+                    id: 'claim',
+                    label: 'Claim Search',
+                    hint: 'Anchored allegation or factual claim',
+                  },
                 ].map((mode) => {
                   const selected = searchMode === mode.id;
                   return (
                     <button
                       key={mode.id}
+                      type="button"
                       onClick={() => setSearchMode(mode.id as 'topic' | 'claim')}
                       className={[
                         'px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest border rounded-sm transition-all',
@@ -278,11 +326,15 @@ export default function SearchPage() {
                   );
                 })}
               </div>
-              <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5">
+              <label
+                htmlFor="scan-query"
+                className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5"
+              >
                 {searchMode === 'claim' ? 'Claim Query' : 'Scan Query'}
               </label>
               <div className="flex gap-2">
                 <input
+                  id="scan-query"
                   ref={inputRef}
                   type="text"
                   value={query}
@@ -296,6 +348,7 @@ export default function SearchPage() {
                   className="flex-1 px-3 py-2.5 font-mono text-sm bg-nerv-bg border border-nerv-border text-nerv-green placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-green/50 focus:shadow-[0_0_8px_rgba(0,255,65,0.15)] transition-all"
                 />
                 <button
+                  type="button"
                   onClick={handleScan}
                   disabled={!query.trim() || (caseMode === 'existing' && !selectedInvestigationId)}
                   className="px-6 py-2.5 bg-nerv-orange/20 border border-nerv-orange/50 text-nerv-orange text-[11px] font-mono uppercase tracking-widest hover:bg-nerv-orange/30 hover:border-nerv-orange disabled:opacity-30 disabled:cursor-not-allowed transition-all"
@@ -312,6 +365,7 @@ export default function SearchPage() {
 
             {/* Advanced toggle */}
             <button
+              type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
               className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted hover:text-nerv-text-secondary transition-colors"
             >
@@ -322,56 +376,80 @@ export default function SearchPage() {
             {showAdvanced && (
               <div className="grid grid-cols-2 gap-3 p-3 border border-nerv-border/50 rounded-sm bg-nerv-bg-panel/30">
                 <div>
-                  <label className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1">
+                  <label
+                    htmlFor="advanced-usernames"
+                    className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1"
+                  >
                     Usernames
                   </label>
                   <input
+                    id="advanced-usernames"
                     type="text"
                     value={usernames}
                     onChange={(e) => setUsernames(e.target.value)}
                     placeholder="@handle1, @handle2"
                     className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
                   />
-                  <span className="text-[7px] font-mono text-nerv-text-muted">Fetch timelines for these users</span>
+                  <span className="text-[7px] font-mono text-nerv-text-muted">
+                    Fetch timelines for these users
+                  </span>
                 </div>
                 <div>
-                  <label className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1">
+                  <label
+                    htmlFor="advanced-hashtags"
+                    className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1"
+                  >
                     Hashtags
                   </label>
                   <input
+                    id="advanced-hashtags"
                     type="text"
                     value={hashtags}
                     onChange={(e) => setHashtags(e.target.value)}
                     placeholder="#tag1, #tag2"
                     className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
                   />
-                  <span className="text-[7px] font-mono text-nerv-text-muted">Add to search terms</span>
+                  <span className="text-[7px] font-mono text-nerv-text-muted">
+                    Add to search terms
+                  </span>
                 </div>
                 <div>
-                  <label className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1">
+                  <label
+                    htmlFor="advanced-wallets"
+                    className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1"
+                  >
                     Wallet / Contract
                   </label>
                   <input
+                    id="advanced-wallets"
                     type="text"
                     value={wallets}
                     onChange={(e) => setWallets(e.target.value)}
                     placeholder="0x1234... or contract address"
                     className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
                   />
-                  <span className="text-[7px] font-mono text-nerv-text-muted">Triggers on-chain evidence lookup</span>
+                  <span className="text-[7px] font-mono text-nerv-text-muted">
+                    Triggers on-chain evidence lookup
+                  </span>
                 </div>
                 <div>
-                  <label className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1">
+                  <label
+                    htmlFor="advanced-subreddits"
+                    className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1"
+                  >
                     Subreddits
                   </label>
                   <input
+                    id="advanced-subreddits"
                     type="text"
                     value={subreddits}
                     onChange={(e) => setSubreddits(e.target.value)}
                     placeholder="r/cryptocurrency, r/bitcoin"
                     className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
                   />
-                  <span className="text-[7px] font-mono text-nerv-text-muted">Scope Reddit search to specific subs</span>
+                  <span className="text-[7px] font-mono text-nerv-text-muted">
+                    Scope Reddit search to specific subs
+                  </span>
                 </div>
               </div>
             )}
@@ -380,9 +458,9 @@ export default function SearchPage() {
             <div className="grid grid-cols-3 gap-4">
               {/* Data Sources */}
               <div>
-                <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
+                <div className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
                   Data Sources
-                </label>
+                </div>
                 <div className="space-y-3">
                   {PLATFORM_GROUPS.map((group) => (
                     <div key={group.label}>
@@ -393,8 +471,9 @@ export default function SearchPage() {
                         {group.platforms.map((p) => {
                           const checked = platforms.includes(p.id);
                           return (
-                            <label
+                            <button
                               key={p.id}
+                              type="button"
                               className="flex items-center gap-2 cursor-pointer group"
                               onClick={() => togglePlatform(p.id)}
                             >
@@ -416,7 +495,7 @@ export default function SearchPage() {
                               >
                                 {p.label}
                               </span>
-                            </label>
+                            </button>
                           );
                         })}
                       </div>
@@ -424,12 +503,14 @@ export default function SearchPage() {
                   ))}
                   <div className="flex gap-2 pt-1">
                     <button
+                      type="button"
                       onClick={() => setPlatforms(ALL_PLATFORMS.map((p) => p.id))}
                       className="text-[8px] font-mono uppercase text-nerv-green hover:underline"
                     >
                       All
                     </button>
                     <button
+                      type="button"
                       onClick={() => setPlatforms([])}
                       className="text-[8px] font-mono uppercase text-nerv-text-muted hover:underline"
                     >
@@ -441,15 +522,16 @@ export default function SearchPage() {
 
               {/* Time Range */}
               <div>
-                <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
+                <div className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
                   Time Range
-                </label>
+                </div>
                 <div className="space-y-1.5">
                   {[...TIME_RANGES, { value: 'custom' as const, label: 'Custom' }].map((t) => {
                     const selected = timeRange === t.value;
                     return (
-                      <label
+                      <button
                         key={t.value}
+                        type="button"
                         className="flex items-center gap-2 cursor-pointer"
                         onClick={() => setTimeRange(t.value)}
                       >
@@ -461,9 +543,7 @@ export default function SearchPage() {
                               : 'border-nerv-border hover:border-nerv-text-muted',
                           ].join(' ')}
                         >
-                          {selected && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-nerv-orange" />
-                          )}
+                          {selected && <span className="w-1.5 h-1.5 rounded-full bg-nerv-orange" />}
                         </span>
                         <span
                           className={[
@@ -473,15 +553,21 @@ export default function SearchPage() {
                         >
                           {t.label}
                         </span>
-                      </label>
+                      </button>
                     );
                   })}
                 </div>
                 {timeRange === 'custom' && (
                   <div className="mt-2 space-y-1.5 pl-5">
                     <div>
-                      <label className="text-[8px] uppercase tracking-widest text-nerv-text-muted block mb-0.5">From</label>
+                      <label
+                        htmlFor="custom-start-date"
+                        className="text-[8px] uppercase tracking-widest text-nerv-text-muted block mb-0.5"
+                      >
+                        From
+                      </label>
                       <input
+                        id="custom-start-date"
                         type="date"
                         value={customStart}
                         onChange={(e) => setCustomStart(e.target.value)}
@@ -489,8 +575,14 @@ export default function SearchPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[8px] uppercase tracking-widest text-nerv-text-muted block mb-0.5">To</label>
+                      <label
+                        htmlFor="custom-end-date"
+                        className="text-[8px] uppercase tracking-widest text-nerv-text-muted block mb-0.5"
+                      >
+                        To
+                      </label>
                       <input
+                        id="custom-end-date"
                         type="date"
                         value={customEnd}
                         onChange={(e) => setCustomEnd(e.target.value)}
@@ -503,15 +595,16 @@ export default function SearchPage() {
 
               {/* Depth */}
               <div>
-                <label className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
+                <div className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
                   Depth
-                </label>
+                </div>
                 <div className="space-y-1.5">
                   {DEPTH_PRESETS.map((preset) => {
                     const selected = depthPreset === preset.id;
                     return (
-                      <label
+                      <button
                         key={preset.id}
+                        type="button"
                         className="flex items-center gap-2 cursor-pointer"
                         onClick={() => setDepthPreset(preset.id)}
                       >
@@ -523,9 +616,7 @@ export default function SearchPage() {
                               : 'border-nerv-border hover:border-nerv-text-muted',
                           ].join(' ')}
                         >
-                          {selected && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-nerv-orange" />
-                          )}
+                          {selected && <span className="w-1.5 h-1.5 rounded-full bg-nerv-orange" />}
                         </span>
                         <div className="flex flex-col">
                           <span
@@ -540,7 +631,7 @@ export default function SearchPage() {
                             {preset.description}
                           </span>
                         </div>
-                      </label>
+                      </button>
                     );
                   })}
                 </div>
@@ -575,6 +666,7 @@ export default function SearchPage() {
                 investigations.map((inv) => (
                   <button
                     key={inv._id ?? inv.id ?? inv.query}
+                    type="button"
                     onClick={() => {
                       const investigationId = inv._id ?? inv.id;
                       if (!investigationId) return;
@@ -607,9 +699,7 @@ export default function SearchPage() {
             <div className="px-3 py-2 space-y-2">
               {TIPS.map((tip) => (
                 <div key={tip} className="flex items-start gap-2">
-                  <span className="text-nerv-green text-[10px] mt-0.5 shrink-0">
-                    &gt;
-                  </span>
+                  <span className="text-nerv-green text-[10px] mt-0.5 shrink-0">&gt;</span>
                   <span className="text-[11px] font-mono text-nerv-text-secondary leading-snug">
                     {tip}
                   </span>

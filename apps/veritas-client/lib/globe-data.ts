@@ -55,6 +55,7 @@ const COUNTRY_COORDS: Record<string, { lat: number; lng: number; name: string }>
   BR: { lat: -14.2, lng: -51.9, name: 'Brazil' },
   MX: { lat: 23.6, lng: -102.6, name: 'Mexico' },
   KR: { lat: 35.9, lng: 127.8, name: 'South Korea' },
+  KP: { lat: 40.3, lng: 127.5, name: 'North Korea' },
   IT: { lat: 41.9, lng: 12.6, name: 'Italy' },
   ES: { lat: 40.5, lng: -3.7, name: 'Spain' },
   NL: { lat: 52.1, lng: 5.3, name: 'Netherlands' },
@@ -123,7 +124,7 @@ const ALIASES: Record<string, string> = {
   prc: 'CN',
   korea: 'KR',
   'south korea': 'KR',
-  'north korea': 'KR', // map to South Korea coords as placeholder
+  'north korea': 'KP',
   japan: 'JP',
   germany: 'DE',
   france: 'FR',
@@ -247,7 +248,8 @@ export function buildGlobeData(params: {
 
   // 1. Extract countries from post text + GDELT signal metadata
   for (let pi = 0; pi < posts.length; pi++) {
-    const post = posts[pi]!;
+    const post = posts[pi];
+    if (!post) continue;
     const codes = extractCountriesFromText(post.text);
 
     // Check for GDELT metadata country (platform === 'gdelt' or 'news')
@@ -305,7 +307,6 @@ export function buildGlobeData(params: {
   // 3. Extract from investigation user platform presence
   if (investigation?.users) {
     for (const userResult of investigation.users) {
-      const _presence = userResult.user.profile?.patterns?.platformPresence ?? [];
       // Platform presence doesn't directly map to countries, but flags might
       for (const flag of userResult.flags) {
         const codes = extractCountriesFromText(flag);
@@ -409,8 +410,9 @@ export function buildGlobeData(params: {
 
   for (let i = 0; i < buckets.length; i++) {
     for (let j = i + 1; j < buckets.length; j++) {
-      const a = buckets[i]!;
-      const b = buckets[j]!;
+      const a = buckets[i];
+      const b = buckets[j];
+      if (!a || !b) continue;
       const coordsA = COUNTRY_COORDS[a.code];
       const coordsB = COUNTRY_COORDS[b.code];
       if (!coordsA || !coordsB) continue;
@@ -428,7 +430,7 @@ export function buildGlobeData(params: {
       const [source, target] = aFirst ? [a, b] : [b, a];
       const [sourceCoords, targetCoords] = aFirst ? [coordsA, coordsB] : [coordsB, coordsA];
 
-      const arcKey = `${source!.code}-${target!.code}`;
+      const arcKey = `${source?.code}-${target?.code}`;
       if (arcSet.has(arcKey)) continue;
       arcSet.add(arcKey);
 

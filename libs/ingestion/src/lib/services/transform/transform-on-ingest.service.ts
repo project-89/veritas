@@ -1,12 +1,12 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
 import {
-  ContentClassificationService,
   ContentClassification,
+  ContentClassificationService,
   EmbeddingsService,
   EmbeddingVector,
 } from '@veritas/content-classification';
+import * as crypto from 'crypto';
 import { NarrativeInsight } from '../../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../../types/social-media.types';
 import { NarrativeRepository } from '../../repositories/narrative-insight.repository';
@@ -25,34 +25,25 @@ export class TransformOnIngestService {
     private readonly configService: ConfigService,
     private readonly narrativeRepository: NarrativeRepository,
     private readonly contentClassificationService: ContentClassificationService,
-    @Optional() private readonly embeddingsService?: EmbeddingsService
+    @Optional() private readonly embeddingsService?: EmbeddingsService,
   ) {
     // Get hash salt from config or generate a secure random one
     this.hashSalt =
-      this.configService.get<string>('HASH_SALT') ||
-      crypto.randomBytes(32).toString('hex');
+      this.configService.get<string>('HASH_SALT') || crypto.randomBytes(32).toString('hex');
 
     // Get retention period from config (default 90 days)
-    this.retentionPeriodDays =
-      this.configService.get<number>('RETENTION_PERIOD_DAYS') || 90;
+    this.retentionPeriodDays = this.configService.get<number>('RETENTION_PERIOD_DAYS') || 90;
 
     this.logger.log('TransformOnIngestService initialized');
 
     if (this.embeddingsService) {
-      this.logger.log(
-        'Embeddings service is available for enhanced content analysis'
-      );
+      this.logger.log('Embeddings service is available for enhanced content analysis');
     } else {
-      this.logger.warn(
-        'Embeddings service not available - some features will be limited'
-      );
+      this.logger.warn('Embeddings service not available - some features will be limited');
     }
 
     // Schedule daily cleanup of expired data
-    const cleanupInterval = setInterval(
-      () => this.cleanupExpiredData(),
-      24 * 60 * 60 * 1000
-    );
+    const cleanupInterval = setInterval(() => this.cleanupExpiredData(), 24 * 60 * 60 * 1000);
     cleanupInterval.unref?.();
   }
 
@@ -63,15 +54,10 @@ export class TransformOnIngestService {
   public async transform(post: SocialMediaPost): Promise<NarrativeInsight> {
     try {
       // Step 1: Classify the content
-      const classification = await this.contentClassificationService.classifyContent(
-        post.text
-      );
+      const classification = await this.contentClassificationService.classifyContent(post.text);
 
       // Step 2: Transform with classification
-      const insight = await this.transformWithClassification(
-        post,
-        classification
-      );
+      const insight = await this.transformWithClassification(post, classification);
 
       // Step 3: Store the insight
       await this.storeInsight(insight);
@@ -88,37 +74,32 @@ export class TransformOnIngestService {
    * Transform and store a batch of social media posts
    * Returns the transformed insights
    */
-  public async transformBatch(
-    posts: SocialMediaPost[]
-  ): Promise<NarrativeInsight[]> {
+  public async transformBatch(posts: SocialMediaPost[]): Promise<NarrativeInsight[]> {
     try {
       // Step 1: Extract all texts for batch classification
       const texts = posts.map((post) => post.text);
 
       // Step 2: Perform batch classification
-      const classifications =
-        await this.contentClassificationService.batchClassify(texts);
+      const classifications = await this.contentClassificationService.batchClassify(texts);
 
       // Step 3: Transform each post with its classification
       const insights = await Promise.all(
         posts.map((post, index) =>
-          this.transformWithClassification(post, classifications[index]!)
-        )
+          this.transformWithClassification(
+            post,
+            classifications[index] ?? this.buildDefaultClassification(),
+          ),
+        ),
       );
 
       // Step 4: Store all insights in a batch operation
       await this.narrativeRepository.saveMany(insights);
-      this.logger.debug(
-        `Stored ${insights.length} insights from batch transformation`
-      );
+      this.logger.debug(`Stored ${insights.length} insights from batch transformation`);
 
       return insights;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in batch transformation: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in batch transformation: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -129,7 +110,7 @@ export class TransformOnIngestService {
    */
   private async transformWithClassification(
     post: SocialMediaPost,
-    classification: ContentClassification
+    classification: ContentClassification,
   ): Promise<NarrativeInsight> {
     // Step 1: Create content hash (deterministic but non-reversible)
     const contentHash = this.hashContent(post.text, post.timestamp);
@@ -149,9 +130,7 @@ export class TransformOnIngestService {
     if (this.embeddingsService) {
       try {
         embedding = await this.embeddingsService.generateEmbedding(post.text);
-        this.logger.debug(
-          `Generated embedding for content: ${contentHash.substring(0, 8)}`
-        );
+        this.logger.debug(`Generated embedding for content: ${contentHash.substring(0, 8)}`);
       } catch (error) {
         const err = error as Error;
         this.logger.warn(`Failed to generate embedding: ${err.message}`);
@@ -184,6 +163,22 @@ export class TransformOnIngestService {
     };
   }
 
+  private buildDefaultClassification(): ContentClassification {
+    return {
+      categories: [],
+      sentiment: {
+        label: 'neutral',
+        score: 0,
+        confidence: 0,
+      },
+      toxicity: 0,
+      subjectivity: 0,
+      language: 'unknown',
+      topics: [],
+      entities: [],
+    };
+  }
+
   /**
    * Store a narrative insight in the repository
    * This is done asynchronously to not block the transformation process
@@ -191,9 +186,7 @@ export class TransformOnIngestService {
   private async storeInsight(insight: NarrativeInsight): Promise<void> {
     try {
       // Check if this content already exists to prevent duplicates
-      const existing = await this.narrativeRepository.findByContentHash(
-        insight.contentHash
-      );
+      const existing = await this.narrativeRepository.findByContentHash(insight.contentHash);
 
       if (!existing) {
         await this.narrativeRepository.save(insight);
@@ -234,15 +227,13 @@ export class TransformOnIngestService {
    * Map entities from ContentClassification format to NarrativeInsight format
    */
   private mapClassificationEntities(
-    entities: ContentClassification['entities']
+    entities: ContentClassification['entities'],
   ): Array<{ name: string; type: string; relevance: number }> {
-    return entities.map(
-      (entity: { text: string; type: string; confidence: number }) => ({
-        name: entity.text,
-        type: entity.type,
-        relevance: entity.confidence,
-      })
-    );
+    return entities.map((entity: { text: string; type: string; confidence: number }) => ({
+      name: entity.text,
+      type: entity.type,
+      relevance: entity.confidence,
+    }));
   }
 
   /**
@@ -250,25 +241,19 @@ export class TransformOnIngestService {
    */
   private calculateNarrativeScore(
     post: SocialMediaPost,
-    classification: ContentClassification
+    classification: ContentClassification,
   ): number {
     // Factor 1: Engagement score (normalized, max 0.4)
     const engagementScore = Math.min(
       this.calculateEngagementScore(post.engagementMetrics) * 0.4,
-      0.4
+      0.4,
     );
 
     // Factor 2: Entity relevance score (max 0.2)
-    const entityScore = Math.min(
-      this.calculateEntityScore(classification.entities) * 0.2,
-      0.2
-    );
+    const entityScore = Math.min(this.calculateEntityScore(classification.entities) * 0.2, 0.2);
 
     // Factor 3: Topic relevance (max 0.2)
-    const topicScore = Math.min(
-      classification.topics.length > 0 ? 0.2 : 0.1,
-      0.2
-    );
+    const topicScore = Math.min(classification.topics.length > 0 ? 0.2 : 0.1, 0.2);
 
     // Factor 4: Sentiment intensity (max 0.2)
     const sentimentIntensity = Math.abs(classification.sentiment.score);
@@ -281,21 +266,15 @@ export class TransformOnIngestService {
   /**
    * Calculate the total engagement from engagement metrics
    */
-  private calculateTotalEngagement(
-    metrics: SocialMediaPost['engagementMetrics']
-  ): number {
+  private calculateTotalEngagement(metrics: SocialMediaPost['engagementMetrics']): number {
     if (!metrics) return 0;
-    return (
-      (metrics.likes || 0) + (metrics.shares || 0) + (metrics.comments || 0)
-    );
+    return (metrics.likes || 0) + (metrics.shares || 0) + (metrics.comments || 0);
   }
 
   /**
    * Calculate an engagement score from engagement metrics
    */
-  private calculateEngagementScore(
-    metrics: SocialMediaPost['engagementMetrics']
-  ): number {
+  private calculateEngagementScore(metrics: SocialMediaPost['engagementMetrics']): number {
     if (!metrics) return 0;
 
     const total = this.calculateTotalEngagement(metrics);
@@ -308,23 +287,18 @@ export class TransformOnIngestService {
   /**
    * Calculate an entity score based on entity relevance
    */
-  private calculateEntityScore(
-    entities: ContentClassification['entities']
-  ): number {
+  private calculateEntityScore(entities: ContentClassification['entities']): number {
     if (!entities || entities.length === 0) return 0;
 
     // Average confidence of all entities
-    return (
-      entities.reduce((sum, entity) => sum + entity.confidence, 0) /
-      entities.length
-    );
+    return entities.reduce((sum, entity) => sum + entity.confidence, 0) / entities.length;
   }
 
   /**
    * Normalize engagement metrics to create a percentage breakdown
    */
   private normalizeEngagementMetrics(
-    metrics: SocialMediaPost['engagementMetrics']
+    metrics: SocialMediaPost['engagementMetrics'],
   ): Record<string, number> {
     if (!metrics) {
       return {
@@ -364,10 +338,7 @@ export class TransformOnIngestService {
       }
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error cleaning up expired data: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error cleaning up expired data: ${err.message}`, err.stack);
     }
   }
 }

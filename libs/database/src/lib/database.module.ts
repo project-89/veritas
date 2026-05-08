@@ -1,13 +1,13 @@
 import { DynamicModule, Module, Provider } from '@nestjs/common';
+import { DATABASE_PROVIDER } from './database.constants';
 import { DatabaseService } from './database.service';
 import {
   DatabaseProvider,
   DatabaseProviderOptions,
 } from './interfaces/database-provider.interface';
-import { MongoDBProvider } from './mongodb/mongodb-provider';
 import { MemgraphProvider } from './memgraph/memgraph-provider';
+import { MongoDBProvider } from './mongodb/mongodb-provider';
 import { RedisProvider } from './redis/redis-provider';
-import { DATABASE_PROVIDER } from './database.constants';
 
 export interface DatabaseModuleOptions {
   /**

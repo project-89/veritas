@@ -1,9 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
-import {
-  MentalModel,
-  MentalModelModel,
-} from '../schemas/mental-model.schema';
+import { MentalModel, MentalModelModel } from '../schemas/mental-model.schema';
 
 @Injectable()
 export class MentalModelRepository implements OnModuleInit {

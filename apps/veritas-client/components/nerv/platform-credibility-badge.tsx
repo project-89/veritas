@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -67,12 +65,7 @@ function riskLabel(value: number): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export function PlatformCredibilityBadge({
-  platform,
-  size = 'sm',
-}: PlatformCredibilityBadgeProps) {
-  const [showTooltip, setShowTooltip] = useState(false);
-
+export function PlatformCredibilityBadge({ platform, size = 'sm' }: PlatformCredibilityBadgeProps) {
   const normalized = platform.toLowerCase().trim();
   const profile = PLATFORM_PROFILES[normalized] ?? NEUTRAL_PROFILE;
 
@@ -85,23 +78,14 @@ export function PlatformCredibilityBadge({
   const textSize = isSm ? 'text-[9px]' : 'text-[10px]';
 
   return (
-    <div
-      className="relative inline-flex flex-col items-center"
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-    >
+    <div className="group relative inline-flex flex-col items-center">
       {/* Platform name */}
-      <span
-        className={`font-mono uppercase tracking-wider text-nerv-text-secondary ${textSize}`}
-      >
+      <span className={`font-mono uppercase tracking-wider text-nerv-text-secondary ${textSize}`}>
         {normalized}
       </span>
 
       {/* Dual bar */}
-      <div
-        className="flex w-full mt-0.5 rounded-sm overflow-hidden"
-        style={{ height: barH }}
-      >
+      <div className="flex w-full mt-0.5 rounded-sm overflow-hidden" style={{ height: barH }}>
         {/* Left: credibility */}
         <div
           className="flex-1"
@@ -121,13 +105,12 @@ export function PlatformCredibilityBadge({
       </div>
 
       {/* Tooltip */}
-      {showTooltip && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-50 whitespace-nowrap px-2 py-1 bg-nerv-bg-elevated border border-nerv-border rounded-sm shadow-lg">
-          <span className="text-[9px] font-mono text-nerv-text">
-            {platform.charAt(0).toUpperCase() + platform.slice(1)} &mdash; Credibility: {credPct}% | Influence: {inflPct}% | Manipulation Risk: {risk}
-          </span>
-        </div>
-      )}
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-sm border border-nerv-border bg-nerv-bg-elevated px-2 py-1 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+        <span className="text-[9px] font-mono text-nerv-text">
+          {platform.charAt(0).toUpperCase() + platform.slice(1)} &mdash; Credibility: {credPct}% |
+          Influence: {inflPct}% | Manipulation Risk: {risk}
+        </span>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
-import { SocialMediaConnector } from './social-media-connector.interface';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { ConnectorSearchOptions } from './data-connector.interface';
+import { SocialMediaConnector } from './social-media-connector.interface';
 
 /**
  * Interface for connectors that implement the transform-on-ingest pattern
@@ -15,10 +15,7 @@ export interface TransformOnIngestConnector extends SocialMediaConnector {
    * @param options - Search options (platform-specific)
    * @returns Promise resolving to an array of anonymized NarrativeInsight objects
    */
-  searchAndTransform(
-    query: string,
-    options?: ConnectorSearchOptions
-  ): Promise<NarrativeInsight[]>;
+  searchAndTransform(query: string, options?: ConnectorSearchOptions): Promise<NarrativeInsight[]>;
 
   /**
    * Stream content and transform it into anonymized narrative insights

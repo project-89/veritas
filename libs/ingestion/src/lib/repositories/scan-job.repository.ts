@@ -1,11 +1,14 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
-import {
-  ScanJobModel,
-  ScanJob,
-  ConnectorStatus,
-} from '../schemas/scan-job.schema';
+import { ConnectorStatus, ScanJob, ScanJobModel } from '../schemas/scan-job.schema';
 import { buildPostDedupKey } from '../utils/post-dedup.util';
+
+interface CachedInvestigationUser {
+  user?: {
+    topicPosts?: unknown[];
+    historicalPosts?: unknown[];
+  };
+}
 
 /**
  * Repository for managing scan jobs.
@@ -37,10 +40,7 @@ export class ScanJobRepository implements OnModuleInit {
       this.logger.log('ScanJob repository initialized');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Failed to initialize ScanJob repository: ${err.message}`,
-        err.stack,
-      );
+      this.logger.error(`Failed to initialize ScanJob repository: ${err.message}`, err.stack);
     }
   }
 
@@ -98,7 +98,9 @@ export class ScanJobRepository implements OnModuleInit {
       completedAt: null,
     } as Partial<ScanJob>);
 
-    this.logger.log(`Created scan job ${job._id} for query "${query}" with connectors: ${platforms.join(', ')}`);
+    this.logger.log(
+      `Created scan job ${job._id} for query "${query}" with connectors: ${platforms.join(', ')}`,
+    );
     return job;
   }
 
@@ -128,7 +130,9 @@ export class ScanJobRepository implements OnModuleInit {
     try {
       const job = await this.scanJobRepo.findById(scanId);
       if (!job) {
-        this.logger.warn(`Skipping connector status update for deleted scan ${scanId} (${connector})`);
+        this.logger.warn(
+          `Skipping connector status update for deleted scan ${scanId} (${connector})`,
+        );
         return;
       }
 
@@ -192,7 +196,6 @@ export class ScanJobRepository implements OnModuleInit {
     scanId: string,
     _connector: string,
     posts: unknown[],
-    _insights: unknown[],
   ): Promise<void> {
     this.ensureInitialized();
     try {
@@ -210,7 +213,9 @@ export class ScanJobRepository implements OnModuleInit {
         totalPosts: allPosts.length,
       } as Partial<ScanJob>);
 
-      this.logger.debug(`Added ${posts.length} posts to scan ${scanId} (total: ${allPosts.length})`);
+      this.logger.debug(
+        `Added ${posts.length} posts to scan ${scanId} (total: ${allPosts.length})`,
+      );
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error in addConnectorResults: ${err.message}`, err.stack);
@@ -252,17 +257,23 @@ export class ScanJobRepository implements OnModuleInit {
       // Strip large fields if needed.
       const json = JSON.stringify(cache);
       if (json.length > 14_000_000) {
-        this.logger.warn(`Analysis cache too large (${(json.length / 1_000_000).toFixed(1)}MB) — trimming`);
+        this.logger.warn(
+          `Analysis cache too large (${(json.length / 1_000_000).toFixed(1)}MB) — trimming`,
+        );
         const inv = cache['investigation'] as Record<string, unknown> | undefined;
         if (inv && Array.isArray(inv['users'])) {
-          for (const user of inv['users'] as any[]) {
+          for (const user of inv['users'] as CachedInvestigationUser[]) {
             if (user?.user?.topicPosts) user.user.topicPosts = [];
             if (user?.user?.historicalPosts) user.user.historicalPosts = [];
           }
         }
         const ds = cache['downstream'] as Record<string, unknown> | undefined;
-        if (ds && Array.isArray(ds['externalSignals']) && (ds['externalSignals'] as any[]).length > 50) {
-          ds['externalSignals'] = (ds['externalSignals'] as any[]).slice(0, 50);
+        if (
+          ds &&
+          Array.isArray(ds['externalSignals']) &&
+          ds['externalSignals'].length > 50
+        ) {
+          ds['externalSignals'] = ds['externalSignals'].slice(0, 50);
         }
       }
 
@@ -287,7 +298,9 @@ export class ScanJobRepository implements OnModuleInit {
 
       const keys: string[] = [];
       for (const scan of scans) {
-        const posts = (scan as any).posts ?? [];
+        const posts = Array.isArray((scan as Partial<ScanJob>).posts)
+          ? ((scan as Partial<ScanJob>).posts as Record<string, unknown>[])
+          : [];
         for (const post of posts) {
           const key = buildPostDedupKey(post);
           if (key) keys.push(key);
@@ -315,7 +328,9 @@ export class ScanJobRepository implements OnModuleInit {
       }
 
       const updatedConnectors: Record<string, ConnectorStatus> = { ...job.connectors };
-      for (const [key, connector] of Object.entries(updatedConnectors) as Array<[string, ConnectorStatus]>) {
+      for (const [key, connector] of Object.entries(updatedConnectors) as Array<
+        [string, ConnectorStatus]
+      >) {
         if (connector.status === 'queued' || connector.status === 'running') {
           updatedConnectors[key] = {
             ...connector,
@@ -362,10 +377,7 @@ export class ScanJobRepository implements OnModuleInit {
   async getRecentJobs(limit = 20): Promise<ScanJob[]> {
     this.ensureInitialized();
     try {
-      return await this.scanJobRepo.find(
-        {},
-        { limit, sort: { createdAt: -1 } },
-      );
+      return await this.scanJobRepo.find({}, { limit, sort: { createdAt: -1 } });
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error in getRecentJobs: ${err.message}`, err.stack);
@@ -379,10 +391,10 @@ export class ScanJobRepository implements OnModuleInit {
   async getJobsByInvestigation(investigationId: string, limit = 50): Promise<ScanJob[]> {
     this.ensureInitialized();
     try {
-      return await this.scanJobRepo.find(
-        { investigationId } as Record<string, unknown>,
-        { limit, sort: { createdAt: -1 } },
-      );
+      return await this.scanJobRepo.find({ investigationId } as Record<string, unknown>, {
+        limit,
+        sort: { createdAt: -1 },
+      });
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error in getJobsByInvestigation: ${err.message}`, err.stack);
@@ -450,7 +462,8 @@ export class ScanJobRepository implements OnModuleInit {
       };
 
       // If overall job was completed/failed, set back to running
-      const jobStatus = job.status === 'completed' || job.status === 'failed' ? 'running' : job.status;
+      const jobStatus =
+        job.status === 'completed' || job.status === 'failed' ? 'running' : job.status;
 
       await this.scanJobRepo.updateById(scanId, {
         connectors: updatedConnectors,

@@ -2,29 +2,29 @@
 
 import {
   createContext,
+  type Dispatch,
+  type ReactNode,
+  useCallback,
   useContext,
   useReducer,
-  useCallback,
-  type ReactNode,
-  type Dispatch,
 } from 'react';
 import type {
-  RawPost,
-  NarrativeInsight,
-  AnalyzedNarrative,
-  DeviationResponse,
-  PropagandaAnalysisResult,
-  ClaimVerificationBatchResult,
-  EntityAnalysisResponse,
-  DownstreamEffectsResult,
-  InvestigationResult,
   Alert,
   AnalysisJob,
+  AnalyzedNarrative,
+  ClaimVerificationBatchResult,
+  DeviationResponse,
+  DownstreamEffectsResult,
+  EntityAnalysisResponse,
   IdentityRecord,
-  SaturationReport,
-  NarrativeComparison,
-  PlatformComparison,
   IntelligenceReport,
+  InvestigationResult,
+  NarrativeComparison,
+  NarrativeInsight,
+  PlatformComparison,
+  PropagandaAnalysisResult,
+  RawPost,
+  SaturationReport,
 } from './api';
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,12 @@ type Action =
   | { type: 'SET_LOADING'; loading: boolean }
   | { type: 'SET_ERROR'; error: string | null }
   | { type: 'SET_PIPELINE'; stage: PipelineStage; status: StageStatus }
-  | { type: 'SET_SEARCH_DATA'; posts: RawPost[]; insights: NarrativeInsight[]; summary: SearchSummary }
+  | {
+      type: 'SET_SEARCH_DATA';
+      posts: RawPost[];
+      insights: NarrativeInsight[];
+      summary: SearchSummary;
+    }
   | { type: 'SET_NARRATIVES'; narratives: AnalyzedNarrative[]; unclusteredCount: number }
   | { type: 'SET_DEVIATIONS'; data: DeviationResponse }
   | { type: 'SET_PROPAGANDA'; data: PropagandaAnalysisResult }
@@ -243,7 +248,10 @@ function mergeInvestigationResults(
         [...current.coordination.clusters, ...incoming.coordination.clusters],
         (cluster) => `${cluster.pattern}:${cluster.users.slice().sort().join(',')}`,
       ),
-      summary: [current.coordination.summary, incoming.coordination.summary].filter(Boolean).join(' ').trim(),
+      summary: [current.coordination.summary, incoming.coordination.summary]
+        .filter(Boolean)
+        .join(' ')
+        .trim(),
     },
     botDetection: incoming.botDetection ?? current.botDetection ?? null,
   };
@@ -316,9 +324,8 @@ function reducer(state: InvestigationState, action: Action): InvestigationState 
       const idx = ids.indexOf(action.narrativeId);
       return {
         ...state,
-        selectedNarrativeIds: idx >= 0
-          ? ids.filter((id) => id !== action.narrativeId)
-          : [...ids, action.narrativeId],
+        selectedNarrativeIds:
+          idx >= 0 ? ids.filter((id) => id !== action.narrativeId) : [...ids, action.narrativeId],
       };
     }
     case 'CLEAR_NARRATIVE_SELECTION':

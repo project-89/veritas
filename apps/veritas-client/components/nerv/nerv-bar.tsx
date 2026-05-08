@@ -16,10 +16,7 @@ export function NervBar({
 
   return (
     <div className="flex items-center gap-2">
-      <div
-        className="flex-1 bg-nerv-bg-elevated rounded-sm overflow-hidden"
-        style={{ height }}
-      >
+      <div className="flex-1 bg-nerv-bg-elevated rounded-sm overflow-hidden" style={{ height }}>
         <div
           className="h-full rounded-sm transition-all duration-300"
           style={{

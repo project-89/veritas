@@ -12,9 +12,7 @@ jest.mock('../../src/lib/config/rss-feed-catalog', () => ({
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 const mockedGetAllFeeds = getAllFeeds as jest.MockedFunction<typeof getAllFeeds>;
-const mockedGetFeedsForQuery = getFeedsForQuery as jest.MockedFunction<
-  typeof getFeedsForQuery
->;
+const mockedGetFeedsForQuery = getFeedsForQuery as jest.MockedFunction<typeof getFeedsForQuery>;
 
 describe('RSSConnector', () => {
   let connector: RSSConnector;
@@ -26,8 +24,8 @@ describe('RSSConnector', () => {
 
     mockedGetAllFeeds.mockReturnValue([]);
     mockedGetFeedsForQuery.mockReturnValue([]);
-    mockedAxios.isAxiosError.mockImplementation(
-      (error: unknown): error is any => Boolean((error as any)?.isAxiosError)
+    mockedAxios.isAxiosError.mockImplementation((error: unknown): error is any =>
+      Boolean((error as any)?.isAxiosError),
     );
 
     configService = {
@@ -40,7 +38,7 @@ describe('RSSConnector', () => {
 
     connector = new RSSConnector(
       configService as ConfigService,
-      transformService as TransformOnIngestService
+      transformService as TransformOnIngestService,
     );
 
     Object.assign((connector as any).logger, {
@@ -117,7 +115,7 @@ describe('RSSConnector', () => {
         Object.assign(new Error('Not found'), {
           isAxiosError: true,
           response: { status: 404 },
-        })
+        }),
       );
 
       await (connector as any).fetchFeedItems('https://example.com/feed.xml');
@@ -128,16 +126,14 @@ describe('RSSConnector', () => {
     });
 
     it('sanitizes malformed feed XML before parsing', async () => {
-      const parseString = jest
-        .spyOn((connector as any).parser, 'parseString')
-        .mockResolvedValue({
-          items: [
-            {
-              title: 'Project89 update',
-              link: 'https://example.com/posts/2',
-            },
-          ],
-        } as any);
+      const parseString = jest.spyOn((connector as any).parser, 'parseString').mockResolvedValue({
+        items: [
+          {
+            title: 'Project89 update',
+            link: 'https://example.com/posts/2',
+          },
+        ],
+      } as any);
 
       mockedAxios.get.mockResolvedValue({
         data: '\uFEFFnoise before xml<rss><channel><item><title>A & B</title></item></channel></rss>',
@@ -146,7 +142,7 @@ describe('RSSConnector', () => {
       await (connector as any).fetchFeedItems('https://example.com/feed.xml');
 
       expect(parseString).toHaveBeenCalledWith(
-        '<rss><channel><item><title>A &amp; B</title></item></channel></rss>'
+        '<rss><channel><item><title>A &amp; B</title></item></channel></rss>',
       );
     });
   });

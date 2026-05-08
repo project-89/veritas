@@ -1,37 +1,30 @@
-import {
-  ObjectType,
-  InputType,
-  Field,
-  ID,
-  Float,
-  registerEnumType,
-} from "@nestjs/graphql";
+import { Field, Float, ID, InputType, ObjectType, registerEnumType } from '@nestjs/graphql';
 import GraphQLJSON from 'graphql-type-json';
 
 export enum SourcePlatform {
-  TWITTER = "twitter",
-  FACEBOOK = "facebook",
-  REDDIT = "reddit",
-  OTHER = "other",
+  TWITTER = 'twitter',
+  FACEBOOK = 'facebook',
+  REDDIT = 'reddit',
+  OTHER = 'other',
 }
 
 export enum VerificationStatus {
-  VERIFIED = "verified",
-  UNVERIFIED = "unverified",
-  DISPUTED = "disputed",
+  VERIFIED = 'verified',
+  UNVERIFIED = 'unverified',
+  DISPUTED = 'disputed',
 }
 
 registerEnumType(SourcePlatform, {
-  name: "SourcePlatform",
-  description: "The platform where the source is from",
+  name: 'SourcePlatform',
+  description: 'The platform where the source is from',
 });
 
 registerEnumType(VerificationStatus, {
-  name: "VerificationStatus",
-  description: "The verification status of a source",
+  name: 'VerificationStatus',
+  description: 'The verification status of a source',
 });
 
-@ObjectType("Source")
+@ObjectType('Source')
 export class SourceType {
   @Field(() => ID)
   id!: string;
@@ -49,7 +42,7 @@ export class SourceType {
   verificationStatus!: VerificationStatus;
 
   @Field(() => GraphQLJSON, { nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   @Field(() => Date)
   createdAt!: Date;
@@ -58,7 +51,7 @@ export class SourceType {
   updatedAt!: Date;
 }
 
-@InputType("SourceCreateInput")
+@InputType('SourceCreateInput')
 export class SourceCreateInputType {
   @Field()
   name!: string;
@@ -73,10 +66,10 @@ export class SourceCreateInputType {
   verificationStatus?: VerificationStatus;
 
   @Field(() => GraphQLJSON, { nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
-@InputType("SourceUpdateInput")
+@InputType('SourceUpdateInput')
 export class SourceUpdateInputType {
   @Field({ nullable: true })
   name?: string;
@@ -88,10 +81,10 @@ export class SourceUpdateInputType {
   verificationStatus?: VerificationStatus;
 
   @Field(() => GraphQLJSON, { nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
-@InputType("SourceSearchParams")
+@InputType('SourceSearchParams')
 export class SourceSearchParamsType {
   @Field({ nullable: true })
   query?: string;

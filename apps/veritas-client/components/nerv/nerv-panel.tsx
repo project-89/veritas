@@ -60,9 +60,7 @@ export function NervPanel({
             )}
           </div>
           {headerRight && (
-            <div className="flex items-center gap-2 ml-2 shrink-0">
-              {headerRight}
-            </div>
+            <div className="flex items-center gap-2 ml-2 shrink-0">{headerRight}</div>
           )}
         </div>
       )}

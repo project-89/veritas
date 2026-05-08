@@ -18,14 +18,14 @@ export class GdacsAdapter implements SignalAdapter {
   readonly maxAgeMs = 60 * 60 * 1000; // 1 hour cache
 
   private readonly logger = new Logger(GdacsAdapter.name);
-  private readonly baseUrl =
-    'https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH';
+  private readonly baseUrl = 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH';
 
   async fetchSignals(params: {
     keywords: string[];
     startDate: string;
     endDate: string;
   }): Promise<ExternalSignal[]> {
+    void params;
     const url = new URL(this.baseUrl);
     url.searchParams.set('alertlevel', 'Green;Orange;Red');
     url.searchParams.set('eventtype', 'EQ;TC;FL;VO;DR;WF');
@@ -108,13 +108,20 @@ export class GdacsAdapter implements SignalAdapter {
   /** Human-readable label for GDACS event type codes. */
   private eventTypeLabel(code?: string): string {
     switch (code) {
-      case 'EQ': return 'Earthquake';
-      case 'TC': return 'Tropical Cyclone';
-      case 'FL': return 'Flood';
-      case 'VO': return 'Volcano';
-      case 'DR': return 'Drought';
-      case 'WF': return 'Wildfire';
-      default: return 'Disaster';
+      case 'EQ':
+        return 'Earthquake';
+      case 'TC':
+        return 'Tropical Cyclone';
+      case 'FL':
+        return 'Flood';
+      case 'VO':
+        return 'Volcano';
+      case 'DR':
+        return 'Drought';
+      case 'WF':
+        return 'Wildfire';
+      default:
+        return 'Disaster';
     }
   }
 }

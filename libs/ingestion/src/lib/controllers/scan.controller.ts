@@ -1,23 +1,28 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
+  Body,
   Controller,
   Get,
-  Post,
-  Put,
-  Body,
-  Param,
-  Query,
-  Logger,
   HttpException,
   HttpStatus,
+  Logger,
+  Param,
+  Post,
+  Put,
+  Query,
 } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { ScanJobRepository } from '../repositories/scan-job.repository';
-import { InvestigationRepository } from '../repositories/investigation.repository';
-import { IngestionService } from '../services/ingestion.service';
-import type { ScanJob } from '../schemas/scan-job.schema';
 import type { ScanJobData } from '../queue/scan.processor';
+import { InvestigationRepository } from '../repositories/investigation.repository';
+import { ScanJobRepository } from '../repositories/scan-job.repository';
 import type { Investigation } from '../schemas/investigation.schema';
+import type { ScanJob } from '../schemas/scan-job.schema';
+import { IngestionService } from '../services/ingestion.service';
+
+type SerializedScanPost = Record<string, unknown> & {
+  sentiment?: { label?: string };
+  platform?: string;
+};
 
 @Controller('scan')
 export class ScanController {
@@ -30,7 +35,7 @@ export class ScanController {
     private readonly ingestionService: IngestionService,
   ) {}
 
-  private buildSummaryFromPosts(posts: Array<Record<string, any>>): {
+  private buildSummaryFromPosts(posts: SerializedScanPost[]): {
     total: number;
     positive: number;
     negative: number;
@@ -102,7 +107,9 @@ export class ScanController {
     let investigationId = '';
     try {
       if (requestedInvestigationId?.trim()) {
-        const investigation = await this.investigationRepository.findById(requestedInvestigationId.trim());
+        const investigation = await this.investigationRepository.findById(
+          requestedInvestigationId.trim(),
+        );
         if (!investigation) {
           throw new Error(`Investigation not found: ${requestedInvestigationId}`);
         }
@@ -118,10 +125,11 @@ export class ScanController {
         };
         await this.investigationRepository.update(investigationId, updatePayload);
       } else {
-        const investigation = await this.investigationRepository.findOrCreateByQuery(
-          query,
-          { platforms: targetPlatforms, limit, timeRange },
-        );
+        const investigation = await this.investigationRepository.findOrCreateByQuery(query, {
+          platforms: targetPlatforms,
+          limit,
+          timeRange,
+        });
         investigationId = investigation._id?.toString() ?? investigation.id ?? '';
       }
     } catch (error) {
@@ -145,7 +153,9 @@ export class ScanController {
         await this.investigationRepository.setLastScanId(investigationId, scanId);
       } catch (error) {
         const err = error as Error;
-        this.logger.warn(`Failed to persist lastScanId for investigation ${investigationId}: ${err.message}`);
+        this.logger.warn(
+          `Failed to persist lastScanId for investigation ${investigationId}: ${err.message}`,
+        );
       }
     }
 
@@ -230,9 +240,7 @@ export class ScanController {
    * GET /scan/:id/posts — Get all posts collected so far.
    */
   @Get(':id/posts')
-  async getScanPosts(
-    @Param('id') id: string,
-  ): Promise<{ posts: unknown[]; totalPosts: number }> {
+  async getScanPosts(@Param('id') id: string): Promise<{ posts: unknown[]; totalPosts: number }> {
     const job = await this.scanJobRepository.getJob(id);
     if (!job) {
       throw new HttpException(`Scan job not found: ${id}`, HttpStatus.NOT_FOUND);
@@ -257,12 +265,10 @@ export class ScanController {
     }
     await this.scanJobRepository.updateAnalysisCache(id, body);
 
-    const serializedPosts = Array.isArray(job.posts)
-      ? (job.posts as Array<Record<string, any>>)
+    const serializedPosts: SerializedScanPost[] = Array.isArray(job.posts)
+      ? (job.posts as SerializedScanPost[])
       : [];
-    const narratives = Array.isArray(body['narratives'])
-      ? (body['narratives'] as unknown[])
-      : null;
+    const narratives = Array.isArray(body['narratives']) ? (body['narratives'] as unknown[]) : null;
 
     if (
       narratives &&
@@ -270,15 +276,11 @@ export class ScanController {
       job.investigationId.trim().length > 0 &&
       job.investigationId !== 'unknown'
     ) {
-      await this.investigationRepository.upsertSnapshotForScan(
-        job.investigationId,
-        id,
-        {
-          posts: serializedPosts,
-          narratives,
-          summary: this.buildSummaryFromPosts(serializedPosts),
-        },
-      );
+      await this.investigationRepository.upsertSnapshotForScan(job.investigationId, id, {
+        posts: serializedPosts,
+        narratives,
+        summary: this.buildSummaryFromPosts(serializedPosts),
+      });
     }
 
     return { success: true };
@@ -288,9 +290,7 @@ export class ScanController {
    * GET /scan/:id/analysis-cache — Get cached analysis results.
    */
   @Get(':id/analysis-cache')
-  async getAnalysisCache(
-    @Param('id') id: string,
-  ): Promise<Record<string, unknown> | null> {
+  async getAnalysisCache(@Param('id') id: string): Promise<Record<string, unknown> | null> {
     const job = await this.scanJobRepository.getJob(id);
     if (!job) {
       return null;
@@ -319,7 +319,7 @@ export class ScanController {
           await queueJob.remove();
         }
       }
-    } catch (error) {
+    } catch {
       this.logger.warn('Could not remove queued BullMQ jobs during cancel');
     }
 

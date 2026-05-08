@@ -1,11 +1,11 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { IngestionService } from '../services/ingestion.service';
-import { ScanJobRepository } from '../repositories/scan-job.repository';
-import { SocialMediaPost } from '../../types/social-media.types';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { SocialMediaPost } from '../../types/social-media.types';
 import { ConnectorSearchOptions } from '../interfaces/data-connector.interface';
+import { ScanJobRepository } from '../repositories/scan-job.repository';
+import { IngestionService } from '../services/ingestion.service';
 import { buildPostDedupKey } from '../utils/post-dedup.util';
 
 export interface ScanJobData {
@@ -81,14 +81,20 @@ export class ScanProcessor extends WorkerHost {
         const relMatch = options.timeRange.match(/^(\d+)([dhm])$/);
         const absMatch = options.timeRange.match(/^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/);
         if (relMatch) {
-          const value = parseInt(relMatch[1]!, 10);
-          const unit = relMatch[2]!;
-          const ms = unit === 'd' ? value * 86400000 : unit === 'h' ? value * 3600000 : value * 60000;
-          searchOptions.endDate = new Date();
-          searchOptions.startDate = new Date(Date.now() - ms);
+          const [, valueText, unit] = relMatch;
+          if (!valueText || !unit) {
+            this.logger.warn(`Invalid relative time range: ${options.timeRange}`);
+          } else {
+            const value = Number.parseInt(valueText, 10);
+            const ms =
+              unit === 'd' ? value * 86400000 : unit === 'h' ? value * 3600000 : value * 60000;
+            searchOptions.endDate = new Date();
+            searchOptions.startDate = new Date(Date.now() - ms);
+          }
         } else if (absMatch) {
-          searchOptions.startDate = new Date(absMatch[1]! + 'T00:00:00Z');
-          searchOptions.endDate = new Date(absMatch[2]! + 'T23:59:59Z');
+          const [, startDate, endDate] = absMatch;
+          searchOptions.startDate = new Date(`${startDate}T00:00:00Z`);
+          searchOptions.endDate = new Date(`${endDate}T23:59:59Z`);
         }
       }
 
@@ -122,7 +128,10 @@ export class ScanProcessor extends WorkerHost {
       const dedupedPosts: SocialMediaPost[] = [];
       const dedupedInsights: NarrativeInsight[] = [];
       for (let i = 0; i < result.posts.length; i++) {
-        const post = result.posts[i]!;
+        const post = result.posts[i];
+        if (!post) {
+          continue;
+        }
         const textKey = buildPostDedupKey(post);
         if (!seenTexts.has(textKey)) {
           seenTexts.add(textKey);
@@ -159,7 +168,7 @@ export class ScanProcessor extends WorkerHost {
       });
 
       // Save results to MongoDB
-      await this.scanJobRepository.addConnectorResults(scanId, connector, serializedPosts, []);
+      await this.scanJobRepository.addConnectorResults(scanId, connector, serializedPosts);
 
       const duration = Date.now() - startTime;
 
@@ -181,10 +190,7 @@ export class ScanProcessor extends WorkerHost {
       const err = error as Error;
       const duration = Date.now() - startTime;
 
-      this.logger.error(
-        `[scan:${scanId}] ${connector} failed: ${err.message}`,
-        err.stack,
-      );
+      this.logger.error(`[scan:${scanId}] ${connector} failed: ${err.message}`, err.stack);
 
       await this.scanJobRepository.updateConnectorStatus(scanId, connector, {
         status: 'failed',

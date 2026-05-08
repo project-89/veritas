@@ -1,32 +1,38 @@
 import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
   Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
   Optional,
 } from '@nestjs/common';
-import { DatabaseService } from '@veritas/database';
-import { DataConnector, ConnectorSearchOptions } from '../interfaces/data-connector.interface';
+import { DatabaseService, Repository } from '@veritas/database';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { SocialMediaPost } from '../../types/social-media.types';
+import {
+  BLUESKY_CONNECTOR,
+  FACEBOOK_CONNECTOR,
+  FARCASTER_CONNECTOR,
+  FOURCHAN_CONNECTOR,
+  REDDIT_CONNECTOR,
+  TELEGRAM_CONNECTOR,
+  TRUTHSOCIAL_CONNECTOR,
+  TWITTER_CONNECTOR,
+  WIKIPEDIA_CONNECTOR,
+  YOUTUBE_CONNECTOR,
+} from '../interfaces/connector-tokens';
+import { ConnectorSearchOptions, DataConnector } from '../interfaces/data-connector.interface';
+import { NarrativeRepository } from '../repositories/narrative-insight.repository';
 import { ContentNode, SourceNode } from '../schemas/base.schema';
 import { RSSConnector } from './rss.connector';
 import { WebScraperConnector } from './web-scraper.connector';
-import { Repository } from '@veritas/database';
-import { NarrativeRepository } from '../repositories/narrative-insight.repository';
-import { SocialMediaPost } from '../../types/social-media.types';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
-import {
-  REDDIT_CONNECTOR,
-  TWITTER_CONNECTOR,
-  YOUTUBE_CONNECTOR,
-  FACEBOOK_CONNECTOR,
-  TRUTHSOCIAL_CONNECTOR,
-  FARCASTER_CONNECTOR,
-  TELEGRAM_CONNECTOR,
-  WIKIPEDIA_CONNECTOR,
-  BLUESKY_CONNECTOR,
-  FOURCHAN_CONNECTOR,
-} from '../interfaces/connector-tokens';
+
+type RawDataConnector = DataConnector & {
+  searchWithRawData?: (
+    query: string,
+    options?: ConnectorSearchOptions,
+  ) => Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }>;
+};
 
 /**
  * Service that manages ingestion connections and data flow
@@ -40,20 +46,24 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
   private sourceRepository!: Repository<SourceNode>;
 
   constructor(
-    @Optional() @Inject(REDDIT_CONNECTOR) private readonly redditConnector: any,
-    @Optional() @Inject(TWITTER_CONNECTOR) private readonly twitterConnector: any,
-    @Optional() @Inject(FACEBOOK_CONNECTOR) private readonly facebookConnector: any,
-    @Optional() @Inject(YOUTUBE_CONNECTOR) private readonly youtubeConnector: any,
-    @Optional() @Inject(TRUTHSOCIAL_CONNECTOR) private readonly truthSocialConnector: any,
-    @Optional() @Inject(FARCASTER_CONNECTOR) private readonly farcasterConnector: any,
-    @Optional() @Inject(TELEGRAM_CONNECTOR) private readonly telegramConnector: any,
-    @Optional() @Inject(WIKIPEDIA_CONNECTOR) private readonly wikipediaConnector: any,
-    @Optional() @Inject(BLUESKY_CONNECTOR) private readonly blueskyConnector: any,
-    @Optional() @Inject(FOURCHAN_CONNECTOR) private readonly fourchanConnector: any,
+    @Optional() @Inject(REDDIT_CONNECTOR) private readonly redditConnector: DataConnector,
+    @Optional() @Inject(TWITTER_CONNECTOR) private readonly twitterConnector: DataConnector,
+    @Optional() @Inject(FACEBOOK_CONNECTOR) private readonly facebookConnector: DataConnector,
+    @Optional() @Inject(YOUTUBE_CONNECTOR) private readonly youtubeConnector: DataConnector,
+    @Optional()
+    @Inject(TRUTHSOCIAL_CONNECTOR)
+    private readonly truthSocialConnector: DataConnector,
+    @Optional() @Inject(FARCASTER_CONNECTOR) private readonly farcasterConnector: DataConnector,
+    @Optional() @Inject(TELEGRAM_CONNECTOR) private readonly telegramConnector: DataConnector,
+    @Optional()
+    @Inject(WIKIPEDIA_CONNECTOR)
+    private readonly wikipediaConnector: DataConnector,
+    @Optional() @Inject(BLUESKY_CONNECTOR) private readonly blueskyConnector: DataConnector,
+    @Optional() @Inject(FOURCHAN_CONNECTOR) private readonly fourchanConnector: DataConnector,
     @Optional() private readonly rssFeedConnector: RSSConnector,
     @Optional() private readonly webScraperConnector: WebScraperConnector,
     private readonly databaseService: DatabaseService,
-    private readonly narrativeRepository: NarrativeRepository
+    private readonly narrativeRepository: NarrativeRepository,
   ) {}
 
   async onModuleInit() {
@@ -74,24 +84,17 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
         this.databaseService.registerModel('Content', {});
         this.databaseService.registerModel('Source', {});
       } catch (error) {
-        this.logger.warn(
-          'Models already registered or error registering models',
-          error
-        );
+        this.logger.warn('Models already registered or error registering models', error);
       }
 
       // Get repositories
-      this.contentRepository =
-        this.databaseService.getRepository<ContentNode>('Content');
+      this.contentRepository = this.databaseService.getRepository<ContentNode>('Content');
       this.sourceRepository = this.databaseService.getRepository<SourceNode>('Source');
 
       this.logger.log('Repositories initialized successfully');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Failed to initialize repositories: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Failed to initialize repositories: ${err.message}`, err.stack);
     }
   }
 
@@ -134,14 +137,12 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
       await connector.connect();
       this.connectors.set(connector.platform, connector);
 
-      this.logger.log(
-        `Registered connector for platform: ${connector.platform}`
-      );
+      this.logger.log(`Registered connector for platform: ${connector.platform}`);
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Failed to register connector for platform: ${connector.platform}`,
-        err.stack
+        err.stack,
       );
     }
   }
@@ -197,22 +198,20 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
     query: string,
     options?: ConnectorSearchOptions & {
       platforms?: string[];
-    }
+    },
   ): Promise<NarrativeInsight[]> {
-    const targetConnectors = options?.platforms
+    const selectedPlatforms = options?.platforms;
+    const targetConnectors = selectedPlatforms
       ? Array.from(this.connectors.values()).filter((connector) =>
-          options.platforms!.includes(connector.platform)
+          selectedPlatforms.includes(connector.platform),
         )
       : Array.from(this.connectors.values());
 
     const searchPromises = targetConnectors.map((connector) =>
       connector.searchAndTransform(query, options).catch((error) => {
-        this.logger.error(
-          `Error searching ${connector.platform}: ${error.message}`,
-          error.stack
-        );
+        this.logger.error(`Error searching ${connector.platform}: ${error.message}`, error.stack);
         return [] as NarrativeInsight[];
-      })
+      }),
     );
 
     const results = await Promise.all(searchPromises);
@@ -228,11 +227,12 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
     query: string,
     options?: ConnectorSearchOptions & {
       platforms?: string[];
-    }
+    },
   ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> {
-    const targetConnectors = options?.platforms
+    const selectedPlatforms = options?.platforms;
+    const targetConnectors = selectedPlatforms
       ? Array.from(this.connectors.values()).filter((connector) =>
-          options.platforms!.includes(connector.platform)
+          selectedPlatforms.includes(connector.platform),
         )
       : Array.from(this.connectors.values());
 
@@ -249,30 +249,31 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
         const start = Date.now();
 
         let result: { posts: SocialMediaPost[]; insights: NarrativeInsight[] };
-        const connRec = connector as unknown as Record<string, unknown>;
-        if ('searchWithRawData' in connector && typeof connRec['searchWithRawData'] === 'function') {
-          result = await (connector as { searchWithRawData: (q: string, o?: ConnectorSearchOptions) => Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> }).searchWithRawData(query, options);
+        const rawDataConnector = connector as RawDataConnector;
+        if (typeof rawDataConnector.searchWithRawData === 'function') {
+          result = await rawDataConnector.searchWithRawData(query, options);
         } else {
           const insights = await connector.searchAndTransform(query, options);
           result = { posts: [], insights };
         }
 
         const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-        this.logger.log(`[search] ${connector.platform} done: ${result.posts.length} posts, ${result.insights.length} insights (${elapsed}s)`);
+        this.logger.log(
+          `[search] ${connector.platform} done: ${result.posts.length} posts, ${result.insights.length} insights (${elapsed}s)`,
+        );
 
         allPosts.push(...result.posts);
         allInsights.push(...result.insights);
       } catch (error) {
         const err = error as Error;
-        this.logger.error(
-          `[search] ${connector.platform} failed: ${err.message}`,
-          err.stack
-        );
+        this.logger.error(`[search] ${connector.platform} failed: ${err.message}`, err.stack);
         // Continue with other connectors
       }
     }
 
-    this.logger.log(`[search] All connectors done: ${allPosts.length} posts, ${allInsights.length} insights total`);
+    this.logger.log(
+      `[search] All connectors done: ${allPosts.length} posts, ${allInsights.length} insights total`,
+    );
     return { posts: allPosts, insights: allInsights };
   }
 }

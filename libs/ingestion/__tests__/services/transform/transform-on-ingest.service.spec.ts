@@ -1,18 +1,17 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { Test, TestingModule } from '@nestjs/testing';
 import {
-  ContentClassificationService,
   ContentClassification,
+  ContentClassificationService,
   EmbeddingsService,
 } from '@veritas/content-classification';
-import { TransformOnIngestService } from '../../../src/lib/services/transform/transform-on-ingest.service';
 import { NarrativeRepository } from '../../../src/lib/repositories/narrative-insight.repository';
-import { SocialMediaPost } from '../../../src/types/social-media.types';
+import { TransformOnIngestService } from '../../../src/lib/services/transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../../src/types/narrative-insight.interface';
+import { SocialMediaPost } from '../../../src/types/social-media.types';
 
 describe('TransformOnIngestService', () => {
   let service: TransformOnIngestService;
-  let configService: ConfigService;
   let narrativeRepository: NarrativeRepository;
   let contentClassificationService: ContentClassificationService;
   let embeddingsService: EmbeddingsService;
@@ -55,36 +54,30 @@ describe('TransformOnIngestService', () => {
 
   // Mock the narrative repository
   const mockNarrativeRepository = {
-    save: jest.fn().mockImplementation(async (insight) => Promise.resolve()),
-    saveMany: jest
-      .fn()
-      .mockImplementation(async (insights) => Promise.resolve()),
-    findByContentHash: jest
-      .fn()
-      .mockImplementation(async (hash) => Promise.resolve(null)),
+    save: jest.fn().mockImplementation(async () => Promise.resolve()),
+    saveMany: jest.fn().mockImplementation(async () => Promise.resolve()),
+    findByContentHash: jest.fn().mockImplementation(async () => Promise.resolve(null)),
   };
 
   // Mock the content classification service
   const mockContentClassificationService = {
     classifyContent: jest
       .fn()
-      .mockImplementation(async (text) => Promise.resolve(mockClassification)),
+      .mockImplementation(async () => Promise.resolve(mockClassification)),
     batchClassify: jest
       .fn()
       .mockImplementation(async (texts) =>
-        Promise.resolve(Array(texts.length).fill(mockClassification))
+        Promise.resolve(Array(texts.length).fill(mockClassification)),
       ),
   };
 
   // Mock the embeddings service
   const mockEmbeddingsService = {
-    generateEmbedding: jest
-      .fn()
-      .mockImplementation(async (text) => Promise.resolve(mockEmbedding)),
+    generateEmbedding: jest.fn().mockImplementation(async () => Promise.resolve(mockEmbedding)),
     batchGenerateEmbeddings: jest
       .fn()
       .mockImplementation(async (texts) =>
-        Promise.resolve(Array(texts.length).fill(mockEmbedding))
+        Promise.resolve(Array(texts.length).fill(mockEmbedding)),
       ),
   };
 
@@ -123,10 +116,9 @@ describe('TransformOnIngestService', () => {
     }).compile();
 
     service = module.get<TransformOnIngestService>(TransformOnIngestService);
-    configService = module.get<ConfigService>(ConfigService);
     narrativeRepository = module.get<NarrativeRepository>(NarrativeRepository);
     contentClassificationService = module.get<ContentClassificationService>(
-      ContentClassificationService
+      ContentClassificationService,
     );
     embeddingsService = module.get<EmbeddingsService>(EmbeddingsService);
   });
@@ -157,44 +149,37 @@ describe('TransformOnIngestService', () => {
 
       // Verify service calls
       expect(contentClassificationService.classifyContent).toHaveBeenCalledWith(
-        mockSocialMediaPost.text
+        mockSocialMediaPost.text,
       );
-      expect(embeddingsService.generateEmbedding).toHaveBeenCalledWith(
-        mockSocialMediaPost.text
-      );
+      expect(embeddingsService.generateEmbedding).toHaveBeenCalledWith(mockSocialMediaPost.text);
       expect(narrativeRepository.findByContentHash).toHaveBeenCalled();
       expect(narrativeRepository.save).toHaveBeenCalled();
     });
 
     it('should handle missing embeddings service gracefully', async () => {
       // Create a new module without the embeddings service
-      const moduleWithoutEmbeddings: TestingModule =
-        await Test.createTestingModule({
-          providers: [
-            TransformOnIngestService,
-            {
-              provide: ConfigService,
-              useValue: mockConfigService,
-            },
-            {
-              provide: NarrativeRepository,
-              useValue: mockNarrativeRepository,
-            },
-            {
-              provide: ContentClassificationService,
-              useValue: mockContentClassificationService,
-            },
-          ],
-        }).compile();
+      const moduleWithoutEmbeddings: TestingModule = await Test.createTestingModule({
+        providers: [
+          TransformOnIngestService,
+          {
+            provide: ConfigService,
+            useValue: mockConfigService,
+          },
+          {
+            provide: NarrativeRepository,
+            useValue: mockNarrativeRepository,
+          },
+          {
+            provide: ContentClassificationService,
+            useValue: mockContentClassificationService,
+          },
+        ],
+      }).compile();
 
       const serviceWithoutEmbeddings =
-        moduleWithoutEmbeddings.get<TransformOnIngestService>(
-          TransformOnIngestService
-        );
+        moduleWithoutEmbeddings.get<TransformOnIngestService>(TransformOnIngestService);
 
-      const result = await serviceWithoutEmbeddings.transform(
-        mockSocialMediaPost
-      );
+      const result = await serviceWithoutEmbeddings.transform(mockSocialMediaPost);
 
       // Verify the result is a NarrativeInsight without embeddings
       expect(result).toBeDefined();
@@ -202,7 +187,7 @@ describe('TransformOnIngestService', () => {
 
       // Verify service calls
       expect(contentClassificationService.classifyContent).toHaveBeenCalledWith(
-        mockSocialMediaPost.text
+        mockSocialMediaPost.text,
       );
       expect(narrativeRepository.findByContentHash).toHaveBeenCalled();
       expect(narrativeRepository.save).toHaveBeenCalled();
@@ -211,7 +196,7 @@ describe('TransformOnIngestService', () => {
     it('should handle embeddings service errors gracefully', async () => {
       // Mock embeddings service to throw an error
       mockEmbeddingsService.generateEmbedding.mockRejectedValueOnce(
-        new Error('Embeddings service error')
+        new Error('Embeddings service error'),
       );
 
       const result = await service.transform(mockSocialMediaPost);
@@ -222,11 +207,9 @@ describe('TransformOnIngestService', () => {
 
       // Verify service calls
       expect(contentClassificationService.classifyContent).toHaveBeenCalledWith(
-        mockSocialMediaPost.text
+        mockSocialMediaPost.text,
       );
-      expect(embeddingsService.generateEmbedding).toHaveBeenCalledWith(
-        mockSocialMediaPost.text
-      );
+      expect(embeddingsService.generateEmbedding).toHaveBeenCalledWith(mockSocialMediaPost.text);
       expect(narrativeRepository.findByContentHash).toHaveBeenCalled();
       expect(narrativeRepository.save).toHaveBeenCalled();
     });
@@ -255,9 +238,7 @@ describe('TransformOnIngestService', () => {
         expiresAt: new Date(),
       };
 
-      mockNarrativeRepository.findByContentHash.mockResolvedValueOnce(
-        existingInsight
-      );
+      mockNarrativeRepository.findByContentHash.mockResolvedValueOnce(existingInsight);
 
       const result = await service.transform(mockSocialMediaPost);
 
@@ -274,11 +255,7 @@ describe('TransformOnIngestService', () => {
 
   describe('transformBatch', () => {
     it('should transform a batch of social media posts', async () => {
-      const posts = [
-        mockSocialMediaPost,
-        mockSocialMediaPost,
-        mockSocialMediaPost,
-      ];
+      const posts = [mockSocialMediaPost, mockSocialMediaPost, mockSocialMediaPost];
 
       const result = await service.transformBatch(posts);
 
@@ -288,7 +265,7 @@ describe('TransformOnIngestService', () => {
 
       // Verify service calls
       expect(contentClassificationService.batchClassify).toHaveBeenCalledWith(
-        posts.map((post) => post.text)
+        posts.map((post) => post.text),
       );
       expect(narrativeRepository.saveMany).toHaveBeenCalled();
     });
@@ -307,14 +284,12 @@ describe('TransformOnIngestService', () => {
     it('should handle errors in batch processing', async () => {
       // Mock content classification service to throw an error
       mockContentClassificationService.batchClassify.mockRejectedValueOnce(
-        new Error('Classification error')
+        new Error('Classification error'),
       );
 
       const posts = [mockSocialMediaPost, mockSocialMediaPost];
 
-      await expect(service.transformBatch(posts)).rejects.toThrow(
-        'Classification error'
-      );
+      await expect(service.transformBatch(posts)).rejects.toThrow('Classification error');
     });
   });
 
@@ -399,9 +374,7 @@ describe('TransformOnIngestService', () => {
         ],
       }).compile();
 
-      const newService = newModule.get<TransformOnIngestService>(
-        TransformOnIngestService
-      );
+      const newService = newModule.get<TransformOnIngestService>(TransformOnIngestService);
 
       // Spy on the new service instance's private method
       const cleanupSpy = jest.spyOn(newService as any, 'cleanupExpiredData');

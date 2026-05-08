@@ -14,13 +14,7 @@ export interface NarrativeRadarProps {
   onCompare?: (narrativeIds: string[]) => void;
 }
 
-type AxisKey =
-  | 'velocity'
-  | 'reach'
-  | 'sentiment'
-  | 'deviation'
-  | 'platformDiv'
-  | 'authorDiv';
+type AxisKey = 'velocity' | 'reach' | 'sentiment' | 'deviation' | 'platformDiv' | 'authorDiv';
 
 interface AxisDefinition {
   key: AxisKey;
@@ -54,29 +48,36 @@ const AXES = [
     key: 'velocity',
     chartLabel: ['POSTING', 'PACE'],
     detailLabel: 'Posting Pace',
-    description: 'How quickly this narrative is generating new posts compared with the other narratives in view.',
-    whatHighMeans: 'Higher values mean this narrative is accelerating faster than the rest of the current result set.',
+    description:
+      'How quickly this narrative is generating new posts compared with the other narratives in view.',
+    whatHighMeans:
+      'Higher values mean this narrative is accelerating faster than the rest of the current result set.',
   },
   {
     key: 'reach',
     chartLabel: ['CONVERSATION', 'SHARE'],
     detailLabel: 'Conversation Share',
     description: 'How much of the captured conversation volume this narrative occupies.',
-    whatHighMeans: 'Higher values mean this narrative accounts for a larger share of the captured posts.',
+    whatHighMeans:
+      'Higher values mean this narrative accounts for a larger share of the captured posts.',
   },
   {
     key: 'sentiment',
     chartLabel: ['EMOTIONAL', 'INTENSITY'],
     detailLabel: 'Emotional Intensity',
-    description: 'How emotionally charged the narrative is, regardless of whether the tone is positive or negative.',
-    whatHighMeans: 'Higher values mean the language is more emotionally loaded, whether positive or negative.',
+    description:
+      'How emotionally charged the narrative is, regardless of whether the tone is positive or negative.',
+    whatHighMeans:
+      'Higher values mean the language is more emotionally loaded, whether positive or negative.',
   },
   {
     key: 'deviation',
     chartLabel: ['OUTLIER', 'SIGNAL'],
     detailLabel: 'Outlier Signal',
-    description: 'How far this narrative sits from the rest of the narrative field in the deviation analysis.',
-    whatHighMeans: 'Higher values mean this narrative is behaving less like the rest of the narratives in view.',
+    description:
+      'How far this narrative sits from the rest of the narrative field in the deviation analysis.',
+    whatHighMeans:
+      'Higher values mean this narrative is behaving less like the rest of the narratives in view.',
   },
   {
     key: 'platformDiv',
@@ -89,8 +90,10 @@ const AXES = [
     key: 'authorDiv',
     chartLabel: ['AUTHOR', 'BREADTH'],
     detailLabel: 'Author Breadth',
-    description: 'How distributed participation is across unique authors instead of being concentrated in a few accounts.',
-    whatHighMeans: 'Higher values mean more unique accounts are participating instead of a small cluster dominating.',
+    description:
+      'How distributed participation is across unique authors instead of being concentrated in a few accounts.',
+    whatHighMeans:
+      'Higher values mean more unique accounts are participating instead of a small cluster dominating.',
   },
 ] as const satisfies readonly AxisDefinition[];
 
@@ -155,8 +158,16 @@ function buildMetrics(
       whatHighMeans: AXES[3].whatHighMeans,
       value: deviation,
       scoreLabel: `${Math.round(deviation * 100)} / 100`,
-      rawLabel: deviation > 0 ? `${(deviation * 100).toFixed(0)}% of max observed deviation` : 'No significant deviation detected',
-      emphasisLabel: deviation > 0.66 ? 'HIGHLY DISTINCT' : deviation > 0.33 ? 'MODERATELY DISTINCT' : 'NEAR BASELINE',
+      rawLabel:
+        deviation > 0
+          ? `${(deviation * 100).toFixed(0)}% of max observed deviation`
+          : 'No significant deviation detected',
+      emphasisLabel:
+        deviation > 0.66
+          ? 'HIGHLY DISTINCT'
+          : deviation > 0.33
+            ? 'MODERATELY DISTINCT'
+            : 'NEAR BASELINE',
     },
     {
       key: 'platformDiv',
@@ -181,19 +192,25 @@ function buildMetrics(
   ];
 }
 
-function hexagonPoint(cx: number, cy: number, radius: number, index: number, total: number): [number, number] {
+function hexagonPoint(
+  cx: number,
+  cy: number,
+  radius: number,
+  index: number,
+  total: number,
+): [number, number] {
   const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
   return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
 }
 
 function polygonPath(cx: number, cy: number, radius: number, values: number[]): string {
   const n = values.length;
-  return values
+  return `${values
     .map((v, i) => {
       const [x, y] = hexagonPoint(cx, cy, radius * v, i, n);
       return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
     })
-    .join(' ') + 'Z';
+    .join(' ')}Z`;
 }
 
 function hexGridPath(cx: number, cy: number, radius: number, levels: number): string {
@@ -205,7 +222,7 @@ function hexGridPath(cx: number, cy: number, radius: number, levels: number): st
       const [x, y] = hexagonPoint(cx, cy, r, i, 6);
       pts.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`);
     }
-    paths.push(pts.join(' ') + 'Z');
+    paths.push(`${pts.join(' ')}Z`);
   }
   return paths.join(' ');
 }
@@ -214,7 +231,12 @@ function hexGridPath(cx: number, cy: number, radius: number, levels: number): st
 // Component
 // ---------------------------------------------------------------------------
 
-export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare }: NarrativeRadarProps) {
+export function NarrativeRadar({
+  narratives,
+  selectedIds,
+  deviations,
+  onCompare,
+}: NarrativeRadarProps) {
   const radarData = useMemo<RadarEntry[] | null>(() => {
     if (narratives.length === 0) return null;
 
@@ -254,7 +276,7 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
         summary: n.summary,
         values: metrics.map((metric) => metric.value),
         metrics,
-        color: OVERLAY_COLORS[i % OVERLAY_COLORS.length]!,
+        color: OVERLAY_COLORS[i % OVERLAY_COLORS.length] ?? OVERLAY_COLORS[0] ?? '#0ea5e9',
       };
     });
   }, [narratives, selectedIds, deviations]);
@@ -291,8 +313,9 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
               Narrative Radar
             </div>
             <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
-              Each spoke measures one narrative trait relative to the narratives currently loaded in this investigation.
-              Center means weak relative presence. The outer ring means strongest relative presence in this result set.
+              Each spoke measures one narrative trait relative to the narratives currently loaded in
+              this investigation. Center means weak relative presence. The outer ring means
+              strongest relative presence in this result set.
             </div>
           </div>
 
@@ -301,7 +324,10 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
             height={size}
             viewBox={`0 0 ${size} ${size}`}
             className="block max-w-full"
+            role="img"
+            aria-label="Narrative radar comparison chart"
           >
+            <title>Narrative radar comparison chart</title>
             <rect width={size} height={size} fill="#0a0a0f" />
 
             <path
@@ -311,11 +337,11 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
               strokeWidth={0.75}
             />
 
-            {AXES.map((_, i) => {
+            {AXES.map((axis, i) => {
               const [x, y] = hexagonPoint(cx, cy, radius, i, numAxes);
               return (
                 <line
-                  key={i}
+                  key={axis.key}
                   x1={cx}
                   y1={cy}
                   x2={x}
@@ -339,8 +365,12 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
                   fontSize={11.5}
                   fontFamily="monospace"
                 >
-                  <tspan x={x} dy="-0.5em">{axis.chartLabel[0]}</tspan>
-                  <tspan x={x} dy="1.2em">{axis.chartLabel[1]}</tspan>
+                  <tspan x={x} dy="-0.5em">
+                    {axis.chartLabel[0]}
+                  </tspan>
+                  <tspan x={x} dy="1.2em">
+                    {axis.chartLabel[1]}
+                  </tspan>
                 </text>
               );
             })}
@@ -376,7 +406,7 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
                   const [x, y] = hexagonPoint(cx, cy, radius * v, i, numAxes);
                   return (
                     <circle
-                      key={i}
+                      key={`${item.id}-${AXES[i]?.key ?? i}`}
                       cx={x}
                       cy={y}
                       r={3.5}
@@ -405,7 +435,8 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
                     Spokes
                   </div>
                   <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
-                    Each spoke represents one dimension of narrative behavior: pace, reach, emotional intensity, outlier behavior, platform spread, and author breadth.
+                    Each spoke represents one dimension of narrative behavior: pace, reach,
+                    emotional intensity, outlier behavior, platform spread, and author breadth.
                   </div>
                 </div>
                 <div className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3">
@@ -413,7 +444,8 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
                     Distance From Center
                   </div>
                   <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
-                    Farther from center means stronger relative expression of that trait inside the current narrative set. This is comparative, not absolute.
+                    Farther from center means stronger relative expression of that trait inside the
+                    current narrative set. This is comparative, not absolute.
                   </div>
                 </div>
                 <div className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3">
@@ -421,14 +453,18 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
                     Overlays
                   </div>
                   <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
-                    When multiple polygons overlap, the right-side breakdown explains the raw values so you can see what each shape is actually communicating.
+                    When multiple polygons overlap, the right-side breakdown explains the raw values
+                    so you can see what each shape is actually communicating.
                   </div>
                 </div>
               </div>
             </section>
 
             {radarData.map((item) => (
-              <section key={item.id} className="rounded border border-nerv-border/80 bg-nerv-bg/70 p-4">
+              <section
+                key={item.id}
+                className="rounded border border-nerv-border/80 bg-nerv-bg/70 p-4"
+              >
                 <div className="flex items-start gap-3">
                   <span
                     className="mt-1 inline-block h-2.5 w-2.5 rounded-full shrink-0"
@@ -446,7 +482,10 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
 
                 <div className="mt-4 grid gap-3">
                   {item.metrics.map((metric) => (
-                    <div key={metric.key} className="rounded border border-nerv-border/70 bg-nerv-bg-alt/30 px-4 py-4">
+                    <div
+                      key={metric.key}
+                      className="rounded border border-nerv-border/70 bg-nerv-bg-alt/30 px-4 py-4"
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="text-[13px] font-mono uppercase tracking-[0.14em] text-nerv-text-secondary">
                           {metric.detailLabel}
@@ -479,7 +518,10 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 {AXES.map((axis) => (
-                  <div key={axis.key} className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3">
+                  <div
+                    key={axis.key}
+                    className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3"
+                  >
                     <div className="text-[13px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
                       {axis.detailLabel}
                     </div>
@@ -502,6 +544,7 @@ export function NarrativeRadar({ narratives, selectedIds, deviations, onCompare 
               )}
               {onCompare && radarData.length >= 2 && (
                 <button
+                  type="button"
                   onClick={() => onCompare(radarData.map((d) => d.id))}
                   className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
                 >

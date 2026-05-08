@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { CausalReasoningService } from './causal-reasoning.service';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { RawPost } from './deviation.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { ExternalSignal, SignalAdapter } from './signal-adapters/signal-adapter.interface';
 
 // ---------------------------------------------------------------------------
@@ -129,8 +129,7 @@ function createService(
 
   // If we have a mock, inject it
   if (mockGenAI) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (service as any).genAI = {
+    (service as unknown as { genAI: { getGenerativeModel: jest.Mock } }).genAI = {
       getGenerativeModel: jest.fn().mockReturnValue(mockGenAI.mockModel),
     };
   }
@@ -192,7 +191,8 @@ describe('CausalReasoningService', () => {
                     node: 'Small-cap tokens follow BTC',
                     type: 'market',
                     description: 'Altcoins typically follow BTC price movements',
-                    evidence: 'Well-established crypto market pattern — small tokens correlate with BTC',
+                    evidence:
+                      'Well-established crypto market pattern — small tokens correlate with BTC',
                     confidence: 0.9,
                   },
                   {
@@ -238,8 +238,12 @@ describe('CausalReasoningService', () => {
       expect(chain.overallConfidence).toBe(0.75);
 
       // Check direction is preserved (extra fields added by causal reasoning)
-      expect((chain as unknown as Record<string, unknown>)['direction']).toBe('effect_to_narrative');
-      expect((chain as unknown as Record<string, unknown>)['scaleAssessment']).toContain('BTC decline');
+      expect((chain as unknown as Record<string, unknown>)['direction']).toBe(
+        'effect_to_narrative',
+      );
+      expect((chain as unknown as Record<string, unknown>)['scaleAssessment']).toContain(
+        'BTC decline',
+      );
 
       expect(result!.summary).toContain('Bitcoin decline');
       expect(result!.iterationsUsed).toBe(1);
@@ -331,7 +335,8 @@ describe('CausalReasoningService', () => {
                   },
                 ],
                 overall_confidence: 0.6,
-                scale_assessment: 'Macro uncertainty → crypto market → niche token narrative. Plausible.',
+                scale_assessment:
+                  'Macro uncertainty → crypto market → niche token narrative. Plausible.',
               },
             },
             {

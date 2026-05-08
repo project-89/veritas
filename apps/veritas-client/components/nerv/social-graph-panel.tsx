@@ -50,14 +50,15 @@ const PLATFORM_COLORS: Record<string, string> = {
   telegram: '#0088cc',
 };
 
-const TIER_STYLES: Record<
-  number,
-  { dotColor: string; textClass: string; label: string }
-> = {
+const TIER_STYLES: Record<number, { dotColor: string; textClass: string; label: string }> = {
   1: { dotColor: '#FF6B2B', textClass: 'text-[10px] font-bold', label: 'Direct' },
   2: { dotColor: '#0ea5e9', textClass: 'text-[10px]', label: 'Contextual' },
   3: { dotColor: '#555570', textClass: 'text-[9px]', label: 'Bridge' },
 };
+
+function getTierStyle(tier: Connection['tier']) {
+  return TIER_STYLES[tier] ?? TIER_STYLES[3];
+}
 
 // ---------------------------------------------------------------------------
 // Data derivation
@@ -80,11 +81,19 @@ function deriveGraph(investigation: InvestigationResult): {
   const directLinks = new Map<string, Set<string>>();
   for (const u of users) {
     if (u.likelySource && userMap.has(u.likelySource)) {
-      if (!directLinks.has(u.user.handle)) directLinks.set(u.user.handle, new Set());
-      directLinks.get(u.user.handle)!.add(u.likelySource);
+      let userLinks = directLinks.get(u.user.handle);
+      if (!userLinks) {
+        userLinks = new Set();
+        directLinks.set(u.user.handle, userLinks);
+      }
+      userLinks.add(u.likelySource);
       // Bidirectional awareness
-      if (!directLinks.has(u.likelySource)) directLinks.set(u.likelySource, new Set());
-      directLinks.get(u.likelySource)!.add(u.user.handle);
+      let sourceLinks = directLinks.get(u.likelySource);
+      if (!sourceLinks) {
+        sourceLinks = new Set();
+        directLinks.set(u.likelySource, sourceLinks);
+      }
+      sourceLinks.add(u.user.handle);
     }
   }
 
@@ -92,8 +101,9 @@ function deriveGraph(investigation: InvestigationResult): {
   const clusterMembership = new Map<string, number[]>();
   clusters.forEach((cluster, clusterIdx) => {
     for (const handle of cluster.users) {
-      if (!clusterMembership.has(handle)) clusterMembership.set(handle, []);
-      clusterMembership.get(handle)!.push(clusterIdx);
+      const memberships = clusterMembership.get(handle) ?? [];
+      memberships.push(clusterIdx);
+      clusterMembership.set(handle, memberships);
     }
   });
 
@@ -203,10 +213,11 @@ function ConnectionRow({
   connection: Connection;
   onSelect?: (handle: string) => void;
 }) {
-  const tierStyle = TIER_STYLES[connection.tier] ?? TIER_STYLES[3]!;
+  const tierStyle = getTierStyle(connection.tier);
 
   return (
     <button
+      type="button"
       onClick={() => onSelect?.(connection.handle)}
       className="w-full flex items-center gap-2 px-2 py-1 hover:bg-nerv-bg-elevated/40 transition-colors rounded-sm group"
     >
@@ -241,11 +252,7 @@ function ConnectionRow({
 
       {/* Weight bar */}
       <div className="w-16 shrink-0">
-        <NervBar
-          value={connection.weight}
-          color={tierStyle.dotColor}
-          height={3}
-        />
+        <NervBar value={connection.weight} color={tierStyle.dotColor} height={3} />
       </div>
     </button>
   );
@@ -267,14 +274,14 @@ function UserConnectionGroup({
     <div className="border border-nerv-border rounded-sm">
       {/* User header */}
       <button
+        type="button"
         onClick={() => onSelectActor?.(node.handle)}
         className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-nerv-bg-elevated/30 transition-colors"
       >
         <span
           className="w-2 h-2 rounded-full shrink-0"
           style={{
-            backgroundColor:
-              PLATFORM_COLORS[node.platform.toLowerCase()] ?? '#888',
+            backgroundColor: PLATFORM_COLORS[node.platform.toLowerCase()] ?? '#888',
           }}
         />
         <span className="text-[10px] font-mono font-bold text-nerv-text truncate flex-1 text-left">
@@ -284,12 +291,8 @@ function UserConnectionGroup({
           {tierCounts[1] > 0 && (
             <NervBadge label={`${tierCounts[1]}D`} variant="orange" size="sm" />
           )}
-          {tierCounts[2] > 0 && (
-            <NervBadge label={`${tierCounts[2]}C`} variant="blue" size="sm" />
-          )}
-          {tierCounts[3] > 0 && (
-            <NervBadge label={`${tierCounts[3]}B`} variant="muted" size="sm" />
-          )}
+          {tierCounts[2] > 0 && <NervBadge label={`${tierCounts[2]}C`} variant="blue" size="sm" />}
+          {tierCounts[3] > 0 && <NervBadge label={`${tierCounts[3]}B`} variant="muted" size="sm" />}
         </div>
       </button>
 
@@ -298,15 +301,15 @@ function UserConnectionGroup({
         {([1, 2, 3] as const).map((tier) => {
           const tierConns = node.connections.filter((c) => c.tier === tier);
           if (tierConns.length === 0) return null;
-          const style = TIER_STYLES[tier]!;
+          const style = getTierStyle(tier);
           return (
             <div key={tier}>
               <div className="text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted px-2 pt-1">
                 {style.label} ({tierConns.length})
               </div>
-              {tierConns.map((c, i) => (
+              {tierConns.map((c) => (
                 <ConnectionRow
-                  key={`${c.handle}-${i}`}
+                  key={`${c.handle}:${c.platform}:${c.tier}`}
                   connection={c}
                   onSelect={onSelectActor}
                 />
@@ -346,6 +349,7 @@ export function SocialGraphPanel({
           </div>
           {onTriggerAnalysis && (
             <button
+              type="button"
               onClick={onTriggerAnalysis}
               className="mt-4 px-4 py-2 text-[10px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors font-bold"
             >
@@ -354,8 +358,7 @@ export function SocialGraphPanel({
           )}
           <div className="text-[11px] font-mono text-nerv-orange mt-3 max-w-[320px] leading-relaxed">
             {'\u2192'} Select a narrative in the left panel, then click{' '}
-            <span className="font-bold">INVESTIGATE THIS NARRATIVE</span> in
-            the right panel.
+            <span className="font-bold">INVESTIGATE THIS NARRATIVE</span> in the right panel.
           </div>
         </div>
       </div>
@@ -371,8 +374,7 @@ export function SocialGraphPanel({
             NO CONNECTIONS FOUND
           </div>
           <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[280px] leading-relaxed">
-            Investigation completed but no social connections could be derived
-            from the data.
+            Investigation completed but no social connections could be derived from the data.
           </div>
         </div>
       </div>
@@ -391,26 +393,14 @@ export function SocialGraphPanel({
             Social Graph
           </span>
           <div className="flex items-center gap-2">
-            <NervBadge
-              label={`${community.communityCount} communities`}
-              variant="blue"
-              size="sm"
-            />
+            <NervBadge label={`${community.communityCount} communities`} variant="blue" size="sm" />
             <NervBadge
               label={`${community.bridgeNodes.length} bridge nodes`}
               variant="amber"
               size="sm"
             />
-            <NervBadge
-              label={`${nodes.length} actors`}
-              variant="muted"
-              size="sm"
-            />
-            <NervBadge
-              label={`${totalConnections} connections`}
-              variant="muted"
-              size="sm"
-            />
+            <NervBadge label={`${nodes.length} actors`} variant="muted" size="sm" />
+            <NervBadge label={`${totalConnections} connections`} variant="muted" size="sm" />
           </div>
         </div>
 
@@ -420,7 +410,7 @@ export function SocialGraphPanel({
             TIERS:
           </span>
           {([1, 2, 3] as const).map((tier) => {
-            const style = TIER_STYLES[tier]!;
+            const style = getTierStyle(tier);
             return (
               <span
                 key={tier}
@@ -445,6 +435,7 @@ export function SocialGraphPanel({
             {community.bridgeNodes.map((handle) => (
               <button
                 key={handle}
+                type="button"
                 onClick={() => onSelectActor?.(handle)}
                 className="text-[8px] font-mono text-nerv-text-secondary hover:text-nerv-orange transition-colors"
               >
@@ -458,11 +449,7 @@ export function SocialGraphPanel({
       {/* Relationship list */}
       <div className="flex-1 overflow-auto p-3 space-y-2">
         {nodes.map((node) => (
-          <UserConnectionGroup
-            key={node.handle}
-            node={node}
-            onSelectActor={onSelectActor}
-          />
+          <UserConnectionGroup key={node.handle} node={node} onSelectActor={onSelectActor} />
         ))}
       </div>
     </div>

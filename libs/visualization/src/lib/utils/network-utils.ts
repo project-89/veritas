@@ -1,5 +1,5 @@
-import { NetworkNode, NetworkEdge } from '../types/network-types';
-import { NODE_COLORS, EDGE_COLORS, EdgeType, adjustColorOpacity } from './color-utils';
+import { NetworkEdge, NetworkNode } from '../types/network-types';
+import { adjustColorOpacity, EDGE_COLORS, EdgeType, NODE_COLORS } from './color-utils';
 
 /**
  * Calculates the size of a node based on its type and properties
@@ -10,24 +10,24 @@ export function calculateNodeSize(node: Partial<NetworkNode> & { type: string })
   let baseSize = 1;
 
   switch (node.type) {
-    case "content": {
+    case 'content': {
       // Size based on engagement metrics
       const engagement =
-        ((node.properties?.likes as number) || 0) + 
-        ((node.properties?.shares as number) || 0) + 
+        ((node.properties?.likes as number) || 0) +
+        ((node.properties?.shares as number) || 0) +
         ((node.properties?.comments as number) || 0);
       baseSize = Math.log10(engagement + 1) + 1;
       break;
     }
-    case "source": {
+    case 'source': {
       // Size based on credibility and activity
       baseSize = ((node.properties?.credibilityScore as number) || 0.5) * 2;
       break;
     }
-    case "account": {
+    case 'account': {
       // Size based on influence metrics
-      const influence = (node.properties?.followers as number) || 
-                        (node.properties?.connections as number) || 0;
+      const influence =
+        (node.properties?.followers as number) || (node.properties?.connections as number) || 0;
       baseSize = Math.log10(influence + 1) + 1;
       break;
     }
@@ -43,27 +43,30 @@ export function calculateNodeSize(node: Partial<NetworkNode> & { type: string })
  * @param weight The weight of the node (0-1)
  * @returns A color string
  */
-export function calculateNodeColor(node: Partial<NetworkNode> & { type: string }, weight: number): string {
+export function calculateNodeColor(
+  node: Partial<NetworkNode> & { type: string },
+  weight: number,
+): string {
   switch (node.type) {
-    case "content": {
+    case 'content': {
       if (weight > 0.7) return NODE_COLORS.content.highImpact;
       if (weight < 0.3) return NODE_COLORS.content.lowImpact;
       return NODE_COLORS.content.default;
     }
-    case "source": {
-      if ((node.properties?.verificationStatus as string) === "verified")
+    case 'source': {
+      if ((node.properties?.verificationStatus as string) === 'verified')
         return NODE_COLORS.source.verified;
-      if ((node.properties?.verificationStatus as string) === "disputed")
+      if ((node.properties?.verificationStatus as string) === 'disputed')
         return NODE_COLORS.source.disputed;
       return NODE_COLORS.source.unverified;
     }
-    case "account": {
+    case 'account': {
       if (weight > 0.7) return NODE_COLORS.account.influential;
       if (weight < 0.3) return NODE_COLORS.account.suspicious;
       return NODE_COLORS.account.normal;
     }
     default:
-      return "#000000";
+      return '#000000';
   }
 }
 
@@ -76,25 +79,25 @@ export function calculateNodeWeight(node: Partial<NetworkNode> & { type: string 
   let weight = 0.5; // Default weight
 
   switch (node.type) {
-    case "content": {
+    case 'content': {
       // Weight based on engagement and credibility
       const engagement =
-        ((node.properties?.likes as number) || 0) + 
-        ((node.properties?.shares as number) || 0) + 
+        ((node.properties?.likes as number) || 0) +
+        ((node.properties?.shares as number) || 0) +
         ((node.properties?.comments as number) || 0);
       const engagementScore = Math.min(engagement / 1000, 1);
       const credibility = (node.properties?.sourceCredibility as number) || 0.5;
       weight = engagementScore * 0.6 + credibility * 0.4;
       break;
     }
-    case "source": {
+    case 'source': {
       // Weight based on verification status and historical accuracy
       weight =
         ((node.properties?.credibilityScore as number) || 0.5) * 0.7 +
         ((node.properties?.historicalAccuracy as number) || 0.5) * 0.3;
       break;
     }
-    case "account": {
+    case 'account': {
       // Weight based on activity patterns and verification
       const activityScore = (node.properties?.activityScore as number) || 0.5;
       const verificationBonus = (node.properties?.isVerified as boolean) ? 0.2 : 0;
@@ -131,7 +134,7 @@ export function calculateEdgeWidth(edge: Partial<NetworkEdge>): number {
  */
 export function calculateEdgeColor(edge: { type: string }, weight: number): string {
   // Get base color from edge type
-  const baseColor = EDGE_COLORS[edge.type as EdgeType] || "#999999";
+  const baseColor = EDGE_COLORS[edge.type as EdgeType] || '#999999';
 
   // If it's a weak relationship, make it more transparent
   if (weight < 0.3) {
@@ -171,4 +174,4 @@ export function calculateNetworkDensity(nodeCount: number, edgeCount: number): n
   if (nodeCount <= 1) return 0;
   const maxEdges = (nodeCount * (nodeCount - 1)) / 2;
   return edgeCount / maxEdges;
-} 
+}

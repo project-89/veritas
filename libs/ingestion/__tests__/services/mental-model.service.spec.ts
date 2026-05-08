@@ -5,9 +5,7 @@ describe('MentalModelService', () => {
     const service = new MentalModelService({
       get: jest.fn().mockReturnValue(undefined),
     } as any);
-    jest
-      .spyOn(service as any, 'generateWithLLM')
-      .mockResolvedValue(null);
+    jest.spyOn(service as any, 'generateWithLLM').mockResolvedValue(null);
 
     const result = await service.buildFromInvestigation({
       investigation: {
@@ -24,7 +22,8 @@ describe('MentalModelService', () => {
             status: 'processed',
             notes: 'Tracks wallets, domains, and team reuse.',
             metadata: {
-              contentPreview: 'The investigator follows wallets, compares sites, and checks repeated infrastructure.',
+              contentPreview:
+                'The investigator follows wallets, compares sites, and checks repeated infrastructure.',
             },
             extractedEntities: [],
             createdAt: new Date('2026-04-06T00:00:00Z'),

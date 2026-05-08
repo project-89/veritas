@@ -1,5 +1,5 @@
-import { RedisProvider } from '../../src/lib/redis/redis-provider';
 import { DatabaseProviderOptions } from '../../src/lib/interfaces/database-provider.interface';
+import { RedisProvider } from '../../src/lib/redis/redis-provider';
 
 // Mock the redis module
 jest.mock('redis', () => {
@@ -109,7 +109,7 @@ describe('RedisProvider', () => {
 
     it('should throw an error if not connected', () => {
       expect(() => provider.getRepository('TestEntity')).toThrow(
-        'Cannot get repository: Redis is not connected'
+        'Cannot get repository: Redis is not connected',
       );
     });
   });

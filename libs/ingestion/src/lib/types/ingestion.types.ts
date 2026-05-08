@@ -1,16 +1,16 @@
-import { InputType, Field, registerEnumType, Float } from '@nestjs/graphql';
-import GraphQLJSON from 'graphql-type-json';
+import { Field, Float, InputType, registerEnumType } from '@nestjs/graphql';
 import {
-  IsString,
   IsEnum,
-  IsNumber,
-  Min,
-  Max,
-  IsOptional,
-  IsObject,
   IsNotEmpty,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
+import GraphQLJSON from 'graphql-type-json';
 
 // Local definition of EngagementMetrics to avoid external dependency
 export interface EngagementMetrics {

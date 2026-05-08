@@ -41,12 +41,7 @@ interface MonitorConfigForScheduling {
 
 interface GeneratedAlert {
   investigationId: string;
-  type:
-    | 'new_narrative'
-    | 'velocity_spike'
-    | 'sentiment_reversal'
-    | 'new_platform'
-    | 'volume_surge';
+  type: 'new_narrative' | 'velocity_spike' | 'sentiment_reversal' | 'new_platform' | 'volume_surge';
   severity: 'info' | 'warning' | 'critical';
   title: string;
   description: string;
@@ -69,53 +64,26 @@ export class MonitorService {
     previous: SnapshotForComparison,
     current: SnapshotForComparison,
     investigationId: string,
-    thresholds: AlertThresholds
+    thresholds: AlertThresholds,
   ): GeneratedAlert[] {
     const alerts: GeneratedAlert[] = [];
 
     // 1. New narratives: narratives in current not in previous
-    alerts.push(
-      ...this.detectNewNarratives(
-        previous,
-        current,
-        investigationId,
-        thresholds
-      )
-    );
+    alerts.push(...this.detectNewNarratives(previous, current, investigationId, thresholds));
 
     // 2. Velocity spikes
-    alerts.push(
-      ...this.detectVelocitySpikes(
-        previous,
-        current,
-        investigationId,
-        thresholds
-      )
-    );
+    alerts.push(...this.detectVelocitySpikes(previous, current, investigationId, thresholds));
 
     // 3. Sentiment reversals
-    alerts.push(
-      ...this.detectSentimentReversals(
-        previous,
-        current,
-        investigationId,
-        thresholds
-      )
-    );
+    alerts.push(...this.detectSentimentReversals(previous, current, investigationId, thresholds));
 
     // 4. New platforms
-    alerts.push(
-      ...this.detectNewPlatforms(previous, current, investigationId)
-    );
+    alerts.push(...this.detectNewPlatforms(previous, current, investigationId));
 
     // 5. Volume surge
-    alerts.push(
-      ...this.detectVolumeSurge(previous, current, investigationId)
-    );
+    alerts.push(...this.detectVolumeSurge(previous, current, investigationId));
 
-    this.logger.log(
-      `Generated ${alerts.length} alerts for investigation ${investigationId}`
-    );
+    this.logger.log(`Generated ${alerts.length} alerts for investigation ${investigationId}`);
 
     return alerts;
   }
@@ -125,9 +93,7 @@ export class MonitorService {
    */
   getDueConfigs<T extends MonitorConfigForScheduling>(configs: T[]): T[] {
     const now = new Date();
-    return configs.filter(
-      (c) => c.enabled && c.nextRunAt && new Date(c.nextRunAt) <= now
-    );
+    return configs.filter((c) => c.enabled && c.nextRunAt && new Date(c.nextRunAt) <= now);
   }
 
   // ---------------------------------------------------------------------------
@@ -138,14 +104,12 @@ export class MonitorService {
     previous: SnapshotForComparison,
     current: SnapshotForComparison,
     investigationId: string,
-    thresholds: AlertThresholds
+    thresholds: AlertThresholds,
   ): GeneratedAlert[] {
     const alerts: GeneratedAlert[] = [];
 
     const prevSummaries = new Set(
-      (previous.narratives ?? [])
-        .map((n) => n.summary?.toLowerCase().trim())
-        .filter(Boolean)
+      (previous.narratives ?? []).map((n) => n.summary?.toLowerCase().trim()).filter(Boolean),
     );
 
     for (const narrative of current.narratives ?? []) {
@@ -159,10 +123,7 @@ export class MonitorService {
       const isNew = !prevSummaries.has(summary);
       if (!isNew) continue;
 
-      const severity =
-        postCount >= thresholds.minNewNarrativePosts * 3
-          ? 'warning'
-          : 'info';
+      const severity = postCount >= thresholds.minNewNarrativePosts * 3 ? 'warning' : 'info';
 
       alerts.push({
         investigationId,
@@ -186,7 +147,7 @@ export class MonitorService {
     previous: SnapshotForComparison,
     current: SnapshotForComparison,
     investigationId: string,
-    thresholds: AlertThresholds
+    thresholds: AlertThresholds,
   ): GeneratedAlert[] {
     const alerts: GeneratedAlert[] = [];
 
@@ -209,9 +170,7 @@ export class MonitorService {
       const multiplier = narrative.velocity.postsPerHour / prevVelocity;
       if (multiplier < thresholds.velocityMultiplier) continue;
 
-      const severity = multiplier >= thresholds.velocityMultiplier * 2
-        ? 'critical'
-        : 'warning';
+      const severity = multiplier >= thresholds.velocityMultiplier * 2 ? 'critical' : 'warning';
 
       alerts.push({
         investigationId,
@@ -236,7 +195,7 @@ export class MonitorService {
     previous: SnapshotForComparison,
     current: SnapshotForComparison,
     investigationId: string,
-    thresholds: AlertThresholds
+    thresholds: AlertThresholds,
   ): GeneratedAlert[] {
     const alerts: GeneratedAlert[] = [];
 
@@ -271,9 +230,7 @@ export class MonitorService {
         investigationId,
         type: 'sentiment_reversal',
         severity,
-        title: reversed
-          ? 'Sentiment reversal detected'
-          : 'Major sentiment shift detected',
+        title: reversed ? 'Sentiment reversal detected' : 'Major sentiment shift detected',
         description: `"${narrative.summary}" sentiment shifted from ${prevSentiment.toFixed(2)} to ${narrative.avgSentiment.toFixed(2)}`,
         metadata: {
           narrativeSummary: narrative.summary,
@@ -292,7 +249,7 @@ export class MonitorService {
   private detectNewPlatforms(
     previous: SnapshotForComparison,
     current: SnapshotForComparison,
-    investigationId: string
+    investigationId: string,
   ): GeneratedAlert[] {
     const alerts: GeneratedAlert[] = [];
 
@@ -312,9 +269,7 @@ export class MonitorService {
       const prevPlatforms = prevPlatformsMap.get(key);
       if (!prevPlatforms) continue;
 
-      const newPlatforms = Object.keys(narrative.platforms).filter(
-        (p) => !prevPlatforms.has(p)
-      );
+      const newPlatforms = Object.keys(narrative.platforms).filter((p) => !prevPlatforms.has(p));
 
       if (newPlatforms.length === 0) continue;
 
@@ -339,7 +294,7 @@ export class MonitorService {
   private detectVolumeSurge(
     previous: SnapshotForComparison,
     current: SnapshotForComparison,
-    investigationId: string
+    investigationId: string,
   ): GeneratedAlert[] {
     if (previous.postCount === 0) return [];
 

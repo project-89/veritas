@@ -37,7 +37,10 @@
       "@veritas/ingestion/internal/repositories/*": ["libs/ingestion/src/lib/repositories/*"],
       "@veritas/ingestion/internal/schemas/*": ["libs/ingestion/src/lib/schemas/*"],
       "@veritas/plugin-atlas": ["packages/atlas-plugin/src/index.ts"],
+      "@veritas/plugin-magi": ["private-plugins/packages/magi-plugin/src/index.ts"],
+      "@veritas/plugin-magi/backend": ["private-plugins/packages/magi-plugin/src/backend/index.ts"],
       "@veritas/shared": ["libs/shared/types/src/index.ts"],
+      "@veritas/shared/plugins": ["libs/shared/src/lib/plugins/plugin-registry.ts"],
       "@veritas/shared/types": ["libs/shared/types/src/index.ts"],
       "@veritas/shared/utils": ["libs/shared/utils/src/index.ts"],
       "@veritas/sources": ["libs/sources/src/index.ts"]

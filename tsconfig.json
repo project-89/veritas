@@ -24,20 +24,8 @@
       "@veritas/sources": ["libs/sources/src/index.ts"],
       "@veritas/sources/*": ["libs/sources/src/*"]
     },
-    "typeRoots": [
-      "./node_modules/@types"
-    ]
+    "typeRoots": ["./node_modules/@types"]
   },
-  "include": [
-    "libs/**/*",
-    "apps/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.spec.ts",
-    "**/*.test.ts",
-    "**/*.d.ts",
-    "**/*.js"
-  ]
-} 
+  "include": ["libs/**/*", "apps/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts", "**/*.d.ts", "**/*.js"]
+}

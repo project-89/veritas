@@ -1,10 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
 import {
-  AnalysisJobModel,
   type AnalysisJob,
-  type AnalysisJobType,
   type AnalysisJobInput,
+  AnalysisJobModel,
+  type AnalysisJobType,
 } from '../schemas/analysis-job.schema';
 
 @Injectable()
@@ -37,7 +37,11 @@ export class AnalysisJobRepository implements OnModuleInit {
 
   private ensureInitialized() {
     if (!this.initialized) {
-      try { this.initializeRepositories(); } catch { /* swallow */ }
+      try {
+        this.initializeRepositories();
+      } catch {
+        /* swallow */
+      }
     }
     if (!this.initialized) {
       throw new Error('AnalysisJobRepository not initialized — is MongoDB connected?');
@@ -78,10 +82,7 @@ export class AnalysisJobRepository implements OnModuleInit {
 
   async getJobsByScan(scanId: string): Promise<AnalysisJob[]> {
     this.ensureInitialized();
-    return this.repo.find(
-      { scanId } as Record<string, unknown>,
-      { sort: { createdAt: -1 } },
-    );
+    return this.repo.find({ scanId } as Record<string, unknown>, { sort: { createdAt: -1 } });
   }
 
   async cancelJobsByScan(scanId: string): Promise<void> {
@@ -97,7 +98,9 @@ export class AnalysisJobRepository implements OnModuleInit {
 
   async updateStatus(
     id: string,
-    update: Partial<Pick<AnalysisJob, 'status' | 'startedAt' | 'completedAt' | 'duration' | 'error' | 'result'>>,
+    update: Partial<
+      Pick<AnalysisJob, 'status' | 'startedAt' | 'completedAt' | 'duration' | 'error' | 'result'>
+    >,
   ): Promise<void> {
     this.ensureInitialized();
     await this.repo.updateById(id, update as Partial<AnalysisJob>);

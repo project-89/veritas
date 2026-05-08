@@ -1,23 +1,20 @@
-import { Injectable, Inject, Logger, Optional, forwardRef } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
-import type { RawPost } from './deviation.service';
-import type {
-  ExternalSignal,
-  SignalAdapter,
-} from './signal-adapters/signal-adapter.interface';
-import { LlmHypothesisAdapter } from './signal-adapters/llm-hypothesis.adapter';
-import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
-import { YahooFinanceAdapter } from './signal-adapters/yahoo-finance.adapter';
-import { WorldBankAdapter } from './signal-adapters/worldbank.adapter';
-import { FredAdapter } from './signal-adapters/fred.adapter';
-import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
-import { AcledAdapter } from './signal-adapters/acled.adapter';
-import { UsgsAdapter } from './signal-adapters/usgs.adapter';
-import { GdacsAdapter } from './signal-adapters/gdacs.adapter';
-import { ReliefWebAdapter } from './signal-adapters/reliefweb.adapter';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { CausalReasoningService } from './causal-reasoning.service';
+import type { RawPost } from './deviation.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
+import { AcledAdapter } from './signal-adapters/acled.adapter';
+import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
+import { FredAdapter } from './signal-adapters/fred.adapter';
+import { GdacsAdapter } from './signal-adapters/gdacs.adapter';
+import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
+import { LlmHypothesisAdapter } from './signal-adapters/llm-hypothesis.adapter';
+import { ReliefWebAdapter } from './signal-adapters/reliefweb.adapter';
+import type { ExternalSignal, SignalAdapter } from './signal-adapters/signal-adapter.interface';
+import { UsgsAdapter } from './signal-adapters/usgs.adapter';
+import { WorldBankAdapter } from './signal-adapters/worldbank.adapter';
+import { YahooFinanceAdapter } from './signal-adapters/yahoo-finance.adapter';
 
 /** Injection token for the causal reasoning service (avoids circular dependency). */
 export const CAUSAL_REASONING_SERVICE = Symbol('CAUSAL_REASONING_SERVICE');
@@ -35,8 +32,17 @@ export const SIGNAL_CACHE_STORE = Symbol('SIGNAL_CACHE_STORE');
 
 /** Minimal interface for signal persistence — decoupled from the repository class. */
 export interface SignalCacheStore {
-  findGlobalCache(adapterName: string, startDate: string, endDate: string): Promise<{ signals: CachedSignalData[]; fetchedAt: Date } | null>;
-  findQueryCache(adapterName: string, keywords: string[], startDate: string, endDate: string): Promise<{ signals: CachedSignalData[]; fetchedAt: Date } | null>;
+  findGlobalCache(
+    adapterName: string,
+    startDate: string,
+    endDate: string,
+  ): Promise<{ signals: CachedSignalData[]; fetchedAt: Date } | null>;
+  findQueryCache(
+    adapterName: string,
+    keywords: string[],
+    startDate: string,
+    endDate: string,
+  ): Promise<{ signals: CachedSignalData[]; fetchedAt: Date } | null>;
   saveSignals(params: {
     adapterName: string;
     scope: 'global' | 'query';
@@ -152,7 +158,16 @@ const DOMAIN_COLORS: Record<string, string> = {
   media: '#EC4899', // pink
 };
 
-const CLUSTER_COLORS = ['#8B5CF6', '#10B981', '#EF4444', '#3B82F6', '#F59E0B', '#EC4899', '#06B6D4', '#84CC16'];
+const CLUSTER_COLORS = [
+  '#8B5CF6',
+  '#10B981',
+  '#EF4444',
+  '#3B82F6',
+  '#F59E0B',
+  '#EC4899',
+  '#06B6D4',
+  '#84CC16',
+];
 
 // ---------------------------------------------------------------------------
 // Service
@@ -168,18 +183,17 @@ export class DownstreamEffectsService {
   constructor(
     private readonly configService: ConfigService,
     @Optional() @Inject(SIGNAL_CACHE_STORE) private readonly signalCache?: SignalCacheStore,
-    @Optional() @Inject(CAUSAL_REASONING_SERVICE) private readonly causalReasoning?: CausalReasoningService,
+    @Optional()
+    @Inject(CAUSAL_REASONING_SERVICE)
+    private readonly causalReasoning?: CausalReasoningService,
   ) {
     const geminiKey =
-      this.configService.get<string>('GEMINI_API_KEY') ||
-      process.env['GEMINI_API_KEY'];
+      this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
 
     if (geminiKey) {
       this.genAI = new GoogleGenerativeAI(geminiKey);
     } else {
-      this.logger.warn(
-        'GEMINI_API_KEY not set — downstream effects will use fallback mode',
-      );
+      this.logger.warn('GEMINI_API_KEY not set — downstream effects will use fallback mode');
     }
 
     // Register adapters — real-world data sources + LLM hypothesis fallback.
@@ -209,7 +223,11 @@ export class DownstreamEffectsService {
     posts: RawPost[],
   ): Promise<DownstreamEffectsResult> {
     if (narratives.length === 0) {
-      return { narrativeCorrelations: [], externalSignals: [], summary: 'No narratives to analyze.' };
+      return {
+        narrativeCorrelations: [],
+        externalSignals: [],
+        summary: 'No narratives to analyze.',
+      };
     }
 
     // 1. Extract keywords from narratives
@@ -235,7 +253,7 @@ export class DownstreamEffectsService {
         if (agentResult) {
           this.logger.log(
             `Causal agent: ${agentResult.correlations.length} correlations, ` +
-            `${agentResult.rejections.length} rejections, ${agentResult.iterationsUsed} iterations`,
+              `${agentResult.rejections.length} rejections, ${agentResult.iterationsUsed} iterations`,
           );
           return {
             narrativeCorrelations: agentResult.correlations,
@@ -244,7 +262,9 @@ export class DownstreamEffectsService {
           };
         }
       } catch (err) {
-        this.logger.warn(`Causal reasoning agent failed, falling back to simple correlation: ${err}`);
+        this.logger.warn(
+          `Causal reasoning agent failed, falling back to simple correlation: ${err}`,
+        );
       }
     }
 
@@ -267,10 +287,7 @@ export class DownstreamEffectsService {
   /**
    * Extract representative keywords from narrative summaries and post content.
    */
-  extractKeywords(
-    narratives: AnalyzedNarrative[],
-    posts: RawPost[],
-  ): string[] {
+  extractKeywords(narratives: AnalyzedNarrative[], posts: RawPost[]): string[] {
     const words = new Map<string, number>();
 
     // Weight narrative summaries heavily
@@ -299,18 +316,112 @@ export class DownstreamEffectsService {
 
   private tokenize(text: string): string[] {
     const stopWords = new Set([
-      'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-      'should', 'may', 'might', 'shall', 'can', 'to', 'of', 'in', 'for',
-      'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
-      'before', 'after', 'above', 'below', 'between', 'out', 'off', 'up',
-      'down', 'about', 'and', 'but', 'or', 'nor', 'not', 'so', 'yet',
-      'both', 'either', 'neither', 'each', 'every', 'all', 'any', 'few',
-      'more', 'most', 'other', 'some', 'such', 'no', 'only', 'own', 'same',
-      'than', 'too', 'very', 'just', 'because', 'it', 'its', 'this', 'that',
-      'these', 'those', 'i', 'me', 'my', 'myself', 'we', 'our', 'you',
-      'your', 'he', 'him', 'his', 'she', 'her', 'they', 'them', 'their',
-      'what', 'which', 'who', 'whom', 'how', 'when', 'where', 'why',
+      'the',
+      'a',
+      'an',
+      'is',
+      'are',
+      'was',
+      'were',
+      'be',
+      'been',
+      'being',
+      'have',
+      'has',
+      'had',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'could',
+      'should',
+      'may',
+      'might',
+      'shall',
+      'can',
+      'to',
+      'of',
+      'in',
+      'for',
+      'on',
+      'with',
+      'at',
+      'by',
+      'from',
+      'as',
+      'into',
+      'through',
+      'during',
+      'before',
+      'after',
+      'above',
+      'below',
+      'between',
+      'out',
+      'off',
+      'up',
+      'down',
+      'about',
+      'and',
+      'but',
+      'or',
+      'nor',
+      'not',
+      'so',
+      'yet',
+      'both',
+      'either',
+      'neither',
+      'each',
+      'every',
+      'all',
+      'any',
+      'few',
+      'more',
+      'most',
+      'other',
+      'some',
+      'such',
+      'no',
+      'only',
+      'own',
+      'same',
+      'than',
+      'too',
+      'very',
+      'just',
+      'because',
+      'it',
+      'its',
+      'this',
+      'that',
+      'these',
+      'those',
+      'i',
+      'me',
+      'my',
+      'myself',
+      'we',
+      'our',
+      'you',
+      'your',
+      'he',
+      'him',
+      'his',
+      'she',
+      'her',
+      'they',
+      'them',
+      'their',
+      'what',
+      'which',
+      'who',
+      'whom',
+      'how',
+      'when',
+      'where',
+      'why',
     ]);
 
     return text
@@ -367,15 +478,16 @@ export class DownstreamEffectsService {
       // 1. Check DB cache for this adapter
       if (this.signalCache) {
         try {
-          const cached = adapter.scope === 'global'
-            ? await this.signalCache.findGlobalCache(adapter.name, startDate, endDate)
-            : await this.signalCache.findQueryCache(adapter.name, keywords, startDate, endDate);
+          const cached =
+            adapter.scope === 'global'
+              ? await this.signalCache.findGlobalCache(adapter.name, startDate, endDate)
+              : await this.signalCache.findQueryCache(adapter.name, keywords, startDate, endDate);
 
           if (cached) {
             const age = Date.now() - new Date(cached.fetchedAt).getTime();
             this.logger.log(
               `Cache hit: "${adapter.name}" — ${cached.signals.length} signals ` +
-              `(${Math.round(age / 3600000)}h old, max ${Math.round(adapter.maxAgeMs / 3600000)}h)`,
+                `(${Math.round(age / 3600000)}h old, max ${Math.round(adapter.maxAgeMs / 3600000)}h)`,
             );
             return cached.signals;
           }
@@ -401,17 +513,19 @@ export class DownstreamEffectsService {
 
         // 3. Persist to DB cache for future requests
         if (this.signalCache && signals.length > 0) {
-          this.signalCache.saveSignals({
-            adapterName: adapter.name,
-            scope: adapter.scope,
-            keywords: adapter.scope === 'query' ? keywords : [],
-            startDate,
-            endDate,
-            signals,
-            maxAgeMs: adapter.maxAgeMs,
-          }).catch((err) => {
-            this.logger.warn(`Failed to cache signals for "${adapter.name}": ${err}`);
-          });
+          this.signalCache
+            .saveSignals({
+              adapterName: adapter.name,
+              scope: adapter.scope,
+              keywords: adapter.scope === 'query' ? keywords : [],
+              startDate,
+              endDate,
+              signals,
+              maxAgeMs: adapter.maxAgeMs,
+            })
+            .catch((err) => {
+              this.logger.warn(`Failed to cache signals for "${adapter.name}": ${err}`);
+            });
         }
 
         return signals;
@@ -452,9 +566,7 @@ export class DownstreamEffectsService {
     return narratives.map((narrative) => {
       const narrativeKeywords = new Set(this.tokenize(narrative.summary));
       const narrativeMidpoint =
-        (new Date(narrative.firstSeen).getTime() +
-          new Date(narrative.lastSeen).getTime()) /
-        2;
+        (new Date(narrative.firstSeen).getTime() + new Date(narrative.lastSeen).getTime()) / 2;
       const msPerDay = 24 * 60 * 60 * 1000;
 
       const correlatedSignals = signals.map((signal) => {
@@ -468,7 +580,10 @@ export class DownstreamEffectsService {
         const overlapCount = signalKeywords.filter((w) => narrativeKeywords.has(w)).length;
         const keywordScore =
           signalKeywords.length > 0
-            ? Math.min(1, overlapCount / Math.max(1, Math.min(narrativeKeywords.size, signalKeywords.length)))
+            ? Math.min(
+                1,
+                overlapCount / Math.max(1, Math.min(narrativeKeywords.size, signalKeywords.length)),
+              )
             : 0;
 
         // Combined correlation strength
@@ -478,9 +593,7 @@ export class DownstreamEffectsService {
         // Determine temporal offset and relationship
         const offsetDays = (signalTs - narrativeMidpoint) / msPerDay;
         const temporalOffset =
-          offsetDays >= 0
-            ? `+${Math.round(offsetDays)} days`
-            : `${Math.round(offsetDays)} days`;
+          offsetDays >= 0 ? `+${Math.round(offsetDays)} days` : `${Math.round(offsetDays)} days`;
 
         let possibleRelationship: 'caused_by' | 'caused' | 'coincident' | 'amplified';
         if (Math.abs(offsetDays) < 1) {
@@ -660,7 +773,10 @@ No other text.`;
         },
         {
           node: cs.signal.title,
-          type: cs.signal.domain === 'media' ? ('social' as const) : (cs.signal.domain as TransmissionChainNode['type']),
+          type:
+            cs.signal.domain === 'media'
+              ? ('social' as const)
+              : (cs.signal.domain as TransmissionChainNode['type']),
           description: cs.signal.description,
           confidence: cs.correlationStrength,
         },
@@ -683,10 +799,7 @@ No other text.`;
     correlations: NarrativeCorrelation[],
     signals: ExternalSignal[],
   ): Promise<string> {
-    const totalChains = correlations.reduce(
-      (sum, c) => sum + c.transmissionChains.length,
-      0,
-    );
+    const totalChains = correlations.reduce((sum, c) => sum + c.transmissionChains.length, 0);
 
     if (totalChains === 0) {
       return `Analyzed ${correlations.length} narrative(s) against ${signals.length} external signal(s). No strong downstream effect correlations were detected.`;
@@ -751,8 +864,11 @@ ${chainSummaries}`;
     }
 
     for (let ni = 0; ni < narratives.length; ni++) {
-      const narrative = narratives[ni]!;
-      const color = CLUSTER_COLORS[ni % CLUSTER_COLORS.length]!;
+      const narrative = narratives[ni];
+      if (!narrative) {
+        continue;
+      }
+      const color = CLUSTER_COLORS[ni % CLUSTER_COLORS.length] ?? '#999';
       const correlation = corrMap.get(narrative.id);
       const clusterNodeIds: string[] = [];
 
@@ -784,11 +900,17 @@ ${chainSummaries}`;
       // For each transmission chain, add intermediate + leaf nodes
       if (correlation) {
         for (let ci = 0; ci < correlation.transmissionChains.length; ci++) {
-          const chain = correlation.transmissionChains[ci]!;
+          const chain = correlation.transmissionChains[ci];
+          if (!chain) {
+            continue;
+          }
           let parentId = rootId;
 
           for (let step = 0; step < chain.chain.length; step++) {
-            const chainNode = chain.chain[step]!;
+            const chainNode = chain.chain[step];
+            if (!chainNode) {
+              continue;
+            }
             // Skip first node if it's the narrative itself (avoid duplication)
             if (step === 0 && chainNode.type === 'narrative') continue;
 
@@ -841,7 +963,10 @@ ${chainSummaries}`;
         // Also add signal nodes directly if no transmission chains
         if (correlation.transmissionChains.length === 0) {
           for (let si = 0; si < Math.min(3, correlation.correlatedSignals.length); si++) {
-            const cs = correlation.correlatedSignals[si]!;
+            const cs = correlation.correlatedSignals[si];
+            if (!cs) {
+              continue;
+            }
             const signalNodeId = `signal-${ni}-${si}`;
             const nodeColor = DOMAIN_COLORS[cs.signal.domain] ?? '#999';
 
@@ -891,11 +1016,10 @@ ${chainSummaries}`;
         nodes: clusterNodeIds,
         centralNodeId: rootId,
         metrics: {
-          cohesion:
-            correlation
-              ? correlation.transmissionChains.reduce((s, tc) => s + tc.overallConfidence, 0) /
-                Math.max(1, correlation.transmissionChains.length)
-              : 0.5,
+          cohesion: correlation
+            ? correlation.transmissionChains.reduce((s, tc) => s + tc.overallConfidence, 0) /
+              Math.max(1, correlation.transmissionChains.length)
+            : 0.5,
           influence: Math.min(1, narrative.totalEngagement / 1000),
           growth:
             narrative.velocity.trend === 'surging'
@@ -910,8 +1034,13 @@ ${chainSummaries}`;
     // Add cross-cluster branches for narratives that share signal domains
     for (let i = 0; i < clusters.length; i++) {
       for (let j = i + 1; j < clusters.length; j++) {
-        const corrI = corrMap.get(narratives[i]!.id);
-        const corrJ = corrMap.get(narratives[j]!.id);
+        const narrativeI = narratives[i];
+        const narrativeJ = narratives[j];
+        if (!narrativeI || !narrativeJ) {
+          continue;
+        }
+        const corrI = corrMap.get(narrativeI.id);
+        const corrJ = corrMap.get(narrativeJ.id);
         if (!corrI || !corrJ) continue;
 
         const domainsI = new Set(corrI.correlatedSignals.map((cs) => cs.signal.domain));
@@ -920,12 +1049,8 @@ ${chainSummaries}`;
 
         if (shared.length > 0) {
           // Connect leaf nodes from shared domains
-          const leafI = nodes.find(
-            (n) => n.narrativeId === narratives[i]!.id && n.type === 'leaf',
-          );
-          const leafJ = nodes.find(
-            (n) => n.narrativeId === narratives[j]!.id && n.type === 'leaf',
-          );
+          const leafI = nodes.find((n) => n.narrativeId === narrativeI.id && n.type === 'leaf');
+          const leafJ = nodes.find((n) => n.narrativeId === narrativeJ.id && n.type === 'leaf');
           if (leafI && leafJ) {
             branches.push({
               id: `cross-${branchIdCounter++}`,

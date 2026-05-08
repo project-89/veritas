@@ -1,17 +1,17 @@
-import { validate } from "class-validator";
+import { validate } from 'class-validator';
 import {
   ContentIngestionInput,
-  SourceIngestionInput,
   EngagementMetricsInput,
   Platform,
+  SourceIngestionInput,
   VerificationStatus,
-} from "../../src/lib/types/ingestion.types";
+} from '../../src/lib/types/ingestion.types';
 
-describe("Ingestion Types", () => {
-  describe("ContentIngestionInput", () => {
-    it("should validate a valid content input", async () => {
+describe('Ingestion Types', () => {
+  describe('ContentIngestionInput', () => {
+    it('should validate a valid content input', async () => {
       const input = new ContentIngestionInput();
-      input.text = "Valid content text";
+      input.text = 'Valid content text';
       input.platform = Platform.TWITTER;
       const metrics = new EngagementMetricsInput();
       metrics.likes = 100;
@@ -20,15 +20,15 @@ describe("Ingestion Types", () => {
       metrics.reach = 1000;
       metrics.viralityScore = 0.75;
       input.engagementMetrics = metrics;
-      input.metadata = { source: "test" };
+      input.metadata = { source: 'test' };
 
       const errors = await validate(input);
       expect(errors).toHaveLength(0);
     });
 
-    it("should fail validation with empty text", async () => {
+    it('should fail validation with empty text', async () => {
       const input = new ContentIngestionInput();
-      input.text = "";
+      input.text = '';
       input.platform = Platform.TWITTER;
       const metrics = new EngagementMetricsInput();
       metrics.likes = 100;
@@ -40,13 +40,13 @@ describe("Ingestion Types", () => {
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0]!.property).toBe("text");
+      expect(errors[0]!.property).toBe('text');
     });
 
-    it("should fail validation with invalid platform", async () => {
+    it('should fail validation with invalid platform', async () => {
       const input = new ContentIngestionInput();
-      input.text = "Valid content";
-      (input as any).platform = "invalid_platform";
+      input.text = 'Valid content';
+      (input as any).platform = 'invalid_platform';
       const metrics = new EngagementMetricsInput();
       metrics.likes = 100;
       metrics.shares = 50;
@@ -57,12 +57,12 @@ describe("Ingestion Types", () => {
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0]!.property).toBe("platform");
+      expect(errors[0]!.property).toBe('platform');
     });
 
-    it("should fail validation with invalid engagement metrics", async () => {
+    it('should fail validation with invalid engagement metrics', async () => {
       const input = new ContentIngestionInput();
-      input.text = "Valid content";
+      input.text = 'Valid content';
       input.platform = Platform.TWITTER;
 
       const metrics = new EngagementMetricsInput();
@@ -78,14 +78,14 @@ describe("Ingestion Types", () => {
         validationError: { target: false },
       });
       expect(errors).toHaveLength(1);
-      expect(errors[0]!.property).toBe("engagementMetrics");
+      expect(errors[0]!.property).toBe('engagementMetrics');
     });
   });
 
-  describe("SourceIngestionInput", () => {
-    it("should validate a valid source input", async () => {
+  describe('SourceIngestionInput', () => {
+    it('should validate a valid source input', async () => {
       const input = new SourceIngestionInput();
-      input.name = "Valid Source";
+      input.name = 'Valid Source';
       input.platform = Platform.TWITTER;
       input.credibilityScore = 0.8;
       input.verificationStatus = VerificationStatus.VERIFIED;
@@ -95,45 +95,45 @@ describe("Ingestion Types", () => {
       expect(errors).toHaveLength(0);
     });
 
-    it("should fail validation with empty name", async () => {
+    it('should fail validation with empty name', async () => {
       const input = new SourceIngestionInput();
-      input.name = "";
+      input.name = '';
       input.platform = Platform.TWITTER;
       input.credibilityScore = 0.8;
       input.verificationStatus = VerificationStatus.VERIFIED;
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0]!.property).toBe("name");
+      expect(errors[0]!.property).toBe('name');
     });
 
-    it("should fail validation with invalid credibility score", async () => {
+    it('should fail validation with invalid credibility score', async () => {
       const input = new SourceIngestionInput();
-      input.name = "Valid Source";
+      input.name = 'Valid Source';
       input.platform = Platform.TWITTER;
       input.credibilityScore = 1.5; // Invalid score > 1
       input.verificationStatus = VerificationStatus.VERIFIED;
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0]!.property).toBe("credibilityScore");
+      expect(errors[0]!.property).toBe('credibilityScore');
     });
 
-    it("should fail validation with invalid verification status", async () => {
+    it('should fail validation with invalid verification status', async () => {
       const input = new SourceIngestionInput();
-      input.name = "Valid Source";
+      input.name = 'Valid Source';
       input.platform = Platform.TWITTER;
       input.credibilityScore = 0.8;
-      (input as any).verificationStatus = "INVALID_STATUS";
+      (input as any).verificationStatus = 'INVALID_STATUS';
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0]!.property).toBe("verificationStatus");
+      expect(errors[0]!.property).toBe('verificationStatus');
     });
   });
 
-  describe("EngagementMetricsInput", () => {
-    it("should validate valid engagement metrics", async () => {
+  describe('EngagementMetricsInput', () => {
+    it('should validate valid engagement metrics', async () => {
       const input = new EngagementMetricsInput();
       input.likes = 100;
       input.shares = 50;
@@ -145,7 +145,7 @@ describe("Ingestion Types", () => {
       expect(errors).toHaveLength(0);
     });
 
-    it("should fail validation with negative metrics", async () => {
+    it('should fail validation with negative metrics', async () => {
       const input = new EngagementMetricsInput();
       input.likes = -1;
       input.shares = 50;
@@ -155,10 +155,10 @@ describe("Ingestion Types", () => {
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0]!.property).toBe("likes");
+      expect(errors[0]!.property).toBe('likes');
     });
 
-    it("should fail validation with invalid virality score", async () => {
+    it('should fail validation with invalid virality score', async () => {
       const input = new EngagementMetricsInput();
       input.likes = 100;
       input.shares = 50;
@@ -168,7 +168,7 @@ describe("Ingestion Types", () => {
 
       const errors = await validate(input);
       expect(errors).toHaveLength(1);
-      expect(errors[0]!.property).toBe("viralityScore");
+      expect(errors[0]!.property).toBe('viralityScore');
     });
   });
 });

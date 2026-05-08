@@ -1,18 +1,18 @@
-import React, { useState, CSSProperties } from 'react';
-import {
-  NarrativeMyceliumVisualization,
-  generateMyceliumData,
-  NarrativeLandscapeVisualization,
-  generateLandscapeData,
-  EnhancedRealityTunnelVisualization,
-  generateEnhancedTunnelData,
-  RealityTunnelVisualization,
-  generateRealityTunnelData,
-  TemporalNarrativeVisualization,
-  generateTemporalData,
-} from './';
+import React, { CSSProperties, useState } from 'react';
 import { NarrativeFlow } from '../components/NarrativeFlow';
 import { generateSampleNarrativeFlowData } from '../data/sample-narrative-flow';
+import {
+  EnhancedRealityTunnelVisualization,
+  generateEnhancedTunnelData,
+  generateLandscapeData,
+  generateMyceliumData,
+  generateRealityTunnelData,
+  generateTemporalData,
+  NarrativeLandscapeVisualization,
+  NarrativeMyceliumVisualization,
+  RealityTunnelVisualization,
+  TemporalNarrativeVisualization,
+} from './';
 
 type VisualizationType =
   | 'mycelium'
@@ -97,9 +97,7 @@ export const VisualizationDemo: React.FC = () => {
 
   // Get button style based on active state
   const getButtonStyle = (vizType: VisualizationType): CSSProperties => {
-    return activeViz === vizType
-      ? { ...styles.button, ...styles.buttonActive }
-      : styles.button!;
+    return activeViz === vizType ? { ...styles.button, ...styles.buttonActive } : styles.button;
   };
 
   return (
@@ -108,36 +106,42 @@ export const VisualizationDemo: React.FC = () => {
         <h2>Narrative Visualization Demo</h2>
         <div style={styles.vizSelector}>
           <button
+            type="button"
             style={getButtonStyle('mycelium')}
             onClick={() => handleVizChange('mycelium')}
           >
             Narrative Mycelium
           </button>
           <button
+            type="button"
             style={getButtonStyle('landscape')}
             onClick={() => handleVizChange('landscape')}
           >
             Narrative Landscape
           </button>
           <button
+            type="button"
             style={getButtonStyle('enhancedTunnel')}
             onClick={() => handleVizChange('enhancedTunnel')}
           >
             Enhanced Reality Tunnel
           </button>
           <button
+            type="button"
             style={getButtonStyle('realityTunnel')}
             onClick={() => handleVizChange('realityTunnel')}
           >
             Reality Tunnel
           </button>
           <button
+            type="button"
             style={getButtonStyle('temporal')}
             onClick={() => handleVizChange('temporal')}
           >
             Temporal Narrative
           </button>
           <button
+            type="button"
             style={getButtonStyle('narrativeFlow')}
             onClick={() => handleVizChange('narrativeFlow')}
           >
@@ -151,9 +155,9 @@ export const VisualizationDemo: React.FC = () => {
           <div style={styles.visualizationWrapper}>
             <h3 style={styles.heading}>Narrative Mycelium Visualization</h3>
             <p style={styles.paragraph}>
-              Visualizes narratives as an organic, interconnected mycelium-like
-              network. Nodes represent narrative elements, with connections
-              showing relationships. Clusters indicate related narrative groups.
+              Visualizes narratives as an organic, interconnected mycelium-like network. Nodes
+              represent narrative elements, with connections showing relationships. Clusters
+              indicate related narrative groups.
             </p>
             <NarrativeMyceliumVisualization
               data={myceliumData}
@@ -169,9 +173,9 @@ export const VisualizationDemo: React.FC = () => {
           <div style={styles.visualizationWrapper}>
             <h3 style={styles.heading}>Narrative Landscape Visualization</h3>
             <p style={styles.paragraph}>
-              Represents narratives as a topographical landscape where elevation
-              indicates narrative strength. Peaks show dominant narratives,
-              valleys show weak areas, and paths trace narrative evolution.
+              Represents narratives as a topographical landscape where elevation indicates narrative
+              strength. Peaks show dominant narratives, valleys show weak areas, and paths trace
+              narrative evolution.
             </p>
             <NarrativeLandscapeVisualization
               data={landscapeData}
@@ -186,14 +190,11 @@ export const VisualizationDemo: React.FC = () => {
 
         {activeViz === 'enhancedTunnel' && (
           <div style={styles.visualizationWrapper}>
-            <h3 style={styles.heading}>
-              Enhanced Reality Tunnel Visualization
-            </h3>
+            <h3 style={styles.heading}>Enhanced Reality Tunnel Visualization</h3>
             <p style={styles.paragraph}>
-              An advanced 3D visualization of the reality tunnel concept,
-              showing how narratives branch and evolve over time. The main path
-              represents consensus reality, with branches showing alternative
-              narratives.
+              An advanced 3D visualization of the reality tunnel concept, showing how narratives
+              branch and evolve over time. The main path represents consensus reality, with branches
+              showing alternative narratives.
             </p>
             <EnhancedRealityTunnelVisualization
               data={enhancedTunnelData}
@@ -212,14 +213,10 @@ export const VisualizationDemo: React.FC = () => {
           <div style={styles.visualizationWrapper}>
             <h3 style={styles.heading}>Reality Tunnel Visualization</h3>
             <p style={styles.paragraph}>
-              The original reality tunnel visualization, showing how narratives
-              form a tunnel of perception through which we view events.
+              The original reality tunnel visualization, showing how narratives form a tunnel of
+              perception through which we view events.
             </p>
-            <RealityTunnelVisualization
-              data={realityTunnelData}
-              width={1000}
-              height={600}
-            />
+            <RealityTunnelVisualization data={realityTunnelData} width={1000} height={600} />
           </div>
         )}
 
@@ -227,14 +224,10 @@ export const VisualizationDemo: React.FC = () => {
           <div style={styles.visualizationWrapper}>
             <h3 style={styles.heading}>Temporal Narrative Visualization</h3>
             <p style={styles.paragraph}>
-              Visualizes how narratives evolve and interact over time, showing
-              strength and relationships across a timeline.
+              Visualizes how narratives evolve and interact over time, showing strength and
+              relationships across a timeline.
             </p>
-            <TemporalNarrativeVisualization
-              data={temporalData}
-              width={1000}
-              height={600}
-            />
+            <TemporalNarrativeVisualization data={temporalData} width={1000} height={600} />
           </div>
         )}
 
@@ -242,10 +235,9 @@ export const VisualizationDemo: React.FC = () => {
           <div style={styles.visualizationWrapper}>
             <h3 style={styles.heading}>Narrative Flow Visualization</h3>
             <p style={styles.paragraph}>
-              Represents how narratives emerge from, diverge from, and sometimes
-              return to consensus reality. The central band represents
-              mainstream consensus, while branches represent alternative
-              narratives with varying strength and divergence.
+              Represents how narratives emerge from, diverge from, and sometimes return to consensus
+              reality. The central band represents mainstream consensus, while branches represent
+              alternative narratives with varying strength and divergence.
             </p>
             <NarrativeFlow
               data={narrativeFlowData}

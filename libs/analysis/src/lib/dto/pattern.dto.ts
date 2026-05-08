@@ -1,4 +1,4 @@
-import { Field, ObjectType, ID, Float } from '@nestjs/graphql';
+import { Field, Float, ID, ObjectType } from '@nestjs/graphql';
 import { TimeFrame } from './timeframe.dto';
 
 @ObjectType('Pattern')

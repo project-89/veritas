@@ -117,8 +117,7 @@ export class MonitorConfigSchema extends Document {
   nextRunAt!: Date | null;
 }
 
-export const MonitorConfigModel =
-  SchemaFactory.createForClass(MonitorConfigSchema);
+export const MonitorConfigModel = SchemaFactory.createForClass(MonitorConfigSchema);
 
 // ---------------------------------------------------------------------------
 // TypeScript interfaces for use outside Mongoose

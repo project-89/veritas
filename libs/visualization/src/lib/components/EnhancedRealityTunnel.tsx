@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  EnhancedTunnelNode,
   EnhancedTunnelBranch,
-  EnhancedTunnelNarrative,
   EnhancedTunnelData,
+  EnhancedTunnelNarrative,
+  EnhancedTunnelNode,
   EnhancedTunnelVisualizationProps,
 } from '../types/enhanced-tunnel-types';
 
@@ -81,9 +81,13 @@ export const generateSampleData = (): EnhancedTunnelData => {
 
     // Connect to previous node in the main path
     if (i > 0) {
+      const previousMainNode = mainPathNodes[i - 1];
+      if (!previousMainNode) {
+        continue;
+      }
       const branch: EnhancedTunnelBranch = {
         id: `main-branch-${i}`,
-        sourceId: mainPathNodes[i - 1]!.id,
+        sourceId: previousMainNode.id,
         targetId: node.id,
         narrativeId: 'narrative-1',
         strength: 0.8 + Math.random() * 0.2,
@@ -93,7 +97,7 @@ export const generateSampleData = (): EnhancedTunnelData => {
         },
       };
       branches.push(branch);
-      mainPathNodes[i - 1]!.connections.push(node.id);
+      previousMainNode.connections.push(node.id);
     }
 
     // Create branches at certain points
@@ -102,7 +106,11 @@ export const generateSampleData = (): EnhancedTunnelData => {
       const altNarrativeId = i % 6 === 0 ? 'narrative-2' : 'narrative-3';
       const branchLength = 2 + Math.floor(Math.random() * 3); // 2-4 nodes in branch
 
-      let lastBranchNode = mainPathNodes[i]!;
+      const rootBranchNode = mainPathNodes[i];
+      if (!rootBranchNode) {
+        continue;
+      }
+      let lastBranchNode = rootBranchNode;
 
       for (let j = 0; j < branchLength; j++) {
         const branchDate = new Date(date);
@@ -194,7 +202,7 @@ export const generateSampleData = (): EnhancedTunnelData => {
       if (Math.random() > 0.5 && i < 9) {
         const reconnectIndex = Math.min(
           i + 2 + Math.floor(Math.random() * 2),
-          mainPathNodes.length - 1
+          mainPathNodes.length - 1,
         );
         const reconnectTarget = mainPathNodes[reconnectIndex];
 
@@ -235,9 +243,7 @@ export const generateSampleData = (): EnhancedTunnelData => {
   };
 };
 
-export const EnhancedRealityTunnelVisualization: React.FC<
-  EnhancedTunnelVisualizationProps
-> = ({
+export const EnhancedRealityTunnelVisualization: React.FC<EnhancedTunnelVisualizationProps> = ({
   data,
   width = 1000,
   height = 600,
@@ -251,36 +257,31 @@ export const EnhancedRealityTunnelVisualization: React.FC<
   colorScheme,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [selectedNode, setSelectedNode] = useState<EnhancedTunnelNode | null>(
-    null
-  );
+  const [selectedNode, setSelectedNode] = useState<EnhancedTunnelNode | null>(null);
   const [viewAngle, setViewAngle] = useState(0); // 0 degrees is front view
   const [viewElevation, setViewElevation] = useState(20); // Degrees above horizontal
+  void colorScheme;
 
   // Calculate 3D projection based on view angles
-  const project = (x: number, y: number, z: number) => {
-    // Convert angles to radians
-    const angleRad = (viewAngle * Math.PI) / 180;
-    const elevationRad = (viewElevation * Math.PI) / 180;
+  const project = useCallback(
+    (x: number, y: number, z: number) => {
+      const angleRad = (viewAngle * Math.PI) / 180;
+      const elevationRad = (viewElevation * Math.PI) / 180;
+      const rotX = x * Math.cos(angleRad) + z * Math.sin(angleRad);
+      const rotZ = -x * Math.sin(angleRad) + z * Math.cos(angleRad);
+      const rotY = y * Math.cos(elevationRad) - rotZ * Math.sin(elevationRad);
+      const finalZ = y * Math.sin(elevationRad) + rotZ * Math.cos(elevationRad);
+      const scale = 1 + (finalZ / depth) * perspective;
 
-    // Apply rotation around Y axis (viewAngle)
-    const rotX = x * Math.cos(angleRad) + z * Math.sin(angleRad);
-    const rotZ = -x * Math.sin(angleRad) + z * Math.cos(angleRad);
-
-    // Apply rotation around X axis (viewElevation)
-    const rotY = y * Math.cos(elevationRad) - rotZ * Math.sin(elevationRad);
-    const finalZ = y * Math.sin(elevationRad) + rotZ * Math.cos(elevationRad);
-
-    // Apply perspective
-    const scale = 1 + (finalZ / depth) * perspective;
-
-    return {
-      x: width / 2 + rotX * scale,
-      y: height / 2 - rotY * scale, // Invert Y for SVG coordinate system
-      z: finalZ,
-      scale,
-    };
-  };
+      return {
+        x: width / 2 + rotX * scale,
+        y: height / 2 - rotY * scale,
+        z: finalZ,
+        scale,
+      };
+    },
+    [depth, height, perspective, viewAngle, viewElevation, width],
+  );
 
   // Render the visualization
   useEffect(() => {
@@ -299,7 +300,7 @@ export const EnhancedRealityTunnelVisualization: React.FC<
     // Create groups for different layers (back to front)
     const branchesGroup = svg.append('g').attr('class', 'branches');
     const nodesGroup = svg.append('g').attr('class', 'nodes');
-    const labelsGroup = svg.append('g').attr('class', 'labels');
+    svg.append('g').attr('class', 'labels');
 
     // Calculate time scale
     const timeScale = d3
@@ -328,23 +329,14 @@ export const EnhancedRealityTunnelVisualization: React.FC<
 
         if (!source || !target) return '';
 
-        const sourcePos = project(
-          source.position.x,
-          source.position.y,
-          source.position.z
-        );
-        const targetPos = project(
-          target.position.x,
-          target.position.y,
-          target.position.z
-        );
+        const sourcePos = project(source.position.x, source.position.y, source.position.z);
+        const targetPos = project(target.position.x, target.position.y, target.position.z);
 
         // Create a curved path
         const midX = (sourcePos.x + targetPos.x) / 2;
         const midY = (sourcePos.y + targetPos.y) / 2;
         const controlY =
-          midY -
-          (targetPos.x - sourcePos.x) * 0.2 * (source.position.y < 0 ? -1 : 1);
+          midY - (targetPos.x - sourcePos.x) * 0.2 * (source.position.y < 0 ? -1 : 1);
 
         return `M ${sourcePos.x} ${sourcePos.y} Q ${midX} ${controlY}, ${targetPos.x} ${targetPos.y}`;
       })
@@ -375,10 +367,7 @@ export const EnhancedRealityTunnelVisualization: React.FC<
         const pos = project(d.position.x, d.position.y, d.position.z);
         return `translate(${pos.x}, ${pos.y})`;
       })
-      .attr(
-        'data-z',
-        (d) => project(d.position.x, d.position.y, d.position.z).z
-      )
+      .attr('data-z', (d) => project(d.position.x, d.position.y, d.position.z).z)
       .style('cursor', 'pointer')
       .on('click', (event, d) => {
         setSelectedNode(d);
@@ -403,20 +392,13 @@ export const EnhancedRealityTunnelVisualization: React.FC<
         const narrative = data.narratives.find((n) => n.id === d.narrativeId);
         return narrative ? narrative.color : '#999';
       })
-      .attr('stroke', (d) =>
-        d.isConsensus && highlightConsensus ? '#fff' : 'none'
-      )
-      .attr('stroke-width', (d) =>
-        d.isConsensus && highlightConsensus ? 2 : 0
-      )
+      .attr('stroke', (d) => (d.isConsensus && highlightConsensus ? '#fff' : 'none'))
+      .attr('stroke-width', (d) => (d.isConsensus && highlightConsensus ? 2 : 0))
       .attr('opacity', (d) => 0.7 + d.metrics.strength * 0.3)
-      .on('mouseover', function (event, d) {
-        d3.select(this)
-          .attr('opacity', 1)
-          .attr('stroke', '#fff')
-          .attr('stroke-width', 2);
+      .on('mouseover', function () {
+        d3.select(this).attr('opacity', 1).attr('stroke', '#fff').attr('stroke-width', 2);
       })
-      .on('mouseout', function (event, d) {
+      .on('mouseout', function (_, d) {
         d3.select(this)
           .attr('opacity', 0.7 + d.metrics.strength * 0.3)
           .attr('stroke', d.isConsensus && highlightConsensus ? '#fff' : 'none')
@@ -441,9 +423,7 @@ export const EnhancedRealityTunnelVisualization: React.FC<
           return narrative ? narrative.color : '#999';
         })
         .attr('opacity', (d) => 0.7 + d.metrics.strength * 0.3)
-        .text((d) =>
-          d.content.length > 20 ? d.content.substring(0, 20) + '...' : d.content
-        );
+        .text((d) => (d.content.length > 20 ? d.content.substring(0, 20) + '...' : d.content));
     }
 
     // Add timeline axis
@@ -489,20 +469,11 @@ export const EnhancedRealityTunnelVisualization: React.FC<
       .text('Narratives');
 
     data.narratives.forEach((narrative, i) => {
-      const g = legend
-        .append('g')
-        .attr('transform', `translate(10, ${35 + i * 20})`);
+      const g = legend.append('g').attr('transform', `translate(10, ${35 + i * 20})`);
 
-      g.append('rect')
-        .attr('width', 12)
-        .attr('height', 12)
-        .attr('fill', narrative.color);
+      g.append('rect').attr('width', 12).attr('height', 12).attr('fill', narrative.color);
 
-      g.append('text')
-        .attr('x', 20)
-        .attr('y', 10)
-        .attr('font-size', 10)
-        .text(narrative.name);
+      g.append('text').attr('x', 20).attr('y', 10).attr('font-size', 10).text(narrative.name);
     });
 
     // Add controls for 3D view if interactive
@@ -529,16 +500,9 @@ export const EnhancedRealityTunnelVisualization: React.FC<
         .text('View Controls');
 
       // Rotation control
-      controls
-        .append('text')
-        .attr('x', 10)
-        .attr('y', 40)
-        .attr('font-size', 10)
-        .text('Rotation:');
+      controls.append('text').attr('x', 10).attr('y', 40).attr('font-size', 10).text('Rotation:');
 
-      const rotationSlider = controls
-        .append('g')
-        .attr('transform', 'translate(70, 36)');
+      const rotationSlider = controls.append('g').attr('transform', 'translate(70, 36)');
 
       rotationSlider
         .append('line')
@@ -562,20 +526,13 @@ export const EnhancedRealityTunnelVisualization: React.FC<
             rotationHandle.attr('cx', x);
             const newAngle = (x / 100) * 360 - 180;
             setViewAngle(newAngle);
-          })
+          }),
         );
 
       // Elevation control
-      controls
-        .append('text')
-        .attr('x', 10)
-        .attr('y', 60)
-        .attr('font-size', 10)
-        .text('Elevation:');
+      controls.append('text').attr('x', 10).attr('y', 60).attr('font-size', 10).text('Elevation:');
 
-      const elevationSlider = controls
-        .append('g')
-        .attr('transform', 'translate(70, 56)');
+      const elevationSlider = controls.append('g').attr('transform', 'translate(70, 56)');
 
       elevationSlider
         .append('line')
@@ -599,22 +556,21 @@ export const EnhancedRealityTunnelVisualization: React.FC<
             elevationHandle.attr('cx', x);
             const newElevation = (x / 100) * 90 - 45;
             setViewElevation(newElevation);
-          })
+          }),
         );
     }
   }, [
     data,
     width,
     height,
-    depth,
-    perspective,
-    viewAngle,
-    viewElevation,
     showLabels,
     highlightConsensus,
     onNodeClick,
     onBranchClick,
     interactive,
+    project,
+    viewAngle,
+    viewElevation,
   ]);
 
   return (
@@ -638,18 +594,14 @@ export const EnhancedRealityTunnelVisualization: React.FC<
           }}
         >
           <h3 style={{ margin: '0 0 5px 0' }}>{selectedNode.content}</h3>
-          <p style={{ margin: '0 0 5px 0' }}>
-            Date: {selectedNode.timestamp.toLocaleDateString()}
-          </p>
+          <p style={{ margin: '0 0 5px 0' }}>Date: {selectedNode.timestamp.toLocaleDateString()}</p>
           <p style={{ margin: 0 }}>
             Strength: {selectedNode.metrics.strength.toFixed(2)} | Relevance:{' '}
             {selectedNode.metrics.relevance.toFixed(2)} | Consensus:{' '}
             {selectedNode.metrics.consensus.toFixed(2)}
           </p>
           <p style={{ margin: '5px 0 0 0', fontStyle: 'italic' }}>
-            {selectedNode.isConsensus
-              ? 'Consensus Reality Point'
-              : 'Alternative Narrative Point'}
+            {selectedNode.isConsensus ? 'Consensus Reality Point' : 'Alternative Narrative Point'}
           </p>
         </div>
       )}

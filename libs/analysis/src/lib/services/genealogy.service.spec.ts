@@ -1,7 +1,7 @@
 import {
   NarrativeGenealogyService,
-  SnapshotNarrative,
   NarrativeSnapshot,
+  SnapshotNarrative,
 } from './genealogy.service';
 
 function makeSnapshotNarrative(
@@ -64,12 +64,8 @@ describe('NarrativeGenealogyService', () => {
     });
 
     it('detects new narratives (no match in previous)', () => {
-      const prev = [
-        makeSnapshotNarrative({ id: 'prev-0', centroidEmbedding: [1, 0, 0] }),
-      ];
-      const curr = [
-        makeSnapshotNarrative({ id: 'curr-0', centroidEmbedding: [0, 1, 0] }),
-      ];
+      const prev = [makeSnapshotNarrative({ id: 'prev-0', centroidEmbedding: [1, 0, 0] })];
+      const curr = [makeSnapshotNarrative({ id: 'curr-0', centroidEmbedding: [0, 1, 0] })];
 
       const lineages = service.traceLineage(prev, curr, '2025-06-02T00:00:00Z');
 
@@ -160,9 +156,7 @@ describe('NarrativeGenealogyService', () => {
     });
 
     it('handles empty current (all died)', () => {
-      const prev = [
-        makeSnapshotNarrative({ id: 'prev-0', centroidEmbedding: [1, 0, 0] }),
-      ];
+      const prev = [makeSnapshotNarrative({ id: 'prev-0', centroidEmbedding: [1, 0, 0] })];
 
       const lineages = service.traceLineage(prev, [], '2025-06-02T00:00:00Z');
       expect(lineages.length).toBe(1);
@@ -211,7 +205,11 @@ describe('NarrativeGenealogyService', () => {
           id: 'snap-1',
           timestamp: '2025-06-02T00:00:00Z',
           narratives: [
-            makeSnapshotNarrative({ id: 'n-0-v2', centroidEmbedding: [0.98, 0.02, 0], postCount: 15 }),
+            makeSnapshotNarrative({
+              id: 'n-0-v2',
+              centroidEmbedding: [0.98, 0.02, 0],
+              postCount: 15,
+            }),
           ],
         },
       ];
@@ -236,14 +234,22 @@ describe('NarrativeGenealogyService', () => {
           id: 'snap-1',
           timestamp: '2025-06-02T00:00:00Z',
           narratives: [
-            makeSnapshotNarrative({ id: 'n-0-v2', centroidEmbedding: [0.99, 0.01, 0], postCount: 10 }),
+            makeSnapshotNarrative({
+              id: 'n-0-v2',
+              centroidEmbedding: [0.99, 0.01, 0],
+              postCount: 10,
+            }),
           ],
         },
         {
           id: 'snap-2',
           timestamp: '2025-06-03T00:00:00Z',
           narratives: [
-            makeSnapshotNarrative({ id: 'n-0-v3', centroidEmbedding: [0.98, 0.02, 0], postCount: 20 }),
+            makeSnapshotNarrative({
+              id: 'n-0-v3',
+              centroidEmbedding: [0.98, 0.02, 0],
+              postCount: 20,
+            }),
           ],
         },
       ];
@@ -259,9 +265,7 @@ describe('NarrativeGenealogyService', () => {
         {
           id: 'snap-0',
           timestamp: '2025-06-01T00:00:00Z',
-          narratives: [
-            makeSnapshotNarrative({ id: 'n-0', centroidEmbedding: [1, 0, 0] }),
-          ],
+          narratives: [makeSnapshotNarrative({ id: 'n-0', centroidEmbedding: [1, 0, 0] })],
         },
         {
           id: 'snap-1',
@@ -351,7 +355,11 @@ describe('NarrativeGenealogyService', () => {
           id: 'snap-2',
           timestamp: '2025-06-03T00:00:00Z',
           narratives: [
-            makeSnapshotNarrative({ id: 'n-0-v3', centroidEmbedding: [0.99, 0.01, 0], postCount: 25 }),
+            makeSnapshotNarrative({
+              id: 'n-0-v3',
+              centroidEmbedding: [0.99, 0.01, 0],
+              postCount: 25,
+            }),
             // n-1 died
             makeSnapshotNarrative({ id: 'n-2', centroidEmbedding: [0, 1, 0], postCount: 3 }),
           ],

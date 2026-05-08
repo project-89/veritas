@@ -9,9 +9,9 @@
 @layer base {
   /* ── DARK THEME (default — classic NERV) ── */
   :root,
-  [data-theme='dark'] {
-    --font-jetbrains: 'JetBrains Mono';
-    --font-inter: 'Inter';
+  [data-theme="dark"] {
+    --font-jetbrains: "JetBrains Mono";
+    --font-inter: "Inter";
     --nerv-bg-deep: 8 11 20;
     --nerv-bg: 14 18 31;
     --nerv-bg-panel: 24 30 50;
@@ -34,9 +34,9 @@
   }
 
   /* ── LIGHT THEME (NERV — clean white command center) ── */
-  [data-theme='light'] {
-    --font-jetbrains: 'JetBrains Mono';
-    --font-inter: 'Inter';
+  [data-theme="light"] {
+    --font-jetbrains: "JetBrains Mono";
+    --font-inter: "Inter";
     --nerv-bg-deep: 255 255 255;
     --nerv-bg: 250 250 250;
     --nerv-bg-panel: 243 243 245;
@@ -70,7 +70,9 @@
   kbd,
   samp,
   .font-mono {
-    font-feature-settings: 'liga' 1, 'calt' 1;
+    font-feature-settings:
+      "liga" 1,
+      "calt" 1;
   }
 
   /* Scrollbar styling */
@@ -89,24 +91,24 @@
     background: var(--nerv-scrollbar-thumb-hover);
   }
 
-  [class*='text-[8px]'] {
-    font-size: 9px !important;
-    line-height: 1.45 !important;
+  [class*="text-[8px]"] {
+    font-size: 9px;
+    line-height: 1.45;
   }
 
-  [class*='text-[9px]'] {
-    font-size: 10px !important;
-    line-height: 1.45 !important;
+  [class*="text-[9px]"] {
+    font-size: 10px;
+    line-height: 1.45;
   }
 
-  [class*='text-[10px]'] {
-    font-size: 11px !important;
-    line-height: 1.5 !important;
+  [class*="text-[10px]"] {
+    font-size: 11px;
+    line-height: 1.5;
   }
 
-  [class*='text-[11px]'] {
-    font-size: 12px !important;
-    line-height: 1.5 !important;
+  [class*="text-[11px]"] {
+    font-size: 12px;
+    line-height: 1.5;
   }
 }
 
@@ -116,7 +118,7 @@
     position: relative;
   }
   .nerv-scanlines::after {
-    content: '';
+    content: "";
     position: absolute;
     inset: 0;
     background: repeating-linear-gradient(
@@ -136,7 +138,7 @@
   }
   .nerv-corners::before,
   .nerv-corners::after {
-    content: '';
+    content: "";
     position: absolute;
     width: 10px;
     height: 10px;

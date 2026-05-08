@@ -1,9 +1,9 @@
-import { truncateText, slugify, hashContent } from '../src/lib/string-utils';
+import { adjustColorOpacity, getContrastingTextColor } from '../src/lib/color-utils';
 import { formatDate, parseTimeframe } from '../src/lib/date-utils';
 import { deepClone, getNestedProperty } from '../src/lib/object-utils';
+import { calculateEngagementScore, normalizeValue } from '../src/lib/scoring-utils';
+import { hashContent, slugify, truncateText } from '../src/lib/string-utils';
 import { isValidEmail, isValidUrl } from '../src/lib/validation-utils';
-import { normalizeValue, calculateEngagementScore } from '../src/lib/scoring-utils';
-import { adjustColorOpacity, getContrastingTextColor } from '../src/lib/color-utils';
 
 describe('string-utils', () => {
   describe('truncateText', () => {
@@ -99,9 +99,7 @@ describe('object-utils', () => {
 
     it('should return default value if property not found', () => {
       const obj = { user: { profile: {} } };
-      expect(getNestedProperty(obj, 'user.profile.name', 'Anonymous')).toBe(
-        'Anonymous'
-      );
+      expect(getNestedProperty(obj, 'user.profile.name', 'Anonymous')).toBe('Anonymous');
     });
   });
 });

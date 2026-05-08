@@ -1,21 +1,12 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Query,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { SourceService } from './services/source.service';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { ContentNode, SourceNode } from '@veritas/shared';
 import type {
   SourceCreateInput,
-  SourceUpdateInput,
   SourceSearchParams,
+  SourceUpdateInput,
 } from './services/source.service';
-import type { SourceNode, ContentNode } from '@veritas/shared';
+import { SourceService } from './services/source.service';
 
 @ApiTags('sources')
 @Controller('sources')
@@ -48,9 +39,7 @@ export class SourceController {
     status: 200,
     description: 'The sources have been successfully retrieved.',
   })
-  async searchSources(
-    @Query() params: SourceSearchParams
-  ): Promise<SourceNode[]> {
+  async searchSources(@Query() params: SourceSearchParams): Promise<SourceNode[]> {
     return this.sourceService.searchSources(params);
   }
 
@@ -62,7 +51,7 @@ export class SourceController {
   })
   async updateSource(
     @Param('id') id: string,
-    @Body() input: SourceUpdateInput
+    @Body() input: SourceUpdateInput,
   ): Promise<SourceNode> {
     return this.sourceService.updateSource(id, input);
   }
@@ -85,7 +74,7 @@ export class SourceController {
   })
   async getSourceContent(
     @Param('id') id: string,
-    @Query('limit') limit?: number
+    @Query('limit') limit?: number,
   ): Promise<ContentNode[]> {
     return this.sourceService.getSourceContent(id, limit);
   }
@@ -98,7 +87,7 @@ export class SourceController {
   })
   async updateSourceCredibility(
     @Param('id') id: string,
-    @Body('score') score: number
+    @Body('score') score: number,
   ): Promise<SourceNode> {
     return this.sourceService.updateCredibilityScore(id, score);
   }
@@ -107,8 +96,7 @@ export class SourceController {
   @ApiOperation({ summary: 'Calculate source aggregate credibility' })
   @ApiResponse({
     status: 200,
-    description:
-      'The source aggregate credibility has been successfully calculated.',
+    description: 'The source aggregate credibility has been successfully calculated.',
   })
   async calculateSourceCredibility(@Param('id') id: string): Promise<number> {
     return this.sourceService.calculateAggregateCredibility(id);

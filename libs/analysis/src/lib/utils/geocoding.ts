@@ -148,12 +148,13 @@ export function resolveCountryCode(
  * Resolve a region string to centroid coordinates and label.
  * Normalizes input by lowercasing and replacing spaces/hyphens with underscores.
  */
-export function resolveRegion(
-  region: string,
-): { lat: number; lng: number; label: string } | null {
+export function resolveRegion(region: string): { lat: number; lng: number; label: string } | null {
   if (!region) return null;
 
-  const key = region.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const key = region
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
   const centroid = REGION_CENTROIDS[key];
   if (centroid) {
     return { lat: centroid.lat, lng: centroid.lng, label: region };

@@ -1,12 +1,19 @@
-import { IntelligenceEngineService } from './intelligence-engine.service';
-import type { BotDetectionResult, BotScore, StructuralPattern } from './graph-bot-detection.service';
-import type { DeepInvestigationResult, UserInvestigationResult } from './deep-investigation.service';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
-import type { ClaimVerificationBatchResult } from './claim-verification.service';
-import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
-import type { GlobalEvent } from '../types/global-event';
-import { PlatformCredibilityService } from './platform-credibility.service';
 import { ConfigService } from '@nestjs/config';
+import type { GlobalEvent } from '../types/global-event';
+import type { ClaimVerificationBatchResult } from './claim-verification.service';
+import type {
+  DeepInvestigationResult,
+  UserInvestigationResult,
+} from './deep-investigation.service';
+import type {
+  BotDetectionResult,
+  BotScore,
+  StructuralPattern,
+} from './graph-bot-detection.service';
+import { IntelligenceEngineService } from './intelligence-engine.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
+import { PlatformCredibilityService } from './platform-credibility.service';
+import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -41,7 +48,11 @@ function makeUser(
   };
 }
 
-function makeBotScore(handle: string, botProbability: number, overrides: Partial<BotScore> = {}): BotScore {
+function makeBotScore(
+  handle: string,
+  botProbability: number,
+  overrides: Partial<BotScore> = {},
+): BotScore {
   return {
     handle,
     platform: 'twitter',
@@ -135,7 +146,11 @@ function makeSignal(overrides: Partial<ExternalSignal> = {}): ExternalSignal {
 }
 
 function makeVerification(
-  results: Array<{ claim: string; status: 'verified' | 'disputed' | 'unverified' | 'mixed' | 'false'; confidence: number }>,
+  results: Array<{
+    claim: string;
+    status: 'verified' | 'disputed' | 'unverified' | 'mixed' | 'false';
+    confidence: number;
+  }>,
 ): ClaimVerificationBatchResult {
   return {
     results: results.map((r) => ({
@@ -150,7 +165,8 @@ function makeVerification(
     summary: '',
     verifiedCount: results.filter((r) => r.status === 'verified').length,
     disputedCount: results.filter((r) => r.status === 'disputed' || r.status === 'false').length,
-    unverifiedCount: results.filter((r) => r.status === 'unverified' || r.status === 'mixed').length,
+    unverifiedCount: results.filter((r) => r.status === 'unverified' || r.status === 'mixed')
+      .length,
   };
 }
 
@@ -176,14 +192,33 @@ describe('IntelligenceEngineService', () => {
   describe('detectCoordinatedCampaign', () => {
     it('should detect campaign with high bot scores and temporal clustering', () => {
       const users = [
-        makeUser('orchestrator', 'twitter', { influenceScore: 0.9, adoptionTimestamp: '2025-01-01T00:00:00Z', flags: ['suspicious_timing', 'burst_posting'] }),
-        makeUser('bot1', 'twitter', { influenceScore: 0.2, adoptionTimestamp: '2025-01-01T00:01:00Z' }),
-        makeUser('bot2', 'twitter', { influenceScore: 0.2, adoptionTimestamp: '2025-01-01T00:02:00Z' }),
-        makeUser('bot3', 'twitter', { influenceScore: 0.1, adoptionTimestamp: '2025-01-01T00:03:00Z' }),
+        makeUser('orchestrator', 'twitter', {
+          influenceScore: 0.9,
+          adoptionTimestamp: '2025-01-01T00:00:00Z',
+          flags: ['suspicious_timing', 'burst_posting'],
+        }),
+        makeUser('bot1', 'twitter', {
+          influenceScore: 0.2,
+          adoptionTimestamp: '2025-01-01T00:01:00Z',
+        }),
+        makeUser('bot2', 'twitter', {
+          influenceScore: 0.2,
+          adoptionTimestamp: '2025-01-01T00:02:00Z',
+        }),
+        makeUser('bot3', 'twitter', {
+          influenceScore: 0.1,
+          adoptionTimestamp: '2025-01-01T00:03:00Z',
+        }),
       ];
       const investigation = makeInvestigation(users, {
         coordination: {
-          clusters: [{ users: ['orchestrator', 'bot1', 'bot2', 'bot3'], pattern: 'synchronized_posting', confidence: 0.8 }],
+          clusters: [
+            {
+              users: ['orchestrator', 'bot1', 'bot2', 'bot3'],
+              pattern: 'synchronized_posting',
+              confidence: 0.8,
+            },
+          ],
           summary: 'Coordinated posting detected.',
         },
       });
@@ -206,9 +241,18 @@ describe('IntelligenceEngineService', () => {
 
     it('should not detect campaign with organic behavior', () => {
       const users = [
-        makeUser('alice', 'twitter', { influenceScore: 0.3, adoptionTimestamp: '2025-01-01T00:00:00Z' }),
-        makeUser('bob', 'reddit', { influenceScore: 0.2, adoptionTimestamp: '2025-01-05T12:00:00Z' }),
-        makeUser('charlie', 'twitter', { influenceScore: 0.1, adoptionTimestamp: '2025-01-10T08:00:00Z' }),
+        makeUser('alice', 'twitter', {
+          influenceScore: 0.3,
+          adoptionTimestamp: '2025-01-01T00:00:00Z',
+        }),
+        makeUser('bob', 'reddit', {
+          influenceScore: 0.2,
+          adoptionTimestamp: '2025-01-05T12:00:00Z',
+        }),
+        makeUser('charlie', 'twitter', {
+          influenceScore: 0.1,
+          adoptionTimestamp: '2025-01-10T08:00:00Z',
+        }),
       ];
       const investigation = makeInvestigation(users);
       const botResult = makeBotResult([
@@ -225,7 +269,10 @@ describe('IntelligenceEngineService', () => {
 
     it('should classify actors correctly by role', () => {
       const users = [
-        makeUser('leader', 'twitter', { influenceScore: 0.9, flags: ['burst_posting', 'suspicious_timing'] }),
+        makeUser('leader', 'twitter', {
+          influenceScore: 0.9,
+          flags: ['burst_posting', 'suspicious_timing'],
+        }),
         makeUser('helper', 'twitter', { influenceScore: 0.5, flags: ['content_similarity'] }),
         makeUser('regular', 'twitter', { influenceScore: 0.1 }),
       ];
@@ -304,7 +351,9 @@ describe('IntelligenceEngineService', () => {
   // =========================================================================
   describe('detectMarketManipulation', () => {
     it('should detect FUD pattern with negative sentiment and price drop', () => {
-      const narratives = [makeNarrative({ summary: '$BTC crash incoming, sell everything', avgSentiment: -0.6 })];
+      const narratives = [
+        makeNarrative({ summary: '$BTC crash incoming, sell everything', avgSentiment: -0.6 }),
+      ];
       const signals = [makeSignal({ metadata: { symbol: 'BTC', priceChange: -0.15 } })];
       const posts = [
         { text: 'Sell your $BTC now!', authorHandle: 'fudder1' },
@@ -320,7 +369,9 @@ describe('IntelligenceEngineService', () => {
     });
 
     it('should detect pump pattern with positive sentiment and price rise', () => {
-      const narratives = [makeNarrative({ summary: '$SOL to the moon, massive adoption', avgSentiment: 0.8 })];
+      const narratives = [
+        makeNarrative({ summary: '$SOL to the moon, massive adoption', avgSentiment: 0.8 }),
+      ];
       const signals = [makeSignal({ metadata: { symbol: 'SOL', priceChange: 0.25 } })];
       const posts = [
         { text: 'Buy $SOL now!', authorHandle: 'pumper1' },
@@ -336,9 +387,7 @@ describe('IntelligenceEngineService', () => {
     it('should not detect manipulation when no correlation', () => {
       const narratives = [makeNarrative({ summary: 'General tech discussion', avgSentiment: 0.1 })];
       const signals = [makeSignal({ metadata: { symbol: 'AAPL', priceChange: 0.01 } })];
-      const posts = [
-        { text: 'Just bought $AAPL', authorHandle: 'investor1' },
-      ];
+      const posts = [{ text: 'Just bought $AAPL', authorHandle: 'investor1' }];
 
       const report = service.detectMarketManipulation(narratives, signals, posts);
 
@@ -349,9 +398,7 @@ describe('IntelligenceEngineService', () => {
     it('should handle posts with no ticker mentions', () => {
       const narratives = [makeNarrative()];
       const signals = [makeSignal()];
-      const posts = [
-        { text: 'Just a normal post', authorHandle: 'user1' },
-      ];
+      const posts = [{ text: 'Just a normal post', authorHandle: 'user1' }];
 
       const report = service.detectMarketManipulation(narratives, signals, posts);
 
@@ -399,7 +446,7 @@ describe('IntelligenceEngineService', () => {
 
     it('should match signals by title when metadata symbol is absent', () => {
       const narratives = [makeNarrative({ summary: '$DOGE wow much pump', avgSentiment: 0.8 })];
-      const signals = [makeSignal({ title: '$DOGE market data', metadata: { priceChange: 0.20 } })];
+      const signals = [makeSignal({ title: '$DOGE market data', metadata: { priceChange: 0.2 } })];
       const posts = [{ text: 'Buy $DOGE now!', authorHandle: 'user1' }];
 
       const report = service.detectMarketManipulation(narratives, signals, posts);
@@ -414,9 +461,18 @@ describe('IntelligenceEngineService', () => {
   describe('assessCrisisRisk', () => {
     it('should flag emergency when 3+ sources converge on a region', () => {
       const events = [
-        makeGlobalEvent({ source: 'USGS', location: { lat: 35, lng: 139, label: 'Tokyo', region: 'Japan' } }),
-        makeGlobalEvent({ source: 'GDELT', location: { lat: 35, lng: 139, label: 'Tokyo', region: 'Japan' } }),
-        makeGlobalEvent({ source: 'ACLED', location: { lat: 35, lng: 139, label: 'Tokyo', region: 'Japan' } }),
+        makeGlobalEvent({
+          source: 'USGS',
+          location: { lat: 35, lng: 139, label: 'Tokyo', region: 'Japan' },
+        }),
+        makeGlobalEvent({
+          source: 'GDELT',
+          location: { lat: 35, lng: 139, label: 'Tokyo', region: 'Japan' },
+        }),
+        makeGlobalEvent({
+          source: 'ACLED',
+          location: { lat: 35, lng: 139, label: 'Tokyo', region: 'Japan' },
+        }),
       ];
 
       const report = service.assessCrisisRisk(events, []);
@@ -428,8 +484,14 @@ describe('IntelligenceEngineService', () => {
 
     it('should flag warning when 2 sources converge', () => {
       const events = [
-        makeGlobalEvent({ source: 'USGS', location: { lat: 0, lng: 0, label: 'Region A', region: 'RegionA' } }),
-        makeGlobalEvent({ source: 'GDELT', location: { lat: 0, lng: 0, label: 'Region A', region: 'RegionA' } }),
+        makeGlobalEvent({
+          source: 'USGS',
+          location: { lat: 0, lng: 0, label: 'Region A', region: 'RegionA' },
+        }),
+        makeGlobalEvent({
+          source: 'GDELT',
+          location: { lat: 0, lng: 0, label: 'Region A', region: 'RegionA' },
+        }),
       ];
 
       const report = service.assessCrisisRisk(events, []);
@@ -440,7 +502,10 @@ describe('IntelligenceEngineService', () => {
 
     it('should flag watch when single source', () => {
       const events = [
-        makeGlobalEvent({ source: 'USGS', location: { lat: 0, lng: 0, label: 'Remote', region: 'Remote' } }),
+        makeGlobalEvent({
+          source: 'USGS',
+          location: { lat: 0, lng: 0, label: 'Remote', region: 'Remote' },
+        }),
       ];
 
       const report = service.assessCrisisRisk(events, []);
@@ -458,9 +523,18 @@ describe('IntelligenceEngineService', () => {
 
     it('should group events by region', () => {
       const events = [
-        makeGlobalEvent({ source: 'USGS', location: { lat: 0, lng: 0, label: 'A', region: 'RegionA' } }),
-        makeGlobalEvent({ source: 'USGS', location: { lat: 0, lng: 0, label: 'B', region: 'RegionB' } }),
-        makeGlobalEvent({ source: 'GDELT', location: { lat: 0, lng: 0, label: 'A', region: 'RegionA' } }),
+        makeGlobalEvent({
+          source: 'USGS',
+          location: { lat: 0, lng: 0, label: 'A', region: 'RegionA' },
+        }),
+        makeGlobalEvent({
+          source: 'USGS',
+          location: { lat: 0, lng: 0, label: 'B', region: 'RegionB' },
+        }),
+        makeGlobalEvent({
+          source: 'GDELT',
+          location: { lat: 0, lng: 0, label: 'A', region: 'RegionA' },
+        }),
       ];
 
       const report = service.assessCrisisRisk(events, []);
@@ -472,10 +546,17 @@ describe('IntelligenceEngineService', () => {
 
     it('should boost severity when narrative correlates with events', () => {
       const events = [
-        makeGlobalEvent({ source: 'USGS', title: 'Earthquake in Turkey', location: { lat: 39, lng: 35, label: 'Turkey', region: 'Turkey' } }),
+        makeGlobalEvent({
+          source: 'USGS',
+          title: 'Earthquake in Turkey',
+          location: { lat: 39, lng: 35, label: 'Turkey', region: 'Turkey' },
+        }),
       ];
       const narratives = [
-        makeNarrative({ summary: 'Massive earthquake devastates Turkey', velocity: { postsPerHour: 50, acceleration: 2, trend: 'surging' } }),
+        makeNarrative({
+          summary: 'Massive earthquake devastates Turkey',
+          velocity: { postsPerHour: 50, acceleration: 2, trend: 'surging' },
+        }),
       ];
 
       const report = service.assessCrisisRisk(events, narratives);
@@ -487,10 +568,22 @@ describe('IntelligenceEngineService', () => {
 
     it('should sort alerts by severity descending', () => {
       const events = [
-        makeGlobalEvent({ source: 'USGS', location: { lat: 0, lng: 0, label: 'A', region: 'Watch' } }),
-        makeGlobalEvent({ source: 'USGS', location: { lat: 0, lng: 0, label: 'B', region: 'Emergency' } }),
-        makeGlobalEvent({ source: 'GDELT', location: { lat: 0, lng: 0, label: 'B', region: 'Emergency' } }),
-        makeGlobalEvent({ source: 'ACLED', location: { lat: 0, lng: 0, label: 'B', region: 'Emergency' } }),
+        makeGlobalEvent({
+          source: 'USGS',
+          location: { lat: 0, lng: 0, label: 'A', region: 'Watch' },
+        }),
+        makeGlobalEvent({
+          source: 'USGS',
+          location: { lat: 0, lng: 0, label: 'B', region: 'Emergency' },
+        }),
+        makeGlobalEvent({
+          source: 'GDELT',
+          location: { lat: 0, lng: 0, label: 'B', region: 'Emergency' },
+        }),
+        makeGlobalEvent({
+          source: 'ACLED',
+          location: { lat: 0, lng: 0, label: 'B', region: 'Emergency' },
+        }),
       ];
 
       const report = service.assessCrisisRisk(events, []);
@@ -501,11 +594,22 @@ describe('IntelligenceEngineService', () => {
 
     it('should include narrative correlation info in summary', () => {
       const events = [
-        makeGlobalEvent({ source: 'USGS', title: 'Flooding in Brazil', location: { lat: -15, lng: -47, label: 'Brazil', region: 'Brazil' } }),
-        makeGlobalEvent({ source: 'GDELT', title: 'Flooding in Brazil', location: { lat: -15, lng: -47, label: 'Brazil', region: 'Brazil' } }),
+        makeGlobalEvent({
+          source: 'USGS',
+          title: 'Flooding in Brazil',
+          location: { lat: -15, lng: -47, label: 'Brazil', region: 'Brazil' },
+        }),
+        makeGlobalEvent({
+          source: 'GDELT',
+          title: 'Flooding in Brazil',
+          location: { lat: -15, lng: -47, label: 'Brazil', region: 'Brazil' },
+        }),
       ];
       const narratives = [
-        makeNarrative({ summary: 'Severe flooding hits Brazil', velocity: { postsPerHour: 30, acceleration: 1, trend: 'surging' } }),
+        makeNarrative({
+          summary: 'Severe flooding hits Brazil',
+          velocity: { postsPerHour: 30, acceleration: 1, trend: 'surging' },
+        }),
       ];
 
       const report = service.assessCrisisRisk(events, narratives);
@@ -528,7 +632,9 @@ describe('IntelligenceEngineService', () => {
       ];
       const investigation = makeInvestigation(users, {
         cuiBono: {
-          beneficiaries: [{ entity: 'CompanyX', howTheyBenefit: 'Stock price manipulation', confidence: 0.7 }],
+          beneficiaries: [
+            { entity: 'CompanyX', howTheyBenefit: 'Stock price manipulation', confidence: 0.7 },
+          ],
           agendas: ['market manipulation'],
           summary: 'CompanyX benefits.',
         },
@@ -540,9 +646,8 @@ describe('IntelligenceEngineService', () => {
         makeBotScore('target1', 0.1),
         makeBotScore('target2', 0.05),
       ]);
-      const narratives = [makeNarrative()];
 
-      const report = service.attributeInfluenceOperation(investigation, botResult, narratives);
+      const report = service.attributeInfluenceOperation(investigation, botResult);
 
       expect(report.operationDetected).toBe(true);
       expect(report.confidence).toBeGreaterThan(0);
@@ -558,12 +663,9 @@ describe('IntelligenceEngineService', () => {
         makeUser('bob', 'reddit', { influenceScore: 0.2 }),
       ];
       const investigation = makeInvestigation(users);
-      const botResult = makeBotResult([
-        makeBotScore('alice', 0.1),
-        makeBotScore('bob', 0.05),
-      ]);
+      const botResult = makeBotResult([makeBotScore('alice', 0.1), makeBotScore('bob', 0.05)]);
 
-      const report = service.attributeInfluenceOperation(investigation, botResult, []);
+      const report = service.attributeInfluenceOperation(investigation, botResult);
 
       expect(report.operationDetected).toBe(false);
       expect(report.summary).toContain('organic');
@@ -577,7 +679,9 @@ describe('IntelligenceEngineService', () => {
       ];
       const investigation = makeInvestigation(users, {
         cuiBono: {
-          beneficiaries: [{ entity: 'Entity1', howTheyBenefit: 'Profits from FUD', confidence: 0.6 }],
+          beneficiaries: [
+            { entity: 'Entity1', howTheyBenefit: 'Profits from FUD', confidence: 0.6 },
+          ],
           agendas: [],
           summary: '',
         },
@@ -588,7 +692,7 @@ describe('IntelligenceEngineService', () => {
         makeBotScore('follower', 0.1),
       ]);
 
-      const report = service.attributeInfluenceOperation(investigation, botResult, []);
+      const report = service.attributeInfluenceOperation(investigation, botResult);
 
       expect(report.investigativeLeads.length).toBeGreaterThan(0);
       expect(report.investigativeLeads.some((l) => l.question.includes('origin'))).toBe(true);
@@ -607,7 +711,10 @@ describe('IntelligenceEngineService', () => {
         makeBotScore('target', 0.1),
       ]);
 
-      const report = serviceWithCredibility.attributeInfluenceOperation(investigation, botResult, []);
+      const report = serviceWithCredibility.attributeInfluenceOperation(
+        investigation,
+        botResult,
+      );
 
       // Platform credibility should affect confidence values
       expect(report.attributionChain.length).toBeGreaterThan(0);
@@ -625,9 +732,13 @@ describe('IntelligenceEngineService', () => {
           summary: '',
         },
       });
-      const botResult = makeBotResult([makeBotScore('a', 0.1), makeBotScore('b', 0.7), makeBotScore('c', 0.1)]);
+      const botResult = makeBotResult([
+        makeBotScore('a', 0.1),
+        makeBotScore('b', 0.7),
+        makeBotScore('c', 0.1),
+      ]);
 
-      const report = service.attributeInfluenceOperation(investigation, botResult, []);
+      const report = service.attributeInfluenceOperation(investigation, botResult);
 
       const beneficiaryNodes = report.attributionChain.filter((n) => n.role === 'beneficiary');
       expect(beneficiaryNodes).toHaveLength(2);
@@ -696,11 +807,17 @@ describe('IntelligenceEngineService', () => {
       ]);
 
       // Farcaster has high credibility (0.7)
-      const reportHighCred = serviceWithCredibility.scoreNarrativeLegitimacy(verification, { farcaster: 10 });
+      const reportHighCred = serviceWithCredibility.scoreNarrativeLegitimacy(verification, {
+        farcaster: 10,
+      });
       // Truth Social has low credibility (0.2)
-      const reportLowCred = serviceWithCredibility.scoreNarrativeLegitimacy(verification, { truthsocial: 10 });
+      const reportLowCred = serviceWithCredibility.scoreNarrativeLegitimacy(verification, {
+        truthsocial: 10,
+      });
 
-      expect(reportHighCred.platformCredibilityAvg).toBeGreaterThan(reportLowCred.platformCredibilityAvg);
+      expect(reportHighCred.platformCredibilityAvg).toBeGreaterThan(
+        reportLowCred.platformCredibilityAvg,
+      );
       expect(reportHighCred.score).toBeGreaterThan(reportLowCred.score);
     });
 

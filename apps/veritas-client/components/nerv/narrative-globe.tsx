@@ -239,7 +239,8 @@ export function NarrativeGlobe({ points, arcs, width, height, onPointClick }: Na
         const intersects = raycaster.intersectObjects(globe.children, true);
         if (intersects.length > 0) {
           // Find closest matching point by distance
-          const hitPoint = intersects[0]!.point;
+          const hitPoint = intersects[0]?.point;
+          if (!hitPoint) return;
           let closest: GlobePoint | null = null;
           let closestDist = Infinity;
           for (const p of pointsRef.current) {

@@ -7,8 +7,8 @@
  * It applies migration files in order based on their version numbers.
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const { program } = require('commander');
 const { MemgraphClient } = require('memgraph');
 const dotenv = require('dotenv');
@@ -27,18 +27,12 @@ const MEMGRAPH_PASSWORD = process.env.MEMGRAPH_PASSWORD || 'memgraph';
 // Setup command line interface
 program.version('1.0.0').description('Memgraph Migration Tool');
 
-program
-  .command('create <name>')
-  .description('Create a new migration file')
-  .action(createMigration);
+program.command('create <name>').description('Create a new migration file').action(createMigration);
 
 program
   .command('up')
   .description('Apply all pending migrations')
-  .option(
-    '-v, --version <version>',
-    'Apply migrations up to a specific version'
-  )
+  .option('-v, --version <version>', 'Apply migrations up to a specific version')
   .action(upMigration);
 
 program
@@ -48,10 +42,7 @@ program
   .option('-a, --all', 'Rollback all migrations')
   .action(downMigration);
 
-program
-  .command('status')
-  .description('Show migration status')
-  .action(migrationStatus);
+program.command('status').description('Show migration status').action(migrationStatus);
 
 program.parse(process.argv);
 
@@ -117,8 +108,7 @@ async function upMigration(options) {
     const pendingMigrations = migrationFiles.filter((file) => {
       const version = getVersionFromFilename(file);
       return (
-        !appliedMigrations.includes(version) &&
-        (!options.version || version <= options.version)
+        !appliedMigrations.includes(version) && (!options.version || version <= options.version)
       );
     });
 
@@ -154,7 +144,7 @@ async function upMigration(options) {
         // Record migration
         await client.executeCypher(
           'CREATE (m:Migration {version: $version, name: $name, appliedAt: datetime()})',
-          { version, name }
+          { version, name },
         );
 
         // Commit transaction
@@ -209,9 +199,7 @@ async function downMigration(options) {
     if (options.all) {
       migrationsToRollback = appliedMigrations;
     } else if (options.version) {
-      migrationsToRollback = appliedMigrations.filter(
-        (version) => version > options.version
-      );
+      migrationsToRollback = appliedMigrations.filter((version) => version > options.version);
     } else {
       // Default: roll back only the latest migration
       migrationsToRollback = [appliedMigrations[0]];
@@ -229,9 +217,7 @@ async function downMigration(options) {
     for (const version of migrationsToRollback) {
       // Find migration file
       const migrationFiles = getMigrationFiles();
-      const file = migrationFiles.find(
-        (f) => getVersionFromFilename(f) === version
-      );
+      const file = migrationFiles.find((f) => getVersionFromFilename(f) === version);
 
       if (!file) {
         console.error(`Migration file for version ${version} not found.`);
@@ -251,10 +237,7 @@ async function downMigration(options) {
         await migration.down(client);
 
         // Remove migration record
-        await client.executeCypher(
-          'MATCH (m:Migration {version: $version}) DELETE m',
-          { version }
-        );
+        await client.executeCypher('MATCH (m:Migration {version: $version}) DELETE m', { version });
 
         // Commit transaction
         await client.executeCypher('COMMIT');
@@ -263,10 +246,7 @@ async function downMigration(options) {
       } catch (error) {
         // Rollback transaction on error
         await client.executeCypher('ROLLBACK');
-        console.error(
-          `Error rolling back migration ${name} (${version}):`,
-          error
-        );
+        console.error(`Error rolling back migration ${name} (${version}):`, error);
         process.exit(1);
       }
     }
@@ -333,28 +313,13 @@ async function migrationStatus() {
     if (allMigrations.length === 0) {
       console.log('No migrations found.');
     } else {
-      console.log(
-        'Version'.padEnd(15) +
-          'Name'.padEnd(30) +
-          'Status'.padEnd(10) +
-          'Applied At'
-      );
-      console.log(
-        '-------'.padEnd(15) +
-          '----'.padEnd(30) +
-          '------'.padEnd(10) +
-          '----------'
-      );
+      console.log(`${'Version'.padEnd(15)}${'Name'.padEnd(30)}${'Status'.padEnd(10)}Applied At`);
+      console.log(`${'-------'.padEnd(15)}${'----'.padEnd(30)}${'------'.padEnd(10)}----------`);
 
       allMigrations.forEach((migration) => {
-        const appliedAt = migration.appliedAt
-          ? new Date(migration.appliedAt).toLocaleString()
-          : '';
+        const appliedAt = migration.appliedAt ? new Date(migration.appliedAt).toLocaleString() : '';
         console.log(
-          migration.version.padEnd(15) +
-            migration.name.padEnd(30) +
-            migration.status.padEnd(10) +
-            appliedAt
+          `${migration.version.padEnd(15)}${migration.name.padEnd(30)}${migration.status.padEnd(10)}${appliedAt}`,
         );
       });
     }
@@ -434,9 +399,7 @@ function getMigrationFiles() {
       return [];
     }
 
-    return fs
-      .readdirSync(MIGRATIONS_DIR)
-      .filter((file) => file.match(/^\d+_.*\.js$/));
+    return fs.readdirSync(MIGRATIONS_DIR).filter((file) => file.match(/^\d+_.*\.js$/));
   } catch (error) {
     console.error('Error getting migration files:', error);
     process.exit(1);

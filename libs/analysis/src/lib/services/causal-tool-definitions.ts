@@ -6,16 +6,13 @@
  * submitting evidence-backed chains, and rejecting spurious correlations.
  */
 
+import type { FunctionCall, FunctionDeclarationsTool } from '@google/generative-ai';
 import { SchemaType } from '@google/generative-ai';
-import type {
-  FunctionDeclarationsTool,
-  FunctionCall,
-} from '@google/generative-ai';
 import { Logger } from '@nestjs/common';
-import type { SignalAdapter, ExternalSignal } from './signal-adapters/signal-adapter.interface';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { RawPost } from './deviation.service';
 import type { SignalCacheStore } from './downstream-effects.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
+import type { ExternalSignal, SignalAdapter } from './signal-adapters/signal-adapter.interface';
 
 // ---------------------------------------------------------------------------
 // Tool declarations for Gemini function calling
@@ -270,7 +267,7 @@ export class ToolDispatcher {
 
   constructor(
     private readonly adapters: SignalAdapter[],
-    private readonly narratives: AnalyzedNarrative[],
+    narratives: AnalyzedNarrative[],
     private readonly posts: RawPost[],
     private readonly signalCache?: SignalCacheStore,
   ) {
@@ -327,19 +324,26 @@ export class ToolDispatcher {
       ]);
 
       this.fetchedSignals.push(...signals);
-      this.logger.debug(`fetch_signals("${adapterName}", ${startDate}→${endDate}): ${signals.length} signals`);
+      this.logger.debug(
+        `fetch_signals("${adapterName}", ${startDate}→${endDate}): ${signals.length} signals`,
+      );
 
       // Persist to cache if available
       if (this.signalCache && signals.length > 0) {
-        this.signalCache.saveSignals({
-          adapterName: adapter.name,
-          scope: adapter.scope,
-          keywords,
-          startDate,
-          endDate,
-          signals,
-          maxAgeMs: adapter.maxAgeMs,
-        }).catch(() => {});
+        void this.signalCache
+          .saveSignals({
+            adapterName: adapter.name,
+            scope: adapter.scope,
+            keywords,
+            startDate,
+            endDate,
+            signals,
+            maxAgeMs: adapter.maxAgeMs,
+          })
+          .catch((cacheError: unknown) => {
+            const message = cacheError instanceof Error ? cacheError.message : String(cacheError);
+            this.logger.debug(`Signal cache persistence skipped: ${message}`);
+          });
       }
 
       return {
@@ -374,7 +378,7 @@ export class ToolDispatcher {
     // Get the posts that belong to this narrative
     const narrativePosts = narrative.postIndices
       .map((idx) => this.posts[idx])
-      .filter(Boolean)
+      .filter((post): post is RawPost => Boolean(post))
       .slice(0, 20); // Cap at 20 posts for context length
 
     return {
@@ -386,11 +390,11 @@ export class ToolDispatcher {
       velocity: narrative.velocity,
       platforms: narrative.platforms,
       posts: narrativePosts.map((p) => ({
-        text: p!.text.slice(0, 500),
-        platform: p!.platform,
-        author: p!.authorHandle,
-        timestamp: p!.timestamp,
-        engagement: p!.engagement,
+        text: p.text.slice(0, 500),
+        platform: p.platform,
+        author: p.authorHandle,
+        timestamp: p.timestamp,
+        engagement: p.engagement,
       })),
     };
   }
@@ -442,7 +446,9 @@ export class ToolDispatcher {
     }
 
     this.fetchedSignals.push(...signals);
-    this.logger.debug(`search_historical("${domain}", ${startDate}→${endDate}): ${signals.length} signals`);
+    this.logger.debug(
+      `search_historical("${domain}", ${startDate}→${endDate}): ${signals.length} signals`,
+    );
 
     return {
       domain,
@@ -471,10 +477,8 @@ export class ToolDispatcher {
     const requestedStart = new Date(startDate).getTime();
 
     if (requestedStart < minAllowed) {
-      const clamped = new Date(minAllowed).toISOString().split('T')[0]!;
-      this.logger.warn(
-        `Date range clamped: requested ${startDate}, max lookback is ${clamped}`,
-      );
+      const [clamped = startDate] = new Date(minAllowed).toISOString().split('T');
+      this.logger.warn(`Date range clamped: requested ${startDate}, max lookback is ${clamped}`);
       return { startDate: clamped, endDate };
     }
 

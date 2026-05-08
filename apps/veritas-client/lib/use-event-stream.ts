@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { GlobalEvent } from './global-event.types';
 
 const MAX_EVENTS = 500;
@@ -49,7 +49,9 @@ function eventSignature(event: GlobalEvent): string {
 }
 
 function hasExactCoordinates(event: GlobalEvent): boolean {
-  const coords = event.metadata['coordinates'] as { latitude?: number; longitude?: number } | undefined;
+  const coords = event.metadata.coordinates as
+    | { latitude?: number; longitude?: number }
+    | undefined;
   return Number.isFinite(coords?.latitude) && Number.isFinite(coords?.longitude);
 }
 
@@ -73,22 +75,28 @@ function sourcePriority(source: string): number {
 }
 
 function earthquakeMagnitude(event: GlobalEvent): number | null {
-  const raw = event.metadata['mag'];
+  const raw = event.metadata.mag;
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
 }
 
 function isEarthquakeLike(event: GlobalEvent): boolean {
   if (event.category !== 'environmental') return false;
 
-  const metadataType = normalizeText(typeof event.metadata['type'] === 'string' ? event.metadata['type'] : '');
+  const metadataType = normalizeText(
+    typeof event.metadata.type === 'string' ? event.metadata.type : '',
+  );
   const text = `${normalizeText(event.title)} ${normalizeText(event.description)} ${normalizeText(event.location.label)}`;
-  return metadataType.includes('earthquake') || text.includes('earthquake') || text.includes(' seismic ');
+  return (
+    metadataType.includes('earthquake') || text.includes('earthquake') || text.includes(' seismic ')
+  );
 }
 
 function geoDistanceDegrees(a: GlobalEvent, b: GlobalEvent): number {
   if (
-    !Number.isFinite(a.location.lat) || !Number.isFinite(a.location.lng) ||
-    !Number.isFinite(b.location.lat) || !Number.isFinite(b.location.lng)
+    !Number.isFinite(a.location.lat) ||
+    !Number.isFinite(a.location.lng) ||
+    !Number.isFinite(b.location.lat) ||
+    !Number.isFinite(b.location.lng)
   ) {
     return Number.POSITIVE_INFINITY;
   }
@@ -178,7 +186,8 @@ function mergeEvents(existing: GlobalEvent[], incoming: GlobalEvent[]): GlobalEv
 
       const currentTs = new Date(current.timestamp).getTime();
       const nextTs = new Date(event.timestamp).getTime();
-      const keepIncoming = Number.isFinite(nextTs) && (!Number.isFinite(currentTs) || nextTs >= currentTs);
+      const keepIncoming =
+        Number.isFinite(nextTs) && (!Number.isFinite(currentTs) || nextTs >= currentTs);
 
       if (keepIncoming) {
         byId.delete(existingBySignatureId);
@@ -219,7 +228,12 @@ function mergeEvents(existing: GlobalEvent[], incoming: GlobalEvent[]): GlobalEv
       continue;
     }
 
-    const current = correlated[existingIdx]!;
+    const current = correlated[existingIdx];
+    if (!current) {
+      correlated.push(event);
+      continue;
+    }
+
     if (compareEventQuality(event, current) > 0) {
       correlated[existingIdx] = event;
     }
@@ -285,8 +299,8 @@ function isCacheFresh(cache: RecentEventsCache | null): boolean {
 
 async function fetchRecentEvents(force = false): Promise<GlobalEvent[]> {
   const existingCache = readRecentEventsCache();
-  if (!force && isCacheFresh(existingCache)) {
-    return existingCache!.events;
+  if (!force && existingCache && isCacheFresh(existingCache)) {
+    return existingCache.events;
   }
 
   if (!force && recentEventsInFlight) {
@@ -310,14 +324,17 @@ export function prefetchRecentEvents(force = false): Promise<GlobalEvent[]> {
   return fetchRecentEvents(force).catch(() => readRecentEventsCache()?.events ?? []);
 }
 
-export function useEventStream(options?: {
-  categories?: string[];
-  regions?: string[];
-}): { events: GlobalEvent[]; connected: boolean; error: string | null } {
+export function useEventStream(options?: { categories?: string[]; regions?: string[] }): {
+  events: GlobalEvent[];
+  connected: boolean;
+  error: string | null;
+} {
   const [events, setEvents] = useState<GlobalEvent[]>(() => readRecentEventsCache()?.events ?? []);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const categoriesKey = options?.categories?.join(',') ?? '';
+  const regionsKey = options?.regions?.join(',') ?? '';
 
   useEffect(() => {
     // 1. Hydrate from warm cache immediately, then refresh recent events in background.
@@ -326,14 +343,16 @@ export function useEventStream(options?: {
       setEvents(cached.events);
     }
 
-    void fetchRecentEvents().then((freshEvents) => {
-      setEvents((prev) => mergeEvents(prev, freshEvents));
-    }).catch(() => {});
+    void fetchRecentEvents()
+      .then((freshEvents) => {
+        setEvents((prev) => mergeEvents(prev, freshEvents));
+      })
+      .catch(() => undefined);
 
     // 2. Open SSE connection
     const params = new URLSearchParams();
-    if (options?.categories?.length) params.set('categories', options.categories.join(','));
-    if (options?.regions?.length) params.set('regions', options.regions.join(','));
+    if (categoriesKey) params.set('categories', categoriesKey);
+    if (regionsKey) params.set('regions', regionsKey);
 
     const url = `${API_BASE}/events/stream${params.toString() ? `?${params}` : ''}`;
     const es = new EventSource(url);
@@ -342,7 +361,7 @@ export function useEventStream(options?: {
     es.addEventListener('event', (e) => {
       try {
         const event = JSON.parse(e.data) as GlobalEvent;
-        setEvents(prev => {
+        setEvents((prev) => {
           const merged = mergeEvents(prev, [event]);
           writeRecentEventsCache(merged);
           return merged;
@@ -352,11 +371,19 @@ export function useEventStream(options?: {
       }
     });
 
-    es.onopen = () => { setConnected(true); setError(null); };
-    es.onerror = () => { setConnected(false); setError('Connection lost — reconnecting...'); };
+    es.onopen = () => {
+      setConnected(true);
+      setError(null);
+    };
+    es.onerror = () => {
+      setConnected(false);
+      setError('Connection lost — reconnecting...');
+    };
 
-    return () => { es.close(); };
-  }, []); // Intentionally no deps — connect once on mount
+    return () => {
+      es.close();
+    };
+  }, [categoriesKey, regionsKey]);
 
   return { events, connected, error };
 }

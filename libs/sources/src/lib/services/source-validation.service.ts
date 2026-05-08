@@ -1,19 +1,19 @@
-import { Injectable } from "@nestjs/common";
-import { z } from "zod";
-import { SourceCreateInput, SourceUpdateInput } from "./source.service";
+import { Injectable } from '@nestjs/common';
+import { z } from 'zod';
+import { SourceCreateInput, SourceUpdateInput } from './source.service';
 
 const SourceCreateSchema = z.object({
   name: z.string().min(1).max(200),
-  platform: z.enum(["twitter", "facebook", "reddit", "other"]),
+  platform: z.enum(['twitter', 'facebook', 'reddit', 'other']),
   credibilityScore: z.number().min(0).max(1).optional(),
-  verificationStatus: z.enum(["verified", "unverified", "disputed"]).optional(),
+  verificationStatus: z.enum(['verified', 'unverified', 'disputed']).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
 const SourceUpdateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   credibilityScore: z.number().min(0).max(1).optional(),
-  verificationStatus: z.enum(["verified", "unverified", "disputed"]).optional(),
+  verificationStatus: z.enum(['verified', 'unverified', 'disputed']).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 

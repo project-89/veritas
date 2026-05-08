@@ -14,7 +14,7 @@
  *   4. Data flows correctly through the pipeline
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @nx/enforce-module-boundaries */
 
 // ---------------------------------------------------------------------------
 // Mock external modules BEFORE imports
@@ -56,7 +56,13 @@ jest.mock('@google/generative-ai', () => ({
     getGenerativeModel: mockGetGenerativeModel,
   })),
   FunctionCallingMode: { AUTO: 'AUTO' },
-  SchemaType: { STRING: 'STRING', NUMBER: 'NUMBER', OBJECT: 'OBJECT', ARRAY: 'ARRAY', BOOLEAN: 'BOOLEAN' },
+  SchemaType: {
+    STRING: 'STRING',
+    NUMBER: 'NUMBER',
+    OBJECT: 'OBJECT',
+    ARRAY: 'ARRAY',
+    BOOLEAN: 'BOOLEAN',
+  },
 }));
 
 // Mock child_process for cross-platform identity (sherlock)
@@ -89,44 +95,41 @@ global.fetch = mockFetch as any;
 // ---------------------------------------------------------------------------
 
 import { ConfigService } from '@nestjs/config';
-
-// Analysis services
-import { NarrativeAnalysisService } from '../../../../libs/analysis/src/lib/services/narrative-analysis.service';
-import { PropagandaAnalysisService } from '../../../../libs/analysis/src/lib/services/propaganda.service';
-import { ClaimVerificationService } from '../../../../libs/analysis/src/lib/services/claim-verification.service';
-import { DeviationService } from '../../../../libs/analysis/src/lib/services/deviation.service';
-import { ComparisonService } from '../../../../libs/analysis/src/lib/services/comparison.service';
-import { EntityAnalysisService } from '../../../../libs/analysis/src/lib/services/entity-analysis.service';
-import { NarrativeGenealogyService } from '../../../../libs/analysis/src/lib/services/genealogy.service';
-import { DownstreamEffectsService } from '../../../../libs/analysis/src/lib/services/downstream-effects.service';
 import { CausalReasoningService } from '../../../../libs/analysis/src/lib/services/causal-reasoning.service';
-import { ReportService } from '../../../../libs/analysis/src/lib/services/report.service';
-import { DeepInvestigationService } from '../../../../libs/analysis/src/lib/services/deep-investigation.service';
+import { ClaimVerificationService } from '../../../../libs/analysis/src/lib/services/claim-verification.service';
+import { ComparisonService } from '../../../../libs/analysis/src/lib/services/comparison.service';
 import { CrossPlatformIdentityService } from '../../../../libs/analysis/src/lib/services/cross-platform-identity.service';
-import { SourceCredibilityService } from '../../../../libs/analysis/src/lib/services/source-credibility.service';
-import { GraphBotDetectionService } from '../../../../libs/analysis/src/lib/services/graph-bot-detection.service';
-import { PlatformCredibilityService } from '../../../../libs/analysis/src/lib/services/platform-credibility.service';
-import { SocialGraphIntelligenceService } from '../../../../libs/analysis/src/lib/services/social-graph-intelligence.service';
-import { GraphDatabaseService } from '../../../../libs/analysis/src/lib/services/graph-database.service';
-import { MonitorService } from '../../../../libs/analysis/src/lib/services/monitor.service';
-import { SaturationMetricsService } from '../../../../libs/analysis/src/lib/services/saturation-metrics.service';
-
-// Signal adapters
-import { CoinGeckoAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/coingecko.adapter';
-import { GdeltAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/gdelt.adapter';
-import { YahooFinanceAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/yahoo-finance.adapter';
-import { WorldBankAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/worldbank.adapter';
-import { FredAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/fred.adapter';
-import { AcledAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/acled.adapter';
-import { UsgsAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/usgs.adapter';
-import { LlmHypothesisAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/llm-hypothesis.adapter';
-
+import { DeepInvestigationService } from '../../../../libs/analysis/src/lib/services/deep-investigation.service';
+import { DeviationService } from '../../../../libs/analysis/src/lib/services/deviation.service';
+import { DownstreamEffectsService } from '../../../../libs/analysis/src/lib/services/downstream-effects.service';
+import { EntityAnalysisService } from '../../../../libs/analysis/src/lib/services/entity-analysis.service';
+import { DexScreenerEvidenceAdapter } from '../../../../libs/analysis/src/lib/services/evidence-adapters/dexscreener.evidence-adapter';
 // Evidence adapters
 import { EtherscanEvidenceAdapter } from '../../../../libs/analysis/src/lib/services/evidence-adapters/etherscan.evidence-adapter';
-import { DexScreenerEvidenceAdapter } from '../../../../libs/analysis/src/lib/services/evidence-adapters/dexscreener.evidence-adapter';
 import { GitHubEvidenceAdapter } from '../../../../libs/analysis/src/lib/services/evidence-adapters/github.evidence-adapter';
 import { SecEdgarEvidenceAdapter } from '../../../../libs/analysis/src/lib/services/evidence-adapters/sec-edgar.evidence-adapter';
 import { SocialGraphEvidenceAdapter } from '../../../../libs/analysis/src/lib/services/evidence-adapters/social-graph.evidence-adapter';
+import { NarrativeGenealogyService } from '../../../../libs/analysis/src/lib/services/genealogy.service';
+import { GraphBotDetectionService } from '../../../../libs/analysis/src/lib/services/graph-bot-detection.service';
+import { GraphDatabaseService } from '../../../../libs/analysis/src/lib/services/graph-database.service';
+import { MonitorService } from '../../../../libs/analysis/src/lib/services/monitor.service';
+// Analysis services
+import { NarrativeAnalysisService } from '../../../../libs/analysis/src/lib/services/narrative-analysis.service';
+import { PlatformCredibilityService } from '../../../../libs/analysis/src/lib/services/platform-credibility.service';
+import { PropagandaAnalysisService } from '../../../../libs/analysis/src/lib/services/propaganda.service';
+import { ReportService } from '../../../../libs/analysis/src/lib/services/report.service';
+import { SaturationMetricsService } from '../../../../libs/analysis/src/lib/services/saturation-metrics.service';
+import { AcledAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/acled.adapter';
+// Signal adapters
+import { CoinGeckoAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/coingecko.adapter';
+import { FredAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/fred.adapter';
+import { GdeltAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/gdelt.adapter';
+import { LlmHypothesisAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/llm-hypothesis.adapter';
+import { UsgsAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/usgs.adapter';
+import { WorldBankAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/worldbank.adapter';
+import { YahooFinanceAdapter } from '../../../../libs/analysis/src/lib/services/signal-adapters/yahoo-finance.adapter';
+import { SocialGraphIntelligenceService } from '../../../../libs/analysis/src/lib/services/social-graph-intelligence.service';
+import { SourceCredibilityService } from '../../../../libs/analysis/src/lib/services/source-credibility.service';
 
 // ---------------------------------------------------------------------------
 // Test data factories
@@ -564,7 +567,14 @@ describe('Section 2: Signal Adapter Contracts', () => {
         json: () =>
           Promise.resolve([
             { page: 1, total: 1 },
-            [{ indicator: { id: 'FP.CPI.TOTL.ZG', value: 'CPI' }, country: { value: 'US' }, date: '2025', value: 3.2 }],
+            [
+              {
+                indicator: { id: 'FP.CPI.TOTL.ZG', value: 'CPI' },
+                country: { value: 'US' },
+                date: '2025',
+                value: 3.2,
+              },
+            ],
           ]),
       });
 
@@ -587,9 +597,7 @@ describe('Section 2: Signal Adapter Contracts', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            observations: [
-              { date: '2026-03-01', value: '5.25' },
-            ],
+            observations: [{ date: '2026-03-01', value: '5.25' }],
           }),
       });
 
@@ -915,11 +923,11 @@ describe('Section 3: Evidence Adapter Contracts', () => {
     });
 
     it('canVerify returns true for coordination claims', () => {
-      expect(adapter.canVerify('coordinated bot network spreading propaganda', [])).toBe(true);
+      expect(adapter.canVerify()).toBe(true);
     });
 
     it('canVerify returns true for any claim (always checks author history)', () => {
-      expect(adapter.canVerify('gold prices are rising', ['gold'])).toBe(true);
+      expect(adapter.canVerify()).toBe(true);
     });
   });
 });
@@ -1085,14 +1093,26 @@ describe('Section 4: Analysis Service Contracts', () => {
           id: 'snap1',
           timestamp: '2026-03-10T00:00:00Z',
           narratives: [
-            { id: 'n1', summary: 'BTC to 100k', centroidEmbedding: [1, 0, 0], postCount: 10, avgSentiment: 0.6 },
+            {
+              id: 'n1',
+              summary: 'BTC to 100k',
+              centroidEmbedding: [1, 0, 0],
+              postCount: 10,
+              avgSentiment: 0.6,
+            },
           ],
         },
         {
           id: 'snap2',
           timestamp: '2026-03-15T00:00:00Z',
           narratives: [
-            { id: 'n2', summary: 'BTC to 100k incoming', centroidEmbedding: [0.95, 0.05, 0], postCount: 20, avgSentiment: 0.7 },
+            {
+              id: 'n2',
+              summary: 'BTC to 100k incoming',
+              centroidEmbedding: [0.95, 0.05, 0],
+              postCount: 20,
+              avgSentiment: 0.7,
+            },
           ],
         },
       ];
@@ -1113,7 +1133,14 @@ describe('Section 4: Analysis Service Contracts', () => {
     const svc = new PlatformCredibilityService(configService);
 
     it('getProfile returns profile for known platforms', () => {
-      const knownPlatforms = ['twitter', 'reddit', 'youtube', 'telegram', 'farcaster', 'truthsocial'];
+      const knownPlatforms = [
+        'twitter',
+        'reddit',
+        'youtube',
+        'telegram',
+        'farcaster',
+        'truthsocial',
+      ];
       for (const platform of knownPlatforms) {
         const profile = svc.getProfile(platform);
         expect(profile).toHaveProperty('platform');
@@ -1233,9 +1260,7 @@ describe('Section 4: Analysis Service Contracts', () => {
         {
           handle: 'bob',
           platform: 'twitter',
-          posts: [
-            { text: 'Thanks @alice', timestamp: '2026-03-15T12:00:30Z' },
-          ],
+          posts: [{ text: 'Thanks @alice', timestamp: '2026-03-15T12:00:30Z' }],
         },
       ];
       const result = await svc.enrichRelationships(users, 'test-investigation');
@@ -1267,10 +1292,22 @@ describe('Section 4: Analysis Service Contracts', () => {
       const currSnapshot = {
         postCount: 30,
         narrativeCount: 4,
-        summary: { total: 30, positive: 5, negative: 20, neutral: 5, byPlatform: { twitter: 20, reddit: 10 } },
+        summary: {
+          total: 30,
+          positive: 5,
+          negative: 20,
+          neutral: 5,
+          byPlatform: { twitter: 20, reddit: 10 },
+        },
         narratives: [
           { id: 'n1', summary: 'test', avgSentiment: -0.3, velocity: { postsPerHour: 10 } },
-          { id: 'n2', summary: 'new narrative', avgSentiment: 0.2, velocity: { postsPerHour: 5 }, postIndices: [0, 1, 2, 3, 4] },
+          {
+            id: 'n2',
+            summary: 'new narrative',
+            avgSentiment: 0.2,
+            velocity: { postsPerHour: 5 },
+            postIndices: [0, 1, 2, 3, 4],
+          },
         ],
       };
       const thresholds = {
@@ -1287,7 +1324,14 @@ describe('Section 4: Analysis Service Contracts', () => {
         expect(alert).toHaveProperty('title');
         expect(alert).toHaveProperty('description');
         expect(alert).toHaveProperty('metadata');
-        expect(['new_narrative', 'velocity_spike', 'sentiment_reversal', 'coordination_detected', 'new_platform', 'volume_surge']).toContain(alert.type);
+        expect([
+          'new_narrative',
+          'velocity_spike',
+          'sentiment_reversal',
+          'coordination_detected',
+          'new_platform',
+          'volume_surge',
+        ]).toContain(alert.type);
         expect(['info', 'warning', 'critical']).toContain(alert.severity);
       }
     });
@@ -1371,7 +1415,12 @@ describe('Section 4: Analysis Service Contracts', () => {
           Promise.resolve({
             query: {
               search: [
-                { title: 'Bitcoin', snippet: 'Bitcoin is a cryptocurrency', pageid: 123, timestamp: '2026-03-15' },
+                {
+                  title: 'Bitcoin',
+                  snippet: 'Bitcoin is a cryptocurrency',
+                  pageid: 123,
+                  timestamp: '2026-03-15',
+                },
               ],
             },
           }),
@@ -1481,14 +1530,28 @@ describe('Section 5: Data Flow Validation', () => {
       makePost({
         id: `post-${i}`,
         text: i < 5 ? 'Bitcoin is the future' : 'Bitcoin is overvalued',
-        sentiment: { score: i < 5 ? 0.7 : -0.5, label: i < 5 ? 'positive' : 'negative', confidence: 0.9 },
+        sentiment: {
+          score: i < 5 ? 0.7 : -0.5,
+          label: i < 5 ? 'positive' : 'negative',
+          confidence: 0.9,
+        },
         timestamp: new Date(Date.now() - (10 - i) * 3600000).toISOString(),
       }),
     );
 
     const narratives = [
-      makeNarrative({ id: 'bullish', summary: 'Bullish narrative', postIndices: [0, 1, 2, 3, 4], centroidEmbedding: [1, 0, 0] }),
-      makeNarrative({ id: 'bearish', summary: 'Bearish narrative', postIndices: [5, 6, 7, 8, 9], centroidEmbedding: [0, 1, 0] }),
+      makeNarrative({
+        id: 'bullish',
+        summary: 'Bullish narrative',
+        postIndices: [0, 1, 2, 3, 4],
+        centroidEmbedding: [1, 0, 0],
+      }),
+      makeNarrative({
+        id: 'bearish',
+        summary: 'Bearish narrative',
+        postIndices: [5, 6, 7, 8, 9],
+        centroidEmbedding: [0, 1, 0],
+      }),
     ];
 
     // Step 1: Compute deviations
@@ -1512,8 +1575,18 @@ describe('Section 5: Data Flow Validation', () => {
   it('narratives -> comparison pipeline works for all comparison types', () => {
     const comparisonSvc = new ComparisonService();
 
-    const nA = makeNarrative({ id: 'a', summary: 'Bull case', centroidEmbedding: [1, 0, 0], avgSentiment: 0.7 });
-    const nB = makeNarrative({ id: 'b', summary: 'Bear case', centroidEmbedding: [0, 1, 0], avgSentiment: -0.3 });
+    const nA = makeNarrative({
+      id: 'a',
+      summary: 'Bull case',
+      centroidEmbedding: [1, 0, 0],
+      avgSentiment: 0.7,
+    });
+    const nB = makeNarrative({
+      id: 'b',
+      summary: 'Bear case',
+      centroidEmbedding: [0, 1, 0],
+      avgSentiment: -0.3,
+    });
 
     // Narrative comparison
     const narrativeComp = comparisonSvc.compareNarratives(nA, nB, [makePost()], [makePost()]);
@@ -1582,22 +1655,46 @@ describe('Section 5: Data Flow Validation', () => {
         id: 'snap-1',
         timestamp: '2026-03-01T00:00:00Z',
         narratives: [
-          { id: 'n1-v1', summary: 'BTC reaching new highs', centroidEmbedding: [1, 0, 0], postCount: 5, avgSentiment: 0.6 },
+          {
+            id: 'n1-v1',
+            summary: 'BTC reaching new highs',
+            centroidEmbedding: [1, 0, 0],
+            postCount: 5,
+            avgSentiment: 0.6,
+          },
         ],
       },
       {
         id: 'snap-2',
         timestamp: '2026-03-08T00:00:00Z',
         narratives: [
-          { id: 'n1-v2', summary: 'BTC surging to new all-time highs', centroidEmbedding: [0.98, 0.02, 0], postCount: 15, avgSentiment: 0.8 },
+          {
+            id: 'n1-v2',
+            summary: 'BTC surging to new all-time highs',
+            centroidEmbedding: [0.98, 0.02, 0],
+            postCount: 15,
+            avgSentiment: 0.8,
+          },
         ],
       },
       {
         id: 'snap-3',
         timestamp: '2026-03-15T00:00:00Z',
         narratives: [
-          { id: 'n1-v3', summary: 'BTC hitting resistance at 100k', centroidEmbedding: [0.9, 0.1, 0], postCount: 25, avgSentiment: 0.4 },
-          { id: 'n2-v1', summary: 'Alt season incoming', centroidEmbedding: [0, 1, 0], postCount: 8, avgSentiment: 0.7 },
+          {
+            id: 'n1-v3',
+            summary: 'BTC hitting resistance at 100k',
+            centroidEmbedding: [0.9, 0.1, 0],
+            postCount: 25,
+            avgSentiment: 0.4,
+          },
+          {
+            id: 'n2-v1',
+            summary: 'Alt season incoming',
+            centroidEmbedding: [0, 1, 0],
+            postCount: 8,
+            avgSentiment: 0.7,
+          },
         ],
       },
     ];
@@ -1606,7 +1703,9 @@ describe('Section 5: Data Flow Validation', () => {
     expect(lineages.length).toBeGreaterThan(0);
 
     // The BTC narrative should have history entries
-    const btcLineage = lineages.find((l: any) => l.currentSummary.includes('BTC') || l.currentSummary.includes('btc'));
+    const btcLineage = lineages.find(
+      (l: any) => l.currentSummary.includes('BTC') || l.currentSummary.includes('btc'),
+    );
     if (btcLineage) {
       expect(btcLineage.history.length).toBeGreaterThanOrEqual(1);
       expect(btcLineage.events.length).toBeGreaterThan(0);
@@ -1653,10 +1752,22 @@ describe('Section 5: Data Flow Validation', () => {
     const curr = {
       postCount: 100,
       narrativeCount: 5,
-      summary: { total: 100, positive: 10, negative: 70, neutral: 20, byPlatform: { twitter: 80, reddit: 20 } },
+      summary: {
+        total: 100,
+        positive: 10,
+        negative: 70,
+        neutral: 20,
+        byPlatform: { twitter: 80, reddit: 20 },
+      },
       narratives: [
         { id: 'n1', summary: 'test', avgSentiment: -0.7, velocity: { postsPerHour: 20 } },
-        { id: 'n2', summary: 'new hotness', postIndices: Array.from({ length: 30 }, (_, i) => i), avgSentiment: 0.2, velocity: { postsPerHour: 15 } },
+        {
+          id: 'n2',
+          summary: 'new hotness',
+          postIndices: Array.from({ length: 30 }, (_, i) => i),
+          avgSentiment: 0.2,
+          velocity: { postsPerHour: 15 },
+        },
       ],
     };
 
@@ -1819,10 +1930,20 @@ describe('Section 6: Frontend API Client Coverage', () => {
   // Validate endpoint path prefixes match controller organization
   it('narrative endpoints map to /api/narratives/*', () => {
     const narrativeEndpoints = [
-      'searchNarratives', 'analyzeNarratives', 'fetchInsights', 'fetchTrends',
-      'fetchDeviations', 'analyzePropaganda', 'verifyClaims',
-      'compareNarratives', 'compareTimePeriods', 'comparePlatforms',
-      'analyzeEntities', 'fetchGenealogy', 'fetchDownstreamEffects', 'generateReport',
+      'searchNarratives',
+      'analyzeNarratives',
+      'fetchInsights',
+      'fetchTrends',
+      'fetchDeviations',
+      'analyzePropaganda',
+      'verifyClaims',
+      'compareNarratives',
+      'compareTimePeriods',
+      'comparePlatforms',
+      'analyzeEntities',
+      'fetchGenealogy',
+      'fetchDownstreamEffects',
+      'generateReport',
     ];
     for (const ep of narrativeEndpoints) {
       expect(apiEndpointMap[ep]!.pathPattern).toMatch(/^\/api\/narratives\//);
@@ -1831,8 +1952,10 @@ describe('Section 6: Frontend API Client Coverage', () => {
 
   it('investigation endpoints map to /api/investigations/*', () => {
     const investigationEndpoints = [
-      'fetchInvestigations', 'fetchInvestigation',
-      'archiveInvestigation', 'renameInvestigation',
+      'fetchInvestigations',
+      'fetchInvestigation',
+      'archiveInvestigation',
+      'renameInvestigation',
     ];
     for (const ep of investigationEndpoints) {
       expect(apiEndpointMap[ep]!.pathPattern).toMatch(/^\/api\/investigations/);
@@ -1841,9 +1964,13 @@ describe('Section 6: Frontend API Client Coverage', () => {
 
   it('monitor endpoints map to /api/monitor/*', () => {
     const monitorEndpoints = [
-      'fetchAlerts', 'fetchUnreadAlertCount', 'markAlertRead',
-      'markAllAlertsRead', 'refreshInvestigation',
-      'fetchMonitorConfig', 'updateMonitorConfig',
+      'fetchAlerts',
+      'fetchUnreadAlertCount',
+      'markAlertRead',
+      'markAllAlertsRead',
+      'refreshInvestigation',
+      'fetchMonitorConfig',
+      'updateMonitorConfig',
     ];
     for (const ep of monitorEndpoints) {
       expect(apiEndpointMap[ep]!.pathPattern).toMatch(/^\/api\/monitor\//);
@@ -1852,8 +1979,14 @@ describe('Section 6: Frontend API Client Coverage', () => {
 
   it('scan endpoints map to /api/scan/*', () => {
     const scanEndpoints = [
-      'startScan', 'getScanStatus', 'getScanPosts', 'cancelScan',
-      'retryScanConnector', 'getRecentScans', 'saveAnalysisCache', 'getAnalysisCache',
+      'startScan',
+      'getScanStatus',
+      'getScanPosts',
+      'cancelScan',
+      'retryScanConnector',
+      'getRecentScans',
+      'saveAnalysisCache',
+      'getAnalysisCache',
     ];
     for (const ep of scanEndpoints) {
       expect(apiEndpointMap[ep]!.pathPattern).toMatch(/^\/api\/scan/);
@@ -1862,8 +1995,10 @@ describe('Section 6: Frontend API Client Coverage', () => {
 
   it('analysis job endpoints map to /api/analysis-jobs/*', () => {
     const analysisJobEndpoints = [
-      'startAnalysisJobs', 'getAnalysisJobsByScan',
-      'getAnalysisJob', 'cancelAnalysisJob',
+      'startAnalysisJobs',
+      'getAnalysisJobsByScan',
+      'getAnalysisJob',
+      'cancelAnalysisJob',
     ];
     for (const ep of analysisJobEndpoints) {
       expect(apiEndpointMap[ep]!.pathPattern).toMatch(/^\/api\/analysis-jobs/);
@@ -1872,8 +2007,11 @@ describe('Section 6: Frontend API Client Coverage', () => {
 
   it('identity endpoints map to /api/identity/*', () => {
     const identityEndpoints = [
-      'getIdentityByHandle', 'getIdentityById',
-      'generateMagiProfile', 'searchIdentities', 'getRecentIdentities',
+      'getIdentityByHandle',
+      'getIdentityById',
+      'generateMagiProfile',
+      'searchIdentities',
+      'getRecentIdentities',
     ];
     for (const ep of identityEndpoints) {
       expect(apiEndpointMap[ep]!.pathPattern).toMatch(/^\/api\/identity/);
@@ -1921,10 +2059,7 @@ describe('Section 7: Error Handling & Graceful Degradation', () => {
   it('Evidence adapters return empty array on network failure', async () => {
     mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
 
-    const adapters = [
-      new DexScreenerEvidenceAdapter(),
-      new GitHubEvidenceAdapter(),
-    ];
+    const adapters = [new DexScreenerEvidenceAdapter(), new GitHubEvidenceAdapter()];
 
     for (const adapter of adapters) {
       const evidence = await adapter.fetchEvidence({
@@ -2074,8 +2209,14 @@ describe('Section 8: Comparison Service Contracts', () => {
     postIndices: [5, 6, 7],
   });
 
-  const postsA = [makePost({ id: 'p1', platform: 'twitter' }), makePost({ id: 'p2', platform: 'reddit' })];
-  const postsB = [makePost({ id: 'p3', platform: 'twitter' }), makePost({ id: 'p4', platform: 'farcaster' })];
+  const postsA = [
+    makePost({ id: 'p1', platform: 'twitter' }),
+    makePost({ id: 'p2', platform: 'reddit' }),
+  ];
+  const postsB = [
+    makePost({ id: 'p3', platform: 'twitter' }),
+    makePost({ id: 'p4', platform: 'farcaster' }),
+  ];
 
   it('compareNarratives() returns correct NarrativeComparison shape', () => {
     const result = svc.compareNarratives(narrativeA, narrativeB, postsA, postsB);
@@ -2097,7 +2238,7 @@ describe('Section 8: Comparison Service Contracts', () => {
 
   it('compareNarratives() computes correct sentimentDelta (A - B)', () => {
     const result = svc.compareNarratives(narrativeA, narrativeB, postsA, postsB);
-    expect(result.sentimentDelta).toBeCloseTo(0.7 - (-0.3), 5);
+    expect(result.sentimentDelta).toBeCloseTo(0.7 - -0.3, 5);
   });
 
   it('compareNarratives() velocityComparison identifies faster narrative', () => {
@@ -2215,10 +2356,7 @@ describe('Section 8: Comparison Service Contracts', () => {
   });
 
   it('comparePlatforms() identifies cross-platform narratives', () => {
-    const multiPlatPosts = [
-      makePost({ platform: 'twitter' }),
-      makePost({ platform: 'reddit' }),
-    ];
+    const multiPlatPosts = [makePost({ platform: 'twitter' }), makePost({ platform: 'reddit' })];
     const multiPlatNarr = makeNarrative({ platforms: { twitter: 5, reddit: 3 } });
     const result = svc.comparePlatforms([multiPlatNarr], multiPlatPosts);
     expect(result.crossPlatform.length).toBe(1);
@@ -2395,7 +2533,15 @@ describe('Section 10: Platform Credibility', () => {
   });
 
   it('getCredibilityMultiplier() returns 0-1 for all known platforms', () => {
-    const platforms = ['twitter', 'truthsocial', 'reddit', 'farcaster', 'youtube', 'telegram', 'rss'];
+    const platforms = [
+      'twitter',
+      'truthsocial',
+      'reddit',
+      'farcaster',
+      'youtube',
+      'telegram',
+      'rss',
+    ];
     for (const platform of platforms) {
       const mult = svc.getCredibilityMultiplier(platform);
       expect(mult).toBeGreaterThanOrEqual(0);
@@ -2404,7 +2550,15 @@ describe('Section 10: Platform Credibility', () => {
   });
 
   it('getInfluenceMultiplier() returns 0-1 for all known platforms', () => {
-    const platforms = ['twitter', 'truthsocial', 'reddit', 'farcaster', 'youtube', 'telegram', 'rss'];
+    const platforms = [
+      'twitter',
+      'truthsocial',
+      'reddit',
+      'farcaster',
+      'youtube',
+      'telegram',
+      'rss',
+    ];
     for (const platform of platforms) {
       const mult = svc.getInfluenceMultiplier(platform);
       expect(mult).toBeGreaterThanOrEqual(0);
@@ -2443,7 +2597,9 @@ describe('Section 10: Platform Credibility', () => {
 describe('Section 11: Evidence Adapter Routing', () => {
   it('Etherscan canVerify() true for claims with 0x addresses', () => {
     const adapter = new EtherscanEvidenceAdapter();
-    expect(adapter.canVerify('Check wallet 0x1234567890abcdef1234567890abcdef12345678', [])).toBe(true);
+    expect(adapter.canVerify('Check wallet 0x1234567890abcdef1234567890abcdef12345678', [])).toBe(
+      true,
+    );
   });
 
   it('Etherscan canVerify() true for crypto keyword claims', () => {
@@ -2492,8 +2648,8 @@ describe('Section 11: Evidence Adapter Routing', () => {
       search: jest.fn(),
     } as any;
     const adapter = new SocialGraphEvidenceAdapter(mockIdentityRepo);
-    expect(adapter.canVerify('any claim at all', [])).toBe(true);
-    expect(adapter.canVerify('', [])).toBe(true);
+    expect(adapter.canVerify()).toBe(true);
+    expect(adapter.canVerify()).toBe(true);
   });
 
   it('all adapters return [] on fetch failure (mock fetch to reject)', async () => {
@@ -2548,11 +2704,7 @@ describe('Section 12: Cross-Scan Deduplication', () => {
    * Normalizes text for consistent deduplication across scans.
    */
   function dedupKey(text: string): string {
-    return text
-      .toLowerCase()
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 100);
+    return text.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 100);
   }
 
   it('same text normalized different ways produces same key', () => {
@@ -2647,8 +2799,14 @@ describe('Section 13: Saturation Integration', () => {
     // 2 narratives with 50 posts each, only 5 unclustered out of 105 total
     const result = svc.computeSaturation({
       narratives: [
-        { postIndices: Array.from({ length: 50 }, (_, i) => i), centroidEmbedding: [0.1, 0.2, 0.3] },
-        { postIndices: Array.from({ length: 50 }, (_, i) => i + 50), centroidEmbedding: [0.7, 0.8, 0.9] },
+        {
+          postIndices: Array.from({ length: 50 }, (_, i) => i),
+          centroidEmbedding: [0.1, 0.2, 0.3],
+        },
+        {
+          postIndices: Array.from({ length: 50 }, (_, i) => i + 50),
+          centroidEmbedding: [0.7, 0.8, 0.9],
+        },
       ],
       totalPosts: 105,
       unclusteredCount: 5, // ~4.7% unclustered, density = 100/2 = 50

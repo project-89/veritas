@@ -1,9 +1,9 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NlpServiceResponse } from '../types/content.types';
-import * as francMin from 'franc-min';
 import { afinn165 } from 'afinn-165';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import * as francMin from 'franc-min';
+import { NlpServiceResponse } from '../types/content.types';
 
 /**
  * Result of content classification including all analysis aspects
@@ -88,12 +88,12 @@ export class ContentClassificationService {
 
   constructor(private readonly configService: ConfigService) {
     // Initialize NLP service configuration
-    this.nlpEndpoint =
-      this.configService.get<string>('NLP_SERVICE_ENDPOINT') || null;
+    this.nlpEndpoint = this.configService.get<string>('NLP_SERVICE_ENDPOINT') || null;
     this.apiKey = this.configService.get<string>('NLP_SERVICE_API_KEY') || null;
 
     // Initialize Gemini for sentiment analysis
-    const geminiKey = this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
+    const geminiKey =
+      this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
     if (geminiKey) {
       try {
         const genAI = new GoogleGenerativeAI(geminiKey);
@@ -127,9 +127,7 @@ export class ContentClassificationService {
       return this.classifyLocally(text);
     } catch (error) {
       this.logger.error(
-        `Classification error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Classification error: ${error instanceof Error ? error.message : String(error)}`,
       );
       // Provide fallback classification rather than failing completely
       return this.getFallbackClassification();
@@ -161,22 +159,25 @@ export class ContentClassificationService {
           const geminiSentiments = await this.batchSentimentWithGemini(texts);
           for (let i = 0; i < localResults.length; i++) {
             const geminiResult = geminiSentiments[i];
-            if (geminiResult) {
-              localResults[i]!.sentiment = geminiResult;
+            const localResult = localResults[i];
+            if (geminiResult && localResult) {
+              localResult.sentiment = geminiResult;
             }
           }
-          this.logger.debug(`Enhanced ${geminiSentiments.filter(Boolean).length}/${texts.length} texts with Gemini sentiment`);
+          this.logger.debug(
+            `Enhanced ${geminiSentiments.filter(Boolean).length}/${texts.length} texts with Gemini sentiment`,
+          );
         } catch (err) {
-          this.logger.warn(`Gemini sentiment failed, using AFINN fallback: ${err instanceof Error ? err.message : err}`);
+          this.logger.warn(
+            `Gemini sentiment failed, using AFINN fallback: ${err instanceof Error ? err.message : err}`,
+          );
         }
       }
 
       return localResults;
     } catch (error) {
       this.logger.error(
-        `Batch classification error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Batch classification error: ${error instanceof Error ? error.message : String(error)}`,
       );
       // Return fallback classifications
       return texts.map(() => this.getFallbackClassification());
@@ -192,7 +193,7 @@ export class ContentClassificationService {
    */
   async updateClassification(
     existingClassification: ContentClassification,
-    newText: string
+    newText: string,
   ): Promise<ContentClassification> {
     // For significant text changes, do a full reclassification
     if (this.shouldRecompute(existingClassification, newText)) {
@@ -206,31 +207,18 @@ export class ContentClassificationService {
       // Merge classifications, biased toward new results
       return {
         categories: [
-          ...new Set([
-            ...deltaClassification.categories,
-            ...existingClassification.categories,
-          ]),
+          ...new Set([...deltaClassification.categories, ...existingClassification.categories]),
         ],
         sentiment: deltaClassification.sentiment,
         toxicity: deltaClassification.toxicity,
         subjectivity: deltaClassification.subjectivity,
         language: deltaClassification.language,
-        topics: [
-          ...new Set([
-            ...deltaClassification.topics,
-            ...existingClassification.topics,
-          ]),
-        ],
-        entities: this.mergeEntities(
-          existingClassification.entities,
-          deltaClassification.entities
-        ),
+        topics: [...new Set([...deltaClassification.topics, ...existingClassification.topics])],
+        entities: this.mergeEntities(existingClassification.entities, deltaClassification.entities),
       };
     } catch (error) {
       this.logger.error(
-        `Update classification error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Update classification error: ${error instanceof Error ? error.message : String(error)}`,
       );
       return existingClassification;
     }
@@ -240,9 +228,7 @@ export class ContentClassificationService {
    * Classify content using external NLP service
    * This leverages advanced ML models for better accuracy
    */
-  private async classifyWithExternalService(
-    text: string
-  ): Promise<ContentClassification> {
+  private async classifyWithExternalService(text: string): Promise<ContentClassification> {
     if (!this.nlpEndpoint || !this.apiKey) {
       throw new Error('External NLP service not configured');
     }
@@ -259,9 +245,7 @@ export class ContentClassificationService {
       });
 
       if (!response.ok) {
-        throw new Error(
-          `NLP service error: ${response.status} ${response.statusText}`
-        );
+        throw new Error(`NLP service error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -270,9 +254,7 @@ export class ContentClassificationService {
       return this.mapServiceResponseToClassification(data);
     } catch (error) {
       this.logger.error(
-        `External NLP service error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `External NLP service error: ${error instanceof Error ? error.message : String(error)}`,
       );
       // Fall back to local processing
       return this.classifyLocally(text);
@@ -283,7 +265,7 @@ export class ContentClassificationService {
    * Batch classify content using external NLP service
    */
   private async batchClassifyWithExternalService(
-    texts: string[]
+    texts: string[],
   ): Promise<ContentClassification[]> {
     if (!this.nlpEndpoint || !this.apiKey) {
       throw new Error('External NLP service not configured');
@@ -301,22 +283,18 @@ export class ContentClassificationService {
       });
 
       if (!response.ok) {
-        throw new Error(
-          `NLP batch service error: ${response.status} ${response.statusText}`
-        );
+        throw new Error(`NLP batch service error: ${response.status} ${response.statusText}`);
       }
 
-      const dataArray = await response.json();
+      const dataArray = (await response.json()) as NlpServiceResponse[];
 
       // Map each response to our internal format
-      return dataArray.map((data: any) =>
-        this.mapServiceResponseToClassification(data)
-      );
+      return dataArray.map((data) => this.mapServiceResponseToClassification(data));
     } catch (error) {
       this.logger.error(
         `External NLP batch service error: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
       // Fall back to local processing
       return Promise.all(texts.map((text) => this.classifyLocally(text)));
@@ -326,9 +304,7 @@ export class ContentClassificationService {
   /**
    * Map external service response to our internal ContentClassification format
    */
-  private mapServiceResponseToClassification(
-    data: NlpServiceResponse
-  ): ContentClassification {
+  private mapServiceResponseToClassification(data: NlpServiceResponse): ContentClassification {
     // This mapping would be specific to your chosen NLP service
     return {
       categories: data.categories || [],
@@ -352,9 +328,7 @@ export class ContentClassificationService {
   /**
    * Map external sentiment labels to our internal format
    */
-  private mapSentimentLabel(
-    externalLabel: string
-  ): 'positive' | 'negative' | 'neutral' {
+  private mapSentimentLabel(externalLabel: string): 'positive' | 'negative' | 'neutral' {
     if (!externalLabel) return 'neutral';
 
     const label = externalLabel.toLowerCase();
@@ -389,79 +363,14 @@ export class ContentClassificationService {
 
     // Common category keywords (simplified implementation)
     const categoryKeywords: Record<string, string[]> = {
-      politics: [
-        'government',
-        'election',
-        'vote',
-        'political',
-        'policy',
-        'president',
-        'congress',
-      ],
-      technology: [
-        'tech',
-        'software',
-        'digital',
-        'ai',
-        'computer',
-        'app',
-        'innovation',
-      ],
-      business: [
-        'company',
-        'market',
-        'industry',
-        'economic',
-        'finance',
-        'investment',
-        'startup',
-      ],
-      health: [
-        'medical',
-        'healthcare',
-        'disease',
-        'treatment',
-        'doctor',
-        'patient',
-        'wellness',
-      ],
-      science: [
-        'research',
-        'discovery',
-        'scientist',
-        'study',
-        'experiment',
-        'physics',
-        'biology',
-      ],
-      entertainment: [
-        'movie',
-        'music',
-        'celebrity',
-        'film',
-        'actor',
-        'game',
-        'TV',
-        'show',
-      ],
-      sports: [
-        'team',
-        'player',
-        'game',
-        'championship',
-        'tournament',
-        'league',
-        'win',
-      ],
-      environment: [
-        'climate',
-        'sustainable',
-        'green',
-        'eco',
-        'environmental',
-        'planet',
-        'carbon',
-      ],
+      politics: ['government', 'election', 'vote', 'political', 'policy', 'president', 'congress'],
+      technology: ['tech', 'software', 'digital', 'ai', 'computer', 'app', 'innovation'],
+      business: ['company', 'market', 'industry', 'economic', 'finance', 'investment', 'startup'],
+      health: ['medical', 'healthcare', 'disease', 'treatment', 'doctor', 'patient', 'wellness'],
+      science: ['research', 'discovery', 'scientist', 'study', 'experiment', 'physics', 'biology'],
+      entertainment: ['movie', 'music', 'celebrity', 'film', 'actor', 'game', 'TV', 'show'],
+      sports: ['team', 'player', 'game', 'championship', 'tournament', 'league', 'win'],
+      environment: ['climate', 'sustainable', 'green', 'eco', 'environmental', 'planet', 'carbon'],
     };
 
     // Check for category keywords in the text
@@ -494,10 +403,10 @@ export class ContentClassificationService {
     for (let i = 0; i < texts.length; i += BATCH_SIZE) {
       const batchNum = Math.floor(i / BATCH_SIZE) + 1;
       const batch = texts.slice(i, i + BATCH_SIZE);
-      this.logger.log(`[Gemini] Processing batch ${batchNum}/${totalBatches} (${batch.length} texts)`);
-      const numberedTexts = batch
-        .map((t, idx) => `[${idx}] ${t.slice(0, 300)}`)
-        .join('\n\n');
+      this.logger.log(
+        `[Gemini] Processing batch ${batchNum}/${totalBatches} (${batch.length} texts)`,
+      );
+      const numberedTexts = batch.map((t, idx) => `[${idx}] ${t.slice(0, 300)}`).join('\n\n');
 
       const prompt = `Analyze the sentiment of each numbered social media post below. For each post, determine:
 - score: a number from -1.0 (very negative) to 1.0 (very positive), 0 = neutral
@@ -530,7 +439,12 @@ ${numberedTexts}`;
             if (item && typeof item.score === 'number') {
               allResults.push({
                 score: Math.max(-1, Math.min(1, item.score)),
-                label: item.label === 'positive' ? 'positive' : item.label === 'negative' ? 'negative' : 'neutral',
+                label:
+                  item.label === 'positive'
+                    ? 'positive'
+                    : item.label === 'negative'
+                      ? 'negative'
+                      : 'neutral',
                 confidence: Math.max(0, Math.min(1, item.confidence ?? 0.5)),
               });
             } else {
@@ -542,7 +456,9 @@ ${numberedTexts}`;
           for (let j = 0; j < batch.length; j++) allResults.push(null);
         }
       } catch (err) {
-        this.logger.warn(`Gemini batch ${i / BATCH_SIZE} failed: ${err instanceof Error ? err.message : err}`);
+        this.logger.warn(
+          `Gemini batch ${i / BATCH_SIZE} failed: ${err instanceof Error ? err.message : err}`,
+        );
         for (let j = 0; j < batch.length; j++) allResults.push(null);
       }
     }
@@ -640,9 +556,7 @@ ${numberedTexts}`;
     try {
       // Text needs to be at least a few characters for reliable detection
       if (text.length < 10) {
-        this.logger.debug(
-          'Text too short for language detection, defaulting to English'
-        );
+        this.logger.debug('Text too short for language detection, defaulting to English');
         return 'en';
       }
 
@@ -669,16 +583,12 @@ ${numberedTexts}`;
 
       // Return the mapped language code or the original code if not in the map
       const mappedLang = langMap[detectedLang] || detectedLang;
-      this.logger.debug(
-        `Detected language: ${mappedLang} (from ${detectedLang})`
-      );
+      this.logger.debug(`Detected language: ${mappedLang} (from ${detectedLang})`);
 
       return mappedLang;
     } catch (error) {
       this.logger.warn(
-        `Language detection error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Language detection error: ${error instanceof Error ? error.message : String(error)}`,
       );
       // Default to English on error
       return 'en';
@@ -687,41 +597,345 @@ ${numberedTexts}`;
 
   /** Comprehensive stopword list for topic extraction */
   private static readonly STOP_WORDS = new Set([
-    'a', 'about', 'above', 'after', 'again', 'against', 'ago', 'ahead', 'all', 'almost',
-    'along', 'already', 'also', 'although', 'always', 'am', 'among', 'an', 'and', 'another',
-    'any', 'anybody', 'anyone', 'anything', 'anywhere', 'are', 'area', 'areas', 'around',
-    'as', 'ask', 'asked', 'asking', 'at', 'available', 'away', 'back', 'backed', 'be',
-    'became', 'because', 'become', 'becomes', 'been', 'before', 'began', 'begin', 'behind',
-    'being', 'below', 'best', 'better', 'between', 'big', 'bit', 'both', 'but', 'by',
-    'came', 'can', 'cannot', 'case', 'cases', 'certain', 'clearly', 'come', 'could',
-    'course', 'currently', 'day', 'days', 'did', 'differ', 'different', 'do', 'does',
-    'doing', 'done', 'down', 'during', 'each', 'early', 'either', 'end', 'enough', 'even',
-    'every', 'everybody', 'everyone', 'everything', 'everywhere', 'fact', 'far', 'feel',
-    'few', 'find', 'first', 'for', 'found', 'from', 'full', 'further', 'gave', 'general',
-    'get', 'gets', 'give', 'given', 'go', 'going', 'gone', 'good', 'got', 'great',
-    'group', 'had', 'has', 'have', 'having', 'he', 'help', 'her', 'here', 'herself',
-    'high', 'him', 'himself', 'his', 'how', 'however', 'http', 'https', 'if', 'important',
-    'in', 'include', 'including', 'interest', 'into', 'is', 'it', 'its', 'itself', 'just',
-    'keep', 'kind', 'knew', 'know', 'known', 'large', 'last', 'later', 'latest', 'least',
-    'less', 'let', 'lets', 'like', 'likely', 'line', 'little', 'long', 'look', 'looking',
-    'lot', 'made', 'make', 'making', 'man', 'many', 'may', 'maybe', 'me', 'men', 'might',
-    'more', 'most', 'mostly', 'mr', 'mrs', 'much', 'must', 'my', 'myself', 'name', 'need',
-    'needed', 'never', 'new', 'next', 'no', 'non', 'nor', 'not', 'nothing', 'now',
-    'number', 'of', 'off', 'often', 'old', 'on', 'once', 'one', 'only', 'open', 'or',
-    'order', 'other', 'others', 'our', 'out', 'over', 'own', 'part', 'per', 'perhaps',
-    'place', 'point', 'possible', 'present', 'problem', 'put', 'quite', 'rather', 'read',
-    'real', 'really', 'right', 'room', 'run', 'said', 'same', 'saw', 'say', 'says',
-    'second', 'see', 'seem', 'seemed', 'set', 'several', 'shall', 'she', 'should', 'show',
-    'showed', 'side', 'since', 'small', 'so', 'some', 'somebody', 'someone', 'something',
-    'sometimes', 'somewhere', 'state', 'still', 'such', 'sure', 'take', 'taken', 'tell',
-    'than', 'that', 'the', 'their', 'them', 'then', 'there', 'therefore', 'these', 'they',
-    'thing', 'things', 'think', 'this', 'those', 'though', 'thought', 'three', 'through',
-    'time', 'to', 'today', 'together', 'too', 'took', 'top', 'toward', 'turn', 'two',
-    'under', 'until', 'up', 'upon', 'us', 'use', 'used', 'using', 'very', 'want', 'was',
-    'way', 'we', 'well', 'went', 'were', 'what', 'when', 'where', 'whether', 'which',
-    'while', 'who', 'whole', 'whom', 'whose', 'why', 'will', 'with', 'within', 'without',
-    'won', 'word', 'words', 'work', 'world', 'would', 'www', 'year', 'years', 'yes',
-    'yet', 'you', 'your', 'yours', 'yourself',
+    'a',
+    'about',
+    'above',
+    'after',
+    'again',
+    'against',
+    'ago',
+    'ahead',
+    'all',
+    'almost',
+    'along',
+    'already',
+    'also',
+    'although',
+    'always',
+    'am',
+    'among',
+    'an',
+    'and',
+    'another',
+    'any',
+    'anybody',
+    'anyone',
+    'anything',
+    'anywhere',
+    'are',
+    'area',
+    'areas',
+    'around',
+    'as',
+    'ask',
+    'asked',
+    'asking',
+    'at',
+    'available',
+    'away',
+    'back',
+    'backed',
+    'be',
+    'became',
+    'because',
+    'become',
+    'becomes',
+    'been',
+    'before',
+    'began',
+    'begin',
+    'behind',
+    'being',
+    'below',
+    'best',
+    'better',
+    'between',
+    'big',
+    'bit',
+    'both',
+    'but',
+    'by',
+    'came',
+    'can',
+    'cannot',
+    'case',
+    'cases',
+    'certain',
+    'clearly',
+    'come',
+    'could',
+    'course',
+    'currently',
+    'day',
+    'days',
+    'did',
+    'differ',
+    'different',
+    'do',
+    'does',
+    'doing',
+    'done',
+    'down',
+    'during',
+    'each',
+    'early',
+    'either',
+    'end',
+    'enough',
+    'even',
+    'every',
+    'everybody',
+    'everyone',
+    'everything',
+    'everywhere',
+    'fact',
+    'far',
+    'feel',
+    'few',
+    'find',
+    'first',
+    'for',
+    'found',
+    'from',
+    'full',
+    'further',
+    'gave',
+    'general',
+    'get',
+    'gets',
+    'give',
+    'given',
+    'go',
+    'going',
+    'gone',
+    'good',
+    'got',
+    'great',
+    'group',
+    'had',
+    'has',
+    'have',
+    'having',
+    'he',
+    'help',
+    'her',
+    'here',
+    'herself',
+    'high',
+    'him',
+    'himself',
+    'his',
+    'how',
+    'however',
+    'http',
+    'https',
+    'if',
+    'important',
+    'in',
+    'include',
+    'including',
+    'interest',
+    'into',
+    'is',
+    'it',
+    'its',
+    'itself',
+    'just',
+    'keep',
+    'kind',
+    'knew',
+    'know',
+    'known',
+    'large',
+    'last',
+    'later',
+    'latest',
+    'least',
+    'less',
+    'let',
+    'lets',
+    'like',
+    'likely',
+    'line',
+    'little',
+    'long',
+    'look',
+    'looking',
+    'lot',
+    'made',
+    'make',
+    'making',
+    'man',
+    'many',
+    'may',
+    'maybe',
+    'me',
+    'men',
+    'might',
+    'more',
+    'most',
+    'mostly',
+    'mr',
+    'mrs',
+    'much',
+    'must',
+    'my',
+    'myself',
+    'name',
+    'need',
+    'needed',
+    'never',
+    'new',
+    'next',
+    'no',
+    'non',
+    'nor',
+    'not',
+    'nothing',
+    'now',
+    'number',
+    'of',
+    'off',
+    'often',
+    'old',
+    'on',
+    'once',
+    'one',
+    'only',
+    'open',
+    'or',
+    'order',
+    'other',
+    'others',
+    'our',
+    'out',
+    'over',
+    'own',
+    'part',
+    'per',
+    'perhaps',
+    'place',
+    'point',
+    'possible',
+    'present',
+    'problem',
+    'put',
+    'quite',
+    'rather',
+    'read',
+    'real',
+    'really',
+    'right',
+    'room',
+    'run',
+    'said',
+    'same',
+    'saw',
+    'say',
+    'says',
+    'second',
+    'see',
+    'seem',
+    'seemed',
+    'set',
+    'several',
+    'shall',
+    'she',
+    'should',
+    'show',
+    'showed',
+    'side',
+    'since',
+    'small',
+    'so',
+    'some',
+    'somebody',
+    'someone',
+    'something',
+    'sometimes',
+    'somewhere',
+    'state',
+    'still',
+    'such',
+    'sure',
+    'take',
+    'taken',
+    'tell',
+    'than',
+    'that',
+    'the',
+    'their',
+    'them',
+    'then',
+    'there',
+    'therefore',
+    'these',
+    'they',
+    'thing',
+    'things',
+    'think',
+    'this',
+    'those',
+    'though',
+    'thought',
+    'three',
+    'through',
+    'time',
+    'to',
+    'today',
+    'together',
+    'too',
+    'took',
+    'top',
+    'toward',
+    'turn',
+    'two',
+    'under',
+    'until',
+    'up',
+    'upon',
+    'us',
+    'use',
+    'used',
+    'using',
+    'very',
+    'want',
+    'was',
+    'way',
+    'we',
+    'well',
+    'went',
+    'were',
+    'what',
+    'when',
+    'where',
+    'whether',
+    'which',
+    'while',
+    'who',
+    'whole',
+    'whom',
+    'whose',
+    'why',
+    'will',
+    'with',
+    'within',
+    'without',
+    'won',
+    'word',
+    'words',
+    'work',
+    'world',
+    'would',
+    'www',
+    'year',
+    'years',
+    'yes',
+    'yet',
+    'you',
+    'your',
+    'yours',
+    'yourself',
   ]);
 
   /**
@@ -878,7 +1092,7 @@ ${numberedTexts}`;
    */
   private mergeEntities(
     existing: ContentClassification['entities'],
-    newEntities: ContentClassification['entities']
+    newEntities: ContentClassification['entities'],
   ): ContentClassification['entities'] {
     const entityMap = new Map<string, ContentClassification['entities'][0]>();
 
@@ -903,10 +1117,7 @@ ${numberedTexts}`;
   /**
    * Determine if content has changed enough to warrant full recomputation
    */
-  private shouldRecompute(
-    existingClassification: ContentClassification,
-    newText: string
-  ): boolean {
+  private shouldRecompute(existingClassification: ContentClassification, newText: string): boolean {
     // If we have categories and topics, we can compare with new text
     const existingKeywords = [
       ...existingClassification.categories,
@@ -916,7 +1127,7 @@ ${numberedTexts}`;
     // Check if key terms are still present in new text
     const textLower = newText.toLowerCase();
     const missingKeywords = existingKeywords.filter(
-      (keyword) => !textLower.includes(keyword.toLowerCase())
+      (keyword) => !textLower.includes(keyword.toLowerCase()),
     );
 
     // If many keywords are missing, text has changed substantially

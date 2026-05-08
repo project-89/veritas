@@ -1,67 +1,67 @@
-import { Module, DynamicModule, Provider, Type, ForwardReference } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
-import { IngestionController } from './controllers/ingestion.controller';
-import { NarrativeController } from './controllers/narrative.controller';
-import { InvestigationController } from './controllers/investigation.controller';
-import { ScanController } from './controllers/scan.controller';
-import { AnalysisJobController } from './controllers/analysis-job.controller';
-import { InvestigationRepository } from './repositories/investigation.repository';
-import { ScanJobRepository } from './repositories/scan-job.repository';
-import { AlertRepository } from './repositories/alert.repository';
-import { SignalCacheRepository } from './repositories/signal-cache.repository';
-import { AnalysisJobRepository } from './repositories/analysis-job.repository';
-import { IdentityRecordRepository } from './repositories/identity-record.repository';
-import { GlobalEventRepository } from './repositories/global-event.repository';
-import { ProjectDossierRepository } from './repositories/project-dossier.repository';
-import { MentalModelRepository } from './repositories/mental-model.repository';
-import { EmbeddingCacheRepository } from './repositories/embedding-cache.repository';
-import { RssCacheRepository } from './repositories/rss-cache.repository';
-import { DatabaseModule, DatabaseService } from '@veritas/database';
-import { IngestionResolver } from './resolvers/ingestion.resolver';
-import { TransformOnIngestService } from './services/transform/transform-on-ingest.service';
-import { RedditFreeConnector } from './services/reddit-free.connector';
-import { FacebookJinaConnector } from './services/facebook-jina.connector';
-import { TwitterFreeConnector } from './services/twitter-free.connector';
-import { RSSConnector } from './services/rss.connector';
-import { WebScraperConnector } from './services/web-scraper.connector';
-import { YouTubeFreeConnector } from './services/youtube-free.connector';
-import { TruthSocialFreeConnector } from './services/truthsocial-free.connector';
-import { FarcasterFreeConnector } from './services/farcaster-free.connector';
-import { TelegramFreeConnector } from './services/telegram-free.connector';
-import { WikipediaEventsConnector } from './services/wikipedia-events.connector';
-import { BlueskyFreeConnector } from './services/bluesky-free.connector';
-import { FourChanFreeConnector } from './services/4chan-free.connector';
-import { InvestigationEvidenceService } from './services/investigation-evidence.service';
-import { ProjectDossierService } from './services/project-dossier.service';
-import { OnChainCorrelationService } from './services/onchain-correlation.service';
-import { MentalModelService } from './services/mental-model.service';
-import { IngestionService } from './services/ingestion.service';
-import { SubprocessUtil } from './services/utils/subprocess.util';
-import { JinaReaderService } from './services/utils/jina-reader.service';
-import { ScanProcessor } from './queue/scan.processor';
+import { DynamicModule, ForwardReference, Module, Provider, Type } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import {
   ContentClassificationModule,
   ContentClassificationService,
   EmbeddingsService,
 } from '@veritas/content-classification';
+import { DatabaseModule, DatabaseService } from '@veritas/database';
+import { AnalysisJobController } from './controllers/analysis-job.controller';
+import { IngestionController } from './controllers/ingestion.controller';
+import { InvestigationController } from './controllers/investigation.controller';
+import { NarrativeController } from './controllers/narrative.controller';
+import { ScanController } from './controllers/scan.controller';
 import {
-  NarrativeRepository,
-  InMemoryNarrativeRepository,
-} from './repositories/narrative-insight.repository';
+  BLUESKY_CONNECTOR,
+  FACEBOOK_CONNECTOR,
+  FARCASTER_CONNECTOR,
+  FOURCHAN_CONNECTOR,
+  REDDIT_CONNECTOR,
+  TELEGRAM_CONNECTOR,
+  TRUTHSOCIAL_CONNECTOR,
+  TWITTER_CONNECTOR,
+  WIKIPEDIA_CONNECTOR,
+  YOUTUBE_CONNECTOR,
+} from './interfaces/connector-tokens';
+import { ScanProcessor } from './queue/scan.processor';
+import { AlertRepository } from './repositories/alert.repository';
+import { AnalysisJobRepository } from './repositories/analysis-job.repository';
+import { EmbeddingCacheRepository } from './repositories/embedding-cache.repository';
+import { GlobalEventRepository } from './repositories/global-event.repository';
+import { IdentityRecordRepository } from './repositories/identity-record.repository';
+import { InvestigationRepository } from './repositories/investigation.repository';
+import { MentalModelRepository } from './repositories/mental-model.repository';
 import { MongoNarrativeRepository } from './repositories/mongo-narrative.repository';
 import {
-  REDDIT_CONNECTOR,
-  TWITTER_CONNECTOR,
-  YOUTUBE_CONNECTOR,
-  FACEBOOK_CONNECTOR,
-  TRUTHSOCIAL_CONNECTOR,
-  FARCASTER_CONNECTOR,
-  TELEGRAM_CONNECTOR,
-  WIKIPEDIA_CONNECTOR,
-  BLUESKY_CONNECTOR,
-  FOURCHAN_CONNECTOR,
-} from './interfaces/connector-tokens';
+  InMemoryNarrativeRepository,
+  NarrativeRepository,
+} from './repositories/narrative-insight.repository';
+import { ProjectDossierRepository } from './repositories/project-dossier.repository';
+import { RssCacheRepository } from './repositories/rss-cache.repository';
+import { ScanJobRepository } from './repositories/scan-job.repository';
+import { SignalCacheRepository } from './repositories/signal-cache.repository';
+import { IngestionResolver } from './resolvers/ingestion.resolver';
+import { FourChanFreeConnector } from './services/4chan-free.connector';
+import { BlueskyFreeConnector } from './services/bluesky-free.connector';
+import { FacebookJinaConnector } from './services/facebook-jina.connector';
+import { FarcasterFreeConnector } from './services/farcaster-free.connector';
+import { IngestionService } from './services/ingestion.service';
+import { InvestigationEvidenceService } from './services/investigation-evidence.service';
+import { MentalModelService } from './services/mental-model.service';
+import { OnChainCorrelationService } from './services/onchain-correlation.service';
+import { ProjectDossierService } from './services/project-dossier.service';
+import { RedditFreeConnector } from './services/reddit-free.connector';
+import { RSSConnector } from './services/rss.connector';
+import { TelegramFreeConnector } from './services/telegram-free.connector';
+import { TransformOnIngestService } from './services/transform/transform-on-ingest.service';
+import { TruthSocialFreeConnector } from './services/truthsocial-free.connector';
+import { TwitterFreeConnector } from './services/twitter-free.connector';
+import { JinaReaderService } from './services/utils/jina-reader.service';
+import { SubprocessUtil } from './services/utils/subprocess.util';
+import { WebScraperConnector } from './services/web-scraper.connector';
+import { WikipediaEventsConnector } from './services/wikipedia-events.connector';
+import { YouTubeFreeConnector } from './services/youtube-free.connector';
 
 /**
  * Configuration options for the Ingestion Module
@@ -139,17 +139,19 @@ export interface IngestionModuleOptions {
 }
 
 @Module({})
+// biome-ignore lint/complexity/noStaticOnlyClass: NestJS modules use the static forRoot pattern by design.
 export class IngestionModule {
   /**
    * Register the ingestion module with configuration options
    * @param options Module configuration options
    */
   static forRoot(options?: IngestionModuleOptions): DynamicModule {
-    const imports: Array<Type<any> | DynamicModule | Promise<DynamicModule> | ForwardReference> = [
-      ConfigModule.forRoot({
-        isGlobal: true,
-      }),
-    ];
+    const imports: Array<Type<object> | DynamicModule | Promise<DynamicModule> | ForwardReference> =
+      [
+        ConfigModule.forRoot({
+          isGlobal: true,
+        }),
+      ];
 
     // Add database module if not provided
     if (!options?.databaseProvider) {
@@ -160,7 +162,7 @@ export class IngestionModule {
             uri: process.env['MONGODB_URI'] || 'mongodb://localhost:27017',
             databaseName: 'veritas',
           },
-        })
+        }),
       );
     }
 
@@ -177,7 +179,7 @@ export class IngestionModule {
                 embeddingDim: options.embeddingsOptions?.embeddingDim,
               }
             : undefined,
-        })
+        }),
       );
     }
 
@@ -226,8 +228,9 @@ export class IngestionModule {
     // Shared utilities needed by free connectors
     providers.push(SubprocessUtil, JinaReaderService);
 
-    // Configure connectors - default to 'free' (API-free) if not specified
-    // WebScraper disabled by default: uses placeholder example.com URLs that cause SSL errors
+    // Configure connectors - default to 'free' (API-free) if not specified.
+    // WebScraper stays disabled by default because it is only useful when
+    // explicitly pointed at real target URLs from evidence intake.
     const connectorConfig = options?.connectors || {
       twitter: true,
       facebook: true,
@@ -321,7 +324,13 @@ export class IngestionModule {
     return {
       module: IngestionModule,
       imports,
-      controllers: [IngestionController, NarrativeController, InvestigationController, ScanController, AnalysisJobController],
+      controllers: [
+        IngestionController,
+        NarrativeController,
+        InvestigationController,
+        ScanController,
+        AnalysisJobController,
+      ],
       providers,
       exports,
       global: options?.isGlobal || false,
@@ -333,7 +342,7 @@ export class IngestionModule {
    * For quick setup in development
    */
   static register(): DynamicModule {
-    return this.forRoot({
+    return IngestionModule.forRoot({
       repositoryType: 'memory',
       enableEmbeddings: false,
       isGlobal: false,

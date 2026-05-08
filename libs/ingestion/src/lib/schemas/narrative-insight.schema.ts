@@ -89,9 +89,7 @@ export class NarrativeInsightSchema extends Document {
   embedding?: number[];
 }
 
-export const NarrativeInsightModel = SchemaFactory.createForClass(
-  NarrativeInsightSchema
-);
+export const NarrativeInsightModel = SchemaFactory.createForClass(NarrativeInsightSchema);
 
 // Create indices for common queries
 // timestamp and themes already indexed via @Prop({ index: true })

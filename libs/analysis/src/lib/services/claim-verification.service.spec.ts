@@ -1,8 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import {
-  ClaimVerificationService,
-  type VerificationResult,
-} from './claim-verification.service';
+import { ClaimVerificationService } from './claim-verification.service';
 import type { ExtractedClaim } from './propaganda.service';
 
 // ---------------------------------------------------------------------------
@@ -43,9 +40,7 @@ function wikiResponse(results: Array<{ title: string; snippet: string }>) {
 }
 
 // Minimal GDELT API response
-function gdeltResponse(
-  articles: Array<{ title: string; url?: string; domain?: string }>,
-) {
+function gdeltResponse(articles: Array<{ title: string; url?: string; domain?: string }>) {
   return {
     articles: articles.map((a) => ({
       title: a.title,
@@ -201,7 +196,7 @@ describe('ClaimVerificationService', () => {
   // -------------------------------------------------------------------------
 
   it('should correctly parse Wikipedia search results', async () => {
-    const results = await service.searchWikipedia('climate change');
+    await service.searchWikipedia('climate change');
 
     // We mock fetch below, so let's test the actual parsing logic
     fetchSpy.mockImplementation(() =>
@@ -284,9 +279,7 @@ describe('ClaimVerificationService', () => {
   });
 
   it('should handle both APIs failing gracefully', async () => {
-    fetchSpy.mockImplementation(() =>
-      Promise.reject(new Error('Network error')),
-    );
+    fetchSpy.mockImplementation(() => Promise.reject(new Error('Network error')));
 
     const claim = makeClaim({ claim: 'Test claim for total failure' });
     const result = await service.verifyBatch([claim]);

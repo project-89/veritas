@@ -105,9 +105,18 @@ export interface DeviationResponse {
 
 const TUNNEL_COLORS = [
   '#2B6CB0', // consensus blue
-  '#48BB78', '#F56565', '#805AD5', '#ECC94B',
-  '#38A169', '#E53E3E', '#6B46C1', '#D69E2E',
-  '#90CDF4', '#FC8181', '#B794F4', '#68D391',
+  '#48BB78',
+  '#F56565',
+  '#805AD5',
+  '#ECC94B',
+  '#38A169',
+  '#E53E3E',
+  '#6B46C1',
+  '#D69E2E',
+  '#90CDF4',
+  '#FC8181',
+  '#B794F4',
+  '#68D391',
 ];
 
 const KNOWN_PLATFORMS = ['twitter', 'reddit', 'youtube', 'facebook', 'tiktok'];
@@ -145,9 +154,7 @@ export class DeviationService {
       const authorCount = narrative.authors.length;
       const maxPostsByOneAuthor = narrative.authors[0]?.postCount ?? 0;
       const concentration =
-        narrative.postIndices.length > 0
-          ? maxPostsByOneAuthor / narrative.postIndices.length
-          : 1;
+        narrative.postIndices.length > 0 ? maxPostsByOneAuthor / narrative.postIndices.length : 1;
       // Higher credibility when many diverse authors, lower when one dominates
       const sourceCredibility = Math.min(
         (1 - concentration) * 0.5 + Math.min(authorCount / 20, 1) * 0.5,
@@ -183,49 +190,45 @@ export class DeviationService {
    * The largest narrative becomes the consensus tunnel.
    * Other narratives become divergent tunnels with deviation scores.
    */
-  toRealityTunnelData(
-    narratives: AnalyzedNarrative[],
-    posts: RawPost[],
-  ): RealityTunnel[] {
+  toRealityTunnelData(narratives: AnalyzedNarrative[], posts: RawPost[]): RealityTunnel[] {
     if (narratives.length === 0) return [];
 
     const deviations = this.computeDeviations(narratives);
     const tunnels: RealityTunnel[] = [];
 
     for (let i = 0; i < narratives.length; i++) {
-      const narrative = narratives[i]!;
-      const deviation = deviations[i]!;
+      const narrative = narratives[i];
+      const deviation = deviations[i];
+      if (!narrative || !deviation) continue;
 
-      const nodes: RealityTunnelNode[] = narrative.postIndices.map(
-        (postIdx, nodeIdx) => {
-          const post = posts[postIdx];
-          const engagement = post
-            ? (post.engagement?.likes ?? 0) +
-              (post.engagement?.comments ?? 0) +
-              (post.engagement?.shares ?? 0)
-            : 0;
-          const maxEngagement = 1000; // normalization cap
+      const nodes: RealityTunnelNode[] = narrative.postIndices.map((postIdx, nodeIdx) => {
+        const post = posts[postIdx];
+        const engagement = post
+          ? (post.engagement?.likes ?? 0) +
+            (post.engagement?.comments ?? 0) +
+            (post.engagement?.shares ?? 0)
+          : 0;
+        const maxEngagement = 1000; // normalization cap
 
-          return {
-            id: `${narrative.id}-node-${nodeIdx}`,
-            content: post?.text?.slice(0, 120) ?? `Post ${postIdx}`,
-            timestamp: new Date(post?.timestamp ?? narrative.firstSeen),
-            deviationScore: deviation.deviationMagnitude,
-            strength: clamp(engagement / maxEngagement, 0.05, 1),
-            tunnelId: narrative.id,
-            // First node of non-consensus tunnels references the closest consensus node
-            parentId:
-              !deviation.isConsensus && nodeIdx === 0 && tunnels[0]?.nodes[0]
-                ? tunnels[0].nodes[0].id
-                : undefined,
-          };
-        },
-      );
+        return {
+          id: `${narrative.id}-node-${nodeIdx}`,
+          content: post?.text?.slice(0, 120) ?? `Post ${postIdx}`,
+          timestamp: new Date(post?.timestamp ?? narrative.firstSeen),
+          deviationScore: deviation.deviationMagnitude,
+          strength: clamp(engagement / maxEngagement, 0.05, 1),
+          tunnelId: narrative.id,
+          // First node of non-consensus tunnels references the closest consensus node
+          parentId:
+            !deviation.isConsensus && nodeIdx === 0 && tunnels[0]?.nodes[0]
+              ? tunnels[0].nodes[0].id
+              : undefined,
+        };
+      });
 
       tunnels.push({
         id: narrative.id,
         name: narrative.summary || `Narrative ${i + 1}`,
-        color: TUNNEL_COLORS[i % TUNNEL_COLORS.length]!,
+        color: TUNNEL_COLORS[i % TUNNEL_COLORS.length] ?? TUNNEL_COLORS[0] ?? '#64748B',
         nodes,
         isConsensus: deviation.isConsensus,
       });
@@ -237,41 +240,39 @@ export class DeviationService {
   /**
    * Transform into EnhancedTunnelData (3D version).
    */
-  toEnhancedTunnelData(
-    narratives: AnalyzedNarrative[],
-    posts: RawPost[],
-  ): EnhancedTunnelData {
+  toEnhancedTunnelData(narratives: AnalyzedNarrative[], posts: RawPost[]): EnhancedTunnelData {
     if (narratives.length === 0) {
       return emptyEnhancedData();
     }
 
     const deviations = this.computeDeviations(narratives);
-    const allTimestamps = posts
-      .map((p) => new Date(p.timestamp).getTime())
-      .filter(Number.isFinite);
+    const allTimestamps = posts.map((p) => new Date(p.timestamp).getTime()).filter(Number.isFinite);
     const minTime = Math.min(...allTimestamps);
     const maxTime = Math.max(...allTimestamps);
     const timeRange = maxTime - minTime || 1;
 
-    const enhancedNarratives: EnhancedTunnelNarrative[] = narratives.map(
-      (n, i) => ({
-        id: n.id,
-        name: n.summary || `Narrative ${i + 1}`,
-        description: `${n.postIndices.length} posts, ${Object.keys(n.platforms).length} platforms`,
-        color: TUNNEL_COLORS[i % TUNNEL_COLORS.length]!,
-        metrics: {
-          strength: clamp(n.postIndices.length / Math.max(narratives[0]!.postIndices.length, 1), 0, 1),
-          coherence: 1 - deviations[i]!.deviationMagnitude,
-        },
-      }),
-    );
+    const enhancedNarratives: EnhancedTunnelNarrative[] = narratives.map((n, i) => ({
+      id: n.id,
+      name: n.summary || `Narrative ${i + 1}`,
+      description: `${n.postIndices.length} posts, ${Object.keys(n.platforms).length} platforms`,
+      color: TUNNEL_COLORS[i % TUNNEL_COLORS.length] ?? TUNNEL_COLORS[0] ?? '#64748B',
+      metrics: {
+        strength: clamp(
+          n.postIndices.length / Math.max(narratives[0]?.postIndices.length ?? 1, 1),
+          0,
+          1,
+        ),
+        coherence: 1 - (deviations[i]?.deviationMagnitude ?? 0),
+      },
+    }));
 
     const nodes: EnhancedTunnelNode[] = [];
     const branches: EnhancedTunnelBranch[] = [];
 
     for (let i = 0; i < narratives.length; i++) {
-      const narrative = narratives[i]!;
-      const deviation = deviations[i]!;
+      const narrative = narratives[i];
+      const deviation = deviations[i];
+      if (!narrative || !deviation) continue;
       const isConsensus = deviation.isConsensus;
 
       // Y offset: consensus at 0, others fan out
@@ -287,7 +288,8 @@ export class DeviationService {
       });
 
       for (let j = 0; j < sortedIndices.length; j++) {
-        const postIdx = sortedIndices[j]!;
+        const postIdx = sortedIndices[j];
+        if (postIdx == null) continue;
         const post = posts[postIdx];
         if (!post) continue;
 
@@ -313,7 +315,9 @@ export class DeviationService {
           metrics: {
             strength: clamp(engagement / 1000, 0.1, 1),
             relevance: clamp(1 - deviation.deviationMagnitude, 0, 1),
-            consensus: isConsensus ? 0.8 + Math.random() * 0.2 : clamp(1 - deviation.deviationMagnitude, 0, 1),
+            consensus: isConsensus
+              ? 0.8 + Math.random() * 0.2
+              : clamp(1 - deviation.deviationMagnitude, 0, 1),
           },
           connections: [],
           branchFactor: j === 0 && !isConsensus ? 0.7 : 0.3,
@@ -344,10 +348,10 @@ export class DeviationService {
           const consensusNodes = nodes.filter((n) => n.isConsensus);
           if (consensusNodes.length > 0) {
             // Find closest by time
-            let closestNode = consensusNodes[0]!;
-            let closestDist = Math.abs(
-              closestNode.timestamp.getTime() - timestamp.getTime(),
-            );
+            const initialClosestNode = consensusNodes[0];
+            if (!initialClosestNode) continue;
+            let closestNode = initialClosestNode;
+            let closestDist = Math.abs(closestNode.timestamp.getTime() - timestamp.getTime());
             for (const cn of consensusNodes) {
               const dist = Math.abs(cn.timestamp.getTime() - timestamp.getTime());
               if (dist < closestDist) {
@@ -402,7 +406,9 @@ export class DeviationService {
   computeConsensusCentroid(narratives: AnalyzedNarrative[]): number[] {
     if (narratives.length === 0) return [];
 
-    const dim = narratives[0]!.centroidEmbedding.length;
+    const firstNarrative = narratives[0];
+    if (!firstNarrative) return [];
+    const dim = firstNarrative.centroidEmbedding.length;
     if (dim === 0) return [];
 
     const totalPosts = narratives.reduce((s, n) => s + n.postIndices.length, 0);
@@ -413,7 +419,7 @@ export class DeviationService {
     for (const narrative of narratives) {
       const weight = narrative.postIndices.length / totalPosts;
       for (let i = 0; i < dim; i++) {
-        centroid[i]! += (narrative.centroidEmbedding[i] ?? 0) * weight;
+        centroid[i] = (centroid[i] ?? 0) + (narrative.centroidEmbedding[i] ?? 0) * weight;
       }
     }
 
@@ -421,7 +427,7 @@ export class DeviationService {
     const mag = Math.sqrt(centroid.reduce((s, v) => s + v * v, 0));
     if (mag > 0) {
       for (let i = 0; i < dim; i++) {
-        centroid[i]! /= mag;
+        centroid[i] = (centroid[i] ?? 0) / mag;
       }
     }
 

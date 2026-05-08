@@ -65,16 +65,12 @@ export class ContentValidationService {
     }
   }
 
-  validateEngagementMetrics(
-    metrics: ContentUpdateInput['engagementMetrics']
-  ): void {
+  validateEngagementMetrics(metrics: ContentUpdateInput['engagementMetrics']): void {
     try {
       EngagementMetricsSchema.parse(metrics);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new Error(
-          `Engagement metrics validation failed: ${error.message}`
-        );
+        throw new Error(`Engagement metrics validation failed: ${error.message}`);
       }
       throw error;
     }

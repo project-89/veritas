@@ -39,4 +39,4 @@
   },
   "tags": ["domain:ingestion", "type:feature"],
   "implicitDependencies": ["types", "content-classification", "database"]
-} 
+}

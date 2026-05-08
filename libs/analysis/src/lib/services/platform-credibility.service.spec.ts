@@ -5,9 +5,7 @@ import { PlatformCredibilityService } from './platform-credibility.service';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeConfigService(
-  overrideJson?: string,
-): ConfigService {
+function makeConfigService(overrideJson?: string): ConfigService {
   return {
     get: (key: string) => {
       if (key === 'PLATFORM_CREDIBILITY_CONFIG') return overrideJson;

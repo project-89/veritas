@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import neo4j, { Driver, Session, Result } from 'neo4j-driver';
-import type { DatabaseProvider, DatabaseProviderOptions } from '../interfaces/database-provider.interface';
-import { MemgraphRepository } from './memgraph-repository';
+import neo4j, { Driver, Result, Session } from 'neo4j-driver';
+import type {
+  DatabaseProvider,
+  DatabaseProviderOptions,
+} from '../interfaces/database-provider.interface';
 import type { Repository } from '../interfaces/repository.interface';
+import { MemgraphRepository } from './memgraph-repository';
 
 /**
  * Memgraph implementation of the DatabaseProvider interface
@@ -38,10 +41,7 @@ export class MemgraphProvider implements DatabaseProvider {
       this.logger.log('Successfully connected to Memgraph');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Failed to connect to Memgraph: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Failed to connect to Memgraph: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -57,10 +57,7 @@ export class MemgraphProvider implements DatabaseProvider {
         this.logger.log('Disconnected from Memgraph');
       } catch (error: unknown) {
         const err = error as Error;
-        this.logger.error(
-          `Failed to disconnect from Memgraph: ${err.message}`,
-          err.stack
-        );
+        this.logger.error(`Failed to disconnect from Memgraph: ${err.message}`, err.stack);
         throw error;
       }
     }
@@ -78,6 +75,7 @@ export class MemgraphProvider implements DatabaseProvider {
    * This is a no-op for Memgraph as it doesn't use schemas
    */
   registerModel(name: string, schema?: unknown): unknown {
+    void schema;
     this.logger.log(`Registering model ${name} for Memgraph (no-op)`);
     return null;
   }

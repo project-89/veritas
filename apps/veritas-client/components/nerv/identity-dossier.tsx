@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import type { IdentityRecord, PlatformAccount } from '../../lib/api';
 import { GENERATED_IDENTITY_PANEL_COMPONENTS } from '../../lib/generated-plugin-components';
 import { hasPluginCapability, usePluginManifest } from '../../lib/plugins';
@@ -29,8 +30,14 @@ const DISCOVERY_TIER_LABELS: Record<'actionable' | 'corroborating' | 'extended',
   extended: 'Extended',
 };
 
-function normalizeDiscoveryTier(account: PlatformAccount): 'actionable' | 'corroborating' | 'extended' {
-  if (account.discoveryTier === 'actionable' || account.discoveryTier === 'corroborating' || account.discoveryTier === 'extended') {
+function normalizeDiscoveryTier(
+  account: PlatformAccount,
+): 'actionable' | 'corroborating' | 'extended' {
+  if (
+    account.discoveryTier === 'actionable' ||
+    account.discoveryTier === 'corroborating' ||
+    account.discoveryTier === 'extended'
+  ) {
     return account.discoveryTier;
   }
   if (account.verified) return 'actionable';
@@ -47,9 +54,12 @@ function ProfileImageDisplay({ identity }: { identity: IdentityRecord }) {
   return (
     <div className="flex items-center gap-3">
       {currentImage ? (
-        <img
+        <Image
           src={currentImage.url}
           alt={identity.primaryHandle}
+          width={48}
+          height={48}
+          unoptimized
           className="w-12 h-12 rounded-full border-2 border-nerv-orange/50 object-cover"
         />
       ) : (
@@ -68,18 +78,13 @@ function ProfileImageDisplay({ identity }: { identity: IdentityRecord }) {
             <span className="text-nerv-blue text-xs">{'\u2713'}</span>
           )}
         </div>
-        {identity.displayName &&
-          identity.displayName !== identity.primaryHandle && (
-            <span className="text-[10px] font-mono text-nerv-text-secondary">
-              {identity.displayName}
-            </span>
-          )}
+        {identity.displayName && identity.displayName !== identity.primaryHandle && (
+          <span className="text-[10px] font-mono text-nerv-text-secondary">
+            {identity.displayName}
+          </span>
+        )}
         <div className="flex items-center gap-2 mt-0.5">
-          <NervBadge
-            label={identity.primaryPlatform}
-            variant="blue"
-            size="sm"
-          />
+          <NervBadge label={identity.primaryPlatform} variant="blue" size="sm" />
           {identity.totalInvestigations > 0 && (
             <span className="text-[9px] font-mono text-nerv-text-muted">
               {identity.totalInvestigations} investigation
@@ -103,9 +108,7 @@ function AuthorStats({ identity }: { identity: IdentityRecord }) {
           <div className="text-xs font-mono font-bold text-nerv-text">
             {formatNumber(ap.followersCount)}
           </div>
-          <div className="text-[8px] font-mono text-nerv-text-muted uppercase">
-            Followers
-          </div>
+          <div className="text-[8px] font-mono text-nerv-text-muted uppercase">Followers</div>
         </div>
       )}
       {ap.followingCount != null && (
@@ -113,9 +116,7 @@ function AuthorStats({ identity }: { identity: IdentityRecord }) {
           <div className="text-xs font-mono font-bold text-nerv-text">
             {formatNumber(ap.followingCount)}
           </div>
-          <div className="text-[8px] font-mono text-nerv-text-muted uppercase">
-            Following
-          </div>
+          <div className="text-[8px] font-mono text-nerv-text-muted uppercase">Following</div>
         </div>
       )}
       {ap.postsCount != null && (
@@ -123,9 +124,7 @@ function AuthorStats({ identity }: { identity: IdentityRecord }) {
           <div className="text-xs font-mono font-bold text-nerv-text">
             {formatNumber(ap.postsCount)}
           </div>
-          <div className="text-[8px] font-mono text-nerv-text-muted uppercase">
-            Posts
-          </div>
+          <div className="text-[8px] font-mono text-nerv-text-muted uppercase">Posts</div>
         </div>
       )}
     </div>
@@ -136,9 +135,15 @@ function CrossPlatformMap({ identity }: { identity: IdentityRecord }) {
   if (identity.platformAccounts.length <= 1) return null;
 
   const grouped = {
-    actionable: identity.platformAccounts.filter((account) => normalizeDiscoveryTier(account) === 'actionable'),
-    corroborating: identity.platformAccounts.filter((account) => normalizeDiscoveryTier(account) === 'corroborating'),
-    extended: identity.platformAccounts.filter((account) => normalizeDiscoveryTier(account) === 'extended'),
+    actionable: identity.platformAccounts.filter(
+      (account) => normalizeDiscoveryTier(account) === 'actionable',
+    ),
+    corroborating: identity.platformAccounts.filter(
+      (account) => normalizeDiscoveryTier(account) === 'corroborating',
+    ),
+    extended: identity.platformAccounts.filter(
+      (account) => normalizeDiscoveryTier(account) === 'extended',
+    ),
   };
 
   const visibleGroups = [
@@ -170,9 +175,9 @@ function CrossPlatformMap({ identity }: { identity: IdentityRecord }) {
                 {DISCOVERY_TIER_LABELS[tier]}
               </div>
               <div className="flex flex-wrap gap-1">
-                {accounts.map((account, i) => (
+                {accounts.map((account) => (
                   <a
-                    key={`${account.platform}-${account.handle}-${i}`}
+                    key={`${account.platform}-${account.handle}-${account.url ?? account.discoveryMethod ?? 'unknown'}`}
                     href={account.url || '#'}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -212,9 +217,7 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
   return (
     <div className="grid grid-cols-2 gap-2">
       <div className="p-2 border border-nerv-border rounded-sm">
-        <div className="text-[8px] font-mono uppercase text-nerv-text-muted mb-1">
-          Credibility
-        </div>
+        <div className="text-[8px] font-mono uppercase text-nerv-text-muted mb-1">Credibility</div>
         <div className="flex items-center gap-2">
           <NervBar
             value={identity.currentCredibility ?? 0}
@@ -222,8 +225,8 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
               (identity.currentCredibility ?? 0) > 0.6
                 ? '#00FF41'
                 : (identity.currentCredibility ?? 0) > 0.3
-                ? '#f59e0b'
-                : '#e94560'
+                  ? '#f59e0b'
+                  : '#e94560'
             }
             height={6}
           />
@@ -231,13 +234,7 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
             {((identity.currentCredibility ?? 0) * 100).toFixed(0)}%
           </span>
         </div>
-        {credHistory.length > 1 && (
-          <NervSparkline
-            data={credHistory}
-            color="#00FF41"
-            height={20}
-          />
-        )}
+        {credHistory.length > 1 && <NervSparkline data={credHistory} color="#00FF41" height={20} />}
       </div>
       <div className="p-2 border border-nerv-border rounded-sm">
         <div className="text-[8px] font-mono uppercase text-nerv-text-muted mb-1">
@@ -250,8 +247,8 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
               (identity.currentBotProbability ?? 0) > 0.7
                 ? '#e94560'
                 : (identity.currentBotProbability ?? 0) > 0.4
-                ? '#f59e0b'
-                : '#00FF41'
+                  ? '#f59e0b'
+                  : '#00FF41'
             }
             height={6}
           />
@@ -259,13 +256,7 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
             {((identity.currentBotProbability ?? 0) * 100).toFixed(0)}%
           </span>
         </div>
-        {botHistory.length > 1 && (
-          <NervSparkline
-            data={botHistory}
-            color="#e94560"
-            height={20}
-          />
-        )}
+        {botHistory.length > 1 && <NervSparkline data={botHistory} color="#e94560" height={20} />}
       </div>
     </div>
   );
@@ -280,9 +271,9 @@ function InvestigationTimeline({ identity }: { identity: IdentityRecord }) {
         Investigation History ({identity.totalInvestigations})
       </div>
       <div className="space-y-1 max-h-32 overflow-auto">
-        {identity.investigations.map((inv, i) => (
+        {identity.investigations.map((inv) => (
           <div
-            key={i}
+            key={`${inv.timestamp}-${inv.query}`}
             className="flex items-center justify-between text-[9px] font-mono px-2 py-1 bg-nerv-bg-elevated/20 rounded-sm"
           >
             <span className="text-nerv-text-secondary truncate max-w-[150px]">
@@ -311,11 +302,7 @@ function formatNumber(n: number): string {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function IdentityDossier({
-  identity,
-  loading,
-  onGenerateProfile,
-}: IdentityDossierProps) {
+export function IdentityDossier({ identity, loading, onGenerateProfile }: IdentityDossierProps) {
   const { plugins } = usePluginManifest();
   if (loading) {
     return (
@@ -353,17 +340,18 @@ export function IdentityDossier({
       {/* Flags */}
       {identity.aggregatedFlags.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {identity.aggregatedFlags.map((flag, i) => (
-            <NervBadge key={i} label={flag} variant="red" size="sm" />
+          {identity.aggregatedFlags.map((flag) => (
+            <NervBadge key={flag} label={flag} variant="red" size="sm" />
           ))}
         </div>
       )}
 
-      {hasMagi && (() => {
-        const MagiIdentityPanel = GENERATED_IDENTITY_PANEL_COMPONENTS['magi-profiles'];
-        if (!MagiIdentityPanel) return null;
-        return <MagiIdentityPanel identity={identity} onGenerateProfile={onGenerateProfile} />;
-      })()}
+      {hasMagi &&
+        (() => {
+          const MagiIdentityPanel = GENERATED_IDENTITY_PANEL_COMPONENTS['magi-profiles'];
+          if (!MagiIdentityPanel) return null;
+          return <MagiIdentityPanel identity={identity} onGenerateProfile={onGenerateProfile} />;
+        })()}
 
       {/* Investigation timeline */}
       <InvestigationTimeline identity={identity} />

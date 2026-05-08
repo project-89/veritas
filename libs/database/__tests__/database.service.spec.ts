@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test } from '@nestjs/testing';
-import { DatabaseService } from '../src/lib/database.service';
 import { DATABASE_PROVIDER } from '../src/lib/database.constants';
+import { DatabaseService } from '../src/lib/database.service';
 import { DatabaseProvider } from '../src/lib/interfaces/database-provider.interface';
 import { Repository } from '../src/lib/interfaces/repository.interface';
 
@@ -33,10 +32,7 @@ describe('DatabaseService', () => {
     };
 
     const moduleRef = await Test.createTestingModule({
-      providers: [
-        DatabaseService,
-        { provide: DATABASE_PROVIDER, useValue: mockProvider },
-      ],
+      providers: [DatabaseService, { provide: DATABASE_PROVIDER, useValue: mockProvider }],
     }).compile();
 
     service = moduleRef.get<DatabaseService>(DatabaseService);
@@ -93,13 +89,9 @@ describe('DatabaseService', () => {
 
     it('should propagate errors from provider.disconnect', async () => {
       mockProvider.isConnected.mockReturnValue(true);
-      mockProvider.disconnect.mockRejectedValue(
-        new Error('Disconnect failed')
-      );
+      mockProvider.disconnect.mockRejectedValue(new Error('Disconnect failed'));
 
-      await expect(service.onModuleDestroy()).rejects.toThrow(
-        'Disconnect failed'
-      );
+      await expect(service.onModuleDestroy()).rejects.toThrow('Disconnect failed');
     });
   });
 
@@ -166,7 +158,7 @@ describe('DatabaseService', () => {
 
     it('should throw an error when not initialized', () => {
       expect(() => service.getRepository('TestEntity')).toThrow(
-        'Database service is not initialized'
+        'Database service is not initialized',
       );
     });
 
@@ -176,9 +168,7 @@ describe('DatabaseService', () => {
         throw new Error('Model not registered');
       });
 
-      expect(() => service.getRepository('Unknown')).toThrow(
-        'Model not registered'
-      );
+      expect(() => service.getRepository('Unknown')).toThrow('Model not registered');
     });
   });
 
@@ -189,16 +179,13 @@ describe('DatabaseService', () => {
 
       const result = service.registerModel('TestModel', mockSchema);
 
-      expect(mockProvider.registerModel).toHaveBeenCalledWith(
-        'TestModel',
-        mockSchema
-      );
+      expect(mockProvider.registerModel).toHaveBeenCalledWith('TestModel', mockSchema);
       expect(result).toEqual({});
     });
 
     it('should throw an error when not initialized', () => {
       expect(() => service.registerModel('TestModel', {})).toThrow(
-        'Database service is not initialized'
+        'Database service is not initialized',
       );
     });
 
@@ -208,9 +195,7 @@ describe('DatabaseService', () => {
         throw new Error('Registration failed');
       });
 
-      expect(() => service.registerModel('TestModel', {})).toThrow(
-        'Registration failed'
-      );
+      expect(() => service.registerModel('TestModel', {})).toThrow('Registration failed');
     });
   });
 });

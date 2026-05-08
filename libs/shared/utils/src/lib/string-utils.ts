@@ -18,11 +18,7 @@ export function sanitizeHtml(input: string): string {
  * @param ellipsis The ellipsis string to append (default: '...')
  * @returns Truncated string
  */
-export function truncateText(
-  text: string,
-  maxLength: number,
-  ellipsis = '...'
-): string {
+export function truncateText(text: string, maxLength: number, ellipsis = '...'): string {
   if (!text || text.length <= maxLength) {
     return text;
   }
@@ -52,7 +48,7 @@ export function slugify(text: string): string {
 export function formatUrl(
   baseUrl: string,
   path: string,
-  params?: Record<string, string | number | boolean | undefined>
+  params?: Record<string, string | number | boolean | undefined>,
 ): string {
   // Remove trailing slashes from baseUrl
   const base = baseUrl.replace(/\/+$/, '');
@@ -65,11 +61,8 @@ export function formatUrl(
   // Add query parameters if provided
   if (params && Object.keys(params).length > 0) {
     const queryParams = Object.entries(params)
-      .filter(([_, value]) => value !== undefined)
-      .map(
-        ([key, value]) =>
-          `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`
-      )
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
       .join('&');
 
     url += `?${queryParams}`;
@@ -109,7 +102,7 @@ export function extractDomain(url: string): string {
   try {
     const urlObj = new URL(url);
     return urlObj.hostname;
-  } catch (e) {
+  } catch {
     // If URL is invalid, return empty string
     return '';
   }

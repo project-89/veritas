@@ -29,6 +29,7 @@ export function NervMetric({
   severity = 'normal',
   sparkline,
 }: NervMetricProps) {
+  const trendIcon = trend ? trendIcons[trend] : null;
   return (
     <div className="flex flex-col gap-0.5 px-3 py-2">
       <span className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
@@ -36,21 +37,18 @@ export function NervMetric({
       </span>
       <div className="flex items-baseline gap-1.5">
         <span
-          className={[
-            'text-xl font-mono font-bold tabular-nums',
-            severityColorMap[severity],
-          ].join(' ')}
+          className={['text-xl font-mono font-bold tabular-nums', severityColorMap[severity]].join(
+            ' ',
+          )}
         >
           {value}
         </span>
         {unit && (
-          <span className="text-[10px] font-mono text-nerv-text-muted uppercase">
-            {unit}
-          </span>
+          <span className="text-[10px] font-mono text-nerv-text-muted uppercase">{unit}</span>
         )}
-        {trend && (
-          <span className={['text-[10px]', trendIcons[trend]!.color].join(' ')}>
-            {trendIcons[trend]!.symbol}
+        {trendIcon && (
+          <span className={['text-[10px]', trendIcon.color].join(' ')}>
+            {trendIcon.symbol}
           </span>
         )}
       </div>
@@ -61,11 +59,7 @@ export function NervMetric({
             width={80}
             height={16}
             color={
-              severity === 'critical'
-                ? '#e94560'
-                : severity === 'warning'
-                  ? '#f59e0b'
-                  : '#00FF41'
+              severity === 'critical' ? '#e94560' : severity === 'warning' ? '#f59e0b' : '#00FF41'
             }
             showEndDot
           />

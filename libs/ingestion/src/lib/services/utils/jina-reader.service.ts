@@ -41,10 +41,7 @@ export class JinaReaderService {
   /**
    * Read a URL and return clean content via Jina Reader
    */
-  async readUrl(
-    url: string,
-    options?: JinaReaderOptions
-  ): Promise<JinaReaderResult> {
+  async readUrl(url: string, options?: JinaReaderOptions): Promise<JinaReaderResult> {
     const format = options?.format ?? 'markdown';
     const timeout = options?.timeout ?? 30000;
 
@@ -84,7 +81,7 @@ export class JinaReaderService {
         if (attempt < this.maxRetries - 1) {
           const delay = this.baseDelayMs * 2 ** attempt;
           this.logger.warn(
-            `Jina Reader request failed (attempt ${attempt + 1}/${this.maxRetries}), retrying in ${delay}ms: ${lastError.message}`
+            `Jina Reader request failed (attempt ${attempt + 1}/${this.maxRetries}), retrying in ${delay}ms: ${lastError.message}`,
           );
           await this.sleep(delay);
         }

@@ -1,14 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { MemgraphProvider } from '@veritas/database';
-import { SourceNode, ContentNode } from '@veritas/shared';
+import { ContentNode, SourceNode } from '@veritas/shared';
 import { SourceValidationService } from '../services/source-validation.service';
 
 /**
  * Extended Memgraph service interface with graph-specific methods
  */
 interface MemgraphService {
-  createNode(label: string, properties: Record<string, unknown>): Promise<any>;
-  executeQuery(query: string, params?: Record<string, unknown>): Promise<any[]>;
+  createNode(label: string, properties: Record<string, unknown>): Promise<SourceNode>;
+  executeQuery(
+    query: string,
+    params?: Record<string, unknown>,
+  ): Promise<Array<Record<string, unknown>>>;
+}
+
+interface SourceRow {
+  s?: SourceNode;
+  deleted?: number;
+  aggregateScore?: number;
+}
+
+interface ContentRow {
+  c?: ContentNode;
 }
 
 export interface SourceCreateInput {
@@ -39,7 +52,7 @@ export interface SourceSearchParams {
 export class SourceService {
   constructor(
     private readonly memgraphService: MemgraphProvider & MemgraphService,
-    private readonly validationService: SourceValidationService
+    private readonly validationService: SourceValidationService,
   ) {}
 
   async createSource(input: SourceCreateInput): Promise<SourceNode> {
@@ -58,10 +71,7 @@ export class SourceService {
     return sourceNode;
   }
 
-  async updateSource(
-    id: string,
-    input: SourceUpdateInput
-  ): Promise<SourceNode> {
+  async updateSource(id: string, input: SourceUpdateInput): Promise<SourceNode> {
     // Validate update input
     await this.validationService.validateSourceUpdate(input);
 
@@ -84,7 +94,7 @@ export class SourceService {
       updates: input,
     });
 
-    return result[0]?.s;
+    return (result[0] as SourceRow | undefined)?.s as SourceNode;
   }
 
   async getSourceById(id: string): Promise<SourceNode | null> {
@@ -95,7 +105,7 @@ export class SourceService {
     `;
 
     const result = await this.memgraphService.executeQuery(query, { id });
-    return result[0]?.s || null;
+    return (result[0] as SourceRow | undefined)?.s ?? null;
   }
 
   async searchSources(params: SourceSearchParams): Promise<SourceNode[]> {
@@ -137,7 +147,9 @@ export class SourceService {
     queryParams.limit = params.limit || 50;
 
     const result = await this.memgraphService.executeQuery(query, queryParams);
-    return result.map((row) => row.s);
+    return result
+      .map((row) => (row as SourceRow).s)
+      .filter((source): source is SourceNode => source !== undefined);
   }
 
   async deleteSource(id: string): Promise<boolean> {
@@ -149,7 +161,7 @@ export class SourceService {
     `;
 
     const result = await this.memgraphService.executeQuery(query, { id });
-    return result[0]?.deleted > 0;
+    return (((result[0] as SourceRow | undefined)?.deleted ?? 0) as number) > 0;
   }
 
   async getSourceContent(id: string, limit = 10): Promise<ContentNode[]> {
@@ -164,7 +176,9 @@ export class SourceService {
       id,
       limit,
     });
-    return result.map((row) => row.c);
+    return result
+      .map((row) => (row as ContentRow).c)
+      .filter((content): content is ContentNode => content !== undefined);
   }
 
   async updateCredibilityScore(id: string, score: number): Promise<SourceNode> {
@@ -190,7 +204,7 @@ export class SourceService {
       score,
     });
 
-    return result[0]?.s;
+    return (result[0] as SourceRow | undefined)?.s as SourceNode;
   }
 
   async calculateAggregateCredibility(id: string): Promise<number> {
@@ -207,6 +221,6 @@ export class SourceService {
     `;
 
     const result = await this.memgraphService.executeQuery(query, { id });
-    return result[0]?.aggregateScore || 0.5;
+    return (result[0] as SourceRow | undefined)?.aggregateScore ?? 0.5;
   }
 }

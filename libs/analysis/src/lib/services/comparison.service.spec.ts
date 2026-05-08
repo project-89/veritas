@@ -1,14 +1,12 @@
 import { ComparisonService } from './comparison.service';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { RawPost } from './deviation.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeNarrative(
-  overrides: Partial<AnalyzedNarrative> & { id: string },
-): AnalyzedNarrative {
+function makeNarrative(overrides: Partial<AnalyzedNarrative> & { id: string }): AnalyzedNarrative {
   return {
     summary: overrides.summary ?? `Summary for ${overrides.id}`,
     postIndices: overrides.postIndices ?? [0, 1],
@@ -277,10 +275,7 @@ describe('ComparisonService', () => {
 
   describe('comparePlatforms', () => {
     it('identifies platforms from posts', () => {
-      const posts: RawPost[] = [
-        ...makePosts(3, 'twitter'),
-        ...makePosts(2, 'reddit'),
-      ];
+      const posts: RawPost[] = [...makePosts(3, 'twitter'), ...makePosts(2, 'reddit')];
       const narratives = [
         makeNarrative({
           id: 'n-0',
@@ -295,10 +290,7 @@ describe('ComparisonService', () => {
     });
 
     it('detects cross-platform narratives', () => {
-      const posts: RawPost[] = [
-        ...makePosts(3, 'twitter'),
-        ...makePosts(2, 'reddit'),
-      ];
+      const posts: RawPost[] = [...makePosts(3, 'twitter'), ...makePosts(2, 'reddit')];
       const narratives = [
         makeNarrative({
           id: 'n-0',
@@ -313,10 +305,7 @@ describe('ComparisonService', () => {
     });
 
     it('detects unique (single-platform) narratives', () => {
-      const posts: RawPost[] = [
-        ...makePosts(3, 'twitter'),
-        ...makePosts(2, 'reddit'),
-      ];
+      const posts: RawPost[] = [...makePosts(3, 'twitter'), ...makePosts(2, 'reddit')];
       const narratives = [
         makeNarrative({
           id: 'n-0',
@@ -340,13 +329,32 @@ describe('ComparisonService', () => {
 
     it('computes top authors per platform', () => {
       const posts: RawPost[] = [
-        { id: '1', text: 'a', platform: 'twitter', authorName: 'Alice', authorHandle: 'alice', timestamp: new Date().toISOString() },
-        { id: '2', text: 'b', platform: 'twitter', authorName: 'Alice', authorHandle: 'alice', timestamp: new Date().toISOString() },
-        { id: '3', text: 'c', platform: 'twitter', authorName: 'Bob', authorHandle: 'bob', timestamp: new Date().toISOString() },
+        {
+          id: '1',
+          text: 'a',
+          platform: 'twitter',
+          authorName: 'Alice',
+          authorHandle: 'alice',
+          timestamp: new Date().toISOString(),
+        },
+        {
+          id: '2',
+          text: 'b',
+          platform: 'twitter',
+          authorName: 'Alice',
+          authorHandle: 'alice',
+          timestamp: new Date().toISOString(),
+        },
+        {
+          id: '3',
+          text: 'c',
+          platform: 'twitter',
+          authorName: 'Bob',
+          authorHandle: 'bob',
+          timestamp: new Date().toISOString(),
+        },
       ];
-      const narratives = [
-        makeNarrative({ id: 'n-0', platforms: { twitter: 3 } }),
-      ];
+      const narratives = [makeNarrative({ id: 'n-0', platforms: { twitter: 3 } })];
 
       const result = service.comparePlatforms(narratives, posts);
       const twitter = result.perPlatform.find((p) => p.platform === 'twitter');
@@ -355,9 +363,7 @@ describe('ComparisonService', () => {
 
     it('handles single platform gracefully', () => {
       const posts = makePosts(5, 'twitter');
-      const narratives = [
-        makeNarrative({ id: 'n-0', platforms: { twitter: 5 } }),
-      ];
+      const narratives = [makeNarrative({ id: 'n-0', platforms: { twitter: 5 } })];
 
       const result = service.comparePlatforms(narratives, posts);
       expect(result.platforms).toEqual(['twitter']);

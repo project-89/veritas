@@ -1,11 +1,11 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Profile, Scraper, SearchMode, Tweet } from '@haruhunab1320/twitter-scraper';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
-import { Scraper, SearchMode, Tweet, Profile } from '@haruhunab1320/twitter-scraper';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '../schemas';
-import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { BaseSocialMediaConnector } from './base-social-media.connector';
+import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 
 /**
  * API-free Twitter/X connector using @haruhunab1320/twitter-scraper.
@@ -107,23 +107,34 @@ export class TwitterFreeConnector
 
       // Search multiple query variations to cast a wider net
       const baseQuery = query.replace(/^[@#]/, '');
-      const withUnderscore = baseQuery.includes('_') ? baseQuery : baseQuery.replace(/(\d+)/, '_$1');
+      const withUnderscore = baseQuery.includes('_')
+        ? baseQuery
+        : baseQuery.replace(/(\d+)/, '_$1');
       const withoutUnderscore = baseQuery.replace(/_/g, '');
-      const uniqueQueries = [...new Set([
-        query,                           // exact as typed
-        baseQuery,                       // stripped prefix
-        `@${baseQuery}`,                 // as mention
-        `#${baseQuery}`,                 // as hashtag
-        withUnderscore !== baseQuery ? `@${withUnderscore}` : null,  // @project_89
-        withUnderscore !== baseQuery ? withUnderscore : null,        // project_89
-        withoutUnderscore !== baseQuery ? withoutUnderscore : null,  // project89
-        `"${baseQuery}"`,               // exact phrase match
-      ].filter(Boolean))] as string[];
+      const uniqueQueries = [
+        ...new Set(
+          [
+            query, // exact as typed
+            baseQuery, // stripped prefix
+            `@${baseQuery}`, // as mention
+            `#${baseQuery}`, // as hashtag
+            withUnderscore !== baseQuery ? `@${withUnderscore}` : null, // @project_89
+            withUnderscore !== baseQuery ? withUnderscore : null, // project_89
+            withoutUnderscore !== baseQuery ? withoutUnderscore : null, // project89
+            `"${baseQuery}"`, // exact phrase match
+          ].filter(Boolean),
+        ),
+      ] as string[];
 
-      this.logger.log(`Searching Twitter with ${uniqueQueries.length} query variations: ${uniqueQueries.join(', ')}`);
+      this.logger.log(
+        `Searching Twitter with ${uniqueQueries.length} query variations: ${uniqueQueries.join(', ')}`,
+      );
 
       for (let qi = 0; qi < uniqueQueries.length; qi++) {
-        const q = uniqueQueries[qi]!;
+        const q = uniqueQueries[qi];
+        if (!q) {
+          continue;
+        }
         // Delay between queries to avoid rate limiting (skip first)
         if (qi > 0) {
           await new Promise((resolve) => setTimeout(resolve, 500));
@@ -149,10 +160,16 @@ export class TwitterFreeConnector
       const usernameMatch = query.match(/^@?(\w+)$/);
       if (usernameMatch && allTweets.length < limit) {
         try {
-          const username = usernameMatch[1]!;
+          const username = usernameMatch[1];
+          if (!username) {
+            throw new Error('Username match missing capture group');
+          }
           this.logger.log(`Also fetching timeline for @${username}`);
           let timelineCount = 0;
-          for await (const tweet of this.scraper.getTweets(username, Math.min(30, limit - allTweets.length))) {
+          for await (const tweet of this.scraper.getTweets(
+            username,
+            Math.min(30, limit - allTweets.length),
+          )) {
             if (tweet.id && !seenIds.has(tweet.id)) {
               seenIds.add(tweet.id);
               allTweets.push(tweet);
@@ -164,21 +181,19 @@ export class TwitterFreeConnector
         }
       }
 
-      this.logger.log(`Found ${allTweets.length} unique tweets across ${uniqueQueries.length} queries`);
+      this.logger.log(
+        `Found ${allTweets.length} unique tweets across ${uniqueQueries.length} queries`,
+      );
 
       // Filter by date client-side
       let filtered = allTweets;
       if (options?.startDate) {
         const start = options.startDate.getTime();
-        filtered = filtered.filter(
-          (t) => t.timeParsed && t.timeParsed.getTime() >= start,
-        );
+        filtered = filtered.filter((t) => t.timeParsed && t.timeParsed.getTime() >= start);
       }
       if (options?.endDate) {
         const end = options.endDate.getTime();
-        filtered = filtered.filter(
-          (t) => t.timeParsed && t.timeParsed.getTime() <= end,
-        );
+        filtered = filtered.filter((t) => t.timeParsed && t.timeParsed.getTime() <= end);
       }
 
       return filtered.map((tweet) => this.transformTweetToSocialMediaPost(tweet));
@@ -202,9 +217,7 @@ export class TwitterFreeConnector
           limit: 100,
         });
 
-        const filteredPosts = posts.filter((post) =>
-          this.postMatchesKeywords(post, keywords),
-        );
+        const filteredPosts = posts.filter((post) => this.postMatchesKeywords(post, keywords));
 
         for (const post of filteredPosts) {
           emitter.emit('data', post);
@@ -255,9 +268,7 @@ export class TwitterFreeConnector
           platform: this.platform,
           text: tweet.text,
           timestamp: tweet.timeParsed ?? new Date(),
-          url: tweet.id
-            ? `https://x.com/${cleanUsername}/status/${tweet.id}`
-            : undefined,
+          url: tweet.id ? `https://x.com/${cleanUsername}/status/${tweet.id}` : undefined,
           engagementMetrics: {
             likes: tweet.likes ?? 0,
             shares: tweet.retweets ?? 0,
@@ -280,6 +291,12 @@ export class TwitterFreeConnector
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
     try {
       const profile = await this.scraper.getProfile(authorId);
+      const profileMedia = profile as Profile & {
+        avatar?: string;
+        banner?: string;
+        profile_image_url_https?: string;
+        profile_banner_url?: string;
+      };
 
       return {
         id: profile.userId,
@@ -288,16 +305,15 @@ export class TwitterFreeConnector
         url: `https://twitter.com/${profile.username}`,
         description: profile.biography || '',
         credibilityScore: this.calculateCredibilityScore(profile),
-        verificationStatus: profile.isVerified || profile.isBlueVerified
-          ? 'verified'
-          : 'unverified',
+        verificationStatus:
+          profile.isVerified || profile.isBlueVerified ? 'verified' : 'unverified',
         metadata: {
           followersCount: profile.followersCount,
           followingCount: profile.followingCount,
           tweetsCount: profile.tweetsCount,
           isBlueVerified: profile.isBlueVerified,
-          avatar: (profile as any).avatar ?? (profile as any).profile_image_url_https ?? null,
-          banner: (profile as any).banner ?? (profile as any).profile_banner_url ?? null,
+          avatar: profileMedia.avatar ?? profileMedia.profile_image_url_https ?? null,
+          banner: profileMedia.banner ?? profileMedia.profile_banner_url ?? null,
         },
       } as Partial<SourceNode>;
     } catch (error: unknown) {

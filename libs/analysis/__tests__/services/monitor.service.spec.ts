@@ -5,24 +5,26 @@ import { MonitorService } from '../../src/lib/services/monitor.service';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeSnapshot(overrides: {
-  postCount?: number;
-  narrativeCount?: number;
-  narratives?: Array<{
-    summary?: string;
-    postIndices?: number[];
-    avgSentiment?: number;
-    platforms?: Record<string, number>;
-    velocity?: { postsPerHour: number; acceleration?: number; trend?: string };
-  }>;
-  summary?: {
-    total: number;
-    positive: number;
-    negative: number;
-    neutral: number;
-    byPlatform: Record<string, number>;
-  };
-} = {}) {
+function makeSnapshot(
+  overrides: {
+    postCount?: number;
+    narrativeCount?: number;
+    narratives?: Array<{
+      summary?: string;
+      postIndices?: number[];
+      avgSentiment?: number;
+      platforms?: Record<string, number>;
+      velocity?: { postsPerHour: number; acceleration?: number; trend?: string };
+    }>;
+    summary?: {
+      total: number;
+      positive: number;
+      negative: number;
+      neutral: number;
+      byPlatform: Record<string, number>;
+    };
+  } = {},
+) {
   const narratives = overrides.narratives ?? [];
   return {
     postCount: overrides.postCount ?? 10,
@@ -102,15 +104,13 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
-      const newNarrativeAlerts = alerts.filter(
-        (a) => a.type === 'new_narrative'
-      );
+      const newNarrativeAlerts = alerts.filter((a) => a.type === 'new_narrative');
       expect(newNarrativeAlerts).toHaveLength(1);
       expect(newNarrativeAlerts[0]!.description).toContain(
-        'New carbon capture technology announced'
+        'New carbon capture technology announced',
       );
     });
 
@@ -132,7 +132,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       expect(alerts.filter((a) => a.type === 'new_narrative')).toHaveLength(0);
@@ -154,7 +154,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       expect(alerts.filter((a) => a.type === 'new_narrative')).toHaveLength(0);
@@ -195,7 +195,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       const spikeAlerts = alerts.filter((a) => a.type === 'velocity_spike');
@@ -232,7 +232,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       const spikeAlerts = alerts.filter((a) => a.type === 'velocity_spike');
@@ -269,7 +269,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       expect(alerts.filter((a) => a.type === 'velocity_spike')).toHaveLength(0);
@@ -310,12 +310,10 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
-      const reversalAlerts = alerts.filter(
-        (a) => a.type === 'sentiment_reversal'
-      );
+      const reversalAlerts = alerts.filter((a) => a.type === 'sentiment_reversal');
       expect(reversalAlerts).toHaveLength(1);
       expect(reversalAlerts[0]!.title).toContain('reversal');
       expect(reversalAlerts[0]!.severity).toBe('warning');
@@ -350,12 +348,10 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
-      const sentimentAlerts = alerts.filter(
-        (a) => a.type === 'sentiment_reversal'
-      );
+      const sentimentAlerts = alerts.filter((a) => a.type === 'sentiment_reversal');
       expect(sentimentAlerts).toHaveLength(1);
       expect(sentimentAlerts[0]!.title).toContain('shift');
     });
@@ -389,12 +385,10 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
-      expect(
-        alerts.filter((a) => a.type === 'sentiment_reversal')
-      ).toHaveLength(0);
+      expect(alerts.filter((a) => a.type === 'sentiment_reversal')).toHaveLength(0);
     });
   });
 
@@ -432,7 +426,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       const platformAlerts = alerts.filter((a) => a.type === 'new_platform');
@@ -454,7 +448,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       const surgeAlerts = alerts.filter((a) => a.type === 'volume_surge');
@@ -470,7 +464,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       const surgeAlerts = alerts.filter((a) => a.type === 'volume_surge');
@@ -486,7 +480,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       expect(alerts.filter((a) => a.type === 'volume_surge')).toHaveLength(0);
@@ -500,7 +494,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       expect(alerts.filter((a) => a.type === 'volume_surge')).toHaveLength(0);
@@ -550,7 +544,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       const types = new Set(alerts.map((a) => a.type));
@@ -580,7 +574,7 @@ describe('MonitorService', () => {
         snapshot,
         snapshot,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       expect(alerts).toHaveLength(0);
@@ -633,12 +627,7 @@ describe('MonitorService', () => {
       const previous = makeSnapshot({ postCount: 10, narratives: [] });
       const current = makeSnapshot({ postCount: 20, narratives: [] });
 
-      const alerts = service.compareSnapshots(
-        previous,
-        current,
-        'inv-abc-123',
-        DEFAULT_THRESHOLDS
-      );
+      const alerts = service.compareSnapshots(previous, current, 'inv-abc-123', DEFAULT_THRESHOLDS);
 
       for (const alert of alerts) {
         expect(alert.investigationId).toBe('inv-abc-123');
@@ -653,7 +642,7 @@ describe('MonitorService', () => {
         previous,
         current,
         INVESTIGATION_ID,
-        DEFAULT_THRESHOLDS
+        DEFAULT_THRESHOLDS,
       );
 
       for (const alert of alerts) {

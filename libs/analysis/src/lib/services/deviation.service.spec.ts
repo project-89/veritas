@@ -1,9 +1,7 @@
 import { DeviationService } from './deviation.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
 
-function makeNarrative(
-  overrides: Partial<AnalyzedNarrative> & { id: string },
-): AnalyzedNarrative {
+function makeNarrative(overrides: Partial<AnalyzedNarrative> & { id: string }): AnalyzedNarrative {
   return {
     summary: overrides.summary ?? `Summary for ${overrides.id}`,
     postIndices: overrides.postIndices ?? [0, 1],
@@ -335,9 +333,7 @@ describe('DeviationService', () => {
         }),
       ];
       const data = service.toEnhancedTunnelData(narratives, posts);
-      expect(data.timeframe.start.getTime()).toBeLessThanOrEqual(
-        data.timeframe.end.getTime(),
-      );
+      expect(data.timeframe.start.getTime()).toBeLessThanOrEqual(data.timeframe.end.getTime());
     });
 
     it('node positions have x increasing with time', () => {
@@ -354,9 +350,7 @@ describe('DeviationService', () => {
         (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
       );
       for (let i = 1; i < sortedNodes.length; i++) {
-        expect(sortedNodes[i]!.position.x).toBeGreaterThanOrEqual(
-          sortedNodes[i - 1]!.position.x,
-        );
+        expect(sortedNodes[i]!.position.x).toBeGreaterThanOrEqual(sortedNodes[i - 1]!.position.x);
       }
     });
   });

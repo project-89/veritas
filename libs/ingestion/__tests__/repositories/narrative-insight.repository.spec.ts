@@ -60,24 +60,15 @@ describe('InMemoryNarrativeRepository', () => {
       providers: [InMemoryNarrativeRepository],
     }).compile();
 
-    repository = module.get<InMemoryNarrativeRepository>(
-      InMemoryNarrativeRepository
-    );
+    repository = module.get<InMemoryNarrativeRepository>(InMemoryNarrativeRepository);
 
     // Reset the repository and add test data
-    await repository.saveMany([
-      mockInsight1,
-      mockInsight2,
-      mockInsight3,
-      mockInsightNoEmbedding,
-    ]);
+    await repository.saveMany([mockInsight1, mockInsight2, mockInsight3, mockInsightNoEmbedding]);
   });
 
   describe('basic CRUD operations', () => {
     it('should save and retrieve an insight', async () => {
-      const result = await repository.findByContentHash(
-        mockInsight1.contentHash
-      );
+      const result = await repository.findByContentHash(mockInsight1.contentHash);
       expect(result).toEqual(mockInsight1);
     });
 
@@ -148,18 +139,14 @@ describe('InMemoryNarrativeRepository', () => {
       const result = await repository.findSimilarContent(queryVector);
 
       // Should not include the insight without embedding
-      expect(
-        result.some((item) => item.insight.id === mockInsightNoEmbedding.id)
-      ).toBe(false);
+      expect(result.some((item) => item.insight.id === mockInsightNoEmbedding.id)).toBe(false);
     });
 
     it('should handle empty repository', async () => {
       // Create a new empty repository
       const emptyRepo = new InMemoryNarrativeRepository();
 
-      const result = await emptyRepo.findSimilarContent([
-        0.1, 0.2, 0.3, 0.4, 0.5,
-      ]);
+      const result = await emptyRepo.findSimilarContent([0.1, 0.2, 0.3, 0.4, 0.5]);
 
       expect(result).toEqual([]);
     });
@@ -169,9 +156,7 @@ describe('InMemoryNarrativeRepository', () => {
       const wrongDimensionVector = [0.1, 0.2, 0.3];
 
       // The repository should throw an error
-      await expect(
-        repository.findSimilarContent(wrongDimensionVector)
-      ).rejects.toThrow();
+      await expect(repository.findSimilarContent(wrongDimensionVector)).rejects.toThrow();
     });
   });
 

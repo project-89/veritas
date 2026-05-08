@@ -1,6 +1,6 @@
+import type { UserPost } from './deep-investigation.service';
 import { GraphBotDetectionService } from './graph-bot-detection.service';
 import { GraphDatabaseService } from './graph-database.service';
-import type { UserPost } from './deep-investigation.service';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -93,9 +93,7 @@ describe('GraphBotDetectionService', () => {
         posts: Array.from({ length: 20 }, (_, i) =>
           makePost({
             text: 'Check out this amazing offer! Click here now!',
-            timestamp: new Date(
-              Date.now() - (20 - i) * 60 * 60 * 1000,
-            ).toISOString(),
+            timestamp: new Date(Date.now() - (20 - i) * 60 * 60 * 1000).toISOString(),
             engagement: { likes: 0, comments: 0, shares: 0 },
             sentiment: { score: 0.5, label: 'positive' },
           }),
@@ -137,9 +135,7 @@ describe('GraphBotDetectionService', () => {
       // Posts at exactly 60-second intervals
       const posts = Array.from({ length: 20 }, (_, i) =>
         makePost({
-          timestamp: new Date(
-            Date.now() - (20 - i) * 60 * 1000,
-          ).toISOString(),
+          timestamp: new Date(Date.now() - (20 - i) * 60 * 1000).toISOString(),
         }),
       );
 
@@ -212,7 +208,9 @@ describe('GraphBotDetectionService', () => {
           handle: 'copycat1',
           platform: 'twitter',
           posts: [
-            makePost({ text: 'This is clearly a coordinated message that multiple accounts share' }),
+            makePost({
+              text: 'This is clearly a coordinated message that multiple accounts share',
+            }),
             makePost({ text: 'Another identical message posted by supposedly different people' }),
           ],
         },
@@ -220,7 +218,9 @@ describe('GraphBotDetectionService', () => {
           handle: 'copycat2',
           platform: 'twitter',
           posts: [
-            makePost({ text: 'This is clearly a coordinated message that multiple accounts share' }),
+            makePost({
+              text: 'This is clearly a coordinated message that multiple accounts share',
+            }),
             makePost({ text: 'Another identical message posted by supposedly different people' }),
           ],
         },

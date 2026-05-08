@@ -1,9 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
 import {
-  SignalCacheModel,
-  type SignalCacheEntry,
   type CachedSignal,
+  type SignalCacheEntry,
+  SignalCacheModel,
 } from '../schemas/signal-cache.schema';
 
 /**

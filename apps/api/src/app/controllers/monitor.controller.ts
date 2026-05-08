@@ -96,17 +96,12 @@ export class MonitorController {
    * GET /monitor/config/:investigationId — get monitor config.
    */
   @Get('config/:investigationId')
-  async getConfig(
-    @Param('investigationId') investigationId: string,
-  ): Promise<MonitorConfig> {
+  async getConfig(@Param('investigationId') investigationId: string): Promise<MonitorConfig> {
     this.logger.log(`Getting monitor config for: ${investigationId}`);
 
-    const investigation =
-      await this.investigationRepository.findById(investigationId);
+    const investigation = await this.investigationRepository.findById(investigationId);
     if (!investigation) {
-      throw new NotFoundException(
-        `Investigation not found: ${investigationId}`,
-      );
+      throw new NotFoundException(`Investigation not found: ${investigationId}`);
     }
 
     const config = await this.alertRepository.getConfig(investigationId);
@@ -123,12 +118,7 @@ export class MonitorController {
   async updateConfig(
     @Param('investigationId') investigationId: string,
     @Body()
-    body: Partial<
-      Pick<
-        MonitorConfig,
-        'enabled' | 'intervalMinutes' | 'alertThresholds'
-      >
-    >,
+    body: Partial<Pick<MonitorConfig, 'enabled' | 'intervalMinutes' | 'alertThresholds'>>,
   ): Promise<MonitorConfig> {
     this.logger.log(`Updating monitor config for: ${investigationId}`);
 
@@ -163,10 +153,7 @@ export class MonitorController {
     try {
       return await this.refreshService.refresh(investigationId);
     } catch (err) {
-      if (
-        err instanceof Error &&
-        err.message.startsWith('Investigation not found')
-      ) {
+      if (err instanceof Error && err.message.startsWith('Investigation not found')) {
         throw new NotFoundException(err.message);
       }
       throw err;

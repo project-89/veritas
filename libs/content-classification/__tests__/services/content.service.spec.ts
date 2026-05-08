@@ -1,9 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ContentService, ExtendedContentNode } from '../../src/lib/services/content.service';
 import { Logger } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import { DATABASE_PROVIDER_TOKEN } from '../../src/lib/constants';
+import { ContentService, ExtendedContentNode } from '../../src/lib/services/content.service';
 import { EmbeddingsService } from '../../src/lib/services/embeddings.service';
-import { ContentClassificationService } from '../../src/lib/services/content-classification.service';
 
 // Define interface instead of importing actual service
 interface ContentClassification {
@@ -88,7 +87,7 @@ const mockContentClassificationService = {
 // Create a mock for the database service
 const mockDatabaseService = {
   getRepository: jest.fn().mockReturnValue({
-    find: jest.fn().mockImplementation((filter, options) => {
+    find: jest.fn().mockImplementation((filter) => {
       if (filter && (filter.$or || filter.embedding)) {
         // Return mock content without embeddings for the generateAllEmbeddings test
         return Promise.resolve([
@@ -120,7 +119,7 @@ const mockDatabaseService = {
     }),
     deleteById: jest.fn().mockResolvedValue(mockContent),
     count: jest.fn().mockResolvedValue(2),
-    vectorSearch: jest.fn().mockImplementation((field, vector, options) => {
+    vectorSearch: jest.fn().mockImplementation(() => {
       return Promise.resolve([
         { item: { ...mockContent, id: 'similar-1' }, score: 0.9 },
         { item: { ...mockContent, id: 'similar-2' }, score: 0.8 },
@@ -133,7 +132,7 @@ const mockDatabaseService = {
 
 // Create a mock for EmbeddingsService
 const mockEmbeddingsService = {
-  generateEmbedding: jest.fn().mockImplementation((text) => {
+  generateEmbedding: jest.fn().mockImplementation(() => {
     // Return standard mock embedding
     return Promise.resolve([0.1, 0.2, 0.3, 0.4]);
   }) as jest.Mock,
@@ -143,14 +142,12 @@ const mockEmbeddingsService = {
     return Promise.resolve(texts.map(() => [0.1, 0.2, 0.3, 0.4]));
   }) as jest.Mock,
 
-  searchSimilarContent: jest
-    .fn()
-    .mockImplementation((textOrVector, options) => {
-      return Promise.resolve([
-        { item: { id: 'similar-1', text: 'Similar content 1' }, score: 0.9 },
-        { item: { id: 'similar-2', text: 'Similar content 2' }, score: 0.8 },
-      ]);
-    }) as jest.Mock,
+  searchSimilarContent: jest.fn().mockImplementation(() => {
+    return Promise.resolve([
+      { item: { id: 'similar-1', text: 'Similar content 1' }, score: 0.9 },
+      { item: { id: 'similar-2', text: 'Similar content 2' }, score: 0.8 },
+    ]);
+  }) as jest.Mock,
 
   calculateSimilarity: jest.fn().mockReturnValue(0.75) as jest.Mock,
 };
@@ -158,7 +155,6 @@ const mockEmbeddingsService = {
 describe('ContentService', () => {
   let service: ContentService;
   let classificationService: any; // Use any type to avoid importing
-  let embeddingsService: EmbeddingsService;
   let mockRepository: any;
 
   beforeEach(async () => {
@@ -194,7 +190,6 @@ describe('ContentService', () => {
 
     service = module.get<ContentService>(ContentService);
     classificationService = module.get('ContentClassificationService');
-    embeddingsService = module.get<EmbeddingsService>(EmbeddingsService);
     // Initialize service
     await service.onModuleInit();
   });
@@ -225,9 +220,7 @@ describe('ContentService', () => {
       expect(result.id).toBeDefined();
       expect(result.text).toBe(input.text);
       expect(result.platform).toBe(input.platform);
-      expect(classificationService.classifyContent).toHaveBeenCalledWith(
-        input.text
-      );
+      expect(classificationService.classifyContent).toHaveBeenCalledWith(input.text);
       expect(result.classification).toBeDefined();
       expect(result.classification.language).toBe('en');
     });
@@ -323,7 +316,7 @@ describe('ContentService', () => {
           query: 'test',
           limit: 10,
           offset: 0,
-        })
+        }),
       ).rejects.toThrow('Database error');
 
       expect(mockRepository.find).toHaveBeenCalled();
@@ -347,9 +340,9 @@ describe('ContentService', () => {
       const result = await service.updateContent('test-id', updateInput);
 
       expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
-      expect(
-        mockContentClassificationService.classifyContent
-      ).toHaveBeenCalledWith(updateInput.text);
+      expect(mockContentClassificationService.classifyContent).toHaveBeenCalledWith(
+        updateInput.text,
+      );
       expect(mockRepository.updateById).toHaveBeenCalled();
       expect(result!.text).toBe('Updated content');
       expect(result!.metadata?.updated).toBe(true);
@@ -409,9 +402,7 @@ describe('ContentService', () => {
       mockRepository.findById.mockResolvedValue(mockContent);
       mockRepository.updateById.mockRejectedValue(new Error('Database error'));
 
-      await expect(
-        service.updateContent('test-id', { text: 'Updated' })
-      ).rejects.toThrow();
+      await expect(service.updateContent('test-id', { text: 'Updated' })).rejects.toThrow();
     });
   });
 
@@ -489,9 +480,7 @@ describe('ContentService', () => {
       mockRepository.findById.mockResolvedValue(mockContent);
 
       // Mock embeddings service
-      mockEmbeddingsService.generateEmbedding.mockResolvedValue([
-        0.1, 0.2, 0.3,
-      ]);
+      mockEmbeddingsService.generateEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
 
       // Mock updateById to return the updated content
       const updatedContent = { ...mockContent, embedding: [0.1, 0.2, 0.3] };
@@ -501,9 +490,7 @@ describe('ContentService', () => {
 
       expect(result).toEqual(updatedContent);
       expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
-      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(
-        mockContent.text
-      );
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(mockContent.text);
       expect(mockRepository.updateById).toHaveBeenCalledWith('test-id', {
         embedding: [0.1, 0.2, 0.3],
       });
@@ -527,16 +514,14 @@ describe('ContentService', () => {
 
       // Mock embeddings service to throw an error
       mockEmbeddingsService.generateEmbedding.mockRejectedValue(
-        new Error('Embedding generation failed')
+        new Error('Embedding generation failed'),
       );
 
       const result = await service.generateEmbedding('test-id');
 
       expect(result).toBeNull();
       expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
-      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(
-        mockContent.text
-      );
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(mockContent.text);
       expect(mockRepository.updateById).not.toHaveBeenCalled();
     });
 
@@ -545,9 +530,7 @@ describe('ContentService', () => {
       mockRepository.findById.mockResolvedValue(mockContent);
 
       // Mock embeddings service
-      mockEmbeddingsService.generateEmbedding.mockResolvedValue([
-        0.1, 0.2, 0.3,
-      ]);
+      mockEmbeddingsService.generateEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
 
       // Mock updateById to throw an error
       mockRepository.updateById.mockRejectedValue(new Error('Database error'));
@@ -556,9 +539,7 @@ describe('ContentService', () => {
 
       expect(result).toBeNull();
       expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
-      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(
-        mockContent.text
-      );
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(mockContent.text);
       expect(mockRepository.updateById).toHaveBeenCalledWith('test-id', {
         embedding: [0.1, 0.2, 0.3],
       });
@@ -587,12 +568,11 @@ describe('ContentService', () => {
       });
 
       expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
-      expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
-        'embedding',
-        [0.1, 0.2, 0.3, 0.4],
-        { limit: 2, minScore: 0.7 }
-      );
-      expect(embeddingsService.generateEmbedding).not.toHaveBeenCalled();
+      expect(mockRepository.vectorSearch).toHaveBeenCalledWith('embedding', [0.1, 0.2, 0.3, 0.4], {
+        limit: 2,
+        minScore: 0.7,
+      });
+      expect(mockEmbeddingsService.generateEmbedding).not.toHaveBeenCalled();
       expect(result).toHaveLength(2);
       expect(result[0]!.content.id).toBe('similar-1');
       expect(result[0]!.score).toBe(0.9);
@@ -603,28 +583,21 @@ describe('ContentService', () => {
       mockRepository.findById.mockResolvedValue(mockContent);
 
       // Mock embeddings service
-      mockEmbeddingsService.generateEmbedding.mockResolvedValue([
-        0.1, 0.2, 0.3,
-      ]);
+      mockEmbeddingsService.generateEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
 
       // Mock repository.vectorSearch to return similar content
       mockRepository.vectorSearch = jest
         .fn()
-        .mockResolvedValue([
-          { item: { id: 'similar-1', text: 'Similar content 1' }, score: 0.9 },
-        ]);
+        .mockResolvedValue([{ item: { id: 'similar-1', text: 'Similar content 1' }, score: 0.9 }]);
 
       const result = await service.findSimilarContent('test-id', { limit: 1 });
 
       expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
-      expect(embeddingsService.generateEmbedding).toHaveBeenCalledWith(
-        mockContent.text
-      );
-      expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
-        'embedding',
-        [0.1, 0.2, 0.3],
-        { limit: 1, minScore: 0.7 }
-      );
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(mockContent.text);
+      expect(mockRepository.vectorSearch).toHaveBeenCalledWith('embedding', [0.1, 0.2, 0.3], {
+        limit: 1,
+        minScore: 0.7,
+      });
       expect(result).toHaveLength(1);
     });
 
@@ -637,7 +610,7 @@ describe('ContentService', () => {
 
       expect(result).toEqual([]);
       expect(mockRepository.findById).toHaveBeenCalledWith('non-existent-id');
-      expect(embeddingsService.generateEmbedding).not.toHaveBeenCalled();
+      expect(mockEmbeddingsService.generateEmbedding).not.toHaveBeenCalled();
       expect(mockRepository.vectorSearch).not.toHaveBeenCalled();
     });
 
@@ -661,9 +634,7 @@ describe('ContentService', () => {
       const result = await service.findSimilarContent('test-id');
 
       expect(mockRepository.findById).toHaveBeenCalledWith('test-id');
-      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(
-        mockContent.text
-      );
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(mockContent.text);
       expect(mockRepository.find).toHaveBeenCalled();
       expect(mockEmbeddingsService.calculateSimilarity).toHaveBeenCalled();
       expect(result.length).toBeGreaterThan(0);
@@ -684,10 +655,8 @@ describe('ContentService', () => {
       };
 
       // Setup temporary mocks
-      const originalGenerateEmbedding = embeddingsService.generateEmbedding;
-      embeddingsService.generateEmbedding = jest
-        .fn()
-        .mockResolvedValue([0.1, 0.2, 0.3, 0.4]);
+      const originalGenerateEmbedding = mockEmbeddingsService.generateEmbedding;
+      mockEmbeddingsService.generateEmbedding = jest.fn().mockResolvedValue([0.1, 0.2, 0.3, 0.4]);
 
       // Mock repository.vectorSearch
       mockRepository.vectorSearch = jest.fn().mockResolvedValue([
@@ -697,19 +666,18 @@ describe('ContentService', () => {
 
       const result = await service.semanticSearchContent(searchParams, true);
 
-      expect(embeddingsService.generateEmbedding).toHaveBeenCalledWith(
-        'artificial intelligence research'
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(
+        'artificial intelligence research',
       );
-      expect(mockRepository.vectorSearch).toHaveBeenCalledWith(
-        'embedding',
-        [0.1, 0.2, 0.3, 0.4],
-        { limit: 5, minScore: 0.6 }
-      );
+      expect(mockRepository.vectorSearch).toHaveBeenCalledWith('embedding', [0.1, 0.2, 0.3, 0.4], {
+        limit: 5,
+        minScore: 0.6,
+      });
       expect(result).toHaveLength(2);
       expect(result[0]!.id).toBe('result-1');
 
       // Restore original mock
-      embeddingsService.generateEmbedding = originalGenerateEmbedding;
+      mockEmbeddingsService.generateEmbedding = originalGenerateEmbedding;
     });
 
     it('should fall back to regular search when useEmbeddings is false', async () => {
@@ -723,7 +691,7 @@ describe('ContentService', () => {
 
       const result = await service.semanticSearchContent(searchParams, false);
 
-      expect(embeddingsService.generateEmbedding).not.toHaveBeenCalled();
+      expect(mockEmbeddingsService.generateEmbedding).not.toHaveBeenCalled();
       expect(mockRepository.vectorSearch).not.toHaveBeenCalled();
       expect(mockRepository.find).toHaveBeenCalled();
       expect(result).toEqual([mockContent]);
@@ -746,9 +714,7 @@ describe('ContentService', () => {
       ]);
 
       // Setup mocks for embeddings service
-      mockEmbeddingsService.generateEmbedding.mockResolvedValue([
-        0.1, 0.2, 0.3,
-      ]);
+      mockEmbeddingsService.generateEmbedding.mockResolvedValue([0.1, 0.2, 0.3]);
       mockEmbeddingsService.calculateSimilarity.mockReturnValue(0.85);
 
       const result = await service.semanticSearchContent(searchParams, true);
@@ -777,9 +743,7 @@ describe('ContentService', () => {
         [0.1, 0.2, 0.3],
         [0.4, 0.5, 0.6],
       ];
-      mockEmbeddingsService.batchGenerateEmbeddings.mockResolvedValue(
-        mockEmbeddings
-      );
+      mockEmbeddingsService.batchGenerateEmbeddings.mockResolvedValue(mockEmbeddings);
 
       // Mock update calls
       mockRepository.updateById.mockResolvedValue({
@@ -792,11 +756,12 @@ describe('ContentService', () => {
       expect(result).toBe(2);
       expect(mockRepository.find).toHaveBeenCalledWith(
         { embedding: { $exists: false } },
-        { limit: 50, skip: 0 }
+        { limit: 50, skip: 0 },
       );
-      expect(
-        mockEmbeddingsService.batchGenerateEmbeddings
-      ).toHaveBeenCalledWith(['test content 1', 'test content 2']);
+      expect(mockEmbeddingsService.batchGenerateEmbeddings).toHaveBeenCalledWith([
+        'test content 1',
+        'test content 2',
+      ]);
       expect(mockRepository.updateById).toHaveBeenCalledTimes(2);
     });
 
@@ -809,11 +774,9 @@ describe('ContentService', () => {
       expect(result).toBe(0);
       expect(mockRepository.find).toHaveBeenCalledWith(
         { embedding: { $exists: false } },
-        { limit: 50, skip: 0 }
+        { limit: 50, skip: 0 },
       );
-      expect(
-        mockEmbeddingsService.batchGenerateEmbeddings
-      ).not.toHaveBeenCalled();
+      expect(mockEmbeddingsService.batchGenerateEmbeddings).not.toHaveBeenCalled();
       expect(mockRepository.updateById).not.toHaveBeenCalled();
     });
 
@@ -826,11 +789,9 @@ describe('ContentService', () => {
       expect(result).toBe(0);
       expect(mockRepository.find).toHaveBeenCalledWith(
         { embedding: { $exists: false } },
-        { limit: 50, skip: 0 }
+        { limit: 50, skip: 0 },
       );
-      expect(
-        mockEmbeddingsService.batchGenerateEmbeddings
-      ).not.toHaveBeenCalled();
+      expect(mockEmbeddingsService.batchGenerateEmbeddings).not.toHaveBeenCalled();
       expect(mockRepository.updateById).not.toHaveBeenCalled();
     });
 
@@ -844,7 +805,7 @@ describe('ContentService', () => {
 
       // Mock batch generate embeddings to throw an error
       mockEmbeddingsService.batchGenerateEmbeddings.mockRejectedValue(
-        new Error('Batch processing failed')
+        new Error('Batch processing failed'),
       );
 
       const result = await service.generateAllEmbeddings();
@@ -852,11 +813,12 @@ describe('ContentService', () => {
       expect(result).toBe(0);
       expect(mockRepository.find).toHaveBeenCalledWith(
         { embedding: { $exists: false } },
-        { limit: 50, skip: 0 }
+        { limit: 50, skip: 0 },
       );
-      expect(
-        mockEmbeddingsService.batchGenerateEmbeddings
-      ).toHaveBeenCalledWith(['test content 1', 'test content 2']);
+      expect(mockEmbeddingsService.batchGenerateEmbeddings).toHaveBeenCalledWith([
+        'test content 1',
+        'test content 2',
+      ]);
       expect(mockRepository.updateById).not.toHaveBeenCalled();
     });
   });

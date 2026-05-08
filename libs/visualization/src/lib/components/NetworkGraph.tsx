@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import { NetworkGraph, NetworkNode, NetworkEdge } from '../types/network-types';
+import React, { useEffect, useRef } from 'react';
+import { NetworkEdge, NetworkGraph, NetworkNode } from '../types/network-types';
 
 // Extend NetworkNode with D3 simulation properties
 interface SimulationNode extends NetworkNode, d3.SimulationNodeDatum {
@@ -42,10 +42,7 @@ export const NetworkGraphVisualization: React.FC<NetworkGraphProps> = ({
     d3.select(svgRef.current).selectAll('*').remove();
 
     // Create SVG container
-    const svg = d3
-      .select(svgRef.current)
-      .attr('width', width)
-      .attr('height', height);
+    const svg = d3.select(svgRef.current).attr('width', width).attr('height', height);
 
     // Cast nodes and links to simulation types
     const nodes = data.nodes as SimulationNode[];
@@ -114,7 +111,7 @@ export const NetworkGraphVisualization: React.FC<NetworkGraphProps> = ({
     // Node labels
     nodeGroups
       .append('text')
-      .text((d) => d.label.length > 20 ? d.label.substring(0, 20) + '...' : d.label)
+      .text((d) => (d.label.length > 20 ? d.label.substring(0, 20) + '...' : d.label))
       .attr('dy', (d) => d.metrics.size + 14)
       .attr('text-anchor', 'middle')
       .attr('font-size', '11px')
@@ -170,4 +167,4 @@ export const NetworkGraphVisualization: React.FC<NetworkGraphProps> = ({
       <svg ref={svgRef} />
     </div>
   );
-}; 
+};

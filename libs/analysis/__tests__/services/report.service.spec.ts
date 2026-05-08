@@ -1,11 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import {
-  ReportService,
-  ReportParams,
-} from '../../src/lib/services/report.service';
-import type { AnalyzedNarrative } from '../../src/lib/services/narrative-analysis.service';
+import { Test, TestingModule } from '@nestjs/testing';
 import type { DeepInvestigationResult } from '../../src/lib/services/deep-investigation.service';
+import type { AnalyzedNarrative } from '../../src/lib/services/narrative-analysis.service';
+import { ReportService } from '../../src/lib/services/report.service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -56,7 +53,11 @@ function makeInvestigation(
           profile: {
             summary: 'Climate activist',
             topics: ['climate'],
-            patterns: { avgPostsPerDay: 5, mostActiveHours: [9, 14], platformPresence: ['twitter'] },
+            patterns: {
+              avgPostsPerDay: 5,
+              mostActiveHours: [9, 14],
+              platformPresence: ['twitter'],
+            },
             motivations: ['advocacy'],
             coordinationFlags: [],
           },
@@ -78,7 +79,11 @@ function makeInvestigation(
           profile: {
             summary: 'Suspicious account',
             topics: ['climate'],
-            patterns: { avgPostsPerDay: 80, mostActiveHours: [0, 1, 2, 3], platformPresence: ['twitter'] },
+            patterns: {
+              avgPostsPerDay: 80,
+              mostActiveHours: [0, 1, 2, 3],
+              platformPresence: ['twitter'],
+            },
             motivations: ['unknown'],
             coordinationFlags: ['burst posting'],
           },
@@ -157,7 +162,15 @@ describe('ReportService', () => {
       const result = await service.generateReport({
         query: 'climate policy',
         summary: baseSummary,
-        narratives: [makeNarrative(), makeNarrative({ id: 'narrative-1', summary: 'Opposition to carbon tax', avgSentiment: -0.4, velocity: { postsPerHour: 0.5, acceleration: -0.5, trend: 'fading' } })],
+        narratives: [
+          makeNarrative(),
+          makeNarrative({
+            id: 'narrative-1',
+            summary: 'Opposition to carbon tax',
+            avgSentiment: -0.4,
+            velocity: { postsPerHour: 0.5, acceleration: -0.5, trend: 'fading' },
+          }),
+        ],
         format: 'markdown',
       });
 
@@ -185,8 +198,16 @@ describe('ReportService', () => {
     });
 
     it('should include dominant and surging/fading narrative highlights', async () => {
-      const surging = makeNarrative({ id: 'n-surging', summary: 'Surging narrative', velocity: { postsPerHour: 10, acceleration: 1.0, trend: 'surging' } });
-      const fading = makeNarrative({ id: 'n-fading', summary: 'Fading narrative', velocity: { postsPerHour: 0.2, acceleration: -0.5, trend: 'fading' } });
+      const surging = makeNarrative({
+        id: 'n-surging',
+        summary: 'Surging narrative',
+        velocity: { postsPerHour: 10, acceleration: 1.0, trend: 'surging' },
+      });
+      const fading = makeNarrative({
+        id: 'n-fading',
+        summary: 'Fading narrative',
+        velocity: { postsPerHour: 0.2, acceleration: -0.5, trend: 'fading' },
+      });
 
       const result = await service.generateReport({
         query: 'test',

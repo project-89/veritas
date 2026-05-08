@@ -35,7 +35,7 @@ export function isValidUrl(url: string, requireHttps = false): boolean {
     }
 
     return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
-  } catch (e) {
+  } catch {
     return false;
   }
 }
@@ -116,11 +116,7 @@ export function isObject(value: unknown): value is Record<string, unknown> {
  * @param max Maximum length
  * @returns Whether the string's length is within the specified range
  */
-export function isLengthValid(
-  value: string,
-  min: number,
-  max: number
-): boolean {
+export function isLengthValid(value: string, min: number, max: number): boolean {
   if (!value) {
     return min === 0;
   }
@@ -135,11 +131,7 @@ export function isLengthValid(
  * @param max Maximum value
  * @returns Whether the number is within the specified range
  */
-export function isNumberInRange(
-  value: number,
-  min: number,
-  max: number
-): boolean {
+export function isNumberInRange(value: number, min: number, max: number): boolean {
   if (!isNumber(value)) {
     return false;
   }
@@ -153,10 +145,7 @@ export function isNumberInRange(
  * @param requiredFields Array of required field names
  * @returns Whether all required fields are present and non-empty
  */
-export function hasRequiredFields(
-  obj: Record<string, unknown>,
-  requiredFields: string[]
-): boolean {
+export function hasRequiredFields(obj: Record<string, unknown>, requiredFields: string[]): boolean {
   if (!isObject(obj)) {
     return false;
   }

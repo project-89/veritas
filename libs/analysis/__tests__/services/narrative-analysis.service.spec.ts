@@ -1,24 +1,22 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import {
-  NarrativeAnalysisService,
-  AnalyzedNarrative,
-  AnalyzeResult,
-} from '../../src/lib/services/narrative-analysis.service';
+import { Test, TestingModule } from '@nestjs/testing';
+import { NarrativeAnalysisService } from '../../src/lib/services/narrative-analysis.service';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makePost(overrides: Partial<{
-  text: string;
-  platform: string;
-  authorName: string;
-  authorHandle: string;
-  timestamp: string;
-  sentiment: { score: number; label: string };
-  engagement: { likes: number; comments: number; shares: number };
-}> = {}) {
+function makePost(
+  overrides: Partial<{
+    text: string;
+    platform: string;
+    authorName: string;
+    authorHandle: string;
+    timestamp: string;
+    sentiment: { score: number; label: string };
+    engagement: { likes: number; comments: number; shares: number };
+  }> = {},
+) {
   return {
     text: overrides.text ?? 'default post text',
     platform: overrides.platform ?? 'twitter',
@@ -43,14 +41,16 @@ function makeCluster(topic: string, count: number, platform = 'twitter') {
     `The truth about ${topic} that nobody talks about`,
   ];
 
-  return Array.from({ length: count }, (_, i) => makePost({
-    text: variations[i % variations.length],
-    platform,
-    authorHandle: `user${i}`,
-    authorName: `User ${i}`,
-    timestamp: new Date(Date.now() - (count - i) * 3600000).toISOString(),
-    sentiment: { score: i % 2 === 0 ? 0.3 : -0.2, label: i % 2 === 0 ? 'positive' : 'negative' },
-  }));
+  return Array.from({ length: count }, (_, i) =>
+    makePost({
+      text: variations[i % variations.length],
+      platform,
+      authorHandle: `user${i}`,
+      authorName: `User ${i}`,
+      timestamp: new Date(Date.now() - (count - i) * 3600000).toISOString(),
+      sentiment: { score: i % 2 === 0 ? 0.3 : -0.2, label: i % 2 === 0 ? 'positive' : 'negative' },
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -104,8 +104,7 @@ describe('NarrativeAnalysisService', () => {
       const result = await service.analyze([
         makePost({
           platform: 'youtube',
-          text:
-            'Rexas Finance scam investigation deep dive with wallet tracing, on-chain evidence, and proof of suspicious fund movement across addresses',
+          text: 'Rexas Finance scam investigation deep dive with wallet tracing, on-chain evidence, and proof of suspicious fund movement across addresses',
           engagement: { likes: 45, comments: 12, shares: 8 },
         }),
       ]);
@@ -116,10 +115,7 @@ describe('NarrativeAnalysisService', () => {
     });
 
     it('should cluster similar posts together', async () => {
-      const posts = [
-        ...makeCluster('climate change', 5),
-        ...makeCluster('cryptocurrency', 5),
-      ];
+      const posts = [...makeCluster('climate change', 5), ...makeCluster('cryptocurrency', 5)];
 
       const result = await service.analyze(posts);
 
@@ -193,9 +189,7 @@ describe('NarrativeAnalysisService', () => {
         expect(narrative.velocity).toBeDefined();
         expect(typeof narrative.velocity.postsPerHour).toBe('number');
         expect(typeof narrative.velocity.acceleration).toBe('number');
-        expect(['surging', 'growing', 'steady', 'fading']).toContain(
-          narrative.velocity.trend,
-        );
+        expect(['surging', 'growing', 'steady', 'fading']).toContain(narrative.velocity.trend);
 
         // Centroid
         expect(narrative.centroidEmbedding).toBeDefined();
@@ -204,10 +198,7 @@ describe('NarrativeAnalysisService', () => {
     });
 
     it('should sort narratives by post count descending', async () => {
-      const posts = [
-        ...makeCluster('big topic', 10),
-        ...makeCluster('small topic', 3),
-      ];
+      const posts = [...makeCluster('big topic', 10), ...makeCluster('small topic', 3)];
 
       const result = await service.analyze(posts);
 
@@ -219,10 +210,7 @@ describe('NarrativeAnalysisService', () => {
     });
 
     it('should not duplicate post indices across narratives', async () => {
-      const posts = [
-        ...makeCluster('topic A', 8),
-        ...makeCluster('topic B', 8),
-      ];
+      const posts = [...makeCluster('topic A', 8), ...makeCluster('topic B', 8)];
 
       const result = await service.analyze(posts);
       const allIndices = [
@@ -248,9 +236,6 @@ describe('NarrativeAnalysisService', () => {
       const result = await service.analyze(posts);
 
       // At least some narrative should have multiple platforms
-      const multiPlatform = result.narratives.some(
-        (n) => Object.keys(n.platforms).length > 1,
-      );
       // With fallback embeddings this isn't guaranteed, but check structure
       for (const narrative of result.narratives) {
         for (const [platform, count] of Object.entries(narrative.platforms)) {
@@ -269,17 +254,21 @@ describe('NarrativeAnalysisService', () => {
 
       // First half: 3 posts over 3 hours
       for (let i = 0; i < 3; i++) {
-        posts.push(makePost({
-          text: 'economy collapse discussion topic',
-          timestamp: new Date(now - 6 * 3600000 + i * 3600000).toISOString(),
-        }));
+        posts.push(
+          makePost({
+            text: 'economy collapse discussion topic',
+            timestamp: new Date(now - 6 * 3600000 + i * 3600000).toISOString(),
+          }),
+        );
       }
       // Second half: 9 posts over 3 hours
       for (let i = 0; i < 9; i++) {
-        posts.push(makePost({
-          text: 'economy collapse urgent discussion',
-          timestamp: new Date(now - 3 * 3600000 + i * 1200000).toISOString(),
-        }));
+        posts.push(
+          makePost({
+            text: 'economy collapse urgent discussion',
+            timestamp: new Date(now - 3 * 3600000 + i * 1200000).toISOString(),
+          }),
+        );
       }
 
       const result = await service.analyze(posts);
@@ -299,17 +288,21 @@ describe('NarrativeAnalysisService', () => {
 
       // First half: 9 posts over 3 hours
       for (let i = 0; i < 9; i++) {
-        posts.push(makePost({
-          text: 'trending scandal breaking news',
-          timestamp: new Date(now - 6 * 3600000 + i * 1200000).toISOString(),
-        }));
+        posts.push(
+          makePost({
+            text: 'trending scandal breaking news',
+            timestamp: new Date(now - 6 * 3600000 + i * 1200000).toISOString(),
+          }),
+        );
       }
       // Second half: 3 posts over 3 hours
       for (let i = 0; i < 3; i++) {
-        posts.push(makePost({
-          text: 'trending scandal update news',
-          timestamp: new Date(now - 3 * 3600000 + i * 3600000).toISOString(),
-        }));
+        posts.push(
+          makePost({
+            text: 'trending scandal update news',
+            timestamp: new Date(now - 3 * 3600000 + i * 3600000).toISOString(),
+          }),
+        );
       }
 
       const result = await service.analyze(posts);
@@ -340,9 +333,7 @@ describe('NarrativeAnalysisService', () => {
 
         // Should be sorted chronologically
         for (let i = 1; i < trajectory.length; i++) {
-          expect(
-            new Date(trajectory[i]!.timestamp).getTime(),
-          ).toBeGreaterThanOrEqual(
+          expect(new Date(trajectory[i]!.timestamp).getTime()).toBeGreaterThanOrEqual(
             new Date(trajectory[i - 1]!.timestamp).getTime(),
           );
         }
@@ -353,10 +344,26 @@ describe('NarrativeAnalysisService', () => {
   describe('author aggregation', () => {
     it('should aggregate authors and sort by post count', async () => {
       const posts = [
-        makePost({ text: 'same topic discussion point', authorHandle: 'prolific', authorName: 'Prolific' }),
-        makePost({ text: 'same topic discussion update', authorHandle: 'prolific', authorName: 'Prolific' }),
-        makePost({ text: 'same topic discussion news', authorHandle: 'prolific', authorName: 'Prolific' }),
-        makePost({ text: 'same topic discussion view', authorHandle: 'casual', authorName: 'Casual' }),
+        makePost({
+          text: 'same topic discussion point',
+          authorHandle: 'prolific',
+          authorName: 'Prolific',
+        }),
+        makePost({
+          text: 'same topic discussion update',
+          authorHandle: 'prolific',
+          authorName: 'Prolific',
+        }),
+        makePost({
+          text: 'same topic discussion news',
+          authorHandle: 'prolific',
+          authorName: 'Prolific',
+        }),
+        makePost({
+          text: 'same topic discussion view',
+          authorHandle: 'casual',
+          authorName: 'Casual',
+        }),
       ];
 
       const result = await service.analyze(posts);
@@ -365,9 +372,7 @@ describe('NarrativeAnalysisService', () => {
         const authors = result.narratives[0]!.authors;
         // Authors should be sorted by postCount descending
         for (let i = 1; i < authors.length; i++) {
-          expect(authors[i - 1]!.postCount).toBeGreaterThanOrEqual(
-            authors[i]!.postCount,
-          );
+          expect(authors[i - 1]!.postCount).toBeGreaterThanOrEqual(authors[i]!.postCount);
         }
       }
     });
@@ -375,10 +380,7 @@ describe('NarrativeAnalysisService', () => {
 
   describe('edge cases', () => {
     it('should handle posts with empty text', async () => {
-      const posts = [
-        makePost({ text: '' }),
-        makePost({ text: '' }),
-      ];
+      const posts = [makePost({ text: '' }), makePost({ text: '' })];
 
       // Should not throw
       const result = await service.analyze(posts);
@@ -387,10 +389,7 @@ describe('NarrativeAnalysisService', () => {
 
     it('should handle posts with very long text', async () => {
       const longText = 'word '.repeat(5000);
-      const posts = [
-        makePost({ text: longText }),
-        makePost({ text: longText }),
-      ];
+      const posts = [makePost({ text: longText }), makePost({ text: longText })];
 
       const result = await service.analyze(posts);
       expect(result).toBeDefined();
@@ -419,8 +418,7 @@ describe('NarrativeAnalysisService', () => {
       const result = await service.analyze(posts);
       // Either clustered together or both unclustered — no crash
       const totalAccountedFor =
-        result.narratives.reduce((s, n) => s + n.postIndices.length, 0) +
-        result.unclustered.length;
+        result.narratives.reduce((s, n) => s + n.postIndices.length, 0) + result.unclustered.length;
       expect(totalAccountedFor).toBe(2);
     });
   });

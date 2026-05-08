@@ -1,4 +1,4 @@
-import { Field, ObjectType, InputType } from '@nestjs/graphql';
+import { Field, InputType, ObjectType } from '@nestjs/graphql';
 
 @ObjectType('TimeFrame')
 @InputType('TimeFrameInput')

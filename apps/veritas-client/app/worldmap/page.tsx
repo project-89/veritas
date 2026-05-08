@@ -2,17 +2,17 @@
 
 import dynamic from 'next/dynamic';
 import { useCallback, useMemo, useState } from 'react';
-import type { GlobalEvent, EventCategory, EventSeverity } from '../../lib/global-event.types';
-import { useEventStream } from '../../lib/use-event-stream';
-import { EventFilterPanel } from '../../components/nerv/event-filter-panel';
-import type { EventFilters } from '../../components/nerv/event-filter-panel';
 import { EventDetailFlyout } from '../../components/nerv/event-detail-flyout';
-import { NervTicker } from '../../components/nerv/nerv-ticker';
+import type { EventFilters } from '../../components/nerv/event-filter-panel';
+import { EventFilterPanel } from '../../components/nerv/event-filter-panel';
 import { NervStatus } from '../../components/nerv/nerv-status';
+import { NervTicker } from '../../components/nerv/nerv-ticker';
+import type { EventCategory, EventSeverity, GlobalEvent } from '../../lib/global-event.types';
+import { useEventStream } from '../../lib/use-event-stream';
 
 // Dynamic import — Three.js requires window
 const EventGlobe = dynamic(
-  () => import('../../components/nerv/event-globe').then(m => ({ default: m.EventGlobe })),
+  () => import('../../components/nerv/event-globe').then((m) => ({ default: m.EventGlobe })),
   { ssr: false },
 );
 
@@ -28,7 +28,7 @@ const ALL_SEVERITIES = new Set<EventSeverity>(['low', 'medium', 'high', 'critica
 
 function isWorldMapEvent(event: GlobalEvent): boolean {
   if (event.source === 'CoinGecko') return false;
-  if (event.metadata['feedCategory'] === 'crypto') return false;
+  if (event.metadata.feedCategory === 'crypto') return false;
   return true;
 }
 
@@ -47,7 +47,7 @@ export default function WorldMapPage() {
     const rangeMs = TIME_RANGE_MS[filters.timeRange] ?? 86400000;
     const cutoff = now - rangeMs;
 
-    return events.filter(ev => {
+    return events.filter((ev) => {
       if (!isWorldMapEvent(ev)) return false;
       if (!filters.categories.has(ev.category)) return false;
       if (!filters.severities.has(ev.severity)) return false;
@@ -60,9 +60,9 @@ export default function WorldMapPage() {
   // Ticker items from high/critical events
   const tickerItems = useMemo(() => {
     return filteredEvents
-      .filter(ev => ev.severity === 'high' || ev.severity === 'critical')
+      .filter((ev) => ev.severity === 'high' || ev.severity === 'critical')
       .slice(0, 30)
-      .map(ev => ({
+      .map((ev) => ({
         id: ev.id,
         severity: ev.severity === 'critical' ? 'critical' : 'warning',
         text: `[${ev.category.toUpperCase()}] ${ev.title} — ${ev.location.label}`,
@@ -74,21 +74,20 @@ export default function WorldMapPage() {
     setSelectedEvent(event);
   }, []);
 
-  const handleTickerClick = useCallback((id: string) => {
-    const ev = events.find(e => e.id === id);
-    if (ev) setSelectedEvent(ev);
-  }, [events]);
+  const handleTickerClick = useCallback(
+    (id: string) => {
+      const ev = events.find((event) => event.id === id);
+      if (ev) setSelectedEvent(ev);
+    },
+    [events],
+  );
 
   return (
     <div className="flex flex-col h-[calc(100vh-44px)] bg-nerv-bg">
       {/* Main content area */}
       <div className="flex flex-1 min-h-0">
         {/* Left: Filter panel */}
-        <EventFilterPanel
-          events={filteredEvents}
-          filters={filters}
-          onFilterChange={setFilters}
-        />
+        <EventFilterPanel events={filteredEvents} filters={filters} onFilterChange={setFilters} />
 
         {/* Center: Globe */}
         <div className="flex-1 relative min-w-0">
@@ -125,19 +124,31 @@ export default function WorldMapPage() {
           <div className="absolute bottom-3 left-3 pointer-events-none z-10">
             <div className="flex items-center gap-3 text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted">
               <span className="flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#00E676' }} />
+                <span
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{ background: '#00E676' }}
+                />
                 ENV
               </span>
               <span className="flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#FF1744' }} />
+                <span
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{ background: '#FF1744' }}
+                />
                 POL
               </span>
               <span className="flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#FFD600' }} />
+                <span
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{ background: '#FFD600' }}
+                />
                 ECON
               </span>
               <span className="flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#2979FF' }} />
+                <span
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{ background: '#2979FF' }}
+                />
                 MEDIA
               </span>
             </div>
@@ -146,10 +157,7 @@ export default function WorldMapPage() {
 
         {/* Right: Detail flyout (conditional) */}
         {selectedEvent && (
-          <EventDetailFlyout
-            event={selectedEvent}
-            onClose={() => setSelectedEvent(null)}
-          />
+          <EventDetailFlyout event={selectedEvent} onClose={() => setSelectedEvent(null)} />
         )}
       </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { InvestigationResult } from '../../lib/api';
 
 // ---------------------------------------------------------------------------
@@ -33,23 +33,6 @@ const PLATFORM_Y_LANES: Record<string, number> = {
   web: 7,
 };
 
-// ---------------------------------------------------------------------------
-// Hexagon path helper
-// ---------------------------------------------------------------------------
-
-function hexPath(cx: number, cy: number, r: number): string {
-  const pts: string[] = [];
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i - Math.PI / 6;
-    pts.push(`${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`);
-  }
-  return `M${pts.join('L')}Z`;
-}
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 export function PropagationFlow({ investigation }: PropagationFlowProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,7 +59,9 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
 
     // Assign lane indices
     const laneMap = new Map<string, number>();
-    platformList.forEach((p, i) => laneMap.set(p, i));
+    platformList.forEach((p, i) => {
+      laneMap.set(p, i);
+    });
 
     // Compute time range
     const timestamps: number[] = [];
@@ -85,7 +70,8 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       if (t) timestamps.push(new Date(t).getTime());
     }
     if (origin?.firstTimestamp) timestamps.push(new Date(origin.firstTimestamp).getTime());
-    if (timestamps.length === 0) return { nodes: [], edges: [], platforms: platformList, coordClusters: [] };
+    if (timestamps.length === 0)
+      return { nodes: [], edges: [], platforms: platformList, coordClusters: [] };
 
     const minT = Math.min(...timestamps);
     const maxT = Math.max(...timestamps);
@@ -131,9 +117,14 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
     // Build edges from likelySource
     const edgeList: Array<{ from: number; to: number }> = [];
     for (let i = 0; i < nodeList.length; i++) {
-      const src = nodeList[i]!.likelySource;
+      const sourceNode = nodeList[i];
+      if (!sourceNode) continue;
+      const src = sourceNode.likelySource;
       if (src && handleIndex.has(src)) {
-        edgeList.push({ from: handleIndex.get(src)!, to: i });
+        const sourceIndex = handleIndex.get(src);
+        if (sourceIndex !== undefined) {
+          edgeList.push({ from: sourceIndex, to: i });
+        }
       }
     }
 
@@ -196,21 +187,35 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       ctx.stroke();
       // Label
       ctx.fillStyle = '#555570';
-      ctx.fillText(platforms[i]!.toUpperCase(), marginLeft - 8, y + 3);
+      const platform = platforms[i];
+      if (platform) {
+        ctx.fillText(platform.toUpperCase(), marginLeft - 8, y + 3);
+      }
     }
 
     // Coordination cluster boundaries
     for (const cluster of coordClusters) {
       if (cluster.userIndices.length < 2) continue;
-      const clusterNodes = cluster.userIndices.map((i) => nodes[i]!);
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      const clusterNodes = cluster.userIndices
+        .map((i) => nodes[i])
+        .filter(
+          (
+            node,
+          ): node is NonNullable<
+            (typeof nodes)[number]
+          > => node !== undefined,
+        );
+      let minX = Infinity,
+        maxX = -Infinity,
+        minY = Infinity,
+        maxY = -Infinity;
       for (const n of clusterNodes) {
-        const nx = marginLeft + n!.x * plotW;
-        const ny = marginTop + n!.y * laneH + laneH / 2;
-        minX = Math.min(minX, nx - n!.r - 10);
-        maxX = Math.max(maxX, nx + n!.r + 10);
-        minY = Math.min(minY, ny - n!.r - 10);
-        maxY = Math.max(maxY, ny + n!.r + 10);
+        const nx = marginLeft + n.x * plotW;
+        const ny = marginTop + n.y * laneH + laneH / 2;
+        minX = Math.min(minX, nx - n.r - 10);
+        maxX = Math.max(maxX, nx + n.r + 10);
+        minY = Math.min(minY, ny - n.r - 10);
+        maxY = Math.max(maxY, ny + n.r + 10);
       }
       ctx.strokeStyle = `rgba(233, 69, 96, ${0.3 + 0.1 * Math.sin(t * 2)})`;
       ctx.lineWidth = 1;
@@ -226,8 +231,9 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
 
     // Edges
     for (const edge of edges) {
-      const from = nodes[edge.from]!;
-      const to = nodes[edge.to]!;
+      const from = nodes[edge.from];
+      const to = nodes[edge.to];
+      if (!from || !to) continue;
       const fx = marginLeft + from.x * plotW;
       const fy = marginTop + from.y * laneH + laneH / 2;
       const tx = marginLeft + to.x * plotW;
@@ -360,7 +366,8 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
             Shows how a narrative spreads from origin through amplifiers across platforms.
           </div>
           <div className="text-[11px] font-mono text-nerv-orange mt-3 max-w-[320px] leading-relaxed">
-            {'\u2192'} Select a narrative in the left panel, then click the <span className="font-bold">INVESTIGATE THIS NARRATIVE</span> button in the right panel.
+            {'\u2192'} Select a narrative in the left panel, then click the{' '}
+            <span className="font-bold">INVESTIGATE THIS NARRATIVE</span> button in the right panel.
           </div>
         </div>
       </div>
@@ -390,7 +397,9 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       </div>
       {/* Legend bar */}
       <div className="shrink-0 px-3 py-1.5 border-t border-nerv-border bg-nerv-bg flex items-center gap-4 flex-wrap">
-        <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">LEGEND:</span>
+        <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+          LEGEND:
+        </span>
         <span className="text-[9px] font-mono text-nerv-orange flex items-center gap-1">
           <span className="inline-block w-2 h-2 rounded-full bg-nerv-orange shadow-[0_0_6px_rgba(255,107,43,0.6)]" />
           ORIGIN

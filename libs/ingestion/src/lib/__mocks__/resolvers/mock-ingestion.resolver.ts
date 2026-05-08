@@ -2,22 +2,20 @@
  * Mock IngestionResolver for testing
  * Simplified version that doesn't require GraphQL decorators
  */
-import { TransformOnIngestService } from '../../services/transform/transform-on-ingest.service';
-import { NarrativeRepository } from '../../repositories/narrative-insight.repository';
+
+import * as crypto from 'crypto';
 import { NarrativeInsight } from '../../../types/narrative-insight.interface';
+import { NarrativeRepository } from '../../repositories/narrative-insight.repository';
+import { TransformOnIngestService } from '../../services/transform/transform-on-ingest.service';
 import {
   ContentIngestionInput,
   SourceIngestionInput,
   VerificationStatus,
 } from '../types/mock-ingestion.types';
-import * as crypto from 'crypto';
 
 /** Interface for the graph database service */
 interface GraphDatabaseService {
-  executeQuery(
-    query: string,
-    params: Record<string, unknown>
-  ): Promise<Record<string, unknown>[]>;
+  executeQuery(query: string, params: Record<string, unknown>): Promise<Record<string, unknown>[]>;
 }
 
 /** Interface for the event streaming client */
@@ -32,18 +30,18 @@ export class IngestionResolver {
   constructor(
     private readonly classificationService: any,
     private readonly transformService: TransformOnIngestService,
-    private readonly narrativeRepository: NarrativeRepository
+    private readonly narrativeRepository: NarrativeRepository,
   ) {}
 
   private mapVerificationStatus(
-    status: VerificationStatus
+    status: VerificationStatus,
   ): 'verified' | 'unverified' | 'suspicious' {
     return status.toLowerCase() as 'verified' | 'unverified' | 'suspicious';
   }
 
   async ingestSocialContent(
     content: ContentIngestionInput,
-    source: SourceIngestionInput
+    source: SourceIngestionInput,
   ): Promise<NarrativeInsight> {
     const socialMediaPost = {
       id: crypto.randomUUID(),
@@ -69,15 +67,14 @@ export class IngestionResolver {
           },
     };
 
-    const narrativeInsight =
-      await this.transformService.transform(socialMediaPost);
+    const narrativeInsight = await this.transformService.transform(socialMediaPost);
     return narrativeInsight;
   }
 
   async getNarrativeInsights(
     timeframe: string,
     limit?: number,
-    skip?: number
+    skip?: number,
   ): Promise<NarrativeInsight[]> {
     return this.narrativeRepository.findByTimeframe(timeframe, { limit, skip });
   }

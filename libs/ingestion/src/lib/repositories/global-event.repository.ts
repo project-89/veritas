@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { DatabaseService, Repository } from '@veritas/database';
-import { GlobalEventModel, GlobalEventSchema } from '../schemas/global-event.schema';
 import type { GlobalEvent } from '@veritas/analysis';
+import { DatabaseService, Repository } from '@veritas/database';
+import { GlobalEventModel } from '../schemas/global-event.schema';
 
 // ---------------------------------------------------------------------------
 // Stored document shape (what Mongo actually holds)
@@ -64,7 +64,9 @@ function eventSignature(doc: GlobalEventDoc): string {
 }
 
 function hasExactCoordinates(doc: GlobalEventDoc): boolean {
-  const coords = doc.metadata['coordinates'] as { latitude?: number; longitude?: number } | undefined;
+  const coords = doc.metadata['coordinates'] as
+    | { latitude?: number; longitude?: number }
+    | undefined;
   return Number.isFinite(coords?.latitude) && Number.isFinite(coords?.longitude);
 }
 
@@ -95,15 +97,21 @@ function earthquakeMagnitude(doc: GlobalEventDoc): number | null {
 function isEarthquakeLike(doc: GlobalEventDoc): boolean {
   if (doc.category !== 'environmental') return false;
 
-  const metadataType = normalizeText(typeof doc.metadata['type'] === 'string' ? doc.metadata['type'] : '');
+  const metadataType = normalizeText(
+    typeof doc.metadata['type'] === 'string' ? doc.metadata['type'] : '',
+  );
   const text = `${normalizeText(doc.title)} ${normalizeText(doc.description)} ${normalizeText(doc.location.label)}`;
-  return metadataType.includes('earthquake') || text.includes('earthquake') || text.includes(' seismic ');
+  return (
+    metadataType.includes('earthquake') || text.includes('earthquake') || text.includes(' seismic ')
+  );
 }
 
 function geoDistanceDegrees(a: GlobalEventDoc, b: GlobalEventDoc): number {
   if (
-    !Number.isFinite(a.location.lat) || !Number.isFinite(a.location.lng) ||
-    !Number.isFinite(b.location.lat) || !Number.isFinite(b.location.lng)
+    !Number.isFinite(a.location.lat) ||
+    !Number.isFinite(a.location.lng) ||
+    !Number.isFinite(b.location.lat) ||
+    !Number.isFinite(b.location.lng)
   ) {
     return Number.POSITIVE_INFINITY;
   }
@@ -217,10 +225,7 @@ export class GlobalEventRepository implements OnModuleInit {
       this.logger.log('GlobalEvent repository initialized');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Failed to initialize GlobalEvent repository: ${err.message}`,
-        err.stack,
-      );
+      this.logger.error(`Failed to initialize GlobalEvent repository: ${err.message}`, err.stack);
     }
   }
 
@@ -241,13 +246,14 @@ export class GlobalEventRepository implements OnModuleInit {
   async upsertEvent(event: GlobalEvent): Promise<void> {
     this.ensureInitialized();
     try {
-      const existing = await this.repo.findOne({ eventId: event.id } as Partial<GlobalEventDoc> & Record<string, unknown>);
+      const existing = await this.repo.findOne({ eventId: event.id } as Partial<GlobalEventDoc> &
+        Record<string, unknown>);
       const doc = this.toDocument(event);
 
       if (existing) {
         const id =
           existing._id?.toString() ??
-          (existing as unknown as Record<string, unknown>)['id'] as string;
+          ((existing as unknown as Record<string, unknown>)['id'] as string);
         await this.repo.updateById(id, doc);
       } else {
         await this.repo.create(doc);
@@ -266,7 +272,8 @@ export class GlobalEventRepository implements OnModuleInit {
       category: event.category,
       severity: event.severity,
       title: event.title?.trim() || `${event.source} event`,
-      description: event.description?.trim() || `${event.source}: ${event.title?.trim() || 'Untitled event'}`,
+      description:
+        event.description?.trim() || `${event.source}: ${event.title?.trim() || 'Untitled event'}`,
       timestamp: new Date(event.timestamp),
       location: {
         ...event.location,
@@ -305,10 +312,13 @@ export class GlobalEventRepository implements OnModuleInit {
         filter['timestamp'] = { $gte: new Date(options.since) };
       }
 
-      const docs = await this.repo.find(filter as Partial<GlobalEventDoc> & Record<string, unknown>, {
-        limit: options?.limit ?? 200,
-        sort: { timestamp: -1 },
-      });
+      const docs = await this.repo.find(
+        filter as Partial<GlobalEventDoc> & Record<string, unknown>,
+        {
+          limit: options?.limit ?? 200,
+          sort: { timestamp: -1 },
+        },
+      );
 
       const dedupedDocs = this.dedupeDocs(docs);
       return dedupedDocs.map((d) => this.toGlobalEvent(d));
@@ -325,7 +335,8 @@ export class GlobalEventRepository implements OnModuleInit {
   async getEventById(eventId: string): Promise<GlobalEvent | null> {
     this.ensureInitialized();
     try {
-      const doc = await this.repo.findOne({ eventId } as Partial<GlobalEventDoc> & Record<string, unknown>);
+      const doc = await this.repo.findOne({ eventId } as Partial<GlobalEventDoc> &
+        Record<string, unknown>);
       return doc ? this.toGlobalEvent(doc) : null;
     } catch (error: unknown) {
       const err = error as Error;
@@ -389,13 +400,19 @@ export class GlobalEventRepository implements OnModuleInit {
     });
 
     for (const doc of qualitySorted) {
-      const existingIdx = correlated.findIndex((current) => areCorrelatedEarthquakeDocs(current, doc));
+      const existingIdx = correlated.findIndex((current) =>
+        areCorrelatedEarthquakeDocs(current, doc),
+      );
       if (existingIdx === -1) {
         correlated.push(doc);
         continue;
       }
 
-      const current = correlated[existingIdx]!;
+      const current = correlated[existingIdx];
+      if (!current) {
+        correlated.push(doc);
+        continue;
+      }
       if (compareDocQuality(doc, current) > 0) {
         correlated[existingIdx] = doc;
       }

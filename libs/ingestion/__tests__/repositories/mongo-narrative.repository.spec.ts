@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { DatabaseService } from '@veritas/database';
 import { MongoNarrativeRepository } from '../../src/lib/repositories/mongo-narrative.repository';
 import { NarrativeInsight } from '../../src/types/narrative-insight.interface';
 import { NarrativeTrend } from '../../src/types/narrative-trend.interface';
-import { DatabaseService } from '@veritas/database';
 
 describe('MongoNarrativeRepository', () => {
   let repository: MongoNarrativeRepository;
@@ -67,9 +67,7 @@ describe('MongoNarrativeRepository', () => {
 
     // Create mock repository with Jest function implementations
     mockInsightRepo = {
-      find: jest
-        .fn()
-        .mockResolvedValue([mockInsight, mockInsight2, mockInsight3]),
+      find: jest.fn().mockResolvedValue([mockInsight, mockInsight2, mockInsight3]),
       findById: jest.fn(),
       findOne: jest.fn().mockResolvedValue(mockInsight),
       count: jest.fn(),
@@ -201,7 +199,7 @@ describe('MongoNarrativeRepository', () => {
         expect.objectContaining({
           limit: 10,
           minScore: 0.7,
-        })
+        }),
       );
     });
 
@@ -216,7 +214,7 @@ describe('MongoNarrativeRepository', () => {
       mockInsightRepo.vectorSearch = undefined;
 
       // Execute the test
-      const result = await repository.findSimilarContent(queryEmbedding, {
+      await repository.findSimilarContent(queryEmbedding, {
         limit: 2,
         minScore: 0.7,
       });

@@ -50,8 +50,7 @@ module.exports = {
             boxShadow: '0 0 4px var(--nerv-glow-color, #e94560)',
           },
           '50%': {
-            boxShadow:
-              '0 0 12px var(--nerv-glow-color, #e94560), 0 0 24px rgba(233,69,96,0.3)',
+            boxShadow: '0 0 12px var(--nerv-glow-color, #e94560), 0 0 24px rgba(233,69,96,0.3)',
           },
         },
         'nerv-scan': {

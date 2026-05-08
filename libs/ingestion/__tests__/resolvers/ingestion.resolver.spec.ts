@@ -1,17 +1,17 @@
 import '@jest/globals';
 
 import { IngestionResolver } from '../../src/lib/__mocks__/resolvers/mock-ingestion.resolver';
-import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
-import { NarrativeRepository } from '../../src/lib/repositories/narrative-insight.repository';
 import {
   ContentIngestionInput,
   SourceIngestionInput,
   VerificationStatus,
 } from '../../src/lib/__mocks__/types/mock-ingestion.types';
+import { NarrativeRepository } from '../../src/lib/repositories/narrative-insight.repository';
+import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
 
 // Mock ContentClassificationService
 class ContentClassificationService {
-  async classifyContent(text: string) {
+  async classifyContent() {
     return {
       toxicity: 0.1,
       sentiment: {
@@ -99,11 +99,7 @@ describe('IngestionResolver', () => {
     } as unknown as NarrativeRepository;
 
     // Directly create the resolver with our mocks
-    resolver = new IngestionResolver(
-      classificationService,
-      transformService,
-      narrativeRepository
-    );
+    resolver = new IngestionResolver(classificationService, transformService, narrativeRepository);
 
     // Set up mocked memgraph and kafka services
     Object.defineProperty(resolver, 'memgraphService', {
@@ -135,10 +131,7 @@ describe('IngestionResolver', () => {
       sourceInput.credibilityScore = 0.8;
       sourceInput.verificationStatus = VerificationStatus.VERIFIED;
 
-      const result = await resolver.ingestSocialContent(
-        contentInput,
-        sourceInput
-      );
+      const result = await resolver.ingestSocialContent(contentInput, sourceInput);
 
       if (result === null || result === undefined) {
         throw new Error('Result should be defined');
@@ -167,9 +160,7 @@ describe('IngestionResolver', () => {
       }
 
       if (mockFn.mock.calls[0][0] !== 'day') {
-        throw new Error(
-          `Expected timeframe 'day', got '${mockFn.mock.calls[0][0]}'`
-        );
+        throw new Error(`Expected timeframe 'day', got '${mockFn.mock.calls[0][0]}'`);
       }
     });
   });
@@ -189,19 +180,14 @@ describe('IngestionResolver', () => {
       }
 
       if (mockFn.mock.calls[0][0] !== 'week') {
-        throw new Error(
-          `Expected timeframe 'week', got '${mockFn.mock.calls[0][0]}'`
-        );
+        throw new Error(`Expected timeframe 'week', got '${mockFn.mock.calls[0][0]}'`);
       }
     });
   });
 
   describe('verifySource', () => {
     it('should verify a source', async () => {
-      const result = await resolver.verifySource(
-        'test-source-id',
-        VerificationStatus.VERIFIED
-      );
+      const result = await resolver.verifySource('test-source-id', VerificationStatus.VERIFIED);
 
       if (result === null || result === undefined) {
         throw new Error('Result should be defined');
@@ -220,13 +206,13 @@ describe('IngestionResolver', () => {
 
       if (execQueryMock.mock.calls[0][1].sourceId !== 'test-source-id') {
         throw new Error(
-          `Expected source ID 'test-source-id', got '${execQueryMock.mock.calls[0][1].sourceId}'`
+          `Expected source ID 'test-source-id', got '${execQueryMock.mock.calls[0][1].sourceId}'`,
         );
       }
 
       if (execQueryMock.mock.calls[0][1].verificationStatus !== 'verified') {
         throw new Error(
-          `Expected verification status 'verified', got '${execQueryMock.mock.calls[0][1].verificationStatus}'`
+          `Expected verification status 'verified', got '${execQueryMock.mock.calls[0][1].verificationStatus}'`,
         );
       }
     });

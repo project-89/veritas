@@ -1,20 +1,10 @@
-import {
-  Controller,
-  Post,
-  Put,
-  Body,
-  Param,
-  Logger,
-  Inject,
-  Optional,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Body, Controller, Inject, Logger, Optional, Param, Post, Put } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { SourceNode } from '@veritas/shared/types';
+import * as crypto from 'crypto';
+import type { SocialMediaContentNode, SocialMediaPost } from '../../types/social-media.types';
 import { NarrativeRepository } from '../repositories/narrative-insight.repository';
 import { TransformOnIngestService } from '../services/transform/transform-on-ingest.service';
-import type { ContentNode, SourceNode } from '@veritas/shared/types';
-import type { SocialMediaPost } from '../../types/social-media.types';
-import type { SocialMediaContentNode } from '../../types/social-media.types';
-import * as crypto from 'crypto';
 
 /** Interface for the graph database service */
 interface GraphDatabaseService {
@@ -35,7 +25,7 @@ export class IngestionController {
     private readonly narrativeRepository: NarrativeRepository,
     private readonly transformService: TransformOnIngestService,
     @Optional() @Inject('MEMGRAPH_SERVICE') private readonly memgraphService: GraphDatabaseService,
-    @Optional() @Inject('KAFKA_SERVICE') private readonly kafkaClient: EventStreamingClient
+    @Optional() @Inject('KAFKA_SERVICE') private readonly kafkaClient: EventStreamingClient,
   ) {}
 
   @Post('content')
@@ -44,7 +34,7 @@ export class IngestionController {
   })
   async ingestContent(
     @Body('content') content: SocialMediaContentNode,
-    @Body('source') source: SourceNode
+    @Body('source') source: SourceNode,
   ) {
     // Convert to SocialMediaPost format
     const post: SocialMediaPost = {
@@ -80,7 +70,7 @@ export class IngestionController {
   @ApiOperation({ summary: 'Update source verification status' })
   async verifySource(
     @Param('id') sourceId: string,
-    @Body('status') status: 'verified' | 'unverified' | 'suspicious'
+    @Body('status') status: 'verified' | 'unverified' | 'suspicious',
   ) {
     try {
       // Update graph database
@@ -108,10 +98,7 @@ export class IngestionController {
       return result[0]?.['s'];
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error verifying source: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error verifying source: ${err.message}`, err.stack);
       throw error;
     }
   }

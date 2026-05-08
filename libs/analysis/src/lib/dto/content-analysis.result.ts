@@ -1,6 +1,6 @@
-import { Field, ObjectType, Float } from '@nestjs/graphql';
+import { Field, Float, ObjectType } from '@nestjs/graphql';
 import GraphQLJSON from 'graphql-type-json';
-import { Pattern, DeviationMetrics } from '../analysis.types';
+import { DeviationMetrics, Pattern } from '../analysis.types';
 
 // Define a local interface instead of importing from @veritas/shared
 interface ContentNode {
@@ -13,7 +13,7 @@ interface ContentNode {
   categories?: string[];
   topics?: string[];
   sourceId?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 @ObjectType()
@@ -46,7 +46,7 @@ export class RelatedContent implements ContentNode {
   sourceId?: string = '';
 
   @Field(() => GraphQLJSON, { nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 @ObjectType()

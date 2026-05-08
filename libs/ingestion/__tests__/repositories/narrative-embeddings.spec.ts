@@ -1,19 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { DatabaseService } from '@veritas/database';
 import { MongoNarrativeRepository } from '../../src/lib/repositories/mongo-narrative.repository';
 import { InMemoryNarrativeRepository } from '../../src/lib/repositories/narrative-insight.repository';
-import { DatabaseService } from '@veritas/database';
 import { NarrativeInsight } from '../../src/types/narrative-insight.interface';
 
 describe('Narrative Repository Embeddings', () => {
   let mongoRepository: MongoNarrativeRepository;
   let inMemoryRepository: InMemoryNarrativeRepository;
-  let databaseService: DatabaseService;
 
   // Create mock narrative insights with embeddings
-  const createMockInsight = (
-    id: string,
-    themes: string[]
-  ): NarrativeInsight => ({
+  const createMockInsight = (id: string, themes: string[]): NarrativeInsight => ({
     id,
     contentHash: `content-hash-${id}`,
     sourceHash: `source-hash-${id.substring(0, 1)}`, // Group some by same source
@@ -27,12 +23,7 @@ describe('Narrative Repository Embeddings', () => {
     })),
     sentiment: {
       score: Math.random() * 2 - 1,
-      label:
-        Math.random() > 0.33
-          ? Math.random() > 0.5
-            ? 'positive'
-            : 'negative'
-          : 'neutral',
+      label: Math.random() > 0.33 ? (Math.random() > 0.5 ? 'positive' : 'negative') : 'neutral',
       confidence: 0.7 + Math.random() * 0.3,
     },
     engagement: {
@@ -79,46 +70,43 @@ describe('Narrative Repository Embeddings', () => {
     deleteMany: jest.fn(),
     vectorSearch: jest
       .fn()
-      .mockImplementation((field: string, vector: number[], options?: any) => {
-        // Simulate vector search by calculating cosine similarity
-        const calculateSimilarity = (
-          vecA: number[],
-          vecB: number[]
-        ): number => {
-          let dotProduct = 0;
-          let normA = 0;
-          let normB = 0;
+      .mockImplementation(
+        (_field: string, vector: number[], options?: { minScore?: number; limit?: number }) => {
+      // Simulate vector search by calculating cosine similarity
+          const calculateSimilarity = (vecA: number[], vecB: number[]): number => {
+            let dotProduct = 0;
+            let normA = 0;
+            let normB = 0;
 
-          for (let i = 0; i < vecA.length; i++) {
-            dotProduct += (vecA[i] ?? 0) * (vecB[i] ?? 0);
-            normA += (vecA[i] ?? 0) * (vecA[i] ?? 0);
-            normB += (vecB[i] ?? 0) * (vecB[i] ?? 0);
-          }
+            for (let i = 0; i < vecA.length; i++) {
+              dotProduct += (vecA[i] ?? 0) * (vecB[i] ?? 0);
+              normA += (vecA[i] ?? 0) * (vecA[i] ?? 0);
+              normB += (vecB[i] ?? 0) * (vecB[i] ?? 0);
+            }
 
-          if (normA === 0 || normB === 0) return 0;
-          return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-        };
+            if (normA === 0 || normB === 0) return 0;
+            return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+          };
 
-        const results = mockInsights
-          .map((insight) => ({
-            item: insight,
-            score: calculateSimilarity(insight.embedding || [], vector),
-          }))
-          .filter((result) => result.score >= (options?.minScore || 0.7))
-          .sort((a, b) => b.score - a.score)
-          .slice(0, options?.limit || 10);
+          const results = mockInsights
+            .map((insight) => ({
+              item: insight,
+              score: calculateSimilarity(insight.embedding || [], vector),
+            }))
+            .filter((result) => result.score >= (options?.minScore || 0.7))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, options?.limit || 10);
 
-        return Promise.resolve(results);
-      }),
+          return Promise.resolve(results);
+        },
+      ),
   };
-
-  // Define type for insightRepository with optional vectorSearch
-  type InsightRepositoryType = typeof mockInsightRepository;
 
   // Mock database service
   const mockDatabaseService = {
     getRepository: jest.fn().mockImplementation((name: string) => {
-      if (name === 'NarrativeInsight' || name === 'narrative-insights') return mockInsightRepository;
+      if (name === 'NarrativeInsight' || name === 'narrative-insights')
+        return mockInsightRepository;
       if (name === 'NarrativeTrend') return mockInsightRepository;
       return null;
     }),
@@ -139,13 +127,8 @@ describe('Narrative Repository Embeddings', () => {
       ],
     }).compile();
 
-    mongoRepository = module.get<MongoNarrativeRepository>(
-      MongoNarrativeRepository
-    );
-    inMemoryRepository = module.get<InMemoryNarrativeRepository>(
-      InMemoryNarrativeRepository
-    );
-    databaseService = module.get<DatabaseService>(DatabaseService);
+    mongoRepository = module.get<MongoNarrativeRepository>(MongoNarrativeRepository);
+    inMemoryRepository = module.get<InMemoryNarrativeRepository>(InMemoryNarrativeRepository);
 
     // Initialize in-memory repository with test data
     for (const insight of mockInsights) {
@@ -155,13 +138,10 @@ describe('Narrative Repository Embeddings', () => {
 
   describe('MongoNarrativeRepository with vector search', () => {
     it('should find similar content using vector search', async () => {
-      const result = await mongoRepository.findSimilarContent(
-        climateRelatedEmbedding,
-        {
-          limit: 3,
-          minScore: 0.7,
-        }
-      );
+      const result = await mongoRepository.findSimilarContent(climateRelatedEmbedding, {
+        limit: 3,
+        minScore: 0.7,
+      });
 
       // Check that results are returned
       expect(result).toBeDefined();
@@ -189,7 +169,7 @@ describe('Narrative Repository Embeddings', () => {
         expect.objectContaining({
           limit: 3,
           minScore: 0.7,
-        })
+        }),
       );
     });
 
@@ -197,12 +177,9 @@ describe('Narrative Repository Embeddings', () => {
       // Mock repository to return empty results
       mockInsightRepository.vectorSearch.mockResolvedValueOnce([]);
 
-      const result = await mongoRepository.findSimilarContent(
-        climateRelatedEmbedding,
-        {
-          minScore: 0.99, // Very high threshold that no results will meet
-        }
-      );
+      const result = await mongoRepository.findSimilarContent(climateRelatedEmbedding, {
+        minScore: 0.99, // Very high threshold that no results will meet
+      });
 
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
@@ -218,7 +195,7 @@ describe('Narrative Repository Embeddings', () => {
         expect.objectContaining({
           limit: 10, // Default limit
           minScore: 0.7, // Default minScore
-        })
+        }),
       );
     });
 
@@ -227,18 +204,12 @@ describe('Narrative Repository Embeddings', () => {
       const originalVectorSearch = mockInsightRepository.vectorSearch;
       mockInsightRepository.vectorSearch = undefined as any;
 
-      const spy = jest.spyOn(
-        mongoRepository as any,
-        'calculateCosineSimilarity'
-      );
+      const spy = jest.spyOn(mongoRepository as any, 'calculateCosineSimilarity');
 
-      const result = await mongoRepository.findSimilarContent(
-        climateRelatedEmbedding,
-        {
-          limit: 2,
-          minScore: 0.7,
-        }
-      );
+      const result = await mongoRepository.findSimilarContent(climateRelatedEmbedding, {
+        limit: 2,
+        minScore: 0.7,
+      });
 
       // Check that in-memory calculation was used
       expect(spy).toHaveBeenCalled();
@@ -255,13 +226,10 @@ describe('Narrative Repository Embeddings', () => {
 
   describe('InMemoryNarrativeRepository with embeddings', () => {
     it('should find similar content using in-memory vector similarity', async () => {
-      const result = await inMemoryRepository.findSimilarContent(
-        climateRelatedEmbedding,
-        {
-          limit: 3,
-          minScore: 0.7,
-        }
-      );
+      const result = await inMemoryRepository.findSimilarContent(climateRelatedEmbedding, {
+        limit: 3,
+        minScore: 0.7,
+      });
 
       // Check that results are returned
       expect(result).toBeDefined();
@@ -285,16 +253,11 @@ describe('Narrative Repository Embeddings', () => {
 
     it('should handle empty results', async () => {
       // Create a vector that likely won't match anything
-      const unrelatedVector = new Array(384)
-        .fill(0)
-        .map((_, i) => (i % 2 === 0 ? 1 : -1));
+      const unrelatedVector = new Array(384).fill(0).map((_, i) => (i % 2 === 0 ? 1 : -1));
 
-      const result = await inMemoryRepository.findSimilarContent(
-        unrelatedVector,
-        {
-          minScore: 0.99, // Very high threshold
-        }
-      );
+      const result = await inMemoryRepository.findSimilarContent(unrelatedVector, {
+        minScore: 0.99, // Very high threshold
+      });
 
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
@@ -302,9 +265,7 @@ describe('Narrative Repository Embeddings', () => {
     });
 
     it('should use default values when options not provided', async () => {
-      const result = await inMemoryRepository.findSimilarContent(
-        climateRelatedEmbedding
-      );
+      const result = await inMemoryRepository.findSimilarContent(climateRelatedEmbedding);
 
       // Default limit should be applied
       expect(result.length).toBeLessThanOrEqual(10);
@@ -317,9 +278,7 @@ describe('Narrative Repository Embeddings', () => {
 
       await inMemoryRepository.save(insightWithoutEmbedding);
 
-      const result = await inMemoryRepository.findSimilarContent(
-        climateRelatedEmbedding
-      );
+      const result = await inMemoryRepository.findSimilarContent(climateRelatedEmbedding);
 
       // Should only include insights that have embeddings
       result.forEach((item) => {
@@ -331,8 +290,7 @@ describe('Narrative Repository Embeddings', () => {
   describe('cosine similarity calculation', () => {
     it('should calculate similarity between vectors correctly', () => {
       // Access the private method through the instance
-      const calculateSimilarity = (mongoRepository as any)
-        .calculateCosineSimilarity;
+      const calculateSimilarity = (mongoRepository as any).calculateCosineSimilarity;
 
       // Test with known vectors
       const vecA = [1, 0, 0];
@@ -356,8 +314,7 @@ describe('Narrative Repository Embeddings', () => {
 
     it('should handle large dimensional vectors', () => {
       // Access the private method through the instance
-      const calculateSimilarity = (mongoRepository as any)
-        .calculateCosineSimilarity;
+      const calculateSimilarity = (mongoRepository as any).calculateCosineSimilarity;
 
       // Create large dimensional vectors
       const dim = 384;

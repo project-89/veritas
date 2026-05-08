@@ -1,15 +1,15 @@
 import {
+  hasRequiredFields,
+  isArray,
+  isBoolean,
+  isLengthValid,
+  isNumber,
+  isNumberInRange,
+  isObject,
+  isString,
+  isValidDate,
   isValidEmail,
   isValidUrl,
-  isValidDate,
-  isString,
-  isNumber,
-  isBoolean,
-  isArray,
-  isObject,
-  isLengthValid,
-  isNumberInRange,
-  hasRequiredFields,
 } from '../src/lib/validation-utils';
 
 describe('validation-utils', () => {

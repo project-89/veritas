@@ -1,11 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  Document,
-  FilterQuery,
-  Model,
-  UpdateQuery,
-  UpdateWithAggregationPipeline,
-} from 'mongoose';
+import { Document, FilterQuery, Model, UpdateQuery, UpdateWithAggregationPipeline } from 'mongoose';
 import { FindOptions, Repository } from '../interfaces/repository.interface';
 
 /**
@@ -45,6 +39,18 @@ export interface VectorSearchResult<T> {
 export class MongoDBRepository<T> implements Repository<T> {
   private readonly logger = new Logger(MongoDBRepository.name);
 
+  private getDbWithCommand(): {
+    command: (command: Record<string, unknown>) => Promise<{ results?: Record<string, unknown>[] }>;
+    collection: (name: string) => { find?: unknown };
+  } {
+    return this.model.db as unknown as {
+      command: (
+        command: Record<string, unknown>,
+      ) => Promise<{ results?: Record<string, unknown>[] }>;
+      collection: (name: string) => { find?: unknown };
+    };
+  }
+
   constructor(private readonly model: Model<T & Document>) {}
 
   /**
@@ -82,10 +88,7 @@ export class MongoDBRepository<T> implements Repository<T> {
       return await this.model.findById(id).exec();
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error finding document by ID: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error finding document by ID: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -138,10 +141,7 @@ export class MongoDBRepository<T> implements Repository<T> {
       return (await this.model.insertMany(data)) as T[];
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error creating multiple documents: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error creating multiple documents: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -156,10 +156,7 @@ export class MongoDBRepository<T> implements Repository<T> {
         .exec();
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error updating document by ID: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error updating document by ID: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -167,10 +164,7 @@ export class MongoDBRepository<T> implements Repository<T> {
   /**
    * Update entities matching the given filter
    */
-  async updateMany(
-    filter: FilterQuery<T>,
-    data: UpdateQuery<T>
-  ): Promise<number> {
+  async updateMany(filter: FilterQuery<T>, data: UpdateQuery<T>): Promise<number> {
     try {
       const result = await this.model
         .updateMany(filter, data as UpdateWithAggregationPipeline)
@@ -191,10 +185,7 @@ export class MongoDBRepository<T> implements Repository<T> {
       return await this.model.findByIdAndDelete(id).exec();
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error deleting document by ID: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error deleting document by ID: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -225,7 +216,7 @@ export class MongoDBRepository<T> implements Repository<T> {
   async vectorSearch<R = T>(
     field: string,
     vector: number[],
-    options: VectorSearchOptions = {}
+    options: VectorSearchOptions = {},
   ): Promise<VectorSearchResult<R>[]> {
     const limit = options.limit || 10;
     const minScore = options.minScore || 0.7;
@@ -237,17 +228,10 @@ export class MongoDBRepository<T> implements Repository<T> {
       }
 
       // Fall back to in-memory vector search if no vector search capability
-      return this.performInMemoryVectorSearch<R>(
-        field,
-        vector,
-        limit,
-        minScore
-      );
+      return this.performInMemoryVectorSearch<R>(field, vector, limit, minScore);
     } catch (error) {
       this.logger.error(
-        `Vector search error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Vector search error: ${error instanceof Error ? error.message : String(error)}`,
       );
       return [];
     }
@@ -260,15 +244,13 @@ export class MongoDBRepository<T> implements Repository<T> {
     try {
       // Attempt to access the vector search command to check if it's available
       // This is a basic check, may need to be refined based on exact MongoDB version
-      const db = this.model.db as any;
+      const db = this.getDbWithCommand();
       return (
         typeof db.command === 'function' &&
         typeof db.collection('system.indexes').find === 'function'
       );
-    } catch (error) {
-      this.logger.warn(
-        'Vector search capability check failed, assuming not available'
-      );
+    } catch {
+      this.logger.warn('Vector search capability check failed, assuming not available');
       return false;
     }
   }
@@ -280,10 +262,10 @@ export class MongoDBRepository<T> implements Repository<T> {
     field: string,
     vector: number[],
     limit: number,
-    minScore: number
+    minScore: number,
   ): Promise<VectorSearchResult<R>[]> {
     try {
-      const db = this.model.db as any;
+      const db = this.getDbWithCommand();
       const result = await db.command({
         $search: {
           index: 'vector',
@@ -308,17 +290,10 @@ export class MongoDBRepository<T> implements Repository<T> {
       }));
     } catch (error) {
       this.logger.error(
-        `Atlas vector search error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Atlas vector search error: ${error instanceof Error ? error.message : String(error)}`,
       );
       // Fall back to in-memory search
-      return this.performInMemoryVectorSearch<R>(
-        field,
-        vector,
-        limit,
-        minScore
-      );
+      return this.performInMemoryVectorSearch<R>(field, vector, limit, minScore);
     }
   }
 
@@ -330,10 +305,10 @@ export class MongoDBRepository<T> implements Repository<T> {
     field: string,
     vector: number[],
     limit: number,
-    minScore: number
+    minScore: number,
   ): Promise<VectorSearchResult<R>[]> {
     // Get all documents that have the vector field
-    const filter: any = {};
+    const filter: Record<string, unknown> = {};
     filter[field] = { $exists: true };
 
     const documents = await this.model.find(filter).lean().exec();
@@ -353,8 +328,7 @@ export class MongoDBRepository<T> implements Repository<T> {
         };
       })
       .filter(
-        (result): result is VectorSearchResult<R> =>
-          result !== null && result.score >= minScore
+        (result): result is VectorSearchResult<R> => result !== null && result.score >= minScore,
       )
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);

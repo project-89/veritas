@@ -1,12 +1,17 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import {
+  CrossPlatformIdentityService,
+  DeepInvestigationService,
+  GraphBotDetectionService,
+  SocialGraphIntelligenceService,
+  SourceCredibilityService,
+} from '@veritas/analysis';
+import { IdentityRecordRepository, IngestionService } from '@veritas/ingestion';
 import { InvestigationController } from '../../src/app/controllers/investigation.controller';
-import { IngestionService, IdentityRecordRepository } from '@veritas/ingestion';
-import { DeepInvestigationService, CrossPlatformIdentityService, SourceCredibilityService, GraphBotDetectionService, SocialGraphIntelligenceService } from '@veritas/analysis';
 
 describe('InvestigationController', () => {
   let controller: InvestigationController;
-  let ingestionService: IngestionService;
   let deepInvestigationService: DeepInvestigationService;
 
   const mockConnectorWithTimeline = {
@@ -52,10 +57,9 @@ describe('InvestigationController', () => {
               if (platform === 'youtube') return mockConnectorWithoutTimeline;
               return undefined;
             }),
-            getAllConnectors: jest.fn().mockReturnValue([
-              mockConnectorWithTimeline,
-              mockConnectorWithoutTimeline,
-            ]),
+            getAllConnectors: jest
+              .fn()
+              .mockReturnValue([mockConnectorWithTimeline, mockConnectorWithoutTimeline]),
           },
         },
         {
@@ -102,7 +106,9 @@ describe('InvestigationController', () => {
         {
           provide: SocialGraphIntelligenceService,
           useValue: {
-            enrichRelationships: jest.fn().mockResolvedValue({ edgesCreated: 0, communitiesDetected: 0 }),
+            enrichRelationships: jest
+              .fn()
+              .mockResolvedValue({ edgesCreated: 0, communitiesDetected: 0 }),
           },
         },
         {
@@ -116,7 +122,6 @@ describe('InvestigationController', () => {
     }).compile();
 
     controller = module.get<InvestigationController>(InvestigationController);
-    ingestionService = module.get<IngestionService>(IngestionService);
     deepInvestigationService = module.get<DeepInvestigationService>(DeepInvestigationService);
   });
 
@@ -126,15 +131,15 @@ describe('InvestigationController', () => {
 
   describe('POST /investigate', () => {
     it('should reject empty query', async () => {
-      await expect(
-        controller.investigate({ query: '', userHandles: ['user1'] }),
-      ).rejects.toThrow(HttpException);
+      await expect(controller.investigate({ query: '', userHandles: ['user1'] })).rejects.toThrow(
+        HttpException,
+      );
     });
 
     it('should reject empty userHandles', async () => {
-      await expect(
-        controller.investigate({ query: 'test', userHandles: [] }),
-      ).rejects.toThrow(HttpException);
+      await expect(controller.investigate({ query: 'test', userHandles: [] })).rejects.toThrow(
+        HttpException,
+      );
     });
 
     it('should call deepInvestigationService.investigate', async () => {
@@ -182,10 +187,9 @@ describe('InvestigationController', () => {
         ],
       });
 
-      expect(mockConnectorWithTimeline.getUserTimeline).toHaveBeenCalledWith(
-        'testuser',
-        { limit: 50 },
-      );
+      expect(mockConnectorWithTimeline.getUserTimeline).toHaveBeenCalledWith('testuser', {
+        limit: 50,
+      });
     });
 
     it('should handle connectors without getUserTimeline gracefully', async () => {

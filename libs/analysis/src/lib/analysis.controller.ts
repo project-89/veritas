@@ -1,19 +1,9 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Query,
-  Param,
-  Inject,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Body, Controller, Get, Inject, Param, Post, Query } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
-import {
-  ANALYSIS_SERVICE,
-} from './interfaces/analysis-service.interface';
-import type { AnalysisServiceInterface } from './interfaces/analysis-service.interface';
 import { TimeFrame } from './analysis.types';
+import type { AnalysisServiceInterface } from './interfaces/analysis-service.interface';
+import { ANALYSIS_SERVICE } from './interfaces/analysis-service.interface';
 
 const TimeFrameSchema = z.object({
   start: z.coerce.date(),

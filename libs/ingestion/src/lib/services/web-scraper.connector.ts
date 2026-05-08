@@ -1,21 +1,15 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventEmitter } from 'events';
+import { SourceNode } from '@veritas/shared/types';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { EventEmitter } from 'events';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import {
-  SocialMediaConnector,
   SocialMediaPost,
 } from '../interfaces/social-media-connector.interface';
 import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
-import { SourceNode } from '@veritas/shared/types';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
 
 interface ScrapedArticle {
   id: string;
@@ -65,7 +59,7 @@ export class WebScraperConnector
 
   constructor(
     private configService: ConfigService,
-    private transformService: TransformOnIngestService
+    private transformService: TransformOnIngestService,
   ) {}
 
   async onModuleInit() {
@@ -80,18 +74,14 @@ export class WebScraperConnector
    * Load scraping configurations from the environment or database
    */
   private async loadScrapeConfigs() {
-    const configsString = this.configService.get<string>(
-      'NEWS_SCRAPER_CONFIGS'
-    );
+    const configsString = this.configService.get<string>('NEWS_SCRAPER_CONFIGS');
     if (configsString) {
       try {
         const configs = JSON.parse(configsString);
         for (const config of configs) {
           this.scrapeConfigs.set(config.name, config);
         }
-        this.logger.log(
-          `Loaded ${this.scrapeConfigs.size} scraping configurations`
-        );
+        this.logger.log(`Loaded ${this.scrapeConfigs.size} scraping configurations`);
       } catch (error) {
         this.logger.error('Error parsing NEWS_SCRAPER_CONFIGS:', error);
       }
@@ -116,9 +106,7 @@ export class WebScraperConnector
       for (const config of defaultConfigs) {
         this.scrapeConfigs.set(config.name, config);
       }
-      this.logger.log(
-        `Added ${defaultConfigs.length} default scraping configurations`
-      );
+      this.logger.log(`Added ${defaultConfigs.length} default scraping configurations`);
     }
   }
 
@@ -168,10 +156,7 @@ export class WebScraperConnector
    * Search content from news sites
    * Implements SocialMediaConnector interface
    */
-  async searchContent(
-    query: string,
-    options?: SearchOptions
-  ): Promise<SocialMediaPost[]> {
+  async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
     try {
       const articles: ScrapedArticle[] = [];
 
@@ -191,7 +176,7 @@ export class WebScraperConnector
       const dateFilteredArticles = this.filterArticlesByDate(
         filteredArticles,
         options?.startDate,
-        options?.endDate
+        options?.endDate,
       );
 
       // Apply limit if provided
@@ -212,10 +197,7 @@ export class WebScraperConnector
    * Enhanced searchAndTransform method that returns anonymized insights
    * Implements TransformOnIngestConnector interface
    */
-  async searchAndTransform(
-    query: string,
-    options?: SearchOptions
-  ): Promise<NarrativeInsight[]> {
+  async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     try {
       this.logger.log(`Searching news sites for: ${query}`);
 
@@ -225,9 +207,7 @@ export class WebScraperConnector
       // Transform immediately - no raw storage
       const insights = await this.transformService.transformBatch(posts);
 
-      this.logger.log(
-        `Transformed ${insights.length} news articles into anonymized insights`
-      );
+      this.logger.log(`Transformed ${insights.length} news articles into anonymized insights`);
 
       // Return only anonymized insights
       return insights;
@@ -240,9 +220,7 @@ export class WebScraperConnector
   /**
    * Scrape articles from a website based on configuration
    */
-  private async scrapeArticles(
-    config: ScrapeConfig
-  ): Promise<ScrapedArticle[]> {
+  private async scrapeArticles(config: ScrapeConfig): Promise<ScrapedArticle[]> {
     try {
       // Fetch the HTML content
       const response = await axios.get(config.url, {
@@ -339,9 +317,7 @@ export class WebScraperConnector
         this.lastScrapedUrls = new Set(urls.slice(urls.length - 1000));
       }
 
-      this.logger.log(
-        `Scraped ${articles.length} articles from ${config.name}`
-      );
+      this.logger.log(`Scraped ${articles.length} articles from ${config.name}`);
       return articles;
     } catch (error) {
       this.logger.error(`Error scraping articles from ${config.name}:`, error);
@@ -415,7 +391,7 @@ export class WebScraperConnector
   private filterArticlesByDate(
     articles: ScrapedArticle[],
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
   ): ScrapedArticle[] {
     if (!startDate && !endDate) {
       return articles;
@@ -440,9 +416,7 @@ export class WebScraperConnector
   /**
    * Transform scraped articles to SocialMediaPost format
    */
-  private transformToSocialMediaPosts(
-    articles: ScrapedArticle[]
-  ): SocialMediaPost[] {
+  private transformToSocialMediaPosts(articles: ScrapedArticle[]): SocialMediaPost[] {
     return articles.map((article) => ({
       id: article.id,
       text: `${article.title}\n\n${article.content}`.substring(0, 2000), // Limit text length
@@ -485,16 +459,13 @@ export class WebScraperConnector
         const articles: ScrapedArticle[] = [];
 
         // Scrape from all configured sources
-        for (const [name, config] of this.scrapeConfigs.entries()) {
+        for (const [, config] of this.scrapeConfigs.entries()) {
           const scrapedArticles = await this.scrapeArticles(config);
           articles.push(...scrapedArticles);
         }
 
         // Filter articles by keywords
-        const filteredArticles = this.filterArticlesByKeywords(
-          articles,
-          keywords
-        );
+        const filteredArticles = this.filterArticlesByKeywords(articles, keywords);
 
         if (filteredArticles.length > 0) {
           // Transform to SocialMediaPost format
@@ -505,9 +476,7 @@ export class WebScraperConnector
             emitter.emit('data', post);
           }
 
-          this.logger.debug(
-            `Emitted ${posts.length} posts from web scraper stream`
-          );
+          this.logger.debug(`Emitted ${posts.length} posts from web scraper stream`);
         }
       } catch (error) {
         emitter.emit('error', error);
@@ -542,16 +511,13 @@ export class WebScraperConnector
         const articles: ScrapedArticle[] = [];
 
         // Scrape from all configured sources
-        for (const [name, config] of this.scrapeConfigs.entries()) {
+        for (const [, config] of this.scrapeConfigs.entries()) {
           const scrapedArticles = await this.scrapeArticles(config);
           articles.push(...scrapedArticles);
         }
 
         // Filter articles by keywords
-        const filteredArticles = this.filterArticlesByKeywords(
-          articles,
-          keywords
-        );
+        const filteredArticles = this.filterArticlesByKeywords(articles, keywords);
 
         if (filteredArticles.length > 0) {
           // Transform to SocialMediaPost format
@@ -566,7 +532,7 @@ export class WebScraperConnector
           }
 
           this.logger.debug(
-            `Emitted ${insights.length} anonymized insights from web scraper stream`
+            `Emitted ${insights.length} anonymized insights from web scraper stream`,
           );
         }
       } catch (error) {
@@ -593,7 +559,7 @@ export class WebScraperConnector
    */
   private filterArticlesByKeywords(
     articles: ScrapedArticle[],
-    keywords: string[]
+    keywords: string[],
   ): ScrapedArticle[] {
     if (!keywords.length) {
       return articles;
@@ -606,9 +572,7 @@ export class WebScraperConnector
         ${article.author || ''}
       `.toLowerCase();
 
-      return keywords.some((keyword) =>
-        articleText.includes(keyword.toLowerCase())
-      );
+      return keywords.some((keyword) => articleText.includes(keyword.toLowerCase()));
     });
   }
 

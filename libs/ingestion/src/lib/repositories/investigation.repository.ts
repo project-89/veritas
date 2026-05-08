@@ -1,13 +1,13 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
 import {
-  InvestigationModel,
-  SnapshotModel,
-  Investigation,
-  Snapshot,
-  InvestigationSettings,
-  SnapshotSummary,
   EvidenceSeed,
+  Investigation,
+  InvestigationModel,
+  InvestigationSettings,
+  Snapshot,
+  SnapshotModel,
+  SnapshotSummary,
 } from '../schemas/investigation.schema';
 
 /**
@@ -33,29 +33,19 @@ export class InvestigationRepository implements OnModuleInit {
       try {
         this.databaseService.registerModel('Investigation', InvestigationModel);
         this.databaseService.registerModel('Snapshot', SnapshotModel);
-        this.logger.debug(
-          'Successfully registered Investigation models with database service'
-        );
+        this.logger.debug('Successfully registered Investigation models with database service');
       } catch (error) {
-        this.logger.warn(
-          'Models already registered or error registering models',
-          error
-        );
+        this.logger.warn('Models already registered or error registering models', error);
       }
 
-      this.investigationRepo =
-        this.databaseService.getRepository<Investigation>('Investigation');
-      this.snapshotRepo =
-        this.databaseService.getRepository<Snapshot>('Snapshot');
+      this.investigationRepo = this.databaseService.getRepository<Investigation>('Investigation');
+      this.snapshotRepo = this.databaseService.getRepository<Snapshot>('Snapshot');
 
       this.initialized = true;
       this.logger.log('Investigation repository initialized');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Failed to initialize repositories: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Failed to initialize repositories: ${err.message}`, err.stack);
       // Don't throw — let the app start, repository methods will fail gracefully
     }
   }
@@ -79,7 +69,7 @@ export class InvestigationRepository implements OnModuleInit {
    */
   async findOrCreateByQuery(
     query: string,
-    settings?: Partial<InvestigationSettings>
+    settings?: Partial<InvestigationSettings>,
   ): Promise<Investigation> {
     this.ensureInitialized();
     try {
@@ -88,9 +78,7 @@ export class InvestigationRepository implements OnModuleInit {
       });
 
       if (existing) {
-        this.logger.debug(
-          `Found existing investigation for query: "${query}"`
-        );
+        this.logger.debug(`Found existing investigation for query: "${query}"`);
         return existing;
       }
 
@@ -113,10 +101,7 @@ export class InvestigationRepository implements OnModuleInit {
       return investigation;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in findOrCreateByQuery: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in findOrCreateByQuery: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -153,10 +138,7 @@ export class InvestigationRepository implements OnModuleInit {
       return investigation;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in createInvestigation: ${err.message}`,
-        err.stack,
-      );
+      this.logger.error(`Error in createInvestigation: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -183,10 +165,7 @@ export class InvestigationRepository implements OnModuleInit {
       });
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in findAll: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in findAll: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -200,10 +179,7 @@ export class InvestigationRepository implements OnModuleInit {
       return await this.investigationRepo.findById(id);
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in findById: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in findById: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -211,10 +187,7 @@ export class InvestigationRepository implements OnModuleInit {
   /**
    * Update an investigation (name, status, settings, etc.).
    */
-  async update(
-    id: string,
-    data: Partial<Investigation>
-  ): Promise<Investigation> {
+  async update(id: string, data: Partial<Investigation>): Promise<Investigation> {
     this.ensureInitialized();
     try {
       const updated = await this.investigationRepo.updateById(id, data);
@@ -225,10 +198,7 @@ export class InvestigationRepository implements OnModuleInit {
       return updated;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in update: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in update: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -265,10 +235,7 @@ export class InvestigationRepository implements OnModuleInit {
   /**
    * Append a new evidence seed to an investigation.
    */
-  async addEvidenceSeed(
-    id: string,
-    seed: EvidenceSeed,
-  ): Promise<Investigation> {
+  async addEvidenceSeed(id: string, seed: EvidenceSeed): Promise<Investigation> {
     this.ensureInitialized();
     const investigation = await this.findById(id);
     if (!investigation) {
@@ -291,10 +258,7 @@ export class InvestigationRepository implements OnModuleInit {
       this.logger.log(`Archived investigation: ${id}`);
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in archive: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in archive: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -325,7 +289,7 @@ export class InvestigationRepository implements OnModuleInit {
       posts: unknown[];
       narratives: unknown[];
       summary: SnapshotSummary;
-    }
+    },
   ): Promise<Snapshot> {
     this.ensureInitialized();
     try {
@@ -346,16 +310,11 @@ export class InvestigationRepository implements OnModuleInit {
         lastSnapshotId: snapshotId,
       } as Partial<Investigation>);
 
-      this.logger.debug(
-        `Added snapshot ${snapshotId} to investigation ${investigationId}`
-      );
+      this.logger.debug(`Added snapshot ${snapshotId} to investigation ${investigationId}`);
       return snapshot;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in addSnapshot: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in addSnapshot: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -393,8 +352,7 @@ export class InvestigationRepository implements OnModuleInit {
       }
 
       const currentId =
-        (current._id as unknown as { toString?: () => string })?.toString?.() ??
-        current.id;
+        (current._id as unknown as { toString?: () => string })?.toString?.() ?? current.id;
       const updated = await this.snapshotRepo.updateById(currentId, {
         timestamp: new Date(),
         postCount: data.posts.length,
@@ -415,10 +373,7 @@ export class InvestigationRepository implements OnModuleInit {
       return updated;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in upsertSnapshotForScan: ${err.message}`,
-        err.stack,
-      );
+      this.logger.error(`Error in upsertSnapshotForScan: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -426,25 +381,16 @@ export class InvestigationRepository implements OnModuleInit {
   /**
    * Get snapshots for an investigation, sorted by most recent first.
    */
-  async getSnapshots(
-    investigationId: string,
-    options?: { limit?: number }
-  ): Promise<Snapshot[]> {
+  async getSnapshots(investigationId: string, options?: { limit?: number }): Promise<Snapshot[]> {
     this.ensureInitialized();
     try {
-      return await this.snapshotRepo.find(
-        { investigationId } as Record<string, unknown>,
-        {
-          limit: options?.limit,
-          sort: { timestamp: -1 },
-        }
-      );
+      return await this.snapshotRepo.find({ investigationId } as Record<string, unknown>, {
+        limit: options?.limit,
+        sort: { timestamp: -1 },
+      });
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in getSnapshots: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in getSnapshots: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -452,9 +398,7 @@ export class InvestigationRepository implements OnModuleInit {
   /**
    * Get the most recent snapshot for an investigation.
    */
-  async getLatestSnapshot(
-    investigationId: string
-  ): Promise<Snapshot | null> {
+  async getLatestSnapshot(investigationId: string): Promise<Snapshot | null> {
     this.ensureInitialized();
     try {
       // Get recent snapshots and return the first one that has posts
@@ -463,22 +407,17 @@ export class InvestigationRepository implements OnModuleInit {
         {
           limit: 5,
           sort: { timestamp: -1 },
-        }
+        },
       );
       // Prefer snapshot with actual post data
-      const withPosts = snapshots.find(
-        (s) => {
-          const rec = s as unknown as Record<string, unknown>;
-          return Array.isArray(rec['posts']) && (rec['posts'] as unknown[]).length > 0;
-        }
-      );
+      const withPosts = snapshots.find((s) => {
+        const rec = s as unknown as Record<string, unknown>;
+        return Array.isArray(rec['posts']) && (rec['posts'] as unknown[]).length > 0;
+      });
       return withPosts ?? snapshots[0] ?? null;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in getLatestSnapshot: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in getLatestSnapshot: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -492,10 +431,7 @@ export class InvestigationRepository implements OnModuleInit {
       return await this.snapshotRepo.findById(snapshotId);
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in getSnapshotById: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in getSnapshotById: ${err.message}`, err.stack);
       throw error;
     }
   }

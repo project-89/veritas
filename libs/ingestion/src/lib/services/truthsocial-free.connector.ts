@@ -1,16 +1,11 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
-import { DataConnector } from '../interfaces/data-connector.interface';
+import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
+import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SubprocessUtil } from './utils/subprocess.util';
 
 interface SearchOptions {
@@ -55,9 +50,7 @@ interface TruthPost {
  * Auth: TRUTHSOCIAL_USERNAME + TRUTHSOCIAL_PASSWORD env vars, or TRUTHSOCIAL_TOKEN
  */
 @Injectable()
-export class TruthSocialFreeConnector
-  implements DataConnector, OnModuleInit, OnModuleDestroy
-{
+export class TruthSocialFreeConnector implements DataConnector, OnModuleInit, OnModuleDestroy {
   platform = 'truthsocial' as const;
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 600000; // 10 minutes
@@ -70,8 +63,7 @@ export class TruthSocialFreeConnector
     private transformService: TransformOnIngestService,
     private subprocessUtil: SubprocessUtil,
   ) {
-    this.truthbrushPath =
-      this.configService.get<string>('TRUTHBRUSH_PATH') || 'truthbrush';
+    this.truthbrushPath = this.configService.get<string>('TRUTHBRUSH_PATH') || 'truthbrush';
   }
 
   async onModuleInit() {
@@ -83,11 +75,9 @@ export class TruthSocialFreeConnector
   }
 
   async connect(): Promise<void> {
-    const result = await this.subprocessUtil.exec(
-      this.truthbrushPath,
-      ['--help'],
-      { timeout: 10000 },
-    );
+    const result = await this.subprocessUtil.exec(this.truthbrushPath, ['--help'], {
+      timeout: 10000,
+    });
     if (result.exitCode !== 0) {
       throw new Error(
         `truthbrush is not installed or not found at "${this.truthbrushPath}". ` +
@@ -99,19 +89,16 @@ export class TruthSocialFreeConnector
   }
 
   async disconnect(): Promise<void> {
-    this.streamConnections.forEach((interval) => clearInterval(interval));
+    this.streamConnections.forEach((interval) => {
+      clearInterval(interval);
+    });
     this.streamConnections.clear();
   }
 
-  async searchAndTransform(
-    query: string,
-    options?: SearchOptions,
-  ): Promise<NarrativeInsight[]> {
+  async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     const posts = await this.searchContent(query, options);
     const insights = await this.transformService.transformBatch(posts);
-    this.logger.log(
-      `Transformed ${insights.length} Truth Social results into insights`,
-    );
+    this.logger.log(`Transformed ${insights.length} Truth Social results into insights`);
     return insights;
   }
 
@@ -122,9 +109,7 @@ export class TruthSocialFreeConnector
     const posts = await this.searchContent(query, options);
     if (posts.length === 0) return { posts: [], insights: [] };
     const insights = await this.transformService.transformBatch(posts);
-    this.logger.log(
-      `Truth Social: ${posts.length} posts, ${insights.length} insights`,
-    );
+    this.logger.log(`Truth Social: ${posts.length} posts, ${insights.length} insights`);
     return { posts, insights };
   }
 
@@ -162,11 +147,9 @@ export class TruthSocialFreeConnector
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
     if (!this.available) return {} as Partial<SourceNode>;
     try {
-      const result = await this.subprocessUtil.exec(
-        this.truthbrushPath,
-        ['user', authorId],
-        { timeout: 30000 },
-      );
+      const result = await this.subprocessUtil.exec(this.truthbrushPath, ['user', authorId], {
+        timeout: 30000,
+      });
 
       if (result.exitCode !== 0) {
         throw new Error(`truthbrush user failed: ${result.stderr}`);
@@ -209,11 +192,9 @@ export class TruthSocialFreeConnector
     if (!this.available) return [];
     const limit = options?.limit ?? 50;
     try {
-      const result = await this.subprocessUtil.exec(
-        this.truthbrushPath,
-        ['statuses', username],
-        { timeout: 60000 },
-      );
+      const result = await this.subprocessUtil.exec(this.truthbrushPath, ['statuses', username], {
+        timeout: 60000,
+      });
 
       if (result.exitCode !== 0) {
         this.logger.debug(`truthbrush statuses failed for @${username}: ${result.stderr}`);
@@ -230,11 +211,9 @@ export class TruthSocialFreeConnector
 
   async validateCredentials(): Promise<boolean> {
     try {
-      const result = await this.subprocessUtil.exec(
-        this.truthbrushPath,
-        ['--help'],
-        { timeout: 10000 },
-      );
+      const result = await this.subprocessUtil.exec(this.truthbrushPath, ['--help'], {
+        timeout: 10000,
+      });
 
       if (result.exitCode === 0) {
         const hasUsername = !!(
@@ -242,8 +221,7 @@ export class TruthSocialFreeConnector
           process.env['TRUTHSOCIAL_USERNAME']
         );
         const hasToken = !!(
-          this.configService.get<string>('TRUTHSOCIAL_TOKEN') ||
-          process.env['TRUTHSOCIAL_TOKEN']
+          this.configService.get<string>('TRUTHSOCIAL_TOKEN') || process.env['TRUTHSOCIAL_TOKEN']
         );
 
         if (!hasUsername && !hasToken) {
@@ -271,10 +249,7 @@ export class TruthSocialFreeConnector
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private async searchContent(
-    query: string,
-    options?: SearchOptions,
-  ): Promise<SocialMediaPost[]> {
+  private async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
     if (!this.available) return [];
 
     const limit = options?.maxResults || options?.limit || 20;
@@ -371,16 +346,12 @@ export class TruthSocialFreeConnector
 
   private calculateViralityScore(post: TruthPost): number {
     const total =
-      (post.favourites_count ?? 0) +
-      (post.reblogs_count ?? 0) +
-      (post.replies_count ?? 0);
+      (post.favourites_count ?? 0) + (post.reblogs_count ?? 0) + (post.replies_count ?? 0);
     if (total === 0) return 0;
     return Math.min(Math.log10(total + 1) / 4, 1);
   }
 
-  private calculateCredibilityScore(
-    account: TruthPost['account'],
-  ): number {
+  private calculateCredibilityScore(account: TruthPost['account']): number {
     const followers = account.followers_count ?? 0;
     let score = 0.1;
     if (account.verified) score += 0.3;

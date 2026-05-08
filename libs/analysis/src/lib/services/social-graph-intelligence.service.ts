@@ -38,8 +38,6 @@ export class SocialGraphIntelligenceService {
       sentiment: number;
     }> = [];
 
-    const handleSet = new Set(users.map((u) => u.handle.toLowerCase()));
-
     // 1. Extract @mentions and reply patterns from post text
     for (const user of users) {
       for (const post of user.posts) {
@@ -93,7 +91,7 @@ export class SocialGraphIntelligenceService {
       }
 
       // 4. Classify tiers for edges we just touched
-      await this.classifyTiersForUsers(users, investigationId);
+      await this.classifyTiersForUsers(users);
     } else {
       // In-memory fallback: just count interactions
       edgesCreated = interactions.length;
@@ -164,12 +162,7 @@ export class SocialGraphIntelligenceService {
   ): Promise<{ path: string[]; hops: number; totalWeight: number } | null> {
     if (!this.graph.isAvailable) return null;
 
-    const result = await this.graph.findShortestPath(
-      handleA,
-      platformA,
-      handleB,
-      platformB,
-    );
+    const result = await this.graph.findShortestPath(handleA, platformA, handleB, platformB);
     if (!result) return null;
 
     // Calculate total weight along the path
@@ -200,12 +193,7 @@ export class SocialGraphIntelligenceService {
   ): Promise<number | null> {
     if (!this.graph.isAvailable) return null;
 
-    const result = await this.graph.findShortestPath(
-      handleA,
-      platformA,
-      handleB,
-      platformB,
-    );
+    const result = await this.graph.findShortestPath(handleA, platformA, handleB, platformB);
     return result ? result.hops : null;
   }
 
@@ -278,12 +266,13 @@ export class SocialGraphIntelligenceService {
   extractMentions(text: string): string[] {
     const regex = /@([\w]+)/g;
     const mentions = new Set<string>();
-    let match: RegExpExecArray | null;
-    while ((match = regex.exec(text)) !== null) {
+    let match = regex.exec(text);
+    while (match !== null) {
       const handle = match[1];
       if (handle) {
         mentions.add(handle);
       }
+      match = regex.exec(text);
     }
     return [...mentions];
   }
@@ -319,8 +308,11 @@ export class SocialGraphIntelligenceService {
    * for all edges involving the given users.
    */
   private async classifyTiersForUsers(
-    users: Array<{ handle: string; platform: string; posts: Array<{ text: string; timestamp: string }> }>,
-    _investigationId: string,
+    users: Array<{
+      handle: string;
+      platform: string;
+      posts: Array<{ text: string; timestamp: string }>;
+    }>,
   ): Promise<void> {
     for (const user of users) {
       const records = await this.graph.runQuery(

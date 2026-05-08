@@ -16,6 +16,7 @@ import { readFile } from 'fs/promises';
 
 const mockExecFile = execFile as unknown as jest.Mock;
 const mockReadFile = readFile as unknown as jest.Mock;
+type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
 
 describe('CrossPlatformIdentityService', () => {
   let service: CrossPlatformIdentityService;
@@ -25,7 +26,7 @@ describe('CrossPlatformIdentityService', () => {
 
     // Mock sherlock --version succeeding
     mockExecFile.mockImplementation(
-      (cmd: string, args: string[], opts: unknown, cb: Function) => {
+      (_cmd: string, args: string[], _opts: unknown, cb: ExecFileCallback) => {
         if (args[0] === '--version') {
           cb(null, 'Sherlock v0.16.0', '');
           return;
@@ -114,7 +115,7 @@ describe('CrossPlatformIdentityService', () => {
 
     it('should handle Sherlock execution failure gracefully', async () => {
       mockExecFile.mockImplementation(
-        (cmd: string, args: string[], opts: unknown, cb: Function) => {
+        (_cmd: string, args: string[], _opts: unknown, cb: ExecFileCallback) => {
           if (args[0] === '--version') {
             cb(null, 'Sherlock v0.16.0', '');
             return;

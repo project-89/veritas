@@ -195,14 +195,18 @@ export class NarrativeGenealogyService {
   buildFullGenealogy(snapshots: NarrativeSnapshot[]): NarrativeLineage[] {
     if (snapshots.length === 0) return [];
     if (snapshots.length === 1) {
+      const firstSnapshot = snapshots[0];
+      if (!firstSnapshot) {
+        return [];
+      }
       // Single snapshot: all narratives are newly emerged
-      return snapshots[0]!.narratives.map((n) => ({
+      return firstSnapshot.narratives.map((n) => ({
         currentId: n.id,
         currentSummary: n.summary,
         history: [
           {
-            snapshotId: snapshots[0]!.id,
-            snapshotTimestamp: snapshots[0]!.timestamp,
+            snapshotId: firstSnapshot.id,
+            snapshotTimestamp: firstSnapshot.timestamp,
             narrativeId: n.id,
             summary: n.summary,
             postCount: n.postCount,
@@ -212,7 +216,7 @@ export class NarrativeGenealogyService {
         ],
         events: [
           {
-            timestamp: snapshots[0]!.timestamp,
+            timestamp: firstSnapshot.timestamp,
             type: 'emerged' as const,
             description: `Narrative first seen: "${n.summary}"`,
           },
@@ -232,7 +236,10 @@ export class NarrativeGenealogyService {
     let activeLineages = new Map<string, NarrativeLineage>();
 
     // Initialize from first snapshot
-    const firstSnap = sorted[0]!;
+    const firstSnap = sorted[0];
+    if (!firstSnap) {
+      return [];
+    }
     for (const n of firstSnap.narratives) {
       activeLineages.set(n.id, {
         currentId: n.id,
@@ -261,8 +268,11 @@ export class NarrativeGenealogyService {
 
     // Process subsequent snapshots
     for (let s = 1; s < sorted.length; s++) {
-      const prevSnap = sorted[s - 1]!;
-      const currSnap = sorted[s]!;
+      const prevSnap = sorted[s - 1];
+      const currSnap = sorted[s];
+      if (!prevSnap || !currSnap) {
+        continue;
+      }
 
       const newActiveLineages = new Map<string, NarrativeLineage>();
       const matchedPrevIds = new Set<string>();
@@ -287,9 +297,7 @@ export class NarrativeGenealogyService {
           const existingLineage = activeLineages.get(bestPrevId);
           const prevNarrative = prevSnap.narratives.find((n) => n.id === bestPrevId);
 
-          const history = existingLineage
-            ? [...existingLineage.history]
-            : [];
+          const history = existingLineage ? [...existingLineage.history] : [];
 
           history.push({
             snapshotId: currSnap.id,
@@ -301,9 +309,7 @@ export class NarrativeGenealogyService {
             similarity: bestSimilarity,
           });
 
-          const events = existingLineage
-            ? [...existingLineage.events]
-            : [];
+          const events = existingLineage ? [...existingLineage.events] : [];
 
           // Detect evolution
           if (prevNarrative && current.postCount > prevNarrative.postCount * 1.3) {

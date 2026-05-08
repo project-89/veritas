@@ -10,7 +10,10 @@ export interface PlatformComparisonPanelProps {
   onRunComparison?: () => void;
 }
 
-const PLATFORM_VARIANTS: Record<string, 'orange' | 'green' | 'blue' | 'purple' | 'amber' | 'red' | 'muted'> = {
+const PLATFORM_VARIANTS: Record<
+  string,
+  'orange' | 'green' | 'blue' | 'purple' | 'amber' | 'red' | 'muted'
+> = {
   twitter: 'blue',
   reddit: 'orange',
   youtube: 'red',
@@ -57,6 +60,7 @@ export function PlatformComparisonPanel({
           </div>
           {onRunComparison && (
             <button
+              type="button"
               onClick={onRunComparison}
               className="px-4 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
             >
@@ -161,9 +165,9 @@ export function PlatformComparisonPanel({
           </div>
 
           <div className="space-y-2">
-            {comparison.crossPlatform.map((cp, i) => (
+            {comparison.crossPlatform.map((cp) => (
               <div
-                key={i}
+                key={`${cp.summary}:${cp.platforms.join(',')}`}
                 className="bg-nerv-bg-panel border border-nerv-border rounded-sm p-3 space-y-2"
               >
                 <div className="text-[10px] font-mono text-nerv-text-secondary leading-snug">

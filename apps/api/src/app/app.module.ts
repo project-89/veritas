@@ -11,6 +11,7 @@ import {
   DeepInvestigationService,
   DownstreamEffectsService,
   GLOBAL_EVENT_REPOSITORY,
+  GLOBAL_EVENT_RSS_FEEDS,
   GraphBotDetectionService,
   PropagandaAnalysisService,
   SIGNAL_CACHE_STORE,
@@ -26,6 +27,7 @@ import {
   DOWNSTREAM_EFFECTS_SERVICE,
   GlobalEventRepository,
   GRAPH_BOT_DETECTION_SERVICE,
+  getAllFeeds,
   IngestionModule,
   PROPAGANDA_SERVICE,
   SignalCacheRepository,
@@ -35,7 +37,10 @@ import { EventsController } from './controllers/events.controller';
 import { InvestigationController } from './controllers/investigation.controller';
 import { MonitorController } from './controllers/monitor.controller';
 import { PluginsController } from './controllers/plugins.controller';
-import { GENERATED_PLUGIN_APP_PROVIDERS, GENERATED_PLUGIN_CONTROLLERS } from './generated-plugin-backend';
+import {
+  GENERATED_PLUGIN_APP_PROVIDERS,
+  GENERATED_PLUGIN_CONTROLLERS,
+} from './generated-plugin-backend';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { LoggingService } from './services/logging.service';
 import { RefreshService } from './services/refresh.service';
@@ -108,6 +113,7 @@ import { SchedulerService } from './services/scheduler.service';
     // Bridge ingestion repositories to analysis tokens
     { provide: SIGNAL_CACHE_STORE, useExisting: SignalCacheRepository },
     { provide: GLOBAL_EVENT_REPOSITORY, useExisting: GlobalEventRepository },
+    { provide: GLOBAL_EVENT_RSS_FEEDS, useValue: getAllFeeds() },
     // Bridge analysis services to ingestion's AnalysisProcessor tokens
     { provide: PROPAGANDA_SERVICE, useExisting: PropagandaAnalysisService },
     { provide: CLAIM_VERIFICATION_SERVICE, useExisting: ClaimVerificationService },
@@ -121,7 +127,13 @@ import { SchedulerService } from './services/scheduler.service';
     // Uncomment when Redis is available:
     // { provide: 'REDIS_SERVICE', useFactory: (db: DatabaseService) => db, inject: [DatabaseService] },
   ],
-  controllers: [InvestigationController, MonitorController, EventsController, PluginsController, ...GENERATED_PLUGIN_CONTROLLERS],
+  controllers: [
+    InvestigationController,
+    MonitorController,
+    EventsController,
+    PluginsController,
+    ...GENERATED_PLUGIN_CONTROLLERS,
+  ],
   exports: ['MONGODB_SERVICE'],
 })
 export class AppModule implements NestModule {

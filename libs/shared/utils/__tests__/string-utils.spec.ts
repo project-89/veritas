@@ -1,10 +1,10 @@
 import {
-  sanitizeHtml,
-  truncateText,
-  slugify,
+  extractDomain,
   formatUrl,
   hashContent,
-  extractDomain,
+  sanitizeHtml,
+  slugify,
+  truncateText,
 } from '../src/lib/string-utils';
 
 describe('string-utils', () => {
@@ -121,27 +121,21 @@ describe('string-utils', () => {
 
   describe('formatUrl', () => {
     it('should combine base URL and path', () => {
-      expect(formatUrl('https://example.com', '/api/users')).toBe(
-        'https://example.com/api/users'
-      );
+      expect(formatUrl('https://example.com', '/api/users')).toBe('https://example.com/api/users');
     });
 
     it('should handle base URL with trailing slash', () => {
-      expect(formatUrl('https://example.com/', '/api/users')).toBe(
-        'https://example.com/api/users'
-      );
+      expect(formatUrl('https://example.com/', '/api/users')).toBe('https://example.com/api/users');
     });
 
     it('should handle base URL with multiple trailing slashes', () => {
       expect(formatUrl('https://example.com///', '/api/users')).toBe(
-        'https://example.com/api/users'
+        'https://example.com/api/users',
       );
     });
 
     it('should handle path without leading slash', () => {
-      expect(formatUrl('https://example.com', 'api/users')).toBe(
-        'https://example.com/api/users'
-      );
+      expect(formatUrl('https://example.com', 'api/users')).toBe('https://example.com/api/users');
     });
 
     it('should add query parameters', () => {
@@ -175,15 +169,11 @@ describe('string-utils', () => {
     });
 
     it('should not add query string when params is empty', () => {
-      expect(formatUrl('https://example.com', '/api', {})).toBe(
-        'https://example.com/api'
-      );
+      expect(formatUrl('https://example.com', '/api', {})).toBe('https://example.com/api');
     });
 
     it('should not add query string when params is undefined', () => {
-      expect(formatUrl('https://example.com', '/api')).toBe(
-        'https://example.com/api'
-      );
+      expect(formatUrl('https://example.com', '/api')).toBe('https://example.com/api');
     });
 
     it('should encode special characters in parameter keys and values', () => {

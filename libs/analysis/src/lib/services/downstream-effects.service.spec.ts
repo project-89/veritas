@@ -1,23 +1,19 @@
+import type { RawPost } from './deviation.service';
 import { DownstreamEffectsService } from './downstream-effects.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
-import type { RawPost } from './deviation.service';
 
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
-function makeNarrative(
-  overrides: Partial<AnalyzedNarrative> & { id: string },
-): AnalyzedNarrative {
+function makeNarrative(overrides: Partial<AnalyzedNarrative> & { id: string }): AnalyzedNarrative {
   return {
     summary: overrides.summary ?? `Summary for ${overrides.id}`,
     postIndices: overrides.postIndices ?? [0, 1],
     avgSentiment: overrides.avgSentiment ?? 0,
     sentimentTrajectory: overrides.sentimentTrajectory ?? [],
     platforms: overrides.platforms ?? { twitter: 2 },
-    authors: overrides.authors ?? [
-      { name: 'Alice', handle: 'alice', postCount: 1 },
-    ],
+    authors: overrides.authors ?? [{ name: 'Alice', handle: 'alice', postCount: 1 }],
     firstSeen: overrides.firstSeen ?? '2025-06-01T00:00:00Z',
     lastSeen: overrides.lastSeen ?? '2025-06-07T00:00:00Z',
     totalEngagement: overrides.totalEngagement ?? 100,
@@ -38,9 +34,7 @@ function makePost(index: number, overrides?: Partial<RawPost>): RawPost {
     platform: overrides?.platform ?? 'twitter',
     authorName: overrides?.authorName ?? `Author ${index}`,
     authorHandle: overrides?.authorHandle ?? `author${index}`,
-    timestamp:
-      overrides?.timestamp ??
-      new Date(Date.now() - (10 - index) * 3600000).toISOString(),
+    timestamp: overrides?.timestamp ?? new Date(Date.now() - (10 - index) * 3600000).toISOString(),
     engagement: overrides?.engagement ?? { likes: 10, shares: 2, comments: 3 },
   };
 }
@@ -109,9 +103,7 @@ describe('DownstreamEffectsService', () => {
 
   describe('extractKeywords()', () => {
     it('extracts keywords from narrative summaries and posts', () => {
-      const narratives = [
-        makeNarrative({ id: 'n-0', summary: 'Oil prices surge amid sanctions' }),
-      ];
+      const narratives = [makeNarrative({ id: 'n-0', summary: 'Oil prices surge amid sanctions' })];
       const posts = [
         makePost(0, { text: 'Oil prices are going through the roof' } as never),
         makePost(1, { text: 'Sanctions hitting hard on energy markets' } as never),
@@ -125,9 +117,7 @@ describe('DownstreamEffectsService', () => {
     });
 
     it('filters out stop words', () => {
-      const narratives = [
-        makeNarrative({ id: 'n-0', summary: 'The oil is at a very high price' }),
-      ];
+      const narratives = [makeNarrative({ id: 'n-0', summary: 'The oil is at a very high price' })];
       const keywords = service.extractKeywords(narratives, []);
 
       expect(keywords).not.toContain('the');
@@ -241,9 +231,7 @@ describe('DownstreamEffectsService', () => {
       const secondSignal = sorted.find((cs) => cs.signal.id === 'sig-1');
 
       if (firstSignal && secondSignal) {
-        expect(firstSignal.correlationStrength).toBeGreaterThan(
-          secondSignal.correlationStrength,
-        );
+        expect(firstSignal.correlationStrength).toBeGreaterThan(secondSignal.correlationStrength);
       }
     });
 
@@ -282,9 +270,7 @@ describe('DownstreamEffectsService', () => {
 
   describe('generateTransmissionChains()', () => {
     it('generates fallback chains when no LLM available', async () => {
-      const narratives = [
-        makeNarrative({ id: 'n-0', summary: 'Oil supply fears' }),
-      ];
+      const narratives = [makeNarrative({ id: 'n-0', summary: 'Oil supply fears' })];
       const signals = [
         {
           id: 'sig-0',
@@ -315,9 +301,7 @@ describe('DownstreamEffectsService', () => {
         // Each node should have required fields
         for (const node of chain.chain) {
           expect(node.node).toBeTruthy();
-          expect(['narrative', 'economic', 'political', 'social', 'market']).toContain(
-            node.type,
-          );
+          expect(['narrative', 'economic', 'political', 'social', 'market']).toContain(node.type);
           expect(node.confidence).toBeGreaterThanOrEqual(0);
           expect(node.confidence).toBeLessThanOrEqual(1);
         }
@@ -431,9 +415,7 @@ describe('DownstreamEffectsService', () => {
       expect(myceliumData.metadata.totalStrength).toBeGreaterThan(0);
 
       // Chain nodes should appear as branch/leaf nodes
-      const chainNodes = myceliumData.nodes.filter(
-        (n) => n.type === 'branch' || n.type === 'leaf',
-      );
+      const chainNodes = myceliumData.nodes.filter((n) => n.type === 'branch' || n.type === 'leaf');
       // The first chain node (narrative type) is skipped, so we should have 2 chain nodes
       expect(chainNodes.length).toBeGreaterThanOrEqual(2);
     });
@@ -504,16 +486,12 @@ describe('DownstreamEffectsService', () => {
       const myceliumData = service.toMyceliumData(narratives, correlations);
 
       // Should have cross-cluster branch
-      const crossBranches = myceliumData.branches.filter((b) =>
-        b.id.startsWith('cross-'),
-      );
+      const crossBranches = myceliumData.branches.filter((b) => b.id.startsWith('cross-'));
       expect(crossBranches.length).toBeGreaterThan(0);
     });
 
     it('all nodes have valid connections referenced in branches', () => {
-      const narratives = [
-        makeNarrative({ id: 'n-0', summary: 'Test narrative' }),
-      ];
+      const narratives = [makeNarrative({ id: 'n-0', summary: 'Test narrative' })];
 
       const correlations = [
         {
@@ -525,9 +503,24 @@ describe('DownstreamEffectsService', () => {
               narrativeId: 'n-0',
               narrativeSummary: 'Test narrative',
               chain: [
-                { node: 'Test narrative', type: 'narrative' as const, description: 'Origin', confidence: 0.8 },
-                { node: 'Public reaction', type: 'social' as const, description: 'Social effect', confidence: 0.6 },
-                { node: 'Policy change', type: 'political' as const, description: 'Policy result', confidence: 0.4 },
+                {
+                  node: 'Test narrative',
+                  type: 'narrative' as const,
+                  description: 'Origin',
+                  confidence: 0.8,
+                },
+                {
+                  node: 'Public reaction',
+                  type: 'social' as const,
+                  description: 'Social effect',
+                  confidence: 0.6,
+                },
+                {
+                  node: 'Policy change',
+                  type: 'political' as const,
+                  description: 'Policy result',
+                  confidence: 0.4,
+                },
               ],
               overallConfidence: 0.5,
             },

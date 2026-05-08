@@ -1,6 +1,6 @@
+import type { RawPost } from './deviation.service';
 import { EntityAnalysisService, InsightInput } from './entity-analysis.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
-import type { RawPost } from './deviation.service';
 
 function makeInsight(overrides: Partial<InsightInput> & { id: string }): InsightInput {
   return {
@@ -24,18 +24,14 @@ function makePost(index: number, overrides?: Partial<RawPost>): RawPost {
   };
 }
 
-function makeNarrative(
-  overrides: Partial<AnalyzedNarrative> & { id: string },
-): AnalyzedNarrative {
+function makeNarrative(overrides: Partial<AnalyzedNarrative> & { id: string }): AnalyzedNarrative {
   return {
     summary: overrides.summary ?? `Summary for ${overrides.id}`,
     postIndices: overrides.postIndices ?? [0, 1],
     avgSentiment: overrides.avgSentiment ?? 0,
     sentimentTrajectory: overrides.sentimentTrajectory ?? [],
     platforms: overrides.platforms ?? { twitter: 2 },
-    authors: overrides.authors ?? [
-      { name: 'Alice', handle: 'alice', postCount: 1 },
-    ],
+    authors: overrides.authors ?? [{ name: 'Alice', handle: 'alice', postCount: 1 }],
     firstSeen: overrides.firstSeen ?? '2025-01-01T00:00:00Z',
     lastSeen: overrides.lastSeen ?? '2025-01-02T00:00:00Z',
     totalEngagement: overrides.totalEngagement ?? 100,

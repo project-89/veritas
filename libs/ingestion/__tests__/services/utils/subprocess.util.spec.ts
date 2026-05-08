@@ -91,7 +91,7 @@ describe('SubprocessUtil', () => {
       mockExecFn.mockRejectedValue(error);
 
       await expect(util.exec('slow-cmd', [], { timeout: 5000 })).rejects.toThrow(
-        'Command timed out after 5000ms'
+        'Command timed out after 5000ms',
       );
     });
 
@@ -99,9 +99,7 @@ describe('SubprocessUtil', () => {
       const error = new Error('ENOENT: command not found');
       mockExecFn.mockRejectedValue(error);
 
-      await expect(util.exec('nonexistent', [])).rejects.toThrow(
-        'ENOENT: command not found'
-      );
+      await expect(util.exec('nonexistent', [])).rejects.toThrow('ENOENT: command not found');
     });
 
     it('should default exitCode to 1 when code is not a number', async () => {
@@ -137,9 +135,7 @@ describe('SubprocessUtil', () => {
       });
       mockExecFn.mockRejectedValue(error);
 
-      await expect(util.execJson('cmd', [])).rejects.toThrow(
-        'Command exited with code 2'
-      );
+      await expect(util.execJson('cmd', [])).rejects.toThrow('Command exited with code 2');
     });
 
     it('should throw when stdout is not valid JSON', async () => {
@@ -149,7 +145,7 @@ describe('SubprocessUtil', () => {
       });
 
       await expect(util.execJson('cmd', [])).rejects.toThrow(
-        'Failed to parse JSON output from cmd'
+        'Failed to parse JSON output from cmd',
       );
     });
   });
@@ -182,9 +178,7 @@ describe('SubprocessUtil', () => {
         stderr: '',
       });
 
-      await expect(util.execJsonLines('cmd', [])).rejects.toThrow(
-        'Failed to parse JSON on line 2'
-      );
+      await expect(util.execJsonLines('cmd', [])).rejects.toThrow('Failed to parse JSON on line 2');
     });
 
     it('should throw when exit code is non-zero', async () => {
@@ -195,9 +189,7 @@ describe('SubprocessUtil', () => {
       });
       mockExecFn.mockRejectedValue(error);
 
-      await expect(util.execJsonLines('cmd', [])).rejects.toThrow(
-        'Command exited with code 1'
-      );
+      await expect(util.execJsonLines('cmd', [])).rejects.toThrow('Command exited with code 1');
     });
   });
 
@@ -213,7 +205,7 @@ describe('SubprocessUtil', () => {
       expect(mockExecFn).toHaveBeenCalledWith(
         'which',
         ['yt-dlp'],
-        expect.objectContaining({ timeout: 5000 })
+        expect.objectContaining({ timeout: 5000 }),
       );
     });
 

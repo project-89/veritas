@@ -1,6 +1,6 @@
 export interface NetworkNode {
   id: string;
-  type: "content" | "source" | "account";
+  type: 'content' | 'source' | 'account';
   label: string;
   properties: Record<string, unknown>; // Using unknown instead of any for better type safety
   metrics: {
@@ -32,4 +32,4 @@ export interface NetworkGraph {
     edgeCount: number;
     density: number;
   };
-} 
+}

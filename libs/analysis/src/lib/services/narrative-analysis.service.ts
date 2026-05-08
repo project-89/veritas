@@ -1,9 +1,9 @@
-import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { cosineSimilarity } from '../utils/math';
-import { SaturationMetricsService } from './saturation-metrics.service';
 import type { SaturationReport } from './saturation-metrics.service';
+import { SaturationMetricsService } from './saturation-metrics.service';
 
 /** Injection token for the EmbeddingCacheRepository (optional — provided by app module) */
 export const EMBEDDING_CACHE_STORE = Symbol('EMBEDDING_CACHE_STORE');
@@ -109,16 +109,17 @@ export class NarrativeAnalysisService {
   constructor(
     private readonly configService: ConfigService,
     @Optional() private readonly saturationMetrics?: SaturationMetricsService,
-    @Optional() @Inject(EMBEDDING_CACHE_STORE) private readonly embeddingCache?: EmbeddingCacheStore,
+    @Optional()
+    @Inject(EMBEDDING_CACHE_STORE)
+    private readonly embeddingCache?: EmbeddingCacheStore,
   ) {
     this.embeddingModel =
       this.configService.get<string>('GEMINI_EMBEDDING_MODEL') ||
       process.env['GEMINI_EMBEDDING_MODEL'] ||
       'gemini-embedding-001';
-    this.embeddingFallbackModels = [
-      'gemini-embedding-001',
-      'gemini-embedding-2-preview',
-    ].filter((model, index, arr) => arr.indexOf(model) === index && model !== this.embeddingModel);
+    this.embeddingFallbackModels = ['gemini-embedding-001', 'gemini-embedding-2-preview'].filter(
+      (model, index, arr) => arr.indexOf(model) === index && model !== this.embeddingModel,
+    );
     this.embeddingBatchSize = Math.max(
       8,
       Number(
@@ -153,8 +154,7 @@ export class NarrativeAnalysisService {
     );
 
     const geminiKey =
-      this.configService.get<string>('GEMINI_API_KEY') ||
-      process.env['GEMINI_API_KEY'];
+      this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
 
     if (geminiKey) {
       this.genAI = new GoogleGenerativeAI(geminiKey);
@@ -162,9 +162,7 @@ export class NarrativeAnalysisService {
         `NarrativeAnalysisService initialized (embedding: ${this.embeddingModel}, chat: ${this.chatModel})`,
       );
     } else {
-      this.logger.warn(
-        'GEMINI_API_KEY not set — narrative analysis will use fallback clustering',
-      );
+      this.logger.warn('GEMINI_API_KEY not set — narrative analysis will use fallback clustering');
     }
   }
 
@@ -202,9 +200,7 @@ export class NarrativeAnalysisService {
       sentimentScore: p.sentiment?.score ?? 0,
       sentimentLabel: p.sentiment?.label ?? 'neutral',
       engagement:
-        (p.engagement?.likes ?? 0) +
-        (p.engagement?.comments ?? 0) +
-        (p.engagement?.shares ?? 0),
+        (p.engagement?.likes ?? 0) + (p.engagement?.comments ?? 0) + (p.engagement?.shares ?? 0),
       embedding: embeddings[i] ?? [],
       claimFacets: this.extractClaimFacets(p.text),
     }));
@@ -224,18 +220,16 @@ export class NarrativeAnalysisService {
     // Step 4: Build narrative objects with metrics
     const narratives: AnalyzedNarrative[] = [];
     for (let i = 0; i < clusters.length; i++) {
-      const cluster = clusters[i]!;
+      const cluster = clusters[i];
+      if (!cluster) continue;
       const narrative = this.buildNarrativeMetrics(cluster, i, 'clustered');
       narratives.push(narrative);
     }
 
     for (let i = 0; i < emerging.length; i++) {
-      const cluster = emerging[i]!;
-      const narrative = this.buildNarrativeMetrics(
-        cluster,
-        clusters.length + i,
-        'emerging',
-      );
+      const cluster = emerging[i];
+      if (!cluster) continue;
+      const narrative = this.buildNarrativeMetrics(cluster, clusters.length + i, 'emerging');
       narratives.push(narrative);
     }
 
@@ -290,7 +284,9 @@ export class NarrativeAnalysisService {
           cachedMap.set(h, emb);
         }
         if (cachedMap.size > 0) {
-          this.logger.log(`Embedding cache hit: ${cachedMap.size}/${texts.length} texts already cached`);
+          this.logger.log(
+            `Embedding cache hit: ${cachedMap.size}/${texts.length} texts already cached`,
+          );
         }
       } catch (err) {
         this.logger.warn(`Embedding cache lookup failed: ${err}`);
@@ -301,9 +297,12 @@ export class NarrativeAnalysisService {
     const uncachedIndices: number[] = [];
     const uncachedTexts: string[] = [];
     for (let i = 0; i < texts.length; i++) {
-      if (!cachedMap.has(hashes[i]!)) {
+      const hash = hashes[i];
+      const text = texts[i];
+      if (!hash || text == null) continue;
+      if (!cachedMap.has(hash)) {
         uncachedIndices.push(i);
-        uncachedTexts.push(texts[i]!);
+        uncachedTexts.push(text);
       }
     }
 
@@ -312,7 +311,8 @@ export class NarrativeAnalysisService {
 
     if (uncachedTexts.length > 0) {
       const modelsToTry = [modelName, ...this.embeddingFallbackModels];
-      let model = this.genAI.getGenerativeModel({ model: modelsToTry[0]! });
+      const primaryModel = modelsToTry[0] ?? modelName;
+      let model = this.genAI.getGenerativeModel({ model: primaryModel });
       const BATCH_SIZE = this.embeddingBatchSize;
       let embIdx = 0;
       let fallbackToNext = false;
@@ -324,10 +324,15 @@ export class NarrativeAnalysisService {
         }));
 
         try {
-          const result = await this.embedBatchWithRetry(model, batch, modelsToTry[0]!);
+          const result = await this.embedBatchWithRetry(model, batch, primaryModel);
           for (let j = 0; j < result.embeddings.length; j++) {
-            const origIdx = uncachedIndices[embIdx]!;
-            freshEmbeddings.set(origIdx, result.embeddings[j]!.values);
+            const origIdx = uncachedIndices[embIdx];
+            const embedding = result.embeddings[j];
+            if (origIdx == null || !embedding) {
+              embIdx++;
+              continue;
+            }
+            freshEmbeddings.set(origIdx, embedding.values);
             embIdx++;
           }
           this.logger.debug(
@@ -335,16 +340,24 @@ export class NarrativeAnalysisService {
           );
         } catch (err) {
           if (i === 0 && !fallbackToNext && modelsToTry.length > 1) {
-            this.logger.warn(
-              `Model ${modelsToTry[0]} failed, trying ${modelsToTry[1]}: ${err}`,
-            );
+            this.logger.warn(`Model ${modelsToTry[0]} failed, trying ${modelsToTry[1]}: ${err}`);
             fallbackToNext = true;
-            model = this.genAI.getGenerativeModel({ model: modelsToTry[1]! });
+            const fallbackModel = modelsToTry[1];
+            if (!fallbackModel) {
+              this.logger.error(`Fallback model also failed: ${err}`);
+              continue;
+            }
+            model = this.genAI.getGenerativeModel({ model: fallbackModel });
             try {
-              const retryResult = await this.embedBatchWithRetry(model, batch, modelsToTry[1]!);
+              const retryResult = await this.embedBatchWithRetry(model, batch, fallbackModel);
               for (let j = 0; j < retryResult.embeddings.length; j++) {
-                const origIdx = uncachedIndices[embIdx]!;
-                freshEmbeddings.set(origIdx, retryResult.embeddings[j]!.values);
+                const origIdx = uncachedIndices[embIdx];
+                const embedding = retryResult.embeddings[j];
+                if (origIdx == null || !embedding) {
+                  embIdx++;
+                  continue;
+                }
+                freshEmbeddings.set(origIdx, embedding.values);
                 embIdx++;
               }
               continue;
@@ -356,7 +369,11 @@ export class NarrativeAnalysisService {
           }
           // Fill with fallback embeddings for this batch
           for (const t of batchTexts) {
-            const origIdx = uncachedIndices[embIdx]!;
+            const origIdx = uncachedIndices[embIdx];
+            if (origIdx == null) {
+              embIdx++;
+              continue;
+            }
             freshEmbeddings.set(origIdx, this.fallbackEmbedding(t));
             embIdx++;
           }
@@ -367,9 +384,14 @@ export class NarrativeAnalysisService {
       if (this.embeddingCache) {
         try {
           for (const [origIdx, emb] of freshEmbeddings) {
-            const h = hashes[origIdx]!;
+            const h = hashes[origIdx];
+            if (!h) continue;
             // Fire-and-forget — don't block on cache writes
-            this.embeddingCache.setEmbedding(h, modelName, emb).catch(() => {});
+            this.embeddingCache.setEmbedding(h, modelName, emb).catch((cacheError) => {
+              this.logger.debug(
+                `Failed to persist embedding cache entry for model ${modelName}: ${cacheError}`,
+              );
+            });
           }
         } catch {
           // Best effort
@@ -380,12 +402,16 @@ export class NarrativeAnalysisService {
     // --- Assemble final result in original order ---
     const allEmbeddings: number[][] = [];
     for (let i = 0; i < texts.length; i++) {
-      const h = hashes[i]!;
+      const h = hashes[i];
+      if (!h) {
+        allEmbeddings.push(this.fallbackEmbedding(texts[i] ?? ''));
+        continue;
+      }
       const cached = cachedMap.get(h);
       if (cached) {
         allEmbeddings.push(cached);
       } else {
-        allEmbeddings.push(freshEmbeddings.get(i) ?? this.fallbackEmbedding(texts[i]!));
+        allEmbeddings.push(freshEmbeddings.get(i) ?? this.fallbackEmbedding(texts[i] ?? ''));
       }
     }
 
@@ -420,7 +446,7 @@ export class NarrativeAnalysisService {
           throw err;
         }
 
-        const backoffMs = this.embeddingRetryBaseMs * Math.pow(2, attempt);
+        const backoffMs = this.embeddingRetryBaseMs * 2 ** attempt;
         this.logger.warn(
           `Embedding rate limit for ${modelLabel}; retrying batch in ${backoffMs}ms (attempt ${attempt + 1}/${this.embeddingMaxRetries})`,
         );
@@ -440,7 +466,8 @@ export class NarrativeAnalysisService {
     const vec = new Array(dim).fill(0);
     const words = text.toLowerCase().split(/\s+/).slice(0, 100);
     for (let i = 0; i < words.length; i++) {
-      const word = words[i]!;
+      const word = words[i];
+      if (!word) continue;
       for (let j = 0; j < word.length; j++) {
         const pos = (i * 7 + j * 13 + word.charCodeAt(j)) % dim;
         vec[pos] += word.charCodeAt(j) / 255 / words.length;
@@ -478,9 +505,13 @@ export class NarrativeAnalysisService {
     const n = posts.length;
     const sim = new Float32Array(n * n);
     for (let i = 0; i < n; i++) {
+      const leftPost = posts[i];
+      if (!leftPost) continue;
       for (let j = i + 1; j < n; j++) {
-        const s = this.cosineSimilarity(posts[i]!.embedding, posts[j]!.embedding);
-        const adjusted = this.adjustNarrativeSimilarity(posts[i]!, posts[j]!, s);
+        const rightPost = posts[j];
+        if (!rightPost) continue;
+        const s = this.cosineSimilarity(leftPost.embedding, rightPost.embedding);
+        const adjusted = this.adjustNarrativeSimilarity(leftPost, rightPost, s);
         sim[i * n + j] = adjusted;
         sim[j * n + i] = adjusted;
       }
@@ -495,7 +526,10 @@ export class NarrativeAnalysisService {
 
       for (let i = 0; i < clusters.length; i++) {
         for (let j = i + 1; j < clusters.length; j++) {
-          const avgSim = this.averageLinkage(clusters[i]!, clusters[j]!, sim, n);
+          const leftCluster = clusters[i];
+          const rightCluster = clusters[j];
+          if (!leftCluster || !rightCluster) continue;
+          const avgSim = this.averageLinkage(leftCluster, rightCluster, sim, n);
           if (avgSim > bestSim) {
             bestSim = avgSim;
             bestI = i;
@@ -518,16 +552,14 @@ export class NarrativeAnalysisService {
     for (const cluster of clusters) {
       if (cluster.length >= 2) {
         realClusters.push(cluster);
-      } else if (this.isEmergingNarrativeCandidate(cluster[0]!)) {
+      } else if (cluster[0] && this.isEmergingNarrativeCandidate(cluster[0])) {
         emerging.push(cluster);
       } else {
         noise.push(...cluster);
       }
     }
 
-    emerging.sort(
-      (a, b) => this.scoreEmergingNarrativeCandidate(b[0]!) - this.scoreEmergingNarrativeCandidate(a[0]!),
-    );
+    emerging.sort((a, b) => this.getEmergingCandidateScore(b) - this.getEmergingCandidateScore(a));
 
     return { clusters: realClusters, emerging: emerging.slice(0, 8), noise };
   }
@@ -561,9 +593,12 @@ export class NarrativeAnalysisService {
     supportLevel: 'clustered' | 'emerging' = 'clustered',
   ): AnalyzedNarrative {
     // Sort by timestamp
-    const sorted = [...cluster].sort(
-      (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
-    );
+    const sorted = [...cluster].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    if (!first || !last) {
+      throw new Error('buildNarrativeMetrics requires at least one post');
+    }
 
     // Platform breakdown
     const platforms: Record<string, number> = {};
@@ -572,10 +607,7 @@ export class NarrativeAnalysisService {
     }
 
     // Author aggregation
-    const authorMap = new Map<
-      string,
-      { name: string; handle: string; count: number }
-    >();
+    const authorMap = new Map<string, { name: string; handle: string; count: number }>();
     for (const p of cluster) {
       const key = p.authorHandle || p.authorName;
       const existing = authorMap.get(key);
@@ -594,8 +626,8 @@ export class NarrativeAnalysisService {
       .sort((a, b) => b.postCount - a.postCount);
 
     // Sentiment trajectory (bucket by day or hour depending on range)
-    const firstTs = sorted[0]!.timestamp.getTime();
-    const lastTs = sorted[sorted.length - 1]!.timestamp.getTime();
+    const firstTs = first.timestamp.getTime();
+    const lastTs = last.timestamp.getTime();
     const range = lastTs - firstTs;
     const bucketMs =
       range > 7 * 24 * 60 * 60 * 1000
@@ -604,9 +636,7 @@ export class NarrativeAnalysisService {
 
     const sentimentBuckets = new Map<number, { sum: number; count: number }>();
     for (const p of sorted) {
-      const bucket =
-        Math.floor((p.timestamp.getTime() - firstTs) / bucketMs) * bucketMs +
-        firstTs;
+      const bucket = Math.floor((p.timestamp.getTime() - firstTs) / bucketMs) * bucketMs + firstTs;
       const existing = sentimentBuckets.get(bucket);
       if (existing) {
         existing.sum += p.sentimentScore;
@@ -637,15 +667,11 @@ export class NarrativeAnalysisService {
       }
     }
 
-    const first = sorted[0]!;
-    const last = sorted[sorted.length - 1]!;
-
     return {
       id: `narrative-${index}`,
       summary: '', // Filled by LLM step
       postIndices: cluster.map((p) => p.index),
-      avgSentiment:
-        cluster.reduce((s, p) => s + p.sentimentScore, 0) / cluster.length,
+      avgSentiment: cluster.reduce((s, p) => s + p.sentimentScore, 0) / cluster.length,
       sentimentTrajectory,
       platforms,
       authors,
@@ -658,11 +684,7 @@ export class NarrativeAnalysisService {
     };
   }
 
-  private adjustNarrativeSimilarity(
-    a: EmbeddedPost,
-    b: EmbeddedPost,
-    cosine: number,
-  ): number {
+  private adjustNarrativeSimilarity(a: EmbeddedPost, b: EmbeddedPost, cosine: number): number {
     let adjusted = cosine;
 
     const aFacets = new Set(a.claimFacets);
@@ -721,6 +743,11 @@ export class NarrativeAnalysisService {
     return this.scoreEmergingNarrativeCandidate(post) >= 2;
   }
 
+  private getEmergingCandidateScore(cluster: EmbeddedPost[]): number {
+    const candidate = cluster[0] ?? cluster[cluster.length - 1];
+    return candidate ? this.scoreEmergingNarrativeCandidate(candidate) : 0;
+  }
+
   private scoreEmergingNarrativeCandidate(post: EmbeddedPost): number {
     let score = 0;
     if (post.claimFacets.length > 0) score += 2;
@@ -730,35 +757,36 @@ export class NarrativeAnalysisService {
     return score;
   }
 
-  private calculateVelocity(
-    sorted: EmbeddedPost[],
-  ): AnalyzedNarrative['velocity'] {
+  private calculateVelocity(sorted: EmbeddedPost[]): AnalyzedNarrative['velocity'] {
     if (sorted.length < 2) {
       return { postsPerHour: 0, acceleration: 0, trend: 'steady' };
     }
 
-    const firstTs = sorted[0]!.timestamp.getTime();
-    const lastTs = sorted[sorted.length - 1]!.timestamp.getTime();
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    if (!first || !last) {
+      return { postsPerHour: 0, acceleration: 0, trend: 'steady' };
+    }
+    const firstTs = first.timestamp.getTime();
+    const lastTs = last.timestamp.getTime();
     const hours = Math.max((lastTs - firstTs) / (1000 * 60 * 60), 0.1);
     const postsPerHour = sorted.length / hours;
 
     // Acceleration: compare first-half rate to second-half rate
     const mid = Math.floor(sorted.length / 2);
-    const midTs = sorted[mid]!.timestamp.getTime();
+    const midPoint = sorted[mid];
+    if (!midPoint) {
+      return { postsPerHour, acceleration: 0, trend: 'steady' };
+    }
+    const midTs = midPoint.timestamp.getTime();
 
     const firstHalfHours = Math.max((midTs - firstTs) / (1000 * 60 * 60), 0.1);
-    const secondHalfHours = Math.max(
-      (lastTs - midTs) / (1000 * 60 * 60),
-      0.1,
-    );
+    const secondHalfHours = Math.max((lastTs - midTs) / (1000 * 60 * 60), 0.1);
 
     const firstHalfRate = mid / firstHalfHours;
     const secondHalfRate = (sorted.length - mid) / secondHalfHours;
 
-    const acceleration =
-      firstHalfRate > 0
-        ? (secondHalfRate - firstHalfRate) / firstHalfRate
-        : 0;
+    const acceleration = firstHalfRate > 0 ? (secondHalfRate - firstHalfRate) / firstHalfRate : 0;
 
     let trend: AnalyzedNarrative['velocity']['trend'] = 'steady';
     if (acceleration > 0.5) trend = 'surging';
@@ -785,8 +813,7 @@ export class NarrativeAnalysisService {
       for (const n of narratives) {
         const texts = n.postIndices.map((i) => posts[i]?.text ?? '');
         const firstText = texts[0] ?? '';
-        n.summary =
-          firstText.slice(0, 120) + (firstText.length > 120 ? '...' : '');
+        n.summary = firstText.slice(0, 120) + (firstText.length > 120 ? '...' : '');
       }
       return;
     }
@@ -825,12 +852,15 @@ ${sections.join('\n\n')}`;
 
       if (jsonMatch) {
         // Fix common LLM JSON issues: trailing commas
-        const cleaned = jsonMatch[0]!.replace(/,\s*]/g, ']').replace(/,\s*}/g, '}');
+        const cleaned = jsonMatch[0].replace(/,\s*]/g, ']').replace(/,\s*}/g, '}');
         const summaries = JSON.parse(cleaned) as string[];
         for (let i = 0; i < Math.min(summaries.length, narratives.length); i++) {
           const summary = summaries[i];
           if (typeof summary === 'string' && summary.length > 0) {
-            narratives[i]!.summary = summary;
+            const narrative = narratives[i];
+            if (narrative) {
+              narrative.summary = summary;
+            }
           }
         }
       }

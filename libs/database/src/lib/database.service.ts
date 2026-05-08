@@ -1,10 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { DATABASE_PROVIDER } from './database.constants';
 import type { DatabaseProvider } from './interfaces/database-provider.interface';
 import type { Repository } from './interfaces/repository.interface';
@@ -17,9 +11,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DatabaseService.name);
   private initialized = false;
 
-  constructor(
-    @Inject(DATABASE_PROVIDER) private readonly provider: DatabaseProvider
-  ) {}
+  constructor(@Inject(DATABASE_PROVIDER) private readonly provider: DatabaseProvider) {}
 
   /**
    * Initialize the database connection when the module is loaded

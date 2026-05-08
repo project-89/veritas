@@ -1,10 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
-import {
-  RssCacheModel,
-  type RssCacheEntry,
-  type RssCacheItem,
-} from '../schemas/rss-cache.schema';
+import { type RssCacheEntry, type RssCacheItem, RssCacheModel } from '../schemas/rss-cache.schema';
 
 /**
  * Repository for caching RSS feed items per-URL.
@@ -61,10 +57,7 @@ export class RssCacheRepository implements OnModuleInit {
   async getCachedFeed(feedUrl: string, maxAgeMs?: number): Promise<RssCacheItem[] | null> {
     this.ensureInitialized();
     try {
-      const entries = await this.repo.find(
-        { feedUrl } as Record<string, unknown>,
-        { limit: 1 },
-      );
+      const entries = await this.repo.find({ feedUrl } as Record<string, unknown>, { limit: 1 });
       const entry = entries[0] ?? null;
       if (!entry) return null;
 
@@ -98,10 +91,7 @@ export class RssCacheRepository implements OnModuleInit {
     try {
       // Delete existing entry for this feed URL
       try {
-        const old = await this.repo.find(
-          { feedUrl } as Record<string, unknown>,
-          { limit: 1 },
-        );
+        const old = await this.repo.find({ feedUrl } as Record<string, unknown>, { limit: 1 });
         for (const entry of old) {
           const id = entry._id?.toString() ?? entry.id;
           if (id) await this.repo.deleteById(id);

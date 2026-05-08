@@ -1,17 +1,11 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EventEmitter } from 'events';
 import axios, { AxiosInstance } from 'axios';
-import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
-import { SocialMediaPost } from '../../types/social-media.types';
-import { SourceNode } from '../schemas';
-import { TransformOnIngestService } from './transform/transform-on-ingest.service';
+import { EventEmitter } from 'events';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { SocialMediaPost } from '../../types/social-media.types';
+import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
+import { SourceNode } from '../schemas';
 import {
   buildClaimQueryPlan,
   extractSignificantQueryTerms,
@@ -20,6 +14,7 @@ import {
   normalizeSearchText,
   type SearchMode,
 } from '../utils/query-intent.util';
+import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 
 interface SearchOptions {
   startDate?: Date;
@@ -56,18 +51,7 @@ interface RedditJsonResponse {
   };
 }
 
-function isRedditListingResponse(
-  response: unknown,
-): response is RedditJsonResponse {
-  if (!response || typeof response !== 'object') return false;
-  const data = (response as { data?: unknown }).data;
-  if (!data || typeof data !== 'object') return false;
-  return Array.isArray((data as { children?: unknown }).children);
-}
-
-function extractRedditListing(
-  response: unknown,
-): RedditJsonResponse['data'] | null {
+function extractRedditListing(response: unknown): RedditJsonResponse['data'] | null {
   if (!response || typeof response !== 'object') return null;
 
   const direct = (response as { data?: unknown }).data;
@@ -110,11 +94,10 @@ export class RedditFreeConnector
 
   constructor(
     private configService: ConfigService,
-    private transformService: TransformOnIngestService
+    private transformService: TransformOnIngestService,
   ) {
     const userAgent =
-      this.configService.get<string>('REDDIT_USER_AGENT') ||
-      'Veritas/1.0.0 (API-free connector)';
+      this.configService.get<string>('REDDIT_USER_AGENT') || 'Veritas/1.0.0 (API-free connector)';
 
     this.client = axios.create({
       baseURL: 'https://www.reddit.com',
@@ -139,9 +122,9 @@ export class RedditFreeConnector
     try {
       await this.rateLimitedRequest('/r/test.json?limit=1');
       this.logger.log('Reddit public JSON API is reachable');
-    } catch (error) {
+    } catch {
       this.logger.warn(
-        'Reddit public JSON API may not be reachable, but connector will still attempt requests'
+        'Reddit public JSON API may not be reachable, but connector will still attempt requests',
       );
     }
   }
@@ -153,16 +136,10 @@ export class RedditFreeConnector
     this.streamConnections.clear();
   }
 
-  async searchContent(
-    query: string,
-    options?: SearchOptions
-  ): Promise<SocialMediaPost[]> {
+  async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
     try {
       const limit = options?.limit || 100;
-      const timeFilter = this.getTimeFilter(
-        options?.startDate,
-        options?.endDate
-      );
+      const timeFilter = this.getTimeFilter(options?.startDate, options?.endDate);
       const searchMode = normalizeSearchMode(
         options?.searchMode ?? (looksLikeClaimQuery(query) ? 'claim' : 'topic'),
       );
@@ -190,13 +167,13 @@ export class RedditFreeConnector
         }
 
         const response = await this.rateLimitedRequest<RedditJsonResponse>(
-          `/search.json?${params.toString()}`
+          `/search.json?${params.toString()}`,
         );
 
         const listing = extractRedditListing(response);
         if (!listing) {
           this.logger.debug(
-            `Reddit search returned unexpected payload shape for query "${query}" on page ${page + 1}`
+            `Reddit search returned unexpected payload shape for query "${query}" on page ${page + 1}`,
           );
           break;
         }
@@ -232,21 +209,15 @@ export class RedditFreeConnector
     }
   }
 
-  async searchAndTransform(
-    query: string,
-    options?: SearchOptions
-  ): Promise<NarrativeInsight[]> {
+  async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     try {
       this.logger.log(`Searching Reddit (API-free) for: ${query}`);
 
       const socialMediaPosts = await this.searchContent(query, options);
 
-      const insights =
-        await this.transformService.transformBatch(socialMediaPosts);
+      const insights = await this.transformService.transformBatch(socialMediaPosts);
 
-      this.logger.log(
-        `Transformed ${insights.length} Reddit posts into anonymized insights`
-      );
+      this.logger.log(`Transformed ${insights.length} Reddit posts into anonymized insights`);
 
       return insights;
     } catch (error) {
@@ -261,7 +232,7 @@ export class RedditFreeConnector
    */
   async searchWithRawData(
     query: string,
-    options?: SearchOptions
+    options?: SearchOptions,
   ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> {
     try {
       this.logger.log(`Searching Reddit (with raw data) for: ${query}`);
@@ -274,9 +245,7 @@ export class RedditFreeConnector
 
       const insights = await this.transformService.transformBatch(posts);
 
-      this.logger.log(
-        `Reddit: ${posts.length} posts, ${insights.length} insights`
-      );
+      this.logger.log(`Reddit: ${posts.length} posts, ${insights.length} insights`);
 
       return { posts, insights };
     } catch (error) {
@@ -296,18 +265,14 @@ export class RedditFreeConnector
           limit: 100,
         });
 
-        const filteredPosts = posts.filter((post) =>
-          this.postMatchesKeywords(post, keywords)
-        );
+        const filteredPosts = posts.filter((post) => this.postMatchesKeywords(post, keywords));
 
         for (const post of filteredPosts) {
           emitter.emit('data', post);
         }
 
         if (filteredPosts.length > 0) {
-          this.logger.debug(
-            `Emitted ${filteredPosts.length} posts from Reddit stream`
-          );
+          this.logger.debug(`Emitted ${filteredPosts.length} posts from Reddit stream`);
         }
       } catch (error) {
         emitter.emit('error', error);
@@ -338,21 +303,16 @@ export class RedditFreeConnector
           limit: 100,
         });
 
-        const filteredPosts = posts.filter((post) =>
-          this.postMatchesKeywords(post, keywords)
-        );
+        const filteredPosts = posts.filter((post) => this.postMatchesKeywords(post, keywords));
 
         if (filteredPosts.length > 0) {
-          const insights =
-            await this.transformService.transformBatch(filteredPosts);
+          const insights = await this.transformService.transformBatch(filteredPosts);
 
           for (const insight of insights) {
             emitter.emit('data', insight);
           }
 
-          this.logger.debug(
-            `Emitted ${insights.length} anonymized insights from Reddit stream`
-          );
+          this.logger.debug(`Emitted ${insights.length} anonymized insights from Reddit stream`);
         }
       } catch (error) {
         emitter.emit('error', error);
@@ -459,9 +419,7 @@ export class RedditFreeConnector
         name: userData.name || authorId,
         platform: this.platform,
         credibilityScore: this.calculateCredibilityScore(userData),
-        verificationStatus: userData.has_verified_email
-          ? 'verified'
-          : 'unverified',
+        verificationStatus: userData.has_verified_email ? 'verified' : 'unverified',
       } as Partial<SourceNode>;
     } catch (error) {
       this.logger.error('Error fetching Reddit author details:', error);
@@ -472,9 +430,7 @@ export class RedditFreeConnector
   async validateCredentials(): Promise<boolean> {
     try {
       await this.connect();
-      this.logger.log(
-        'Reddit API-free connector validated successfully (no credentials needed)'
-      );
+      this.logger.log('Reddit API-free connector validated successfully (no credentials needed)');
       return true;
     } catch (error) {
       this.logger.error('Reddit API-free connector validation failed:', error);
@@ -497,9 +453,7 @@ export class RedditFreeConnector
     return response.data;
   }
 
-  private transformPostsToSocialMediaPosts(
-    posts: RedditJsonPost[]
-  ): SocialMediaPost[] {
+  private transformPostsToSocialMediaPosts(posts: RedditJsonPost[]): SocialMediaPost[] {
     return posts.map((post) => ({
       id: post.id,
       text: post.selftext || post.title,
@@ -513,20 +467,14 @@ export class RedditFreeConnector
         likes: Math.round(post.score * (post.upvote_ratio || 1)),
         shares: 0,
         comments: post.num_comments,
-        reach:
-          post.upvote_ratio > 0
-            ? Math.round(post.score / post.upvote_ratio)
-            : post.score,
+        reach: post.upvote_ratio > 0 ? Math.round(post.score / post.upvote_ratio) : post.score,
         viralityScore: this.calculateViralityScore(post),
       },
     }));
   }
 
   private calculateViralityScore(post: RedditJsonPost): number {
-    return (
-      (post.upvote_ratio || 0.5) * 0.5 +
-      Math.min(post.num_comments / 100, 0.5)
-    );
+    return (post.upvote_ratio || 0.5) * 0.5 + Math.min(post.num_comments / 100, 0.5);
   }
 
   private calculateCredibilityScore(userData: {
@@ -537,8 +485,7 @@ export class RedditFreeConnector
   }): number {
     const totalKarma = userData.link_karma + userData.comment_karma;
     const karmaRatio = totalKarma > 0 ? userData.link_karma / totalKarma : 0.5;
-    const accountAgeYears =
-      (Date.now() / 1000 - userData.created) / (60 * 60 * 24 * 365);
+    const accountAgeYears = (Date.now() / 1000 - userData.created) / (60 * 60 * 24 * 365);
     const normalizedAge = Math.min(accountAgeYears / 5, 1);
     const verifiedBonus = userData.has_verified_email ? 0.1 : 0;
     const karmaScore = Math.min(Math.log10(totalKarma + 1) / 4, 0.5);
@@ -549,24 +496,17 @@ export class RedditFreeConnector
     return Math.min(Math.max(score, 0), 1);
   }
 
-  private postMatchesKeywords(
-    post: SocialMediaPost,
-    keywords: string[]
-  ): boolean {
+  private postMatchesKeywords(post: SocialMediaPost, keywords: string[]): boolean {
     const text = post.text.toLowerCase();
     return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
   }
 
-  private postMatchesQuery(
-    post: RedditJsonPost,
-    query: string,
-    searchMode: SearchMode,
-  ): boolean {
+  private postMatchesQuery(post: RedditJsonPost, query: string, searchMode: SearchMode): boolean {
     const normalizedQuery = normalizeSearchText(query);
     if (!normalizedQuery) return true;
 
     const haystack = normalizeSearchText(
-      [post.title, post.selftext, post.url, post.subreddit].filter(Boolean).join(' ')
+      [post.title, post.selftext, post.url, post.subreddit].filter(Boolean).join(' '),
     );
 
     if (!haystack) return false;
@@ -600,7 +540,11 @@ export class RedditFreeConnector
       if (plan.evidenceTerms.length > 0 && matchedEvidence.length === 0) {
         return false;
       }
-      if (plan.actionTerms.length > 0 && matchedActions.length === 0 && matchedAnchors.length === 0) {
+      if (
+        plan.actionTerms.length > 0 &&
+        matchedActions.length === 0 &&
+        matchedAnchors.length === 0
+      ) {
         return false;
       }
       if (plan.anchorTerms.length > 0 && matchedAnchors.length === 0) {
@@ -618,9 +562,7 @@ export class RedditFreeConnector
     }
 
     const anchorTerms = terms.filter((term) => /\d/.test(term) || term.includes('-'));
-    const matchedAnchors = anchorTerms.filter((term) =>
-      this.haystackIncludesTerm(haystack, term),
-    );
+    const matchedAnchors = anchorTerms.filter((term) => this.haystackIncludesTerm(haystack, term));
 
     if (anchorTerms.length > 0 && matchedAnchors.length === 0) {
       return false;
@@ -639,13 +581,13 @@ export class RedditFreeConnector
 
   private getTimeFilter(
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
   ): 'hour' | 'day' | 'week' | 'month' | 'year' | 'all' {
+    void endDate;
     if (!startDate) return 'all';
 
     const now = new Date();
-    const diffHours =
-      (now.getTime() - startDate.getTime()) / (60 * 60 * 1000);
+    const diffHours = (now.getTime() - startDate.getTime()) / (60 * 60 * 1000);
 
     // Reddit time filters: hour=1h, day=24h, week=7d, month=30d, year=365d
     if (diffHours <= 1) return 'hour';

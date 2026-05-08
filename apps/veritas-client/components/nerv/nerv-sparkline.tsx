@@ -35,11 +35,19 @@ export function NervSparkline({
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       className="block"
+      role="img"
+      aria-label="Trend sparkline"
     >
-      <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-      {showEndDot && last && (
-        <circle cx={last.x} cy={last.y} r={2} fill={color} />
-      )}
+      <title>Trend sparkline</title>
+      <path
+        d={pathD}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {showEndDot && last && <circle cx={last.x} cy={last.y} r={2} fill={color} />}
     </svg>
   );
 }

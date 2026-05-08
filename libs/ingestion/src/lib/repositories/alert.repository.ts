@@ -1,11 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
-import {
-  Alert,
-  AlertModel,
-  MonitorConfig,
-  MonitorConfigModel,
-} from '../schemas/alert.schema';
+import { Alert, AlertModel, MonitorConfig, MonitorConfigModel } from '../schemas/alert.schema';
 
 /**
  * Repository for managing alerts and monitor configs.
@@ -31,24 +26,17 @@ export class AlertRepository implements OnModuleInit {
         this.databaseService.registerModel('Alert', AlertModel);
         this.databaseService.registerModel('MonitorConfig', MonitorConfigModel);
       } catch (error) {
-        this.logger.warn(
-          'Models already registered or error registering models',
-          error
-        );
+        this.logger.warn('Models already registered or error registering models', error);
       }
 
       this.alertRepo = this.databaseService.getRepository<Alert>('Alert');
-      this.configRepo =
-        this.databaseService.getRepository<MonitorConfig>('MonitorConfig');
+      this.configRepo = this.databaseService.getRepository<MonitorConfig>('MonitorConfig');
 
       this.initialized = true;
       this.logger.log('Alert repository initialized');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Failed to initialize repositories: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Failed to initialize repositories: ${err.message}`, err.stack);
     }
   }
 
@@ -90,7 +78,7 @@ export class AlertRepository implements OnModuleInit {
 
   async getAlerts(
     investigationId?: string,
-    options?: { unreadOnly?: boolean; limit?: number; skip?: number }
+    options?: { unreadOnly?: boolean; limit?: number; skip?: number },
   ): Promise<Alert[]> {
     this.ensureInitialized();
     try {
@@ -139,7 +127,8 @@ export class AlertRepository implements OnModuleInit {
       const unreadAlerts = await this.alertRepo.find(filter);
       let count = 0;
       for (const alert of unreadAlerts) {
-        const id = alert._id?.toString() ?? (alert as unknown as Record<string, unknown>)['id'] as string;
+        const id =
+          alert._id?.toString() ?? ((alert as unknown as Record<string, unknown>)['id'] as string);
         await this.alertRepo.updateById(id, { read: true } as Partial<Alert>);
         count++;
       }
@@ -162,10 +151,7 @@ export class AlertRepository implements OnModuleInit {
       return alerts.length;
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in getUnreadCount: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in getUnreadCount: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -189,7 +175,7 @@ export class AlertRepository implements OnModuleInit {
 
   async upsertConfig(
     investigationId: string,
-    data: Partial<MonitorConfig>
+    data: Partial<MonitorConfig>,
   ): Promise<MonitorConfig> {
     this.ensureInitialized();
     try {
@@ -198,7 +184,7 @@ export class AlertRepository implements OnModuleInit {
       if (existing) {
         const id =
           existing._id?.toString() ??
-          (existing as unknown as Record<string, unknown>)['id'] as string;
+          ((existing as unknown as Record<string, unknown>)['id'] as string);
         const updated = await this.configRepo.updateById(id, data);
         if (!updated) {
           throw new Error(`MonitorConfig not found after update: ${id}`);
@@ -221,10 +207,7 @@ export class AlertRepository implements OnModuleInit {
       } as Partial<MonitorConfig>);
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in upsertConfig: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in upsertConfig: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -235,10 +218,7 @@ export class AlertRepository implements OnModuleInit {
       return await this.configRepo.find({ enabled: true });
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Error in getAllEnabledConfigs: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Error in getAllEnabledConfigs: ${err.message}`, err.stack);
       throw error;
     }
   }

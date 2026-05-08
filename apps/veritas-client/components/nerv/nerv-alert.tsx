@@ -40,20 +40,16 @@ export function NervAlert({
   onClick,
 }: NervAlertProps) {
   const config = severityConfig[severity] ?? severityConfig.info;
+  const classes = [
+    'flex items-start gap-2 px-3 py-2 border-l-2 border border-nerv-border',
+    config.border,
+    config.bg,
+    onClick ? 'cursor-pointer hover:bg-nerv-bg-elevated/40 transition-colors' : '',
+  ].join(' ');
 
-  return (
-    <div
-      onClick={onClick}
-      className={[
-        'flex items-start gap-2 px-3 py-2 border-l-2 border border-nerv-border',
-        config!.border,
-        config!.bg,
-        onClick ? 'cursor-pointer hover:bg-nerv-bg-elevated/40 transition-colors' : '',
-      ].join(' ')}
-    >
-      <span className={['text-sm mt-0.5 shrink-0', config!.iconColor].join(' ')}>
-        {config!.icon}
-      </span>
+  const content = (
+    <>
+      <span className={['text-sm mt-0.5 shrink-0', config.iconColor].join(' ')}>{config.icon}</span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">
@@ -65,15 +61,23 @@ export function NervAlert({
             </span>
           )}
         </div>
-        <p className="text-xs font-mono text-nerv-text leading-snug mt-0.5 truncate">
-          {title}
-        </p>
+        <p className="text-xs font-mono text-nerv-text leading-snug mt-0.5 truncate">{title}</p>
         {description && (
           <p className="text-[10px] font-mono text-nerv-text-secondary leading-snug mt-0.5 line-clamp-2">
             {description}
           </p>
         )}
       </div>
-    </div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={classes}>
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={classes}>{content}</div>;
 }

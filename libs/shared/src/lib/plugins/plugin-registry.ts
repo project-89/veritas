@@ -1,7 +1,4 @@
-import type {
-  VeritasPluginManifest,
-  VeritasPluginNavItem,
-} from '@veritas/shared/types';
+import type { VeritasPluginManifest, VeritasPluginNavItem } from '@veritas/shared/types';
 import { INSTALLED_PLUGIN_MANIFESTS } from './generated-plugin-manifests';
 
 const CORE_PLUGIN_MANIFESTS: VeritasPluginManifest[] = [

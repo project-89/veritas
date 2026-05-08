@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState, useEffect, useRef } from 'react';
-import type { AnalyzedNarrative, AnalysisJob } from '../../lib/api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { AnalysisJob, AnalyzedNarrative } from '../../lib/api';
 import { NervBadge } from './nerv-badge';
 import { NervBar } from './nerv-bar';
 import { PlatformCredibilityBadge } from './platform-credibility-badge';
@@ -103,9 +103,7 @@ export function NarrativeList({
       case 'posts':
         return arr.sort((a, b) => b.postIndices.length - a.postIndices.length);
       case 'recency':
-        return arr.sort(
-          (a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime(),
-        );
+        return arr.sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
       default:
         return arr;
     }
@@ -131,6 +129,7 @@ export function NarrativeList({
         {(['velocity', 'sentiment', 'posts', 'recency'] as SortKey[]).map((key) => (
           <button
             key={key}
+            type="button"
             onClick={() => setSortKey(key)}
             className={[
               'text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-sm transition-colors',
@@ -172,97 +171,122 @@ export function NarrativeList({
                   />
                   {/* Status indicator dot */}
                   {hasRunningJob && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-nerv-orange animate-pulse shrink-0" title="Running" />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-nerv-orange animate-pulse shrink-0"
+                      title="Running"
+                    />
                   )}
                   {hasPendingJob && !hasRunningJob && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-nerv-text-muted shrink-0" title="Queued" />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-nerv-text-muted shrink-0"
+                      title="Queued"
+                    />
                   )}
                   {hasCompletedJob && !hasRunningJob && !hasPendingJob && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-nerv-green shrink-0" title="Analyzed" />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-nerv-green shrink-0"
+                      title="Analyzed"
+                    />
                   )}
                   {hasFailedJob && !hasRunningJob && !hasPendingJob && !hasCompletedJob && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-nerv-red shrink-0" title="Failed" />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-nerv-red shrink-0"
+                      title="Failed"
+                    />
                   )}
                   {isInvestigated && !hasRunningJob && !hasPendingJob && (
-                    <span className="text-[8px] text-nerv-green shrink-0" title="Investigated">{'\u2713'}</span>
+                    <span className="text-[8px] text-nerv-green shrink-0" title="Investigated">
+                      {'\u2713'}
+                    </span>
                   )}
                 </label>
               )}
               <button
-              ref={(el) => { if (el) itemRefs.current.set(narrative.id, el); }}
-              onClick={(e) => onSelect(isSelected ? null : narrative.id, e.shiftKey)}
-              className={[
-                'w-full text-left px-3 py-2.5 transition-all',
-                isSelected
-                  ? 'bg-nerv-orange/10 border-l-2 border-l-nerv-orange'
-                  : 'border-l-2 border-l-transparent hover:bg-nerv-bg-elevated/40',
-              ].join(' ')}
-            >
-              {/* Row 1: Status dot + summary */}
-              <div className="flex items-start gap-2">
-                <span
-                  className={[
-                    'w-2 h-2 rounded-full mt-1 shrink-0',
-                    VELOCITY_DOT_CLASS[trend],
-                  ].join(' ')}
-                />
-                <span className="text-[11px] font-mono text-nerv-text leading-snug line-clamp-2">
-                  &quot;{narrative.summary}&quot;
-                </span>
-                {narrative.supportLevel === 'emerging' && (
-                  <NervBadge label="EMERG" variant="amber" size="sm" />
-                )}
-              </div>
-
-              {/* Row 2: Velocity label, sentiment, volume bar, count */}
-              <div className="flex items-center gap-2 mt-1.5 ml-4">
-                <span
-                  className="text-[9px] font-mono uppercase tracking-wider"
-                  style={{ color: VELOCITY_COLORS[trend] }}
-                >
-                  {trend === 'surging' ? '\u2191\u2191' : trend === 'growing' ? '\u2191' : trend === 'fading' ? '\u2193' : '\u2192'}{' '}
-                  {VELOCITY_LABEL[trend]}
-                </span>
-                <span
-                  className={[
-                    'text-[9px] font-mono tabular-nums',
-                    narrative.avgSentiment > 0.1
-                      ? 'text-nerv-green'
-                      : narrative.avgSentiment < -0.1
-                        ? 'text-nerv-red'
-                        : 'text-nerv-text-muted',
-                  ].join(' ')}
-                >
-                  {narrative.avgSentiment >= 0 ? '+' : ''}
-                  {narrative.avgSentiment.toFixed(2)}
-                </span>
-                <div className="flex-1 max-w-[60px]">
-                  <NervBar
-                    value={postCount / maxPosts}
-                    color={VELOCITY_COLORS[trend]}
-                    height={4}
+                type="button"
+                ref={(el) => {
+                  if (el) itemRefs.current.set(narrative.id, el);
+                }}
+                onClick={(e) => onSelect(isSelected ? null : narrative.id, e.shiftKey)}
+                className={[
+                  'w-full text-left px-3 py-2.5 transition-all',
+                  isSelected
+                    ? 'bg-nerv-orange/10 border-l-2 border-l-nerv-orange'
+                    : 'border-l-2 border-l-transparent hover:bg-nerv-bg-elevated/40',
+                ].join(' ')}
+              >
+                {/* Row 1: Status dot + summary */}
+                <div className="flex items-start gap-2">
+                  <span
+                    className={[
+                      'w-2 h-2 rounded-full mt-1 shrink-0',
+                      VELOCITY_DOT_CLASS[trend],
+                    ].join(' ')}
                   />
+                  <span className="text-[11px] font-mono text-nerv-text leading-snug line-clamp-2">
+                    &quot;{narrative.summary}&quot;
+                  </span>
+                  {narrative.supportLevel === 'emerging' && (
+                    <NervBadge label="EMERG" variant="amber" size="sm" />
+                  )}
                 </div>
-                <span className="text-[9px] font-mono text-nerv-text-muted tabular-nums">
-                  {postCount}
-                </span>
-              </div>
 
-              {/* Row 3: Platform chips + credibility badges */}
-              <div className="flex items-center gap-1 mt-1 ml-4">
-                {Object.entries(narrative.platforms).map(([platform, count]) => (
-                  <NervBadge
-                    key={platform}
-                    label={`${PLATFORM_ABBREV[platform] ?? platform.toUpperCase().slice(0, 2)}(${count})`}
-                    variant={PLATFORM_COLOR[platform] ?? 'muted'}
-                    size="sm"
-                  />
-                ))}
-                {Object.keys(narrative.platforms).slice(0, 2).map(p => (
-                  <PlatformCredibilityBadge key={`cred-${p}`} platform={p} size="sm" />
-                ))}
-              </div>
-            </button>
+                {/* Row 2: Velocity label, sentiment, volume bar, count */}
+                <div className="flex items-center gap-2 mt-1.5 ml-4">
+                  <span
+                    className="text-[9px] font-mono uppercase tracking-wider"
+                    style={{ color: VELOCITY_COLORS[trend] }}
+                  >
+                    {trend === 'surging'
+                      ? '\u2191\u2191'
+                      : trend === 'growing'
+                        ? '\u2191'
+                        : trend === 'fading'
+                          ? '\u2193'
+                          : '\u2192'}{' '}
+                    {VELOCITY_LABEL[trend]}
+                  </span>
+                  <span
+                    className={[
+                      'text-[9px] font-mono tabular-nums',
+                      narrative.avgSentiment > 0.1
+                        ? 'text-nerv-green'
+                        : narrative.avgSentiment < -0.1
+                          ? 'text-nerv-red'
+                          : 'text-nerv-text-muted',
+                    ].join(' ')}
+                  >
+                    {narrative.avgSentiment >= 0 ? '+' : ''}
+                    {narrative.avgSentiment.toFixed(2)}
+                  </span>
+                  <div className="flex-1 max-w-[60px]">
+                    <NervBar
+                      value={postCount / maxPosts}
+                      color={VELOCITY_COLORS[trend]}
+                      height={4}
+                    />
+                  </div>
+                  <span className="text-[9px] font-mono text-nerv-text-muted tabular-nums">
+                    {postCount}
+                  </span>
+                </div>
+
+                {/* Row 3: Platform chips + credibility badges */}
+                <div className="flex items-center gap-1 mt-1 ml-4">
+                  {Object.entries(narrative.platforms).map(([platform, count]) => (
+                    <NervBadge
+                      key={platform}
+                      label={`${PLATFORM_ABBREV[platform] ?? platform.toUpperCase().slice(0, 2)}(${count})`}
+                      variant={PLATFORM_COLOR[platform] ?? 'muted'}
+                      size="sm"
+                    />
+                  ))}
+                  {Object.keys(narrative.platforms)
+                    .slice(0, 2)
+                    .map((p) => (
+                      <PlatformCredibilityBadge key={`cred-${p}`} platform={p} size="sm" />
+                    ))}
+                </div>
+              </button>
             </div>
           );
         })}
@@ -278,6 +302,7 @@ export function NarrativeList({
             <div className="flex gap-1">
               {onAnalyzeSelected && (
                 <button
+                  type="button"
                   onClick={onAnalyzeSelected}
                   className="px-2 py-1 text-[9px] font-mono uppercase bg-nerv-orange/20 text-nerv-orange border border-nerv-orange/40 rounded-sm hover:bg-nerv-orange/30 transition-colors font-bold"
                 >
@@ -286,6 +311,7 @@ export function NarrativeList({
               )}
               {onClearSelection && (
                 <button
+                  type="button"
                   onClick={onClearSelection}
                   className="px-2 py-1 text-[9px] font-mono uppercase text-nerv-text-muted border border-nerv-border rounded-sm hover:bg-nerv-bg-elevated transition-colors"
                 >

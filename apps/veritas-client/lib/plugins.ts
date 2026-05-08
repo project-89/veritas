@@ -1,11 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  fetchPluginManifest,
-  type PluginManifest,
-  type PluginManifestResponse,
-} from './api';
+import { fetchPluginManifest, type PluginManifest, type PluginManifestResponse } from './api';
 
 let manifestCache: PluginManifestResponse | null = null;
 let manifestInflight: Promise<PluginManifestResponse> | null = null;
@@ -55,9 +51,7 @@ export function usePluginManifest() {
 
 export function hasPluginCapability(plugins: PluginManifest[], capability: string): boolean {
   return plugins.some(
-    (plugin) =>
-      plugin.status === 'installed' &&
-      plugin.capabilities.includes(capability),
+    (plugin) => plugin.status === 'installed' && plugin.capabilities.includes(capability),
   );
 }
 

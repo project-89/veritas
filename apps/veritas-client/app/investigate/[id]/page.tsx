@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { fetchInvestigation, type Investigation } from '../../../lib/api';
+import { Suspense, useEffect, useState } from 'react';
+import { fetchInvestigation } from '../../../lib/api';
 
 function LoadingState() {
   return (
@@ -25,7 +25,10 @@ function InvestigatePageInner() {
 
   useEffect(() => {
     const investigationId =
-      typeof params.id === 'string' && params.id.trim() !== '' && params.id !== 'undefined' && params.id !== 'null'
+      typeof params.id === 'string' &&
+      params.id.trim() !== '' &&
+      params.id !== 'undefined' &&
+      params.id !== 'null'
         ? params.id
         : null;
     if (!investigationId) return;
@@ -61,6 +64,7 @@ function InvestigatePageInner() {
         <div className="text-center space-y-3">
           <span className="text-sm font-mono text-nerv-red">{error}</span>
           <button
+            type="button"
             onClick={() => router.push('/monitor')}
             className="block text-[10px] font-mono text-nerv-orange uppercase tracking-widest hover:underline mx-auto"
           >

@@ -1,5 +1,12 @@
 {
   "name": "@veritas-nx/source",
   "$schema": "node_modules/nx/schemas/project-schema.json",
-  "targets": {}
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "echo \"No root source files to lint\""
+      }
+    }
+  }
 }

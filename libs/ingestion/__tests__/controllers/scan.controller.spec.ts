@@ -1,8 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
+import { Test, TestingModule } from '@nestjs/testing';
 import { ScanController } from '../../src/lib/controllers/scan.controller';
-import { ScanJobRepository } from '../../src/lib/repositories/scan-job.repository';
 import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
+import { ScanJobRepository } from '../../src/lib/repositories/scan-job.repository';
 import { IngestionService } from '../../src/lib/services/ingestion.service';
 
 describe('ScanController', () => {
@@ -34,10 +34,31 @@ describe('ScanController', () => {
     query: 'test query',
     investigationId: 'inv-456',
     status: 'running' as const,
-    settings: { platforms: ['reddit', 'twitter'], timeRange: '7d', limit: 100, searchMode: 'topic' as const },
+    settings: {
+      platforms: ['reddit', 'twitter'],
+      timeRange: '7d',
+      limit: 100,
+      searchMode: 'topic' as const,
+    },
     connectors: {
-      reddit: { status: 'done' as const, postCount: 50, insightCount: 50, startedAt: null, completedAt: null, error: null, duration: null },
-      twitter: { status: 'running' as const, postCount: 0, insightCount: 0, startedAt: null, completedAt: null, error: null, duration: null },
+      reddit: {
+        status: 'done' as const,
+        postCount: 50,
+        insightCount: 50,
+        startedAt: null,
+        completedAt: null,
+        error: null,
+        duration: null,
+      },
+      twitter: {
+        status: 'running' as const,
+        postCount: 0,
+        insightCount: 0,
+        startedAt: null,
+        completedAt: null,
+        error: null,
+        duration: null,
+      },
     },
     totalPosts: 50,
     totalInsights: 50,
@@ -48,7 +69,9 @@ describe('ScanController', () => {
 
   beforeEach(async () => {
     investigationRepo = {
-      findOrCreateByQuery: jest.fn().mockResolvedValue({ _id: 'inv-456', id: 'inv-456', query: 'test query' }),
+      findOrCreateByQuery: jest
+        .fn()
+        .mockResolvedValue({ _id: 'inv-456', id: 'inv-456', query: 'test query' }),
       findById: jest.fn().mockResolvedValue({
         _id: 'inv-existing',
         id: 'inv-existing',
@@ -96,10 +119,9 @@ describe('ScanController', () => {
         {
           provide: IngestionService,
           useValue: {
-            getAllConnectors: jest.fn().mockReturnValue([
-              { platform: 'reddit' },
-              { platform: 'twitter' },
-            ]),
+            getAllConnectors: jest
+              .fn()
+              .mockReturnValue([{ platform: 'reddit' }, { platform: 'twitter' }]),
           },
         },
         {
@@ -176,7 +198,10 @@ describe('ScanController', () => {
 
   describe('GET /scan/:id/posts', () => {
     it('should return posts', async () => {
-      const jobWithPosts = { ...mockScanJob, posts: [{ id: '1', text: 'test', platform: 'reddit' }] };
+      const jobWithPosts = {
+        ...mockScanJob,
+        posts: [{ id: '1', text: 'test', platform: 'reddit' }],
+      };
       (scanJobRepo.getJob as jest.Mock).mockResolvedValue(jobWithPosts);
       const result = await controller.getScanPosts('scan-123');
       expect(result.posts).toHaveLength(1);

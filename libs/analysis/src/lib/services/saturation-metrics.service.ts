@@ -46,9 +46,7 @@ export class SaturationMetricsService {
     // Core ratios
     const unclusteredRatio = totalPosts > 0 ? unclusteredCount / totalPosts : 0;
     const clusterDensity =
-      narrativeCount > 0
-        ? (totalPosts - unclusteredCount) / narrativeCount
-        : 0;
+      narrativeCount > 0 ? (totalPosts - unclusteredCount) / narrativeCount : 0;
     const topicCoverage = Math.max(0, Math.min(1, 1 - unclusteredRatio));
 
     // Deduplication rate
@@ -62,31 +60,17 @@ export class SaturationMetricsService {
       .map((n) => n.centroidEmbedding)
       .filter((c): c is number[] => c != null && c.length > 0);
 
-    const avgInterClusterDistance = this.computeAvgInterClusterDistance(
-      centroids,
-      narrativeCount,
-      totalPosts,
-    );
+    const avgInterClusterDistance = this.computeAvgInterClusterDistance(centroids);
     const embeddingSpread = this.computeEmbeddingSpread(centroids);
 
     // New topic yield
-    const newTopicYield = this.computeNewTopicYield(
-      narratives,
-      previousReport,
-    );
+    const newTopicYield = this.computeNewTopicYield(narratives, previousReport);
 
     // Classification
-    const saturationLevel = this.classifySaturation(
-      totalPosts,
-      unclusteredRatio,
-      clusterDensity,
-    );
+    const saturationLevel = this.classifySaturation(totalPosts, unclusteredRatio, clusterDensity);
 
     // Suggested depth
-    const suggestedDepth = this.computeSuggestedDepth(
-      saturationLevel,
-      currentLimit,
-    );
+    const suggestedDepth = this.computeSuggestedDepth(saturationLevel, currentLimit);
 
     // Recommendation
     const recommendation = this.buildRecommendation(
@@ -118,8 +102,6 @@ export class SaturationMetricsService {
 
   private computeAvgInterClusterDistance(
     centroids: number[][],
-    narrativeCount: number,
-    totalPosts: number,
   ): number {
     if (centroids.length < 2) return 0;
 
@@ -127,7 +109,12 @@ export class SaturationMetricsService {
     let pairCount = 0;
     for (let i = 0; i < centroids.length; i++) {
       for (let j = i + 1; j < centroids.length; j++) {
-        totalDistance += 1 - this.cosineSimilarity(centroids[i]!, centroids[j]!);
+        const left = centroids[i];
+        const right = centroids[j];
+        if (!left || !right) {
+          continue;
+        }
+        totalDistance += 1 - this.cosineSimilarity(left, right);
         pairCount++;
       }
     }
@@ -138,19 +125,24 @@ export class SaturationMetricsService {
     if (centroids.length < 2) return 0;
 
     // Compute variance across all dimensions of centroid vectors
-    const dim = centroids[0]!.length;
+    const firstCentroid = centroids[0];
+    if (!firstCentroid) {
+      return 0;
+    }
+
+    const dim = firstCentroid.length;
     if (dim === 0) return 0;
 
     let totalVariance = 0;
     for (let d = 0; d < dim; d++) {
       let sum = 0;
       for (const c of centroids) {
-        sum += c[d]!;
+        sum += c[d] ?? 0;
       }
       const mean = sum / centroids.length;
       let variance = 0;
       for (const c of centroids) {
-        const diff = c[d]! - mean;
+        const diff = (c[d] ?? 0) - mean;
         variance += diff * diff;
       }
       totalVariance += variance / centroids.length;

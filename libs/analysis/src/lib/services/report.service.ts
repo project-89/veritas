@@ -1,8 +1,8 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { DeepInvestigationResult } from './deep-investigation.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,8 +41,7 @@ export class ReportService {
 
   constructor(private readonly configService: ConfigService) {
     const geminiKey =
-      this.configService.get<string>('GEMINI_API_KEY') ||
-      process.env['GEMINI_API_KEY'];
+      this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
 
     if (geminiKey) {
       this.genAI = new GoogleGenerativeAI(geminiKey);
@@ -62,9 +61,7 @@ export class ReportService {
   async generateReport(params: ReportParams): Promise<ReportResult> {
     const { query, summary, narratives, investigation, format } = params;
 
-    this.logger.log(
-      `Generating ${format} report for "${query}" (${narratives.length} narratives)`,
-    );
+    this.logger.log(`Generating ${format} report for "${query}" (${narratives.length} narratives)`);
 
     const executiveSummary = await this.writeExecutiveSummary(
       query,
@@ -212,7 +209,11 @@ Do NOT use markdown formatting. Just write clean prose paragraphs separated by n
   }
 
   private mdExecutiveSummary(prose: string, summary: ReportSummary): string {
-    return `## Executive Summary\n\n${prose}\n\n| Metric | Value |\n|--------|-------|\n| Total Posts | ${summary.total} |\n| Positive | ${summary.positive} |\n| Negative | ${summary.negative} |\n| Neutral | ${summary.neutral} |\n${Object.entries(summary.byPlatform).map(([p, c]) => `| ${p} | ${c} |`).join('\n')}`;
+    return `## Executive Summary\n\n${prose}\n\n| Metric | Value |\n|--------|-------|\n| Total Posts | ${summary.total} |\n| Positive | ${summary.positive} |\n| Negative | ${summary.negative} |\n| Neutral | ${summary.neutral} |\n${Object.entries(
+      summary.byPlatform,
+    )
+      .map(([p, c]) => `| ${p} | ${c} |`)
+      .join('\n')}`;
   }
 
   private mdNarrativeLandscape(narratives: AnalyzedNarrative[]): string {
@@ -262,9 +263,14 @@ Do NOT use markdown formatting. Just write clean prose paragraphs separated by n
       md += `- **Velocity:** ${n.velocity.postsPerHour.toFixed(1)} posts/hr (${n.velocity.trend})\n`;
       md += `- **First seen:** ${n.firstSeen}\n`;
       md += `- **Last seen:** ${n.lastSeen}\n`;
-      md += `- **Platforms:** ${Object.entries(n.platforms).map(([p, c]) => `${p}: ${c}`).join(', ')}\n`;
+      md += `- **Platforms:** ${Object.entries(n.platforms)
+        .map(([p, c]) => `${p}: ${c}`)
+        .join(', ')}\n`;
       if (n.authors.length > 0) {
-        md += `- **Top authors:** ${n.authors.slice(0, 5).map((a) => `@${a.handle || a.name} (${a.postCount})`).join(', ')}\n`;
+        md += `- **Top authors:** ${n.authors
+          .slice(0, 5)
+          .map((a) => `@${a.handle || a.name} (${a.postCount})`)
+          .join(', ')}\n`;
       }
     }
 
@@ -337,8 +343,14 @@ Do NOT use markdown formatting. Just write clean prose paragraphs separated by n
     investigation?: DeepInvestigationResult,
   ): string {
     const platforms = Object.keys(summary.byPlatform).join(', ') || 'N/A';
-    const allFirstSeen = narratives.map((n) => n.firstSeen).filter(Boolean).sort();
-    const allLastSeen = narratives.map((n) => n.lastSeen).filter(Boolean).sort();
+    const allFirstSeen = narratives
+      .map((n) => n.firstSeen)
+      .filter(Boolean)
+      .sort();
+    const allLastSeen = narratives
+      .map((n) => n.lastSeen)
+      .filter(Boolean)
+      .sort();
     const timeRange =
       allFirstSeen.length > 0 && allLastSeen.length > 0
         ? `${allFirstSeen[0]} to ${allLastSeen[allLastSeen.length - 1]}`
@@ -500,7 +512,9 @@ ${summaryRows}
     <li><strong>Velocity:</strong> ${n.velocity.postsPerHour.toFixed(1)} posts/hr ${trendBadge(n.velocity.trend)}</li>
     <li><strong>First seen:</strong> ${n.firstSeen}</li>
     <li><strong>Last seen:</strong> ${n.lastSeen}</li>
-    <li><strong>Platforms:</strong> ${Object.entries(n.platforms).map(([p, c]) => `${p}: ${c}`).join(', ')}</li>
+    <li><strong>Platforms:</strong> ${Object.entries(n.platforms)
+      .map(([p, c]) => `${p}: ${c}`)
+      .join(', ')}</li>
     ${authors ? `<li><strong>Top authors:</strong> ${authors}</li>` : ''}
   </ul>
 </div>`;
@@ -589,8 +603,14 @@ ${rows}
     investigation?: DeepInvestigationResult,
   ): string {
     const platforms = Object.keys(summary.byPlatform).join(', ') || 'N/A';
-    const allFirstSeen = narratives.map((n) => n.firstSeen).filter(Boolean).sort();
-    const allLastSeen = narratives.map((n) => n.lastSeen).filter(Boolean).sort();
+    const allFirstSeen = narratives
+      .map((n) => n.firstSeen)
+      .filter(Boolean)
+      .sort();
+    const allLastSeen = narratives
+      .map((n) => n.lastSeen)
+      .filter(Boolean)
+      .sort();
     const timeRange =
       allFirstSeen.length > 0 && allLastSeen.length > 0
         ? `${allFirstSeen[0]} to ${allLastSeen[allLastSeen.length - 1]}`

@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createClient, RedisClientType } from 'redis';
-import type { DatabaseProvider, DatabaseProviderOptions } from '../interfaces/database-provider.interface';
-import { RedisRepository } from './redis-repository';
+import type {
+  DatabaseProvider,
+  DatabaseProviderOptions,
+} from '../interfaces/database-provider.interface';
 import type { Repository } from '../interfaces/repository.interface';
+import { RedisRepository } from './redis-repository';
 
 /**
  * Redis implementation of the DatabaseProvider interface
@@ -38,10 +41,7 @@ export class RedisProvider implements DatabaseProvider {
       this.logger.log('Successfully connected to Redis');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(
-        `Failed to connect to Redis: ${err.message}`,
-        err.stack
-      );
+      this.logger.error(`Failed to connect to Redis: ${err.message}`, err.stack);
       throw error;
     }
   }
@@ -57,10 +57,7 @@ export class RedisProvider implements DatabaseProvider {
         this.logger.log('Disconnected from Redis');
       } catch (error: unknown) {
         const err = error as Error;
-        this.logger.error(
-          `Failed to disconnect from Redis: ${err.message}`,
-          err.stack
-        );
+        this.logger.error(`Failed to disconnect from Redis: ${err.message}`, err.stack);
         throw error;
       }
     }
@@ -95,10 +92,7 @@ export class RedisProvider implements DatabaseProvider {
       // Type assertion here is necessary because Redis repositories
       // require entities with 'id' property, but we need to maintain
       // compatibility with the DatabaseProvider interface
-      const repository = new RedisRepository(
-        this.client,
-        entityName
-      ) as unknown as Repository<T>;
+      const repository = new RedisRepository(this.client, entityName) as unknown as Repository<T>;
       this.repositories.set(entityName, repository);
     }
 

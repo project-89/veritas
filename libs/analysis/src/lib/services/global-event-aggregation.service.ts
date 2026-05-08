@@ -1,30 +1,34 @@
 import {
-  Injectable,
   Inject,
+  Injectable,
   Logger,
-  OnModuleInit,
   OnModuleDestroy,
+  OnModuleInit,
   Optional,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { Subject, Observable } from 'rxjs';
-import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
-import { UsgsAdapter } from './signal-adapters/usgs.adapter';
-import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
+import { Observable, Subject } from 'rxjs';
+import type { EventCategory, EventSeverity, GeoLocation, GlobalEvent } from '../types/global-event';
+import { REGION_CENTROIDS, resolveCountryCode } from '../utils/geocoding';
 import { AcledAdapter } from './signal-adapters/acled.adapter';
 import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
 import { GdacsAdapter } from './signal-adapters/gdacs.adapter';
+import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
 import { ReliefWebAdapter } from './signal-adapters/reliefweb.adapter';
-import { resolveCountryCode, REGION_CENTROIDS } from '../utils/geocoding';
-import { getAllFeeds, getFeedsByTier, type RssFeedEntry } from '@veritas/ingestion';
-import type {
-  GlobalEvent,
-  EventCategory,
-  EventSeverity,
-  GeoLocation,
-} from '../types/global-event';
+import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
+import { UsgsAdapter } from './signal-adapters/usgs.adapter';
 /** Injection token for the global event repository (avoids cross-module dependency). */
 export const GLOBAL_EVENT_REPOSITORY = Symbol('GLOBAL_EVENT_REPOSITORY');
+export const GLOBAL_EVENT_RSS_FEEDS = Symbol('GLOBAL_EVENT_RSS_FEEDS');
+
+export interface RssFeedEntry {
+  name: string;
+  url: string;
+  category: string;
+  tier: 1 | 2 | 3;
+  language: string;
+  region?: string;
+}
 
 interface EventRepository {
   upsertEvent(event: GlobalEvent): Promise<unknown>;
@@ -59,9 +63,7 @@ const DEFAULT_EVENT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
  * - Optionally persists to MongoDB via GlobalEventRepository
  */
 @Injectable()
-export class GlobalEventAggregationService
-  implements OnModuleInit, OnModuleDestroy
-{
+export class GlobalEventAggregationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(GlobalEventAggregationService.name);
 
   // Adapters (stateless — instantiated directly)
@@ -92,6 +94,7 @@ export class GlobalEventAggregationService
   constructor(
     private readonly moduleRef: ModuleRef,
     @Optional() @Inject(GLOBAL_EVENT_REPOSITORY) private eventRepo?: EventRepository,
+    @Optional() @Inject(GLOBAL_EVENT_RSS_FEEDS) private readonly rssFeeds: RssFeedEntry[] = [],
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -109,7 +112,9 @@ export class GlobalEventAggregationService
       }
     }
 
-    this.logger.log(`Starting global event aggregation (persistence: ${this.eventRepo ? 'enabled' : 'DISABLED — GLOBAL_EVENT_REPOSITORY not injected'})`);
+    this.logger.log(
+      `Starting global event aggregation (persistence: ${this.eventRepo ? 'enabled' : 'DISABLED — GLOBAL_EVENT_REPOSITORY not injected'})`,
+    );
 
     // Stagger initial polls to avoid thundering herd / rate limits
     void this.pollUsgs();
@@ -130,40 +135,24 @@ export class GlobalEventAggregationService
     }
 
     // Set up recurring intervals
-    this.usgsInterval = setInterval(
-      () => void this.pollUsgs(),
-      USGS_INTERVAL_MS,
-    );
+    this.usgsInterval = setInterval(() => void this.pollUsgs(), USGS_INTERVAL_MS);
     this.usgsInterval.unref?.();
-    this.gdeltInterval = setInterval(
-      () => void this.pollGdelt(),
-      GDELT_INTERVAL_MS,
-    );
+    this.gdeltInterval = setInterval(() => void this.pollGdelt(), GDELT_INTERVAL_MS);
     this.gdeltInterval.unref?.();
-    this.coingeckoInterval = setInterval(
-      () => void this.pollCoingecko(),
-      COINGECKO_INTERVAL_MS,
-    );
+    this.coingeckoInterval = setInterval(() => void this.pollCoingecko(), COINGECKO_INTERVAL_MS);
     this.coingeckoInterval.unref?.();
-    this.gdacsInterval = setInterval(
-      () => void this.pollGdacs(),
-      GDACS_INTERVAL_MS,
-    );
+    this.gdacsInterval = setInterval(() => void this.pollGdacs(), GDACS_INTERVAL_MS);
     this.gdacsInterval.unref?.();
-    this.reliefwebInterval = setInterval(
-      () => void this.pollReliefweb(),
-      RELIEFWEB_INTERVAL_MS,
-    );
+    this.reliefwebInterval = setInterval(() => void this.pollReliefweb(), RELIEFWEB_INTERVAL_MS);
     this.reliefwebInterval.unref?.();
-    this.rssInterval = setInterval(
-      () => void this.pollRss(),
-      RSS_INTERVAL_MS,
-    );
+    this.rssInterval = setInterval(() => void this.pollRss(), RSS_INTERVAL_MS);
     this.rssInterval.unref?.();
   }
 
   onModuleDestroy(): void {
-    this.initialPollTimeouts.forEach((timeout) => clearTimeout(timeout));
+    this.initialPollTimeouts.forEach((timeout) => {
+      clearTimeout(timeout);
+    });
     this.initialPollTimeouts = [];
     if (this.rssInterval) clearInterval(this.rssInterval);
     if (this.coingeckoInterval) clearInterval(this.coingeckoInterval);
@@ -249,7 +238,7 @@ export class GlobalEventAggregationService
   private async pollRss(): Promise<void> {
     try {
       // Only poll tier-1 feeds for the world map (most important ~15 feeds)
-      const tier1Feeds = getFeedsByTier(1);
+      const tier1Feeds = this.rssFeeds.filter((feed) => feed.tier === 1);
       const events: GlobalEvent[] = [];
       const now = new Date();
 
@@ -276,7 +265,8 @@ export class GlobalEventAggregationService
           // Only items from last 2 hours
           const cutoff = now.getTime() - 2 * 60 * 60 * 1000;
 
-          for (const item of items.slice(0, 5)) { // Max 5 per feed
+          for (const item of items.slice(0, 5)) {
+            // Max 5 per feed
             const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : 0;
             if (pubDate < cutoff) continue;
 
@@ -285,11 +275,21 @@ export class GlobalEventAggregationService
 
             // Resolve location from feed region
             const region = feed.region ?? 'global';
-            const centroid = REGION_CENTROIDS[region] ?? REGION_CENTROIDS['global'] ?? { lat: 20, lng: 0 };
+            const centroid = REGION_CENTROIDS[region] ??
+              REGION_CENTROIDS['global'] ?? { lat: 20, lng: 0 };
 
             // Classify category from feed category
             let category: EventCategory = 'media';
-            if (['us_politics', 'europe', 'middle_east', 'africa', 'latin_america', 'asia_pacific'].includes(feed.category)) {
+            if (
+              [
+                'us_politics',
+                'europe',
+                'middle_east',
+                'africa',
+                'latin_america',
+                'asia_pacific',
+              ].includes(feed.category)
+            ) {
               category = 'political';
             } else if (['finance', 'crypto', 'energy'].includes(feed.category)) {
               category = 'economic';
@@ -308,8 +308,8 @@ export class GlobalEventAggregationService
               severity: feed.tier === 1 ? 'medium' : 'low',
               title,
               description: this.getEventDescription(
-                item.contentSnippet?.slice(0, 300)
-                  ?? item.content?.replace(/<[^>]+>/g, ' ').slice(0, 300),
+                item.contentSnippet?.slice(0, 300) ??
+                  item.content?.replace(/<[^>]+>/g, ' ').slice(0, 300),
                 title,
                 `RSS:${feed.name}`,
               ),
@@ -354,27 +354,28 @@ export class GlobalEventAggregationService
         .filter((s) => s.magnitude >= 0.3) // Only significant moves
         .map((s) => {
           const priceChange =
-            (s.metadata?.['price_change_percentage_24h'] as number)
-            ?? (s.metadata?.['price_change_24h'] as number)
-            ?? 0;
+            (s.metadata?.['price_change_percentage_24h'] as number) ??
+            (s.metadata?.['price_change_24h'] as number) ??
+            0;
           const direction = priceChange >= 0 ? 'up' : 'down';
           const symbol = (s.metadata?.['symbol'] as string)?.toUpperCase() ?? '???';
           const isTrending = Number((s.metadata?.['trending_score'] as number) ?? 0) > 0;
-          const title = isTrending && priceChange === 0
-            ? `[Trending] ${symbol}`
-            : `${symbol} ${direction} ${Math.abs(priceChange).toFixed(1)}% in 24h`;
+          const title =
+            isTrending && priceChange === 0
+              ? `[Trending] ${symbol}`
+              : `${symbol} ${direction} ${Math.abs(priceChange).toFixed(1)}% in 24h`;
 
           return {
             id: `coingecko-${s.id}`,
             source: 'CoinGecko',
             category: 'economic' as EventCategory,
-            severity: (s.magnitude >= 0.7 ? 'high' : s.magnitude >= 0.5 ? 'medium' : 'low') as EventSeverity,
+            severity: (s.magnitude >= 0.7
+              ? 'high'
+              : s.magnitude >= 0.5
+                ? 'medium'
+                : 'low') as EventSeverity,
             title,
-            description: this.getEventDescription(
-              s.description,
-              title,
-              'CoinGecko',
-            ),
+            description: this.getEventDescription(s.description, title, 'CoinGecko'),
             timestamp: s.timestamp,
             location: { lat: 20, lng: 0, label: 'Global', region: 'global' }, // Crypto is global
             magnitude: s.magnitude,
@@ -496,9 +497,7 @@ export class GlobalEventAggregationService
   }
 
   private sanitizeLocation(location: GeoLocation): GeoLocation {
-    const lat = Number.isFinite(location.lat)
-      ? Math.max(-90, Math.min(90, location.lat))
-      : 0;
+    const lat = Number.isFinite(location.lat) ? Math.max(-90, Math.min(90, location.lat)) : 0;
     const lng = Number.isFinite(location.lng)
       ? ((((location.lng + 180) % 360) + 360) % 360) - 180
       : 0;

@@ -153,7 +153,10 @@ type Mutation {
   deleteContent(id: String!): Boolean!
   generateAllEmbeddings(batchSize: Int): Int!
   generateEmbedding(id: String!): Content!
-  ingestSocialContent(content: ContentIngestionInput!, source: SourceIngestionInput!): NarrativeInsight!
+  ingestSocialContent(
+    content: ContentIngestionInput!
+    source: SourceIngestionInput!
+  ): NarrativeInsight!
   updateContent(id: String!, input: ContentUpdateInput!): Content!
   updateEngagementMetrics(id: String!, metrics: ContentEngagementMetricsInput!): Content!
   verifySource(sourceId: String!, status: VerificationStatus!): IngestionSource!
@@ -205,7 +208,12 @@ type Query {
   relatedContent(id: String!, limit: Float): [Content!]!
   searchContent(params: ContentSearchParams!): [Content!]!
   semanticSearch(params: SemanticSearchParams!): [Content!]!
-  similarContent(id: String!, limit: Int, minScore: Float, useExistingEmbedding: Boolean): [SimilarContentResult!]!
+  similarContent(
+    id: String!
+    limit: Int
+    minScore: Float
+    useExistingEmbedding: Boolean
+  ): [SimilarContentResult!]!
 }
 
 type RelatedContent {
@@ -225,13 +233,17 @@ input SemanticSearchParams {
   endDate: DateTime
   limit: Float
 
-  """Minimum similarity score threshold (0-1)"""
+  """
+  Minimum similarity score threshold (0-1)
+  """
   minScore: Float
   offset: Float
   platform: String
   query: String
 
-  """Semantic query text for vector similarity search"""
+  """
+  Semantic query text for vector similarity search
+  """
   semanticQuery: String!
   sourceId: String
   startDate: DateTime
@@ -246,7 +258,9 @@ type SentimentAnalysisType {
 type SimilarContentResult {
   content: Content!
 
-  """Similarity score between 0-1"""
+  """
+  Similarity score between 0-1
+  """
   score: Float!
 }
 
@@ -268,7 +282,9 @@ input TimeFrameInput {
   start: DateTime!
 }
 
-"""The verification status of a source"""
+"""
+The verification status of a source
+"""
 enum VerificationStatus {
   SUSPICIOUS
   UNVERIFIED

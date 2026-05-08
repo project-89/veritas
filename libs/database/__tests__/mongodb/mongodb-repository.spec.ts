@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 interface TestEntity {
   _id: string;
   name: string;
@@ -172,9 +170,7 @@ describe('MongoDBRepository', () => {
       queryMock.exec.mockRejectedValue(error);
       mockModel.findById.mockReturnValue(queryMock);
 
-      await expect(repository.findById('some-id')).rejects.toThrow(
-        'FindById failed'
-      );
+      await expect(repository.findById('some-id')).rejects.toThrow('FindById failed');
     });
   });
 
@@ -205,9 +201,7 @@ describe('MongoDBRepository', () => {
       queryMock.exec.mockRejectedValue(error);
       mockModel.findOne.mockReturnValue(queryMock);
 
-      await expect(repository.findOne({ name: 'any' })).rejects.toThrow(
-        'FindOne failed'
-      );
+      await expect(repository.findOne({ name: 'any' })).rejects.toThrow('FindOne failed');
     });
   });
 
@@ -262,9 +256,7 @@ describe('MongoDBRepository', () => {
       const error = new Error('Create failed');
       mockModel.__instance.save.mockRejectedValue(error);
 
-      await expect(
-        repository.create({ name: 'Fail', value: 0 })
-      ).rejects.toThrow('Create failed');
+      await expect(repository.create({ name: 'Fail', value: 0 })).rejects.toThrow('Create failed');
     });
   });
 
@@ -288,7 +280,7 @@ describe('MongoDBRepository', () => {
       mockModel.insertMany.mockRejectedValue(error);
 
       await expect(repository.createMany([{ name: 'Fail', value: 0 }])).rejects.toThrow(
-        'InsertMany failed'
+        'InsertMany failed',
       );
     });
   });
@@ -306,7 +298,7 @@ describe('MongoDBRepository', () => {
       expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
         testEntity._id,
         { name: 'Updated' },
-        { new: true }
+        { new: true },
       );
       expect(result).toEqual(updated);
     });
@@ -328,9 +320,9 @@ describe('MongoDBRepository', () => {
       queryMock.exec.mockRejectedValue(error);
       mockModel.findByIdAndUpdate.mockReturnValue(queryMock);
 
-      await expect(
-        repository.updateById('some-id', { name: 'Fail' })
-      ).rejects.toThrow('Update failed');
+      await expect(repository.updateById('some-id', { name: 'Fail' })).rejects.toThrow(
+        'Update failed',
+      );
     });
   });
 
@@ -339,15 +331,9 @@ describe('MongoDBRepository', () => {
       const queryMock = createQueryMock({ modifiedCount: 3 });
       mockModel.updateMany.mockReturnValue(queryMock);
 
-      const result = await repository.updateMany(
-        { value: 1 },
-        { name: 'Bulk Updated' }
-      );
+      const result = await repository.updateMany({ value: 1 }, { name: 'Bulk Updated' });
 
-      expect(mockModel.updateMany).toHaveBeenCalledWith(
-        { value: 1 },
-        { name: 'Bulk Updated' }
-      );
+      expect(mockModel.updateMany).toHaveBeenCalledWith({ value: 1 }, { name: 'Bulk Updated' });
       expect(result).toBe(3);
     });
 
@@ -355,10 +341,7 @@ describe('MongoDBRepository', () => {
       const queryMock = createQueryMock({ modifiedCount: 0 });
       mockModel.updateMany.mockReturnValue(queryMock);
 
-      const result = await repository.updateMany(
-        { value: 999 },
-        { name: 'None' }
-      );
+      const result = await repository.updateMany({ value: 999 }, { name: 'None' });
 
       expect(result).toBe(0);
     });
@@ -369,9 +352,9 @@ describe('MongoDBRepository', () => {
       queryMock.exec.mockRejectedValue(error);
       mockModel.updateMany.mockReturnValue(queryMock);
 
-      await expect(
-        repository.updateMany({ value: 1 }, { name: 'Fail' })
-      ).rejects.toThrow('UpdateMany failed');
+      await expect(repository.updateMany({ value: 1 }, { name: 'Fail' })).rejects.toThrow(
+        'UpdateMany failed',
+      );
     });
   });
 
@@ -401,9 +384,7 @@ describe('MongoDBRepository', () => {
       queryMock.exec.mockRejectedValue(error);
       mockModel.findByIdAndDelete.mockReturnValue(queryMock);
 
-      await expect(repository.deleteById('some-id')).rejects.toThrow(
-        'Delete failed'
-      );
+      await expect(repository.deleteById('some-id')).rejects.toThrow('Delete failed');
     });
   });
 
@@ -433,9 +414,7 @@ describe('MongoDBRepository', () => {
       queryMock.exec.mockRejectedValue(error);
       mockModel.deleteMany.mockReturnValue(queryMock);
 
-      await expect(repository.deleteMany({ value: 1 })).rejects.toThrow(
-        'DeleteMany failed'
-      );
+      await expect(repository.deleteMany({ value: 1 })).rejects.toThrow('DeleteMany failed');
     });
   });
 
@@ -470,10 +449,7 @@ describe('MongoDBRepository', () => {
       const queryMock = createQueryMock([]);
       mockModel.find.mockReturnValue(queryMock);
 
-      const results = await repository.vectorSearch(
-        'embedding',
-        queryVector
-      );
+      const results = await repository.vectorSearch('embedding', queryVector);
 
       expect(results).toEqual([]);
     });
@@ -524,10 +500,7 @@ describe('MongoDBRepository', () => {
       const queryMock = createQueryMock([]);
       mockModel.find.mockReturnValue(queryMock);
 
-      const results = await repository.vectorSearch(
-        'embedding',
-        queryVector
-      );
+      const results = await repository.vectorSearch('embedding', queryVector);
 
       expect(results).toEqual([]);
     });

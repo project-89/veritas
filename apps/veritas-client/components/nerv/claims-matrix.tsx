@@ -2,15 +2,15 @@
 
 import { useMemo } from 'react';
 import type {
-  PropagandaAnalysisResult,
   ClaimVerificationBatchResult,
   ExtractedClaim,
+  PropagandaAnalysisResult,
   VerificationResult,
 } from '../../lib/api';
-import { NervTable } from './nerv-table';
-import type { NervTableColumn } from './nerv-table';
 import { NervBadge } from './nerv-badge';
 import { NervBar } from './nerv-bar';
+import type { NervTableColumn } from './nerv-table';
+import { NervTable } from './nerv-table';
 
 interface ClaimRow {
   index: number;
@@ -87,11 +87,7 @@ export function ClaimsMatrix({
         render: (val: unknown) => {
           const s = val as string;
           return (
-            <NervBadge
-              label={s.toUpperCase()}
-              variant={STATUS_VARIANT[s] ?? 'muted'}
-              size="sm"
-            />
+            <NervBadge label={s.toUpperCase()} variant={STATUS_VARIANT[s] ?? 'muted'} size="sm" />
           );
         },
       },
@@ -116,11 +112,7 @@ export function ClaimsMatrix({
         render: (val: unknown) => {
           const t = val as string;
           return (
-            <NervBadge
-              label={t.toUpperCase()}
-              variant={TYPE_VARIANT[t] ?? 'muted'}
-              size="sm"
-            />
+            <NervBadge label={t.toUpperCase()} variant={TYPE_VARIANT[t] ?? 'muted'} size="sm" />
           );
         },
       },
@@ -157,11 +149,13 @@ export function ClaimsMatrix({
             PROPAGANDA ANALYSIS REQUIRED
           </div>
           <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[300px] leading-relaxed">
-            Run propaganda analysis to extract claims, detect manipulation techniques, and identify narrative frames.
+            Run propaganda analysis to extract claims, detect manipulation techniques, and identify
+            narrative frames.
           </div>
         </div>
         {onRunPropaganda && (
           <button
+            type="button"
             onClick={onRunPropaganda}
             disabled={propagandaLoading}
             className={[
@@ -199,7 +193,8 @@ export function ClaimsMatrix({
           ({Math.round(propaganda.overallAssessment.confidence * 100)}% conf)
           {' - '}
           <span className="text-nerv-text-secondary">
-            {propaganda.techniques.length} techniques / {propaganda.claims.length} claims / {propaganda.frames.length} frames
+            {propaganda.techniques.length} techniques / {propaganda.claims.length} claims /{' '}
+            {propaganda.frames.length} frames
           </span>
         </div>
       )}
@@ -209,9 +204,7 @@ export function ClaimsMatrix({
         data={rows}
         getRowId={(row) => String(row.index)}
         selectedId={selectedClaimIndex !== null ? String(selectedClaimIndex) : undefined}
-        onRowClick={(row) =>
-          onSelectClaim(row.index === selectedClaimIndex ? null : row.index)
-        }
+        onRowClick={(row) => onSelectClaim(row.index === selectedClaimIndex ? null : row.index)}
         compact
       />
 
@@ -224,6 +217,7 @@ export function ClaimsMatrix({
             <span className="text-nerv-text-muted">{claims.unverifiedCount ?? 0} unverified</span>
             {onVerifyClaims && (
               <button
+                type="button"
                 onClick={onVerifyClaims}
                 disabled={verifyingClaims}
                 className="ml-auto px-2 py-1 text-[8px] font-mono uppercase border border-nerv-blue/50 text-nerv-blue hover:bg-nerv-blue/10 rounded-sm transition-colors"
@@ -234,6 +228,7 @@ export function ClaimsMatrix({
           </div>
         ) : onVerifyClaims ? (
           <button
+            type="button"
             onClick={onVerifyClaims}
             disabled={verifyingClaims || (propaganda?.claims?.length ?? 0) === 0}
             className={[

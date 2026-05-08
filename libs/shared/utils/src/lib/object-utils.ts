@@ -36,7 +36,7 @@ export function deepClone<T>(obj: T): T {
 export function getNestedProperty<T>(
   obj: Record<string, unknown>,
   path: string,
-  defaultValue?: T
+  defaultValue?: T,
 ): T | undefined {
   if (!obj || !path) {
     return defaultValue;
@@ -46,11 +46,7 @@ export function getNestedProperty<T>(
   let current: unknown = obj;
 
   for (const key of keys) {
-    if (
-      current === null ||
-      current === undefined ||
-      typeof current !== 'object'
-    ) {
+    if (current === null || current === undefined || typeof current !== 'object') {
       return defaultValue;
     }
 
@@ -133,7 +129,7 @@ export function deepMerge<T>(target: T, ...sources: Partial<T>[]): T {
       ) {
         (result as Record<string, unknown>)[key] = deepMerge(
           result[typedKey] as object,
-          sourceValue as Partial<object>
+          sourceValue as Partial<object>,
         );
       } else {
         (result as Record<string, unknown>)[key] = sourceValue;
@@ -167,23 +163,19 @@ export function removeEmptyValues<T extends object>(obj: T): Partial<T> {
  * @param prefix Prefix for keys
  * @returns Flattened object
  */
-export function flattenObject(
-  obj: Record<string, unknown>,
-  prefix = ''
-): Record<string, unknown> {
-  return Object.keys(obj).reduce((acc, key) => {
-    const pre = prefix.length ? `${prefix}.` : '';
+export function flattenObject(obj: Record<string, unknown>, prefix = ''): Record<string, unknown> {
+  return Object.keys(obj).reduce(
+    (acc, key) => {
+      const pre = prefix.length ? `${prefix}.` : '';
 
-    if (
-      typeof obj[key] === 'object' &&
-      obj[key] !== null &&
-      !Array.isArray(obj[key])
-    ) {
-      Object.assign(acc, flattenObject(obj[key] as Record<string, unknown>, `${pre}${key}`));
-    } else {
-      acc[`${pre}${key}`] = obj[key];
-    }
+      if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+        Object.assign(acc, flattenObject(obj[key] as Record<string, unknown>, `${pre}${key}`));
+      } else {
+        acc[`${pre}${key}`] = obj[key];
+      }
 
-    return acc;
-  }, {} as Record<string, unknown>);
+      return acc;
+    },
+    {} as Record<string, unknown>,
+  );
 }

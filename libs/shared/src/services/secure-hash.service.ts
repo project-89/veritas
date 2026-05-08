@@ -26,11 +26,7 @@ export class SecureHashService {
    * @param secondarySalt - Secondary salt (cross-correlation prevention)
    * @returns Securely hashed identifier
    */
-  public doubleHash(
-    value: string,
-    primarySalt: string,
-    secondarySalt: string
-  ): string {
+  public doubleHash(value: string, primarySalt: string, secondarySalt: string): string {
     const primaryHash = this.hashWithSalt(value, primarySalt);
     return this.hashWithSalt(primaryHash, secondarySalt);
   }

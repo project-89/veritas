@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { EvidenceSeed, ExtractedEntity } from '../schemas/investigation.schema';
 import { YOUTUBE_CONNECTOR } from '../interfaces/connector-tokens';
+import { EvidenceSeed, ExtractedEntity } from '../schemas/investigation.schema';
 import { JinaReaderService } from './utils/jina-reader.service';
 
 type EvidenceSeedKind = EvidenceSeed['kind'];
@@ -122,9 +122,10 @@ export class InvestigationEvidenceService {
         };
 
         existing.occurrenceCount += 1;
-        existing.displayValue = existing.displayValue.length >= entity.value.length
-          ? existing.displayValue
-          : entity.value;
+        existing.displayValue =
+          existing.displayValue.length >= entity.value.length
+            ? existing.displayValue
+            : entity.value;
 
         if (!existing.sources.some((source) => source.seedId === seed.id)) {
           existing.sources.push({
@@ -270,7 +271,8 @@ export class InvestigationEvidenceService {
       entities.push({ type, value: trimmed });
     };
 
-    const domainMatches = text.match(/\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}\b/gi) ?? [];
+    const domainMatches =
+      text.match(/\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}\b/gi) ?? [];
     for (const domain of domainMatches) {
       add('domain', domain.toLowerCase());
     }
@@ -288,7 +290,10 @@ export class InvestigationEvidenceService {
       }
 
       const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
-      if ((parsedUrl.hostname.includes('x.com') || parsedUrl.hostname.includes('twitter.com')) && pathSegments[0]) {
+      if (
+        (parsedUrl.hostname.includes('x.com') || parsedUrl.hostname.includes('twitter.com')) &&
+        pathSegments[0]
+      ) {
         add('handle', `@${pathSegments[0].replace(/^@/, '')}`);
       }
       if (parsedUrl.hostname.includes('t.me') && pathSegments[0]) {
@@ -340,7 +345,10 @@ export class InvestigationEvidenceService {
     return deduped;
   }
 
-  private mergeEntities(existing: ExtractedEntity[], incoming: ExtractedEntity[]): ExtractedEntity[] {
+  private mergeEntities(
+    existing: ExtractedEntity[],
+    incoming: ExtractedEntity[],
+  ): ExtractedEntity[] {
     return this.dedupeEntities([...(existing ?? []), ...(incoming ?? [])]);
   }
 
@@ -379,7 +387,11 @@ export class InvestigationEvidenceService {
 
   private looksLikeArticleUrl(parsedUrl: URL): boolean {
     const path = parsedUrl.pathname.toLowerCase();
-    return path.split('/').filter(Boolean).length >= 2 || path.includes('/news/') || path.includes('/article/');
+    return (
+      path.split('/').filter(Boolean).length >= 2 ||
+      path.includes('/news/') ||
+      path.includes('/article/')
+    );
   }
 
   private normalizeDomainValue(value: string): string | null {
@@ -422,7 +434,9 @@ export class InvestigationEvidenceService {
       return parsedUrl.searchParams.get('v');
     }
     const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
-    const embedIndex = pathSegments.findIndex((segment) => segment === 'embed' || segment === 'shorts');
+    const embedIndex = pathSegments.findIndex(
+      (segment) => segment === 'embed' || segment === 'shorts',
+    );
     if (embedIndex >= 0 && pathSegments[embedIndex + 1]) {
       return pathSegments[embedIndex + 1] ?? null;
     }

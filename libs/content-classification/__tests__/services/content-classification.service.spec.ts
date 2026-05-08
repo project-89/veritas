@@ -1,7 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { ContentClassificationService } from '../../src/lib/services/content-classification.service';
+import { Test, TestingModule } from '@nestjs/testing';
 import * as francMin from 'franc-min';
+import { ContentClassificationService } from '../../src/lib/services/content-classification.service';
 
 // Mock franc-min
 jest.mock('franc-min', () => ({
@@ -10,7 +10,6 @@ jest.mock('franc-min', () => ({
 
 describe('ContentClassificationService', () => {
   let service: ContentClassificationService;
-  let configService: ConfigService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -29,10 +28,7 @@ describe('ContentClassificationService', () => {
       ],
     }).compile();
 
-    service = module.get<ContentClassificationService>(
-      ContentClassificationService
-    );
-    configService = module.get<ConfigService>(ConfigService);
+    service = module.get<ContentClassificationService>(ContentClassificationService);
 
     // Reset all mocks before each test
     jest.clearAllMocks();
@@ -53,7 +49,7 @@ describe('ContentClassificationService', () => {
       (francMin.franc as jest.Mock).mockReturnValue('eng');
 
       const result = await service['detectLanguage'](
-        'This is a longer text that should be detected as English'
+        'This is a longer text that should be detected as English',
       );
       expect(francMin.franc).toHaveBeenCalled();
       expect(result).toBe('en');
@@ -64,7 +60,7 @@ describe('ContentClassificationService', () => {
       (francMin.franc as jest.Mock).mockReturnValue('spa');
 
       const result = await service['detectLanguage'](
-        'Este es un texto en español que debería ser detectado correctamente'
+        'Este es un texto en español que debería ser detectado correctamente',
       );
       expect(francMin.franc).toHaveBeenCalled();
       expect(result).toBe('es');
@@ -85,9 +81,7 @@ describe('ContentClassificationService', () => {
         throw new Error('Language detection failed');
       });
 
-      const result = await service['detectLanguage'](
-        'Some text causing an error'
-      );
+      const result = await service['detectLanguage']('Some text causing an error');
       expect(result).toBe('en'); // Should default to English on error
     });
 
@@ -95,9 +89,7 @@ describe('ContentClassificationService', () => {
       // Mock franc returning 'und' (undefined)
       (francMin.franc as jest.Mock).mockReturnValue('und');
 
-      const result = await service['detectLanguage'](
-        'Text that cannot be identified'
-      );
+      const result = await service['detectLanguage']('Text that cannot be identified');
       expect(francMin.franc).toHaveBeenCalled();
       expect(result).toBe('en'); // Should map 'und' to 'en'
     });
@@ -105,8 +97,7 @@ describe('ContentClassificationService', () => {
 
   describe('extractTopics', () => {
     it('should extract main topics from text', () => {
-      const text =
-        'Machine learning algorithms are transforming artificial intelligence research';
+      const text = 'Machine learning algorithms are transforming artificial intelligence research';
       const topics = service['extractTopics'](text);
 
       // Check that at least 3 of these keywords are present
@@ -120,9 +111,7 @@ describe('ContentClassificationService', () => {
         'intelligence',
         'research',
       ];
-      const foundKeywords = expectedKeywords.filter((keyword) =>
-        topics.includes(keyword)
-      );
+      const foundKeywords = expectedKeywords.filter((keyword) => topics.includes(keyword));
 
       expect(foundKeywords.length).toBeGreaterThanOrEqual(3);
 
@@ -141,8 +130,7 @@ describe('ContentClassificationService', () => {
     });
 
     it('should prioritize topics by frequency', () => {
-      const text =
-        'Data science data analysis data visualization data science models';
+      const text = 'Data science data analysis data visualization data science models';
       const topics = service['extractTopics'](text);
 
       // Repeated phrases should be surfaced first, while still retaining
@@ -160,7 +148,7 @@ describe('ContentClassificationService', () => {
       (francMin.franc as jest.Mock).mockReturnValue('eng');
 
       const classification = await service.classifyContent(
-        'This is a test message for classification'
+        'This is a test message for classification',
       );
 
       expect(classification).toBeDefined();

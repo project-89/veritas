@@ -1,7 +1,7 @@
-import { EventEmitter } from 'events';
-import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '@veritas/shared/types';
+import { EventEmitter } from 'events';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
+import { SocialMediaPost } from '../../types/social-media.types';
 import { ConnectorSearchOptions } from './data-connector.interface';
 
 /**
@@ -31,10 +31,7 @@ export interface SocialMediaConnector {
    * @param options - Search options (platform-specific)
    * @returns Promise resolving to an array of SocialMediaPost objects
    */
-  searchContent(
-    query: string,
-    options?: ConnectorSearchOptions
-  ): Promise<SocialMediaPost[]>;
+  searchContent(query: string, options?: ConnectorSearchOptions): Promise<SocialMediaPost[]>;
 
   /**
    * Stream content from the platform based on keywords
@@ -73,7 +70,7 @@ export interface SocialMediaConnector {
       startDate?: Date;
       endDate?: Date;
       limit?: number;
-    }
+    },
   ): Promise<NarrativeInsight[]>;
 
   /**

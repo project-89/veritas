@@ -1,30 +1,30 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  fetchInvestigations,
-  fetchAlerts,
-  fetchInvestigation,
-  markAlertRead,
-  markAllAlertsRead,
-  fetchUnreadAlertCount,
-  archiveInvestigation,
-  renameInvestigation,
-  deleteInvestigation,
-  type Investigation,
-  type Alert,
-} from '../../lib/api';
-import { hasPluginCapability, usePluginManifest } from '../../lib/plugins';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   NervAlert,
   NervBadge,
   NervMetric,
   NervPanel,
-  NervStatus,
   NervTicker,
   type NervTickerItem,
 } from '../../components/nerv';
+import {
+  type Alert,
+  archiveInvestigation,
+  deleteInvestigation,
+  fetchAlerts,
+  fetchInvestigation,
+  fetchInvestigations,
+  fetchUnreadAlertCount,
+  type Investigation,
+  markAlertRead,
+  markAllAlertsRead,
+  renameInvestigation,
+  type Snapshot,
+} from '../../lib/api';
+import { hasPluginCapability, usePluginManifest } from '../../lib/plugins';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -40,10 +40,13 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function severityVariant(severity: string): 'blue' | 'amber' | 'red' {
-  if (severity === 'critical') return 'red';
-  if (severity === 'warning') return 'amber';
-  return 'blue';
+function getInvestigationId(inv: Investigation): string {
+  return inv._id ?? inv.id ?? '';
+}
+
+interface InvestigationPreview {
+  investigation: Investigation;
+  snapshot: Snapshot | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +61,7 @@ export default function MonitorPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedInvId, setSelectedInvId] = useState<string | null>(null);
   const [menuOpenInvId, setMenuOpenInvId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ investigation: Investigation; snapshot: any } | null>(null);
+  const [preview, setPreview] = useState<InvestigationPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [alertFilter, setAlertFilter] = useState<string>('all');
@@ -85,15 +88,16 @@ export default function MonitorPage() {
   useEffect(() => {
     pollRef.current = setInterval(async () => {
       try {
-        const [alts, count] = await Promise.all([
-          fetchAlerts(),
-          fetchUnreadAlertCount(),
-        ]);
+        const [alts, count] = await Promise.all([fetchAlerts(), fetchUnreadAlertCount()]);
         setAlerts(alts);
         setUnreadCount(count);
-      } catch { /* silent */ }
+      } catch {
+        /* silent */
+      }
     }, 30000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, []);
 
   // Load preview when investigation selected
@@ -110,9 +114,10 @@ export default function MonitorPage() {
     if (selectedInvestigation) {
       setPreview((prev) => ({
         investigation: selectedInvestigation,
-        snapshot: prev?.investigation && getInvestigationId(prev.investigation) === selectedInvId
-          ? prev.snapshot
-          : null,
+        snapshot:
+          prev?.investigation && getInvestigationId(prev.investigation) === selectedInvId
+            ? prev.snapshot
+            : null,
       }));
     }
     setPreviewError(null);
@@ -122,13 +127,20 @@ export default function MonitorPage() {
     fetchInvestigation(selectedInvId)
       .then((data) => {
         if (previewRequestRef.current !== requestId) return;
-        setPreview(data as any);
+        setPreview({
+          investigation: data.investigation,
+          snapshot: data.snapshot,
+        });
         setPreviewError(null);
       })
       .catch((err) => {
         if (previewRequestRef.current !== requestId) return;
-        setPreview((prev) => prev && getInvestigationId(prev.investigation) === selectedInvId ? prev : null);
-        setPreviewError(err instanceof Error ? err.message : 'Failed to load investigation preview');
+        setPreview((prev) =>
+          prev && getInvestigationId(prev.investigation) === selectedInvId ? prev : null,
+        );
+        setPreviewError(
+          err instanceof Error ? err.message : 'Failed to load investigation preview',
+        );
       })
       .finally(() => {
         if (previewRequestRef.current === requestId) {
@@ -139,7 +151,7 @@ export default function MonitorPage() {
 
   const handleMarkRead = useCallback(async (alertId: string) => {
     await markAlertRead(alertId);
-    setAlerts((prev) => prev.map((a) => a._id === alertId ? { ...a, read: true } : a));
+    setAlerts((prev) => prev.map((a) => (a._id === alertId ? { ...a, read: true } : a)));
     setUnreadCount((c) => Math.max(0, c - 1));
   }, []);
 
@@ -155,55 +167,65 @@ export default function MonitorPage() {
     return invs;
   }, []);
 
-  const handleRenameInvestigation = useCallback(async (inv: Investigation) => {
-    const investigationId = getInvestigationId(inv);
-    if (!investigationId) return;
-    const nextName = window.prompt('Rename investigation', inv.name || inv.query);
-    if (!nextName || !nextName.trim()) return;
+  const handleRenameInvestigation = useCallback(
+    async (inv: Investigation) => {
+      const investigationId = getInvestigationId(inv);
+      if (!investigationId) return;
+      const nextName = window.prompt('Rename investigation', inv.name || inv.query);
+      if (!nextName?.trim()) return;
 
-    await renameInvestigation(investigationId, nextName.trim());
-    const invs = await refreshInvestigations();
-    setMenuOpenInvId(null);
-    if (selectedInvId === investigationId) {
-      const next = invs.find((item) => getInvestigationId(item) === investigationId) ?? null;
-      if (next) {
-        setPreview((prev) => prev ? { ...prev, investigation: next } : prev);
+      await renameInvestigation(investigationId, nextName.trim());
+      const invs = await refreshInvestigations();
+      setMenuOpenInvId(null);
+      if (selectedInvId === investigationId) {
+        const next = invs.find((item) => getInvestigationId(item) === investigationId) ?? null;
+        if (next) {
+          setPreview((prev) => (prev ? { ...prev, investigation: next } : prev));
+        }
       }
-    }
-  }, [refreshInvestigations, selectedInvId]);
+    },
+    [refreshInvestigations, selectedInvId],
+  );
 
-  const handleArchiveInvestigation = useCallback(async (inv: Investigation) => {
-    const investigationId = getInvestigationId(inv);
-    if (!investigationId) return;
-    const confirmed = window.confirm(`Archive "${inv.name || inv.query}"?`);
-    if (!confirmed) return;
+  const handleArchiveInvestigation = useCallback(
+    async (inv: Investigation) => {
+      const investigationId = getInvestigationId(inv);
+      if (!investigationId) return;
+      const confirmed = window.confirm(`Archive "${inv.name || inv.query}"?`);
+      if (!confirmed) return;
 
-    await archiveInvestigation(investigationId);
-    setMenuOpenInvId(null);
-    await refreshInvestigations();
-    if (selectedInvId === investigationId) {
-      setSelectedInvId(null);
-    }
-  }, [refreshInvestigations, selectedInvId]);
+      await archiveInvestigation(investigationId);
+      setMenuOpenInvId(null);
+      await refreshInvestigations();
+      if (selectedInvId === investigationId) {
+        setSelectedInvId(null);
+      }
+    },
+    [refreshInvestigations, selectedInvId],
+  );
 
-  const handleDeleteInvestigation = useCallback(async (inv: Investigation) => {
-    const investigationId = getInvestigationId(inv);
-    if (!investigationId) return;
-    const label = inv.name || inv.query;
-    const confirmed = window.confirm(`Delete "${label}" permanently?\n\nThis removes snapshots, scan history, dossiers, and monitor records.`);
-    if (!confirmed) return;
+  const handleDeleteInvestigation = useCallback(
+    async (inv: Investigation) => {
+      const investigationId = getInvestigationId(inv);
+      if (!investigationId) return;
+      const label = inv.name || inv.query;
+      const confirmed = window.confirm(
+        `Delete "${label}" permanently?\n\nThis removes snapshots, scan history, dossiers, and monitor records.`,
+      );
+      if (!confirmed) return;
 
-    await deleteInvestigation(investigationId);
-    setMenuOpenInvId(null);
-    await refreshInvestigations();
-    if (selectedInvId === investigationId) {
-      setSelectedInvId(null);
-    }
-  }, [refreshInvestigations, selectedInvId]);
+      await deleteInvestigation(investigationId);
+      setMenuOpenInvId(null);
+      await refreshInvestigations();
+      if (selectedInvId === investigationId) {
+        setSelectedInvId(null);
+      }
+    },
+    [refreshInvestigations, selectedInvId],
+  );
 
-  const filteredAlerts = alertFilter === 'all'
-    ? alerts
-    : alerts.filter((a) => a.severity === alertFilter);
+  const filteredAlerts =
+    alertFilter === 'all' ? alerts : alerts.filter((a) => a.severity === alertFilter);
 
   const tickerItems: NervTickerItem[] = alerts
     .filter((a) => a.severity === 'critical' || a.severity === 'warning')
@@ -217,7 +239,6 @@ export default function MonitorPage() {
 
   const criticalCount = alerts.filter((a) => a.severity === 'critical' && !a.read).length;
   const warningCount = alerts.filter((a) => a.severity === 'warning' && !a.read).length;
-  const getInvestigationId = (inv: Investigation): string => inv._id ?? inv.id ?? '';
 
   return (
     <div className="h-[calc(100vh-3.5rem)] flex flex-col">
@@ -233,6 +254,7 @@ export default function MonitorPage() {
               <div className="flex items-center gap-3">
                 {hasAtlas && (
                   <button
+                    type="button"
                     onClick={() => router.push('/atlas')}
                     className="text-[8px] font-mono uppercase text-nerv-text-muted hover:text-nerv-orange"
                   >
@@ -240,6 +262,7 @@ export default function MonitorPage() {
                   </button>
                 )}
                 <button
+                  type="button"
                   onClick={() => router.push('/search')}
                   className="text-[8px] font-mono uppercase text-nerv-orange hover:underline"
                 >
@@ -263,6 +286,7 @@ export default function MonitorPage() {
                   const isSelected = selectedInvId === investigationId;
                   return (
                     <button
+                      type="button"
                       key={investigationId || inv.query}
                       onClick={() => {
                         if (!investigationId) return;
@@ -323,86 +347,95 @@ export default function MonitorPage() {
                     value={String(warningCount)}
                     severity={warningCount > 0 ? 'warning' : undefined}
                   />
-                  <NervMetric
-                    label="Unread Alerts"
-                    value={String(unreadCount)}
-                  />
+                  <NervMetric label="Unread Alerts" value={String(unreadCount)} />
                 </div>
               </NervPanel>
 
               <NervPanel title="Active Investigations" accent="blue" corners>
                 <div className="divide-y divide-nerv-border">
-                  {investigations.filter((i) => i.status === 'active').map((inv) => (
-                    <div
-                      key={getInvestigationId(inv) || inv.query}
-                      className="flex items-center justify-between px-3 py-2 hover:bg-nerv-bg-elevated/20 transition-colors relative"
-                    >
-                      <div>
-                        <span className="text-xs font-mono text-nerv-text">{inv.name || inv.query}</span>
-                        <span className="text-[9px] font-mono text-nerv-text-muted ml-2">
-                          {timeAgo(inv.updatedAt as unknown as string)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            const investigationId = getInvestigationId(inv);
-                            if (!investigationId) return;
-                            router.push(`/investigate/${investigationId}`);
-                          }}
-                          className="text-[9px] font-mono uppercase text-nerv-orange hover:underline tracking-widest"
-                        >
-                          Investigate
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const investigationId = getInvestigationId(inv);
-                            if (!investigationId) return;
-                            setMenuOpenInvId((current) => current === investigationId ? null : investigationId);
-                          }}
-                          className="w-6 h-6 flex items-center justify-center border border-nerv-border text-nerv-text-muted hover:text-nerv-text hover:border-nerv-text-muted rounded-sm text-[12px] font-mono"
-                          aria-label={`Actions for ${inv.name || inv.query}`}
-                        >
-                          ...
-                        </button>
-                      </div>
-
-                      {menuOpenInvId === getInvestigationId(inv) && (
-                        <div className="absolute right-3 top-10 z-20 w-44 border border-nerv-border bg-nerv-bg-panel shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+                  {investigations
+                    .filter((i) => i.status === 'active')
+                    .map((inv) => (
+                      <div
+                        key={getInvestigationId(inv) || inv.query}
+                        className="flex items-center justify-between px-3 py-2 hover:bg-nerv-bg-elevated/20 transition-colors relative"
+                      >
+                        <div>
+                          <span className="text-xs font-mono text-nerv-text">
+                            {inv.name || inv.query}
+                          </span>
+                          <span className="text-[9px] font-mono text-nerv-text-muted ml-2">
+                            {timeAgo(inv.updatedAt as unknown as string)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
                           <button
+                            type="button"
                             onClick={() => {
                               const investigationId = getInvestigationId(inv);
                               if (!investigationId) return;
-                              setMenuOpenInvId(null);
                               router.push(`/investigate/${investigationId}`);
                             }}
-                            className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
+                            className="text-[9px] font-mono uppercase text-nerv-orange hover:underline tracking-widest"
                           >
-                            Open
+                            Investigate
                           </button>
                           <button
-                            onClick={() => void handleRenameInvestigation(inv)}
-                            className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const investigationId = getInvestigationId(inv);
+                              if (!investigationId) return;
+                              setMenuOpenInvId((current) =>
+                                current === investigationId ? null : investigationId,
+                              );
+                            }}
+                            className="w-6 h-6 flex items-center justify-center border border-nerv-border text-nerv-text-muted hover:text-nerv-text hover:border-nerv-text-muted rounded-sm text-[12px] font-mono"
+                            aria-label={`Actions for ${inv.name || inv.query}`}
                           >
-                            Rename
-                          </button>
-                          <button
-                            onClick={() => void handleArchiveInvestigation(inv)}
-                            className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
-                          >
-                            Archive
-                          </button>
-                          <button
-                            onClick={() => void handleDeleteInvestigation(inv)}
-                            className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-red hover:bg-nerv-red/10"
-                          >
-                            Delete
+                            ...
                           </button>
                         </div>
-                      )}
-                    </div>
-                  ))}
+
+                        {menuOpenInvId === getInvestigationId(inv) && (
+                          <div className="absolute right-3 top-10 z-20 w-44 border border-nerv-border bg-nerv-bg-panel shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const investigationId = getInvestigationId(inv);
+                                if (!investigationId) return;
+                                setMenuOpenInvId(null);
+                                router.push(`/investigate/${investigationId}`);
+                              }}
+                              className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
+                            >
+                              Open
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleRenameInvestigation(inv)}
+                              className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
+                            >
+                              Rename
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleArchiveInvestigation(inv)}
+                              className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
+                            >
+                              Archive
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteInvestigation(inv)}
+                              className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-red hover:bg-nerv-red/10"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                 </div>
               </NervPanel>
             </div>
@@ -424,23 +457,37 @@ export default function MonitorPage() {
                     <>
                       <div className="grid grid-cols-3 gap-4">
                         <NervMetric label="Query" value={preview.investigation.query} />
-                        <NervMetric label="Time Range" value={preview.investigation.settings?.timeRange || '7d'} />
+                        <NervMetric
+                          label="Time Range"
+                          value={preview.investigation.settings?.timeRange || '7d'}
+                        />
                         <NervMetric label="Status" value={preview.investigation.status} />
                       </div>
 
                       {preview.snapshot && (
                         <div className="grid grid-cols-3 gap-4 mt-3">
-                          <NervMetric label="Posts" value={String(preview.snapshot.postCount ?? 0)} />
-                          <NervMetric label="Narratives" value={String(preview.snapshot.narrativeCount ?? 0)} />
+                          <NervMetric
+                            label="Posts"
+                            value={String(preview.snapshot.postCount ?? 0)}
+                          />
+                          <NervMetric
+                            label="Narratives"
+                            value={String(preview.snapshot.narrativeCount ?? 0)}
+                          />
                           <NervMetric
                             label="Last Scan"
-                            value={preview.snapshot.timestamp ? timeAgo(preview.snapshot.timestamp) : 'N/A'}
+                            value={
+                              preview.snapshot.timestamp
+                                ? timeAgo(preview.snapshot.timestamp)
+                                : 'N/A'
+                            }
                           />
                         </div>
                       )}
 
                       <div className="pt-3 flex gap-2">
                         <button
+                          type="button"
                           onClick={() => {
                             const investigationId = getInvestigationId(preview.investigation);
                             if (!investigationId) return;
@@ -451,7 +498,12 @@ export default function MonitorPage() {
                           Open Investigation
                         </button>
                         <button
-                          onClick={() => router.push(`/search?q=${encodeURIComponent(preview.investigation.query)}`)}
+                          type="button"
+                          onClick={() =>
+                            router.push(
+                              `/search?q=${encodeURIComponent(preview.investigation.query)}`,
+                            )
+                          }
                           className="px-4 py-2 bg-nerv-bg border border-nerv-border text-nerv-text-muted text-[10px] font-mono uppercase tracking-widest hover:border-nerv-text-muted transition-all"
                         >
                           Re-scan
@@ -481,10 +533,14 @@ export default function MonitorPage() {
           <div className="p-2">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
-                Alert Feed {unreadCount > 0 && <NervBadge label={String(unreadCount)} variant="red" size="sm" />}
+                Alert Feed{' '}
+                {unreadCount > 0 && (
+                  <NervBadge label={String(unreadCount)} variant="red" size="sm" />
+                )}
               </span>
               {unreadCount > 0 && (
                 <button
+                  type="button"
                   onClick={handleMarkAllRead}
                   className="text-[8px] font-mono uppercase text-nerv-text-muted hover:text-nerv-text-secondary"
                 >
@@ -498,6 +554,7 @@ export default function MonitorPage() {
               {['all', 'critical', 'warning', 'info'].map((f) => (
                 <button
                   key={f}
+                  type="button"
                   onClick={() => setAlertFilter(f)}
                   className={`text-[8px] font-mono uppercase px-2 py-0.5 border rounded-sm transition-all ${
                     alertFilter === f
@@ -518,10 +575,11 @@ export default function MonitorPage() {
                 </div>
               ) : (
                 filteredAlerts.slice(0, 50).map((alert) => (
-                  <div
+                  <button
                     key={alert._id}
                     onClick={() => handleMarkRead(alert._id)}
-                    className={`cursor-pointer transition-opacity ${alert.read ? 'opacity-40' : 'opacity-100'}`}
+                    type="button"
+                    className={`w-full text-left transition-opacity ${alert.read ? 'opacity-40' : 'opacity-100'}`}
                   >
                     <NervAlert
                       type={alert.type}
@@ -530,7 +588,7 @@ export default function MonitorPage() {
                       description={alert.description}
                       timestamp={timeAgo(alert.createdAt)}
                     />
-                  </div>
+                  </button>
                 ))
               )}
             </div>

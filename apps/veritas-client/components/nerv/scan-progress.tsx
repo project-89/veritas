@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import type { ScanJob, ConnectorStatus } from '../../lib/api';
+import type { ConnectorStatus, ScanJob } from '../../lib/api';
 
 // ---------------------------------------------------------------------------
 // Platform display config
@@ -32,7 +32,7 @@ function StatusBadge({ status }: { status: ConnectorStatus['status'] }) {
     failed: { bg: 'bg-nerv-red/20', text: 'text-nerv-red', label: 'FAILED' },
     cancelled: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', label: 'CANCELLED' },
   };
-  const c = config[status] ?? config.queued!;
+  const c = config[status] ?? config.queued;
   return (
     <span
       className={[
@@ -67,11 +67,7 @@ function ConnectorProgressBar({
   };
 
   const bgColor =
-    status === 'failed'
-      ? 'bg-nerv-red'
-      : status === 'cancelled'
-        ? 'bg-yellow-500'
-        : undefined;
+    status === 'failed' ? 'bg-nerv-red' : status === 'cancelled' ? 'bg-yellow-500' : undefined;
 
   return (
     <div className="h-1 flex-1 bg-nerv-border rounded-full overflow-hidden">
@@ -133,6 +129,7 @@ function ConnectorRow({
       {/* Retry button for failed connectors */}
       {connector.status === 'failed' && (
         <button
+          type="button"
           onClick={() => onRetry(platform)}
           className="text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors shrink-0"
         >
@@ -194,6 +191,7 @@ export function ScanProgress({ scanJob, onCancel, onRetry }: ScanProgressProps) 
           )}
           {isActive && (
             <button
+              type="button"
               onClick={onCancel}
               className="text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 border border-nerv-red/50 text-nerv-red hover:bg-nerv-red/10 rounded-sm transition-colors"
             >

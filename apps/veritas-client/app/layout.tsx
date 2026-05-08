@@ -8,11 +8,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      className="dark"
-      translate="no"
-    >
+    <html lang="en" className="dark" translate="no">
       <head>
         <meta name="google" content="notranslate" />
       </head>

@@ -1,21 +1,21 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
+  Body,
   Controller,
   Get,
-  Post,
-  Body,
-  Param,
-  Query,
-  Logger,
   HttpException,
   HttpStatus,
+  Logger,
+  Param,
+  Post,
+  Query,
 } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { IdentityRecordRepository } from '../repositories/identity-record.repository';
-import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
-import type { IdentityRecord } from '../schemas/identity-record.schema';
 import type { AnalysisJobData } from '../queue/analysis.processor';
+import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
+import { IdentityRecordRepository } from '../repositories/identity-record.repository';
 import type { PsychologicalProfileMode } from '../schemas/analysis-job.schema';
+import type { IdentityRecord } from '../schemas/identity-record.schema';
 
 interface GenerateProfileBody {
   mode?: PsychologicalProfileMode;
@@ -51,9 +51,7 @@ export class IdentityController {
    * GET /identity/recent — Recently investigated identities.
    */
   @Get('recent')
-  async getRecent(
-    @Query('limit') limit?: string,
-  ): Promise<IdentityRecord[]> {
+  async getRecent(@Query('limit') limit?: string): Promise<IdentityRecord[]> {
     return this.identityRepo.getRecentlyInvestigated(limit ? parseInt(limit, 10) : 20);
   }
 
@@ -151,7 +149,7 @@ export class IdentityController {
       // Create analysis job for the profiler
       const analysisJob = await this.analysisJobRepo.createJob({
         scanId,
-        type: 'psychological-profile' as any,
+        type: 'psychological-profile',
         narrativeIds: [id],
         input: {
           query: record.primaryHandle,
@@ -197,8 +195,11 @@ export class IdentityController {
       return { status: 'queued', jobId };
     } catch (err) {
       const error = err as Error;
-      this.logger.error(`Failed to queue MAGI profile for @${record.primaryHandle}: ${error.message}`, error.stack);
-      await this.identityRepo.updateProfileStatus(id, 'failed').catch(() => {});
+      this.logger.error(
+        `Failed to queue MAGI profile for @${record.primaryHandle}: ${error.message}`,
+        error.stack,
+      );
+      await this.identityRepo.updateProfileStatus(id, 'failed').catch(() => undefined);
       return { status: 'failed', error: error.message };
     }
   }

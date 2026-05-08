@@ -6,9 +6,9 @@ describe('OnChainCorrelationService', () => {
   });
 
   it('returns unavailable when no API key is configured', async () => {
-    const service = new OnChainCorrelationService(
-      { get: jest.fn().mockReturnValue(undefined) } as any,
-    );
+    const service = new OnChainCorrelationService({
+      get: jest.fn().mockReturnValue(undefined),
+    } as any);
 
     const result = await service.buildSummary(['0x1234567890abcdef1234567890abcdef12345678']);
 
@@ -24,8 +24,14 @@ describe('OnChainCorrelationService', () => {
           status: '1',
           message: 'OK',
           result: [
-            { from: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', to: '0xcccccccccccccccccccccccccccccccccccccccc' },
-            { from: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', to: '0xdddddddddddddddddddddddddddddddddddddddd' },
+            {
+              from: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              to: '0xcccccccccccccccccccccccccccccccccccccccc',
+            },
+            {
+              from: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              to: '0xdddddddddddddddddddddddddddddddddddddddd',
+            },
           ],
         }),
       },
@@ -50,7 +56,10 @@ describe('OnChainCorrelationService', () => {
           status: '1',
           message: 'OK',
           result: [
-            { from: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', to: '0xcccccccccccccccccccccccccccccccccccccccc' },
+            {
+              from: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+              to: '0xcccccccccccccccccccccccccccccccccccccccc',
+            },
           ],
         }),
       },
@@ -72,9 +81,7 @@ describe('OnChainCorrelationService', () => {
     ];
 
     const fetchMock = jest.fn().mockImplementation(async () => responses.shift());
-    const service = new OnChainCorrelationService(
-      { get: jest.fn().mockReturnValue('key') } as any,
-    );
+    const service = new OnChainCorrelationService({ get: jest.fn().mockReturnValue('key') } as any);
     service.setFetchImplementation(fetchMock as any);
 
     const result = await service.buildSummary([

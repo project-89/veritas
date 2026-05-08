@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 export interface NervTableColumn<T> {
   key: string;
@@ -104,12 +104,8 @@ export function NervTable<T>({
                   rowHeight,
                   'border-b border-nerv-border/50 transition-colors',
                   i % 2 === 0 ? 'bg-transparent' : 'bg-nerv-bg-panel/30',
-                  isSelected
-                    ? 'bg-nerv-orange/10 border-l-2 border-l-nerv-orange'
-                    : '',
-                  onRowClick
-                    ? 'cursor-pointer hover:bg-nerv-bg-elevated/60'
-                    : '',
+                  isSelected ? 'bg-nerv-orange/10 border-l-2 border-l-nerv-orange' : '',
+                  onRowClick ? 'cursor-pointer hover:bg-nerv-bg-elevated/60' : '',
                 ].join(' ')}
               >
                 {columns.map((col) => {
@@ -128,10 +124,7 @@ export function NervTable<T>({
           })}
           {sortedData.length === 0 && (
             <tr>
-              <td
-                colSpan={columns.length}
-                className="px-3 py-6 text-center text-nerv-text-muted"
-              >
+              <td colSpan={columns.length} className="px-3 py-6 text-center text-nerv-text-muted">
                 NO DATA
               </td>
             </tr>

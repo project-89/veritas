@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { RawPost } from './deviation.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -120,7 +120,8 @@ export class EntityAnalysisService {
     >();
 
     for (let idx = 0; idx < insights.length; idx++) {
-      const insight = insights[idx]!;
+      const insight = insights[idx];
+      if (!insight) continue;
       if (!insight.entities || insight.entities.length === 0) continue;
 
       for (const ent of insight.entities) {
@@ -133,7 +134,7 @@ export class EntityAnalysisService {
         if (!mentionsByEntity.has(key)) {
           mentionsByEntity.set(key, []);
         }
-        mentionsByEntity.get(key)!.push({ insightIdx: idx, relevance: ent.relevance });
+        mentionsByEntity.get(key)?.push({ insightIdx: idx, relevance: ent.relevance });
       }
     }
 
@@ -142,7 +143,10 @@ export class EntityAnalysisService {
     // If lengths don't match, we map by index up to the minimum.
     const insightByPostIdx = new Map<number, InsightInput>();
     for (let i = 0; i < insights.length; i++) {
-      insightByPostIdx.set(i, insights[i]!);
+      const insight = insights[i];
+      if (insight) {
+        insightByPostIdx.set(i, insight);
+      }
     }
 
     // Build narrative -> set of post indices
@@ -161,16 +165,14 @@ export class EntityAnalysisService {
     const dossiers: EntityDossier[] = [];
 
     for (const [key, mentions] of mentionsByEntity.entries()) {
-      const canon = canonMap.get(key)!;
+      const canon = canonMap.get(key);
+      if (!canon) continue;
       const totalMentions = mentions.length;
 
       // -----------------------------------------------------------------------
       // Narrative appearances
       // -----------------------------------------------------------------------
-      const narrativeMentions = new Map<
-        string,
-        { count: number; sentimentSum: number }
-      >();
+      const narrativeMentions = new Map<string, { count: number; sentimentSum: number }>();
 
       for (const m of mentions) {
         // Determine which narrative(s) this insight/post belongs to
@@ -316,7 +318,10 @@ export class EntityAnalysisService {
         if (!entityMeta.has(key)) {
           entityMeta.set(key, { name: ent.name, type: ent.type, count: 0 });
         }
-        entityMeta.get(key)!.count++;
+        const meta = entityMeta.get(key);
+        if (meta) {
+          meta.count++;
+        }
       }
       insightEntitySets.push(keys);
     }
@@ -326,8 +331,9 @@ export class EntityAnalysisService {
     for (const entities of insightEntitySets) {
       for (let i = 0; i < entities.length; i++) {
         for (let j = i + 1; j < entities.length; j++) {
-          const a = entities[i]!;
-          const b = entities[j]!;
+          const a = entities[i];
+          const b = entities[j];
+          if (!a || !b) continue;
           const edgeKey = a < b ? `${a}|||${b}` : `${b}|||${a}`;
           edgeCounts.set(edgeKey, (edgeCounts.get(edgeKey) ?? 0) + 1);
         }
@@ -338,8 +344,8 @@ export class EntityAnalysisService {
     const connectedEntities = new Set<string>();
     for (const [edgeKey] of edgeCounts) {
       const [a, b] = edgeKey.split('|||');
-      connectedEntities.add(a!);
-      connectedEntities.add(b!);
+      if (a) connectedEntities.add(a);
+      if (b) connectedEntities.add(b);
     }
 
     // Find max count for normalization
@@ -367,10 +373,11 @@ export class EntityAnalysisService {
     const edges: EntityNetworkEdge[] = [];
     for (const [edgeKey, count] of edgeCounts) {
       const [a, b] = edgeKey.split('|||');
+      if (!a || !b) continue;
       edges.push({
         id: `edge-${a}-${b}`,
-        source: a!,
-        target: b!,
+        source: a,
+        target: b,
         type: 'co-occurrence',
         properties: { frequency: count },
         metrics: {
@@ -438,7 +445,12 @@ export class EntityAnalysisService {
       for (const phrase of capitalizedPhrases) {
         if (phrase.length < 4 || seen.has(phrase.toLowerCase())) continue;
         // Skip common sentence starters
-        if (['The', 'This', 'That', 'What', 'When', 'Where', 'How', 'Why'].some((w) => phrase.startsWith(w + ' '))) continue;
+        if (
+          ['The', 'This', 'That', 'What', 'When', 'Where', 'How', 'Why'].some((w) =>
+            phrase.startsWith(w + ' '),
+          )
+        )
+          continue;
         seen.add(phrase.toLowerCase());
         entities.push({ name: phrase, type: 'entity', relevance: 0.5 });
       }

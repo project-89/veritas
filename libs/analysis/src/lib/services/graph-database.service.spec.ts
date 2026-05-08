@@ -39,15 +39,11 @@ describe('GraphDatabaseService', () => {
     });
 
     it('should no-op on upsertUser when not connected', async () => {
-      await expect(
-        service.upsertUser('testuser', 'twitter'),
-      ).resolves.not.toThrow();
+      await expect(service.upsertUser('testuser', 'twitter')).resolves.not.toThrow();
     });
 
     it('should no-op on upsertNarrative when not connected', async () => {
-      await expect(
-        service.upsertNarrative('narr-1', 'Test narrative'),
-      ).resolves.not.toThrow();
+      await expect(service.upsertNarrative('narr-1', 'Test narrative')).resolves.not.toThrow();
     });
 
     it('should no-op on addEdge when not connected', async () => {
@@ -99,8 +95,9 @@ describe('GraphDatabaseService', () => {
   describe('sanitizeRelType', () => {
     it('should sanitize relationship type names', () => {
       // Access private method via bracket notation for testing
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sanitize = (service as any)['sanitizeRelType'].bind(service) as (t: string) => string;
+      const sanitize = (
+        service as unknown as { sanitizeRelType: (t: string) => string }
+      ).sanitizeRelType.bind(service) as (t: string) => string;
 
       expect(sanitize('CO_TIMED')).toBe('CO_TIMED');
       expect(sanitize('co-timed')).toBe('CO_TIMED');

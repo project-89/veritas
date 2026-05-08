@@ -8,10 +8,11 @@
  */
 
 import * as dotenv from 'dotenv';
+
 dotenv.config();
 
-import axios from 'axios';
 import { Scraper, SearchMode } from '@the-convocation/twitter-scraper';
+import axios from 'axios';
 
 const QUERY = process.argv[2] || 'project89';
 const LIMIT = parseInt(process.argv[3] || '50', 10);
@@ -37,16 +38,57 @@ function analyzeSentiment(text: string): { label: string; score: number } {
   const lower = text.toLowerCase();
 
   const positiveWords = [
-    'love', 'great', 'amazing', 'awesome', 'excellent', 'good', 'best',
-    'fantastic', 'wonderful', 'brilliant', 'incredible', 'beautiful',
-    'happy', 'excited', 'impressive', 'perfect', 'support', 'thank',
-    'cool', 'nice', 'helpful', 'innovative', 'revolutionary',
+    'love',
+    'great',
+    'amazing',
+    'awesome',
+    'excellent',
+    'good',
+    'best',
+    'fantastic',
+    'wonderful',
+    'brilliant',
+    'incredible',
+    'beautiful',
+    'happy',
+    'excited',
+    'impressive',
+    'perfect',
+    'support',
+    'thank',
+    'cool',
+    'nice',
+    'helpful',
+    'innovative',
+    'revolutionary',
   ];
   const negativeWords = [
-    'hate', 'terrible', 'awful', 'bad', 'worst', 'horrible', 'disgusting',
-    'trash', 'garbage', 'stupid', 'scam', 'fake', 'fraud', 'sucks',
-    'disappointed', 'angry', 'annoying', 'toxic', 'attack', 'destroy',
-    'lie', 'liar', 'pathetic', 'ridiculous', 'manipulat', 'exploit',
+    'hate',
+    'terrible',
+    'awful',
+    'bad',
+    'worst',
+    'horrible',
+    'disgusting',
+    'trash',
+    'garbage',
+    'stupid',
+    'scam',
+    'fake',
+    'fraud',
+    'sucks',
+    'disappointed',
+    'angry',
+    'annoying',
+    'toxic',
+    'attack',
+    'destroy',
+    'lie',
+    'liar',
+    'pathetic',
+    'ridiculous',
+    'manipulat',
+    'exploit',
   ];
 
   let posCount = 0;
@@ -171,8 +213,9 @@ async function main() {
     searchTwitter(QUERY, LIMIT),
   ]);
 
-  const allPosts = [...redditPosts, ...twitterPosts]
-    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  const allPosts = [...redditPosts, ...twitterPosts].sort(
+    (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
+  );
 
   if (allPosts.length === 0) {
     console.log('\nNo posts found. Try a different query.');
@@ -193,9 +236,15 @@ async function main() {
   console.log(`  Reddit: ${redditPosts.length} | Twitter: ${twitterPosts.length}`);
   console.log('');
   console.log('  SENTIMENT BREAKDOWN:');
-  console.log(`    Positive: ${positive.length} (${((positive.length / allPosts.length) * 100).toFixed(1)}%)`);
-  console.log(`    Neutral:  ${neutral.length} (${((neutral.length / allPosts.length) * 100).toFixed(1)}%)`);
-  console.log(`    Negative: ${negative.length} (${((negative.length / allPosts.length) * 100).toFixed(1)}%)`);
+  console.log(
+    `    Positive: ${positive.length} (${((positive.length / allPosts.length) * 100).toFixed(1)}%)`,
+  );
+  console.log(
+    `    Neutral:  ${neutral.length} (${((neutral.length / allPosts.length) * 100).toFixed(1)}%)`,
+  );
+  console.log(
+    `    Negative: ${negative.length} (${((negative.length / allPosts.length) * 100).toFixed(1)}%)`,
+  );
   console.log(`    Average sentiment score: ${avgScore.toFixed(3)} (range: -1 to 1)`);
   console.log('');
 
@@ -210,7 +259,9 @@ async function main() {
     const platAvg = platformPosts.reduce((s, p) => s + p.sentimentScore, 0) / platformPosts.length;
 
     console.log(`  ${platform.toUpperCase()} (${platformPosts.length} posts):`);
-    console.log(`    +${platPositive} positive | ${platNeutral} neutral | -${platNegative} negative | avg: ${platAvg.toFixed(3)}`);
+    console.log(
+      `    +${platPositive} positive | ${platNeutral} neutral | -${platNegative} negative | avg: ${platAvg.toFixed(3)}`,
+    );
   }
 
   // Engagement stats
@@ -228,13 +279,13 @@ async function main() {
     console.log(`\n${'─'.repeat(60)}`);
     console.log('  MOST NEGATIVE POSTS');
     console.log(`${'─'.repeat(60)}`);
-    const worstPosts = negative
-      .sort((a, b) => a.sentimentScore - b.sentimentScore)
-      .slice(0, 5);
+    const worstPosts = negative.sort((a, b) => a.sentimentScore - b.sentimentScore).slice(0, 5);
 
     for (const post of worstPosts) {
       const date = post.timestamp.toISOString().split('T')[0];
-      console.log(`\n  [${post.platform}] ${date} | by ${post.author} | score: ${post.sentimentScore.toFixed(2)}`);
+      console.log(
+        `\n  [${post.platform}] ${date} | by ${post.author} | score: ${post.sentimentScore.toFixed(2)}`,
+      );
       console.log(`  ${post.text.slice(0, 200)}${post.text.length > 200 ? '...' : ''}`);
       console.log(`  ${post.url}`);
     }
@@ -245,13 +296,13 @@ async function main() {
     console.log(`\n${'─'.repeat(60)}`);
     console.log('  MOST POSITIVE POSTS');
     console.log(`${'─'.repeat(60)}`);
-    const bestPosts = positive
-      .sort((a, b) => b.sentimentScore - a.sentimentScore)
-      .slice(0, 5);
+    const bestPosts = positive.sort((a, b) => b.sentimentScore - a.sentimentScore).slice(0, 5);
 
     for (const post of bestPosts) {
       const date = post.timestamp.toISOString().split('T')[0];
-      console.log(`\n  [${post.platform}] ${date} | by ${post.author} | score: ${post.sentimentScore.toFixed(2)}`);
+      console.log(
+        `\n  [${post.platform}] ${date} | by ${post.author} | score: ${post.sentimentScore.toFixed(2)}`,
+      );
       console.log(`  ${post.text.slice(0, 200)}${post.text.length > 200 ? '...' : ''}`);
       console.log(`  ${post.url}`);
     }
@@ -270,9 +321,7 @@ async function main() {
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
 
-    const dayPosts = allPosts.filter(
-      (p) => p.timestamp >= dayStart && p.timestamp < dayEnd,
-    );
+    const dayPosts = allPosts.filter((p) => p.timestamp >= dayStart && p.timestamp < dayEnd);
 
     const label = dayStart.toISOString().split('T')[0];
     if (dayPosts.length === 0) {
@@ -284,11 +333,14 @@ async function main() {
     const dayNeg = dayPosts.filter((p) => p.sentiment === 'negative').length;
     const dayAvg = dayPosts.reduce((s, p) => s + p.sentimentScore, 0) / dayPosts.length;
 
-    const bar = dayAvg >= 0
-      ? `${'█'.repeat(Math.round(dayAvg * 20))}${'░'.repeat(20 - Math.round(dayAvg * 20))}`
-      : `${'░'.repeat(20 + Math.round(dayAvg * 20))}${'▓'.repeat(-Math.round(dayAvg * 20))}`;
+    const bar =
+      dayAvg >= 0
+        ? `${'█'.repeat(Math.round(dayAvg * 20))}${'░'.repeat(20 - Math.round(dayAvg * 20))}`
+        : `${'░'.repeat(20 + Math.round(dayAvg * 20))}${'▓'.repeat(-Math.round(dayAvg * 20))}`;
 
-    console.log(`  ${label}: ${dayPosts.length.toString().padStart(3)} posts | +${dayPos} -${dayNeg} | ${bar} ${dayAvg.toFixed(2)}`);
+    console.log(
+      `  ${label}: ${dayPosts.length.toString().padStart(3)} posts | +${dayPos} -${dayNeg} | ${bar} ${dayAvg.toFixed(2)}`,
+    );
   }
 
   console.log(`\n${'='.repeat(60)}\n`);

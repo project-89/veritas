@@ -1,5 +1,5 @@
-import { SaturationMetricsService } from './saturation-metrics.service';
 import type { SaturationReport } from './saturation-metrics.service';
+import { SaturationMetricsService } from './saturation-metrics.service';
 
 describe('SaturationMetricsService', () => {
   let service: SaturationMetricsService;
@@ -9,16 +9,9 @@ describe('SaturationMetricsService', () => {
   });
 
   // Helper to create narratives with optional centroids
-  function makeNarratives(
-    count: number,
-    postsPerNarrative: number,
-    centroids?: number[][],
-  ) {
+  function makeNarratives(count: number, postsPerNarrative: number, centroids?: number[][]) {
     return Array.from({ length: count }, (_, i) => ({
-      postIndices: Array.from(
-        { length: postsPerNarrative },
-        (_, j) => i * postsPerNarrative + j,
-      ),
+      postIndices: Array.from({ length: postsPerNarrative }, (_, j) => i * postsPerNarrative + j),
       centroidEmbedding: centroids?.[i],
     }));
   }
@@ -460,10 +453,7 @@ describe('SaturationMetricsService', () => {
 
     it('handles narratives without centroid embeddings', () => {
       const result = service.computeSaturation({
-        narratives: [
-          { postIndices: [0, 1] },
-          { postIndices: [2, 3] },
-        ],
+        narratives: [{ postIndices: [0, 1] }, { postIndices: [2, 3] }],
         totalPosts: 4,
         unclusteredCount: 0,
       });

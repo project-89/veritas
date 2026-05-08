@@ -4,16 +4,13 @@
  * for consistency
  */
 
-// Data connector for general data sources
-export * from './data-connector.interface';
-
-// Social media connectors for social platforms
-export * from './social-media-connector.interface';
-
-// Transform-on-ingest connectors that anonymize data during ingestion
-export * from './transform-on-ingest-connector.interface';
-
 // Injection tokens for swappable connectors
 export * from './connector-tokens';
+// Data connector for general data sources
+export * from './data-connector.interface';
+// Social media connectors for social platforms
+export * from './social-media-connector.interface';
+// Transform-on-ingest connectors that anonymize data during ingestion
+export * from './transform-on-ingest-connector.interface';
 
 // Export other interfaces as needed

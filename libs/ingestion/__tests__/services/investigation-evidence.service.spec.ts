@@ -10,10 +10,7 @@ describe('InvestigationEvidenceService', () => {
   };
 
   const buildService = () =>
-    new InvestigationEvidenceService(
-      mockJinaReader as any,
-      mockYoutubeConnector as any,
-    );
+    new InvestigationEvidenceService(mockJinaReader as any, mockYoutubeConnector as any);
 
   beforeEach(() => {
     jest.clearAllMocks();

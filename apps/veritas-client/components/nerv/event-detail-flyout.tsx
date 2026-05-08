@@ -19,7 +19,7 @@ const SEVERITY_STYLES: Record<string, string> = {
 function formatTimestamp(ts: string): string {
   try {
     const d = new Date(ts);
-    return d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    return `${d.toISOString().replace('T', ' ').slice(0, 19)} UTC`;
   } catch {
     return ts;
   }
@@ -40,6 +40,7 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
           Event Detail
         </span>
         <button
+          type="button"
           onClick={onClose}
           className="w-6 h-6 flex items-center justify-center text-nerv-text-muted hover:text-nerv-text transition-colors rounded-sm hover:bg-nerv-bg-elevated"
         >
@@ -50,9 +51,7 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
       {/* Content */}
       <div className="flex-1 p-3 space-y-4">
         {/* Title */}
-        <h2 className="text-sm font-mono font-bold text-nerv-text leading-tight">
-          {event.title}
-        </h2>
+        <h2 className="text-sm font-mono font-bold text-nerv-text leading-tight">{event.title}</h2>
 
         {/* Badges row */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -84,9 +83,7 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
             <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted w-14">
               Source
             </span>
-            <span className="text-[10px] font-mono text-nerv-text-secondary">
-              {event.source}
-            </span>
+            <span className="text-[10px] font-mono text-nerv-text-secondary">{event.source}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted w-14">
@@ -103,9 +100,7 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
           <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
             Location
           </div>
-          <div className="text-[11px] font-mono text-nerv-text">
-            {event.location.label}
-          </div>
+          <div className="text-[11px] font-mono text-nerv-text">{event.location.label}</div>
           <div className="text-[9px] font-mono text-nerv-text-muted mt-0.5 tabular-nums">
             {event.location.lat.toFixed(4)}, {event.location.lng.toFixed(4)}
             {event.location.countryCode && ` (${event.location.countryCode})`}

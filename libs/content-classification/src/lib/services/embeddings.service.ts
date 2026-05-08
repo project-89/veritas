@@ -1,7 +1,7 @@
-import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DATABASE_PROVIDER_TOKEN } from '../constants';
 import type { DatabaseProvider } from '@veritas/database';
+import { DATABASE_PROVIDER_TOKEN } from '../constants';
 
 /**
  * Vector embedding dimensions
@@ -52,26 +52,19 @@ export class EmbeddingsService {
   private readonly apiKey: string | null = null;
   private readonly embeddingDimension: number = 384; // Default for many models like MiniLM
   private readonly cacheTTL = 86400000; // 24 hours in milliseconds
-  private embeddingsCache: Map<
-    string,
-    { vector: EmbeddingVector; timestamp: number }
-  > = new Map();
+  private embeddingsCache: Map<string, { vector: EmbeddingVector; timestamp: number }> = new Map();
 
   constructor(
     private readonly configService: ConfigService,
     @Optional()
     @Inject(DATABASE_PROVIDER_TOKEN)
-    private readonly databaseService?: DatabaseProvider
+    private readonly databaseService?: DatabaseProvider,
   ) {
     // Initialize embeddings service configuration
-    this.embeddingEndpoint =
-      this.configService.get<string>('EMBEDDING_SERVICE_ENDPOINT') || null;
-    this.apiKey =
-      this.configService.get<string>('EMBEDDING_SERVICE_API_KEY') || null;
+    this.embeddingEndpoint = this.configService.get<string>('EMBEDDING_SERVICE_ENDPOINT') || null;
+    this.apiKey = this.configService.get<string>('EMBEDDING_SERVICE_API_KEY') || null;
 
-    const configuredDimension = this.configService.get<number>(
-      'EMBEDDING_DIMENSION'
-    );
+    const configuredDimension = this.configService.get<number>('EMBEDDING_DIMENSION');
     if (configuredDimension) {
       this.embeddingDimension = configuredDimension;
     }
@@ -79,7 +72,7 @@ export class EmbeddingsService {
     // Validate configuration
     if (!this.embeddingEndpoint) {
       this.logger.warn(
-        'EMBEDDING_SERVICE_ENDPOINT not configured, falling back to local processing'
+        'EMBEDDING_SERVICE_ENDPOINT not configured, falling back to local processing',
       );
     }
 
@@ -123,9 +116,7 @@ export class EmbeddingsService {
       return embedding;
     } catch (error) {
       this.logger.error(
-        `Embedding generation error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Embedding generation error: ${error instanceof Error ? error.message : String(error)}`,
       );
       // Return zero vector as fallback
       return Array(this.embeddingDimension).fill(0);
@@ -153,7 +144,7 @@ export class EmbeddingsService {
       this.logger.error(
         `Batch embedding generation error: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
       // Return zero vectors as fallback
       return texts.map(() => Array(this.embeddingDimension).fill(0));
@@ -169,7 +160,7 @@ export class EmbeddingsService {
    */
   async searchSimilarContent<T>(
     textOrVector: string | EmbeddingVector,
-    options: VectorSearchOptions = {}
+    options: VectorSearchOptions = {},
   ): Promise<VectorSearchResult<T>[]> {
     try {
       const queryVector = Array.isArray(textOrVector)
@@ -188,12 +179,12 @@ export class EmbeddingsService {
             return (await contentRepository.vectorSearch(
               'embedding', // Field name containing the vector
               queryVector,
-              { limit, minScore }
+              { limit, minScore },
             )) as VectorSearchResult<T>[];
           } catch (error: unknown) {
             this.logger.error(
               `Error performing vector search: ${error instanceof Error ? error.message : String(error)}`,
-              error instanceof Error ? error.stack : undefined
+              error instanceof Error ? error.stack : undefined,
             );
           }
         }
@@ -203,9 +194,7 @@ export class EmbeddingsService {
       return this.performLocalVectorSearch<T>(queryVector, limit, minScore);
     } catch (error) {
       this.logger.error(
-        `Vector similarity search error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Vector similarity search error: ${error instanceof Error ? error.message : String(error)}`,
       );
       return [];
     }
@@ -251,9 +240,7 @@ export class EmbeddingsService {
    * @param text Text to generate embedding for
    * @returns Promise resolving to embedding vector
    */
-  private async generateEmbeddingWithExternalService(
-    text: string
-  ): Promise<EmbeddingVector> {
+  private async generateEmbeddingWithExternalService(text: string): Promise<EmbeddingVector> {
     if (!this.embeddingEndpoint || !this.apiKey) {
       throw new Error('External embedding service not configured');
     }
@@ -270,17 +257,14 @@ export class EmbeddingsService {
       });
 
       if (!response.ok) {
-        throw new Error(
-          `Embedding service error: ${response.status} ${response.statusText}`
-        );
+        throw new Error(`Embedding service error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
 
       // Extract the embedding vector from the response based on service format
       // This is based on common embedding API response formats and may need adjustment
-      const embedding =
-        data.data?.[0]?.embedding || data.embedding || data.vector;
+      const embedding = data.data?.[0]?.embedding || data.embedding || data.vector;
 
       if (!Array.isArray(embedding)) {
         throw new Error('Invalid embedding response format');
@@ -291,7 +275,7 @@ export class EmbeddingsService {
       this.logger.error(
         `External embedding service error: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
       // Fall back to local processing
       return this.generateEmbeddingLocally(text);
@@ -304,9 +288,7 @@ export class EmbeddingsService {
    * @param texts Array of texts to generate embeddings for
    * @returns Promise resolving to array of embedding vectors
    */
-  private async batchGenerateWithExternalService(
-    texts: string[]
-  ): Promise<EmbeddingVector[]> {
+  private async batchGenerateWithExternalService(texts: string[]): Promise<EmbeddingVector[]> {
     if (!this.embeddingEndpoint || !this.apiKey) {
       throw new Error('External embedding service not configured');
     }
@@ -323,9 +305,7 @@ export class EmbeddingsService {
       });
 
       if (!response.ok) {
-        throw new Error(
-          `Embedding batch service error: ${response.status} ${response.statusText}`
-        );
+        throw new Error(`Embedding batch service error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -335,9 +315,7 @@ export class EmbeddingsService {
 
       if (Array.isArray(data.data)) {
         // Handle OpenAI-like format
-        embeddings = data.data.map(
-          (item: { embedding: EmbeddingVector }) => item.embedding
-        );
+        embeddings = data.data.map((item: { embedding: EmbeddingVector }) => item.embedding);
       } else if (Array.isArray(data.embeddings)) {
         // Handle format with direct embeddings array
         embeddings = data.embeddings;
@@ -350,12 +328,10 @@ export class EmbeddingsService {
       this.logger.error(
         `External embedding batch service error: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
       // Fall back to local processing
-      return Promise.all(
-        texts.map((text) => this.generateEmbeddingLocally(text))
-      );
+      return Promise.all(texts.map((text) => this.generateEmbeddingLocally(text)));
     }
   }
 
@@ -385,7 +361,10 @@ export class EmbeddingsService {
     // Simple character-level approach for generating pseudo-embeddings
     // This does NOT produce meaningful semantic vectors but serves as a fallback
     for (let i = 0; i < words.length; i++) {
-      const word = words[i]!;
+      const word = words[i];
+      if (!word) {
+        continue;
+      }
 
       for (let j = 0; j < word.length && j < this.embeddingDimension; j++) {
         // Use character code as a simple feature
@@ -398,9 +377,7 @@ export class EmbeddingsService {
     }
 
     // Normalize the vector to unit length
-    const magnitude = Math.sqrt(
-      vector.reduce((sum, val) => sum + val * val, 0)
-    );
+    const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
 
     return magnitude === 0 ? vector : vector.map((v) => v / magnitude);
   }
@@ -429,7 +406,7 @@ export class EmbeddingsService {
   private async performLocalVectorSearch<T>(
     queryVector: EmbeddingVector,
     limit: number,
-    minScore: number
+    minScore: number,
   ): Promise<VectorSearchResult<T>[]> {
     // For local implementation, we need content with embeddings
     // This is a very inefficient approach and should only be used as fallback
@@ -438,36 +415,31 @@ export class EmbeddingsService {
     }
 
     try {
-      const contentRepository = this.databaseService.getRepository<any>('Content');
+      const contentRepository = this.databaseService.getRepository<{ embedding?: number[] }>(
+        'Content',
+      );
       const allContent = await contentRepository.find();
 
       // Filter content that has embeddings
       const contentWithEmbeddings = allContent.filter(
-        (item: any) =>
-          item.embedding && Array.isArray(item.embedding)
+        (item): item is { embedding: number[] } =>
+          Array.isArray(item.embedding) && item.embedding.length > 0,
       );
 
       // Calculate similarity for each item
-      const results = contentWithEmbeddings.map(
-        (item: any) => ({
-          item: item as T,
-          score: this.calculateSimilarity(
-            queryVector,
-            item.embedding as number[]
-          ),
-        })
-      );
+      const results = contentWithEmbeddings.map((item) => ({
+        item: item as T,
+        score: this.calculateSimilarity(queryVector, item.embedding),
+      }));
 
       // Filter by minimum score and sort by similarity (descending)
       return results
-        .filter((result: any) => result.score >= minScore)
-        .sort((a: any, b: any) => b.score - a.score)
+        .filter((result) => result.score >= minScore)
+        .sort((a, b) => b.score - a.score)
         .slice(0, limit);
     } catch (error) {
       this.logger.error(
-        `Local vector search error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
+        `Local vector search error: ${error instanceof Error ? error.message : String(error)}`,
       );
       return [];
     }

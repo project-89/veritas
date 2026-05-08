@@ -49,6 +49,38 @@ interface RawPostDto {
   };
 }
 
+interface AuthorDetailsSnapshot {
+  platform: string;
+  followersCount: number | null;
+  followingCount: number | null;
+  tweetsCount: number | null;
+  isVerified: boolean;
+  name: string;
+  description: string;
+  url: string;
+  avatar: string | null;
+  banner: string | null;
+}
+
+type SocialGraphResult = Awaited<ReturnType<SocialGraphIntelligenceService['enrichRelationships']>>;
+type BotDetectionSummary = {
+  summary: string;
+  structuralPatterns: BotDetectionResult['structuralPatterns'];
+  graphEnhanced: boolean;
+};
+type InvestigationResultWithEnrichment = DeepInvestigationResult & {
+  botDetection?: BotDetectionSummary | null;
+  socialGraph?: SocialGraphResult | null;
+};
+
+function asNullableNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function asNullableString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -108,9 +140,7 @@ export class InvestigationController {
    *   4. Pass everything to DeepInvestigationService.investigate()
    */
   @Post()
-  async investigate(
-    @Body() body: InvestigateRequestBody,
-  ): Promise<DeepInvestigationResult> {
+  async investigate(@Body() body: InvestigateRequestBody): Promise<DeepInvestigationResult> {
     const { query, userHandles, platforms, topicPosts } = body;
 
     if (!query?.trim()) {
@@ -146,7 +176,7 @@ export class InvestigationController {
     >();
 
     // Author profile data (followers, following, etc.) keyed by handle
-    const authorProfileMap = new Map<string, Record<string, unknown>>();
+    const authorProfileMap = new Map<string, AuthorDetailsSnapshot>();
 
     // Process each user handle concurrently (bounded by 5)
     const CONCURRENCY = 5;
@@ -163,11 +193,7 @@ export class InvestigationController {
           // 2. Determine the platform(s) to query for this user's timeline
           //    If the user has topic posts, use the platform from the first post.
           //    Otherwise try each requested platform.
-          let platformsToTry = this.resolvePlatforms(
-            handle,
-            userTopicDtos,
-            platforms,
-          );
+          let platformsToTry = this.resolvePlatforms(handle, userTopicDtos, platforms);
 
           // 2b. Cross-platform discovery via Sherlock (with 15s timeout)
           //     Find this user's accounts on other platforms we can fetch from
@@ -222,10 +248,7 @@ export class InvestigationController {
           }
 
           // 3. Fetch historical timeline from connectors that support it
-          const historicalPosts = await this.fetchTimeline(
-            handle,
-            platformsToTry,
-          );
+          const historicalPosts = await this.fetchTimeline(handle, platformsToTry);
 
           // 4. Fetch author profile details (followers, following, etc.)
           const authorDetails = await this.fetchAuthorDetails(handle, platformsToTry);
@@ -245,7 +268,10 @@ export class InvestigationController {
       `Timelines built for ${userTimelines.size} users — handing off to DeepInvestigationService`,
     );
 
-    const investigationResult = await this.deepInvestigationService.investigate(query, userTimelines);
+    const investigationResult = (await this.deepInvestigationService.investigate(
+      query,
+      userTimelines,
+    )) as InvestigationResultWithEnrichment;
 
     // --- Source credibility scoring ---
     const credibilityUsers = investigationResult.users.map((u) => ({
@@ -291,9 +317,7 @@ export class InvestigationController {
 
     // Attach credibility and bot scores to user results
     const credibilityMap = new Map(credibilityScores.map((s) => [s.handle, s]));
-    const botScoreMap = new Map(
-      (botDetection?.scores ?? []).map((s) => [s.handle, s]),
-    );
+    const botScoreMap = new Map((botDetection?.scores ?? []).map((s) => [s.handle, s]));
 
     for (const userResult of investigationResult.users) {
       const cred = credibilityMap.get(userResult.user.handle);
@@ -314,15 +338,13 @@ export class InvestigationController {
         userResult.flags.push(...cred.flags.filter((f) => !userResult.flags.includes(f)));
       }
       if (bot && bot.botProbability > 0.5) {
-        userResult.flags.push(
-          `Bot probability: ${Math.round(bot.botProbability * 100)}%`,
-        );
+        userResult.flags.push(`Bot probability: ${Math.round(bot.botProbability * 100)}%`);
         userResult.flags.push(...bot.detectedPatterns.filter((p) => !userResult.flags.includes(p)));
       }
     }
 
     // Attach bot detection summary and structural patterns to the result
-    (investigationResult as unknown as Record<string, unknown>).botDetection = botDetection
+    investigationResult.botDetection = botDetection
       ? {
           summary: botDetection.summary,
           structuralPatterns: botDetection.structuralPatterns,
@@ -332,14 +354,16 @@ export class InvestigationController {
 
     // --- Social Graph Enrichment ---
     try {
-      const graphUsers = investigationResult.users.map((u: any) => ({
-        handle: u.user.handle,
-        platform: u.user.platform,
-        posts: [...(u.user.topicPosts ?? []), ...(u.user.historicalPosts ?? [])],
+      const graphUsers = investigationResult.users.map((userResult) => ({
+        handle: userResult.user.handle,
+        platform: userResult.user.platform,
+        posts: [...(userResult.user.topicPosts ?? []), ...(userResult.user.historicalPosts ?? [])],
       }));
       const graphResult = await this.socialGraph.enrichRelationships(graphUsers, query);
-      this.logger.log(`Social graph: ${graphResult.edgesCreated} edges, ${graphResult.communitiesDetected} communities`);
-      (investigationResult as any).socialGraph = graphResult;
+      this.logger.log(
+        `Social graph: ${graphResult.edgesCreated} edges, ${graphResult.communitiesDetected} communities`,
+      );
+      investigationResult.socialGraph = graphResult;
     } catch (err) {
       this.logger.warn(`Social graph enrichment failed: ${err}`);
     }
@@ -354,7 +378,7 @@ export class InvestigationController {
         await this.identityRecordRepo.upsertFromInvestigation({
           handle: userResult.user.handle,
           platform: userResult.user.platform,
-          displayName: (profile as any)?.name ?? userResult.user.name,
+          displayName: profile?.name ?? userResult.user.name,
           snapshot: {
             query,
             timestamp: new Date(),
@@ -365,22 +389,24 @@ export class InvestigationController {
             flags: userResult.flags,
             influenceScore: userResult.influenceScore,
           },
-          authorProfile: profile ? {
-            followersCount: (profile as any).followersCount ?? null,
-            followingCount: (profile as any).followingCount ?? null,
-            postsCount: (profile as any).tweetsCount ?? null,
-            isVerified: (profile as any).isVerified ?? false,
-            bio: (profile as any).description ?? null,
-          } : null,
-          profileImageUrl: (profile as any)?.avatar ?? null,
-          bannerImageUrl: (profile as any)?.banner ?? null,
+          authorProfile: profile
+            ? {
+                followersCount: profile.followersCount ?? null,
+                followingCount: profile.followingCount ?? null,
+                postsCount: profile.tweetsCount ?? null,
+                isVerified: profile.isVerified ?? false,
+                bio: profile.description ?? null,
+              }
+            : null,
+          profileImageUrl: profile?.avatar ?? null,
+          bannerImageUrl: profile?.banner ?? null,
           credibilityScore: cred?.overallScore ?? null,
           botProbability: bot?.botProbability ?? null,
           flags: userResult.flags,
           observedPosts: [
             ...(userResult.user.topicPosts ?? []),
             ...(userResult.user.historicalPosts ?? []),
-          ].map((post: any) => ({
+          ].map((post: UserPost) => ({
             text: post.text ?? '',
             timestamp: post.timestamp ?? new Date().toISOString(),
             platform: post.platform ?? userResult.user.platform ?? 'unknown',
@@ -505,7 +531,7 @@ export class InvestigationController {
   private async fetchAuthorDetails(
     handle: string,
     platformsToTry: string[],
-  ): Promise<Record<string, unknown> | null> {
+  ): Promise<AuthorDetailsSnapshot | null> {
     for (const platform of platformsToTry) {
       const connector = this.ingestionService.getConnector(platform);
       if (!connector) continue;
@@ -519,17 +545,18 @@ export class InvestigationController {
         ).call(connector, handle);
 
         if (details) {
+          const metadata = (details.metadata ?? {}) as Record<string, unknown>;
           return {
             platform,
-            followersCount: (details.metadata as Record<string, unknown>)?.followersCount ?? null,
-            followingCount: (details.metadata as Record<string, unknown>)?.followingCount ?? null,
-            tweetsCount: (details.metadata as Record<string, unknown>)?.tweetsCount ?? null,
+            followersCount: asNullableNumber(metadata.followersCount),
+            followingCount: asNullableNumber(metadata.followingCount),
+            tweetsCount: asNullableNumber(metadata.tweetsCount),
             isVerified: details.verificationStatus === 'verified',
-            name: details.name ?? handle,
-            description: details.description ?? '',
-            url: details.url ?? '',
-            avatar: (details.metadata as Record<string, unknown>)?.avatar ?? null,
-            banner: (details.metadata as Record<string, unknown>)?.banner ?? null,
+            name: asNullableString(details.name) ?? handle,
+            description: asNullableString(details.description) ?? '',
+            url: asNullableString(details.url) ?? '',
+            avatar: asNullableString(metadata.avatar),
+            banner: asNullableString(metadata.banner),
           };
         }
       } catch (err) {

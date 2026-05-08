@@ -23,7 +23,11 @@ class PlatformAccountEmbed {
   @Prop({ type: String, enum: ['sherlock', 'investigation', 'manual'], default: 'investigation' })
   discoveryMethod!: 'sherlock' | 'investigation' | 'manual';
 
-  @Prop({ type: String, enum: ['actionable', 'corroborating', 'extended'], default: 'corroborating' })
+  @Prop({
+    type: String,
+    enum: ['actionable', 'corroborating', 'extended'],
+    default: 'corroborating',
+  })
   discoveryTier!: 'actionable' | 'corroborating' | 'extended';
 
   @Prop({ type: Boolean, default: false })

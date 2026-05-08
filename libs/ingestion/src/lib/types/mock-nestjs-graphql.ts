@@ -4,7 +4,7 @@
 
 // Mock Field decorator
 export function Field(typeFunc?: () => any, options?: any) {
-  return function (target: any, key: string) {
+  return (target: any, key: string) => {
     // This is a mock implementation that does nothing
     // In a real scenario, it would register the field with GraphQL schema
   };
@@ -12,7 +12,7 @@ export function Field(typeFunc?: () => any, options?: any) {
 
 // Mock InputType decorator
 export function InputType(options?: any) {
-  return function (target: any) {
+  return (target: any) => {
     // This is a mock implementation that does nothing
     // In a real scenario, it would register the class as a GraphQL input type
   };
@@ -21,7 +21,7 @@ export function InputType(options?: any) {
 // Mock registerEnumType function
 export function registerEnumType(
   enumType: object,
-  options: { name: string; description?: string }
+  options: { name: string; description?: string },
 ) {
   // This is a mock implementation that does nothing
   // In a real scenario, it would register the enum with GraphQL schema

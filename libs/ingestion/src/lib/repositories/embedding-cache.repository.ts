@@ -1,9 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
-import {
-  EmbeddingCacheModel,
-  type EmbeddingCacheEntry,
-} from '../schemas/embedding-cache.schema';
+import { type EmbeddingCacheEntry, EmbeddingCacheModel } from '../schemas/embedding-cache.schema';
 
 /** 30 days in milliseconds */
 const TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -52,7 +49,10 @@ export class EmbeddingCacheRepository implements OnModuleInit {
       this.logger.log('EmbeddingCache repository initialized');
     } catch (error: unknown) {
       const err = error as Error;
-      this.logger.error(`Failed to initialize EmbeddingCache repository: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to initialize EmbeddingCache repository: ${err.message}`,
+        err.stack,
+      );
     }
   }
 

@@ -2,10 +2,7 @@
  * Extended ContentNode interface to include social media specific fields
  * used by the ingestion controllers
  */
-import {
-  ContentNode,
-  EngagementMetrics as BaseEngagementMetrics,
-} from '@veritas/shared/types';
+import { EngagementMetrics as BaseEngagementMetrics, ContentNode } from '@veritas/shared/types';
 
 /**
  * Common social media engagement metrics interface

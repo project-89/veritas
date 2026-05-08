@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
-import { JinaReaderService } from '../../../src/lib/services/utils/jina-reader.service';
 import axios from 'axios';
+import { JinaReaderService } from '../../../src/lib/services/utils/jina-reader.service';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -43,7 +43,7 @@ describe('JinaReaderService', () => {
           headers: expect.objectContaining({
             Accept: 'application/json',
           }),
-        })
+        }),
       );
 
       const createCall = mockedAxios.create.mock.calls[0]![0];
@@ -56,10 +56,7 @@ describe('JinaReaderService', () => {
       new JinaReaderService(configService as ConfigService);
 
       const createCall = mockedAxios.create.mock.calls[1]![0];
-      expect(createCall?.headers).toHaveProperty(
-        'Authorization',
-        'Bearer test-api-key'
-      );
+      expect(createCall?.headers).toHaveProperty('Authorization', 'Bearer test-api-key');
     });
   });
 
@@ -90,7 +87,7 @@ describe('JinaReaderService', () => {
         expect.objectContaining({
           headers: { 'X-Return-Format': 'markdown' },
           timeout: 30000,
-        })
+        }),
       );
     });
 
@@ -109,7 +106,7 @@ describe('JinaReaderService', () => {
         expect.objectContaining({
           headers: { 'X-Return-Format': 'text' },
           timeout: 5000,
-        })
+        }),
       );
     });
 
@@ -162,7 +159,8 @@ describe('JinaReaderService', () => {
 
       // Create a new service for this test since we need real timers
       const fastService = new JinaReaderService(configService as ConfigService);
-      const fastClient = mockedAxios.create.mock.results[mockedAxios.create.mock.results.length - 1]!.value;
+      const fastClient =
+        mockedAxios.create.mock.results[mockedAxios.create.mock.results.length - 1]!.value;
 
       const error = new Error('Persistent failure');
       fastClient.get.mockRejectedValue(error);
@@ -171,7 +169,7 @@ describe('JinaReaderService', () => {
       (fastService as any).baseDelayMs = 0;
 
       await expect(fastService.readUrl('https://example.com')).rejects.toThrow(
-        'Persistent failure'
+        'Persistent failure',
       );
       expect(fastClient.get).toHaveBeenCalledTimes(3);
 

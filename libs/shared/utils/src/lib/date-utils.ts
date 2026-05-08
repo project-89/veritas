@@ -128,7 +128,6 @@ export function parseTimeframe(timeframe: string): {
  */
 export function getTimeFilter(
   startDate?: Date,
-  endDate?: Date
 ): 'hour' | 'day' | 'week' | 'month' | 'year' | 'all' {
   if (!startDate) return 'all';
 

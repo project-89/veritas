@@ -1,20 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { SchedulerService } from '../../src/app/services/scheduler.service';
-import { RefreshService } from '../../src/app/services/refresh.service';
-import { AlertRepository } from '@veritas/ingestion';
 import { MonitorService } from '@veritas/analysis';
+import { AlertRepository } from '@veritas/ingestion';
+import { RefreshService } from '../../src/app/services/refresh.service';
+import { SchedulerService } from '../../src/app/services/scheduler.service';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-function makeConfig(overrides: {
-  investigationId?: string;
-  enabled?: boolean;
-  intervalMinutes?: number;
-  nextRunAt?: Date | null;
-  lastRunAt?: Date | null;
-} = {}) {
+function makeConfig(
+  overrides: {
+    investigationId?: string;
+    enabled?: boolean;
+    intervalMinutes?: number;
+    nextRunAt?: Date | null;
+    lastRunAt?: Date | null;
+  } = {},
+) {
   return {
     _id: `config-${overrides.investigationId ?? 'inv-1'}`,
     investigationId: overrides.investigationId ?? 'inv-1',
@@ -193,9 +195,7 @@ describe('SchedulerService', () => {
   });
 
   it('should handle getAllEnabledConfigs failure gracefully', async () => {
-    alertRepository.getAllEnabledConfigs.mockRejectedValue(
-      new Error('DB connection lost'),
-    );
+    alertRepository.getAllEnabledConfigs.mockRejectedValue(new Error('DB connection lost'));
 
     // Should not throw
     await expect(service.tick()).resolves.toBeUndefined();
@@ -203,9 +203,7 @@ describe('SchedulerService', () => {
   });
 
   it('should reset running flag even after top-level error', async () => {
-    alertRepository.getAllEnabledConfigs.mockRejectedValue(
-      new Error('DB connection lost'),
-    );
+    alertRepository.getAllEnabledConfigs.mockRejectedValue(new Error('DB connection lost'));
 
     await service.tick();
 
@@ -226,9 +224,12 @@ describe('SchedulerService', () => {
   it('should clear interval on destroy', () => {
     // Manually call onModuleInit so the interval exists
     service.onModuleInit();
-    expect(service['intervalHandle']).not.toBeNull();
+    const schedulerState = service as unknown as {
+      intervalHandle: ReturnType<typeof setInterval> | null;
+    };
+    expect(schedulerState.intervalHandle).not.toBeNull();
 
     service.onModuleDestroy();
-    expect(service['intervalHandle']).toBeNull();
+    expect(schedulerState.intervalHandle).toBeNull();
   });
 });

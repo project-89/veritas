@@ -1,9 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
-import {
-  ProjectDossier,
-  ProjectDossierModel,
-} from '../schemas/project-dossier.schema';
+import { ProjectDossier, ProjectDossierModel } from '../schemas/project-dossier.schema';
 
 @Injectable()
 export class ProjectDossierRepository implements OnModuleInit {

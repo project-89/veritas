@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GraphDatabaseService } from './graph-database.service';
 import type { UserPost } from './deep-investigation.service';
+import { GraphDatabaseService } from './graph-database.service';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -93,13 +93,8 @@ export class GraphBotDetectionService {
     for (const pattern of structuralPatterns) {
       for (const score of scores) {
         if (pattern.members.includes(score.handle)) {
-          score.structuralScore = Math.min(
-            1,
-            score.structuralScore + pattern.confidence * 0.3,
-          );
-          score.detectedPatterns.push(
-            `Part of ${pattern.type} pattern: ${pattern.description}`,
-          );
+          score.structuralScore = Math.min(1, score.structuralScore + pattern.confidence * 0.3);
+          score.detectedPatterns.push(`Part of ${pattern.type} pattern: ${pattern.description}`);
         }
       }
     }
@@ -162,16 +157,18 @@ export class GraphBotDetectionService {
     // Build edges between all user pairs
     for (let i = 0; i < users.length; i++) {
       for (let j = i + 1; j < users.length; j++) {
-        const userA = users[i]!;
-        const userB = users[j]!;
+        const userA = users[i];
+        const userB = users[j];
+        if (!userA || !userB) {
+          continue;
+        }
 
         // CO_TIMED: posts within 5 minutes
         let coTimedCount = 0;
         for (const postA of userA.posts) {
           for (const postB of userB.posts) {
             const delta = Math.abs(
-              new Date(postA.timestamp).getTime() -
-                new Date(postB.timestamp).getTime(),
+              new Date(postA.timestamp).getTime() - new Date(postB.timestamp).getTime(),
             );
             if (delta <= CO_TIME_WINDOW_MS) {
               coTimedCount++;
@@ -184,8 +181,10 @@ export class GraphBotDetectionService {
 
         if (coTimedCount > 0) {
           await this.graph.addEdge(
-            userA.handle, userA.platform,
-            userB.handle, userB.platform,
+            userA.handle,
+            userA.platform,
+            userB.handle,
+            userB.platform,
             'CO_TIMED',
             { count: coTimedCount, ...edgeMeta },
           );
@@ -195,8 +194,10 @@ export class GraphBotDetectionService {
         const similarCount = this.countSimilarPosts(userA.posts, userB.posts);
         if (similarCount > 0) {
           await this.graph.addEdge(
-            userA.handle, userA.platform,
-            userB.handle, userB.platform,
+            userA.handle,
+            userA.platform,
+            userB.handle,
+            userB.platform,
             'SIMILAR_CONTENT',
             { count: similarCount, ...edgeMeta },
           );
@@ -204,8 +205,10 @@ export class GraphBotDetectionService {
 
         // CO_NARRATIVE: always connected since they're in the same investigation
         await this.graph.addEdge(
-          userA.handle, userA.platform,
-          userB.handle, userB.platform,
+          userA.handle,
+          userA.platform,
+          userB.handle,
+          userB.platform,
           'CO_NARRATIVE',
           edgeMeta,
         );
@@ -226,10 +229,7 @@ export class GraphBotDetectionService {
 
     let structuralScore = 0;
     if (graphAvailable) {
-      structuralScore = await this.computeGraphStructuralScore(
-        user.handle,
-        user.platform,
-      );
+      structuralScore = await this.computeGraphStructuralScore(user.handle, user.platform);
     }
 
     const detectedPatterns: string[] = [];
@@ -272,9 +272,7 @@ export class GraphBotDetectionService {
     if (posts.length < 3) return 0;
 
     let score = 0;
-    const timestamps = posts
-      .map((p) => new Date(p.timestamp).getTime())
-      .sort((a, b) => a - b);
+    const timestamps = posts.map((p) => new Date(p.timestamp).getTime()).sort((a, b) => a - b);
 
     // 1. Burst detection: many posts in a very short window
     const burstScore = this.detectBurstiness(timestamps);
@@ -300,8 +298,12 @@ export class GraphBotDetectionService {
 
     let burstCount = 0;
     for (let i = 0; i < timestamps.length - 4; i++) {
-      const windowMinutes =
-        (timestamps[i + 4]! - timestamps[i]!) / (1000 * 60);
+      const start = timestamps[i];
+      const end = timestamps[i + 4];
+      if (start === undefined || end === undefined) {
+        continue;
+      }
+      const windowMinutes = (end - start) / (1000 * 60);
       if (windowMinutes < 2) {
         burstCount++;
       }
@@ -315,7 +317,12 @@ export class GraphBotDetectionService {
 
     const intervals: number[] = [];
     for (let i = 1; i < timestamps.length; i++) {
-      intervals.push(timestamps[i]! - timestamps[i - 1]!);
+      const previous = timestamps[i - 1];
+      const current = timestamps[i];
+      if (previous === undefined || current === undefined) {
+        continue;
+      }
+      intervals.push(current - previous);
     }
 
     // Check if intervals are suspiciously uniform
@@ -323,8 +330,7 @@ export class GraphBotDetectionService {
     if (mean === 0) return 1; // All at same time = very suspicious
 
     const deviations = intervals.map((i) => Math.abs(i - mean) / mean);
-    const avgDeviation =
-      deviations.reduce((s, v) => s + v, 0) / deviations.length;
+    const avgDeviation = deviations.reduce((s, v) => s + v, 0) / deviations.length;
 
     // Very low deviation = machine-like regularity
     if (avgDeviation < 0.05) return 1.0;
@@ -336,9 +342,7 @@ export class GraphBotDetectionService {
   private detect24hCoverage(posts: UserPost[]): number {
     if (posts.length < 10) return 0;
 
-    const hours = new Set(
-      posts.map((p) => new Date(p.timestamp).getUTCHours()),
-    );
+    const hours = new Set(posts.map((p) => new Date(p.timestamp).getUTCHours()));
     // 24 hours covered = very suspicious
     const coverage = hours.size / 24;
     if (coverage > 0.85) return 1.0;
@@ -349,15 +353,12 @@ export class GraphBotDetectionService {
   private detectWeekendActivity(posts: UserPost[]): number {
     if (posts.length < 10) return 0;
 
-    let weekdayCount = 0;
     let weekendCount = 0;
 
     for (const post of posts) {
       const day = new Date(post.timestamp).getUTCDay();
       if (day === 0 || day === 6) {
         weekendCount++;
-      } else {
-        weekdayCount++;
       }
     }
 
@@ -400,9 +401,7 @@ export class GraphBotDetectionService {
   }
 
   private detectContentRepetition(posts: UserPost[]): number {
-    const normalizedTexts = posts.map((p) =>
-      p.text.toLowerCase().trim().slice(0, 100),
-    );
+    const normalizedTexts = posts.map((p) => p.text.toLowerCase().trim().slice(0, 100));
     const uniqueTexts = new Set(normalizedTexts);
     const uniqueRatio = uniqueTexts.size / normalizedTexts.length;
 
@@ -415,10 +414,7 @@ export class GraphBotDetectionService {
 
   private detectEngagementAnomalies(posts: UserPost[]): number {
     const zeroEngagement = posts.filter(
-      (p) =>
-        p.engagement.likes === 0 &&
-        p.engagement.comments === 0 &&
-        p.engagement.shares === 0,
+      (p) => p.engagement.likes === 0 && p.engagement.comments === 0 && p.engagement.shares === 0,
     ).length;
 
     const zeroRatio = zeroEngagement / posts.length;
@@ -432,8 +428,7 @@ export class GraphBotDetectionService {
 
     const sentiments = posts.map((p) => p.sentiment.score);
     const mean = sentiments.reduce((s, v) => s + v, 0) / sentiments.length;
-    const variance =
-      sentiments.reduce((s, v) => s + (v - mean) ** 2, 0) / sentiments.length;
+    const variance = sentiments.reduce((s, v) => s + (v - mean) ** 2, 0) / sentiments.length;
 
     // Very low variance in sentiment = possible automation
     if (variance < 0.01) return 0.7;
@@ -445,10 +440,7 @@ export class GraphBotDetectionService {
   // Graph-based structural scoring
   // --------------------------------------------------------------------------
 
-  private async computeGraphStructuralScore(
-    handle: string,
-    platform: string,
-  ): Promise<number> {
+  private async computeGraphStructuralScore(handle: string, platform: string): Promise<number> {
     // Count how many CO_TIMED and SIMILAR_CONTENT edges this user has
     const records = await this.graph.runQuery(
       `MATCH (u:User {handle: $handle, platform: $platform})-[r:CO_TIMED|SIMILAR_CONTENT]-(other:User)
@@ -531,15 +523,17 @@ export class GraphBotDetectionService {
     const coTimedPairs: Array<[string, string, number]> = [];
     for (let i = 0; i < users.length; i++) {
       for (let j = i + 1; j < users.length; j++) {
-        const userA = users[i]!;
-        const userB = users[j]!;
+        const userA = users[i];
+        const userB = users[j];
+        if (!userA || !userB) {
+          continue;
+        }
 
         let coTimedCount = 0;
         for (const postA of userA.posts) {
           for (const postB of userB.posts) {
             const delta = Math.abs(
-              new Date(postA.timestamp).getTime() -
-                new Date(postB.timestamp).getTime(),
+              new Date(postA.timestamp).getTime() - new Date(postB.timestamp).getTime(),
             );
             if (delta <= CO_TIME_WINDOW_MS) {
               coTimedCount++;
@@ -572,9 +566,7 @@ export class GraphBotDetectionService {
 
     // Find groups of users all co-timed with each other (clique-like)
     if (coTimedPairs.length >= 3) {
-      const allHandlesInPairs = new Set(
-        coTimedPairs.flatMap(([a, b]) => [a, b]),
-      );
+      const allHandlesInPairs = new Set(coTimedPairs.flatMap(([a, b]) => [a, b]));
       if (allHandlesInPairs.size >= 3 && allHandlesInPairs.size <= 8) {
         patterns.push({
           type: 'clique',
@@ -588,12 +580,18 @@ export class GraphBotDetectionService {
     // Detect similar content without graph
     for (let i = 0; i < users.length; i++) {
       for (let j = i + 1; j < users.length; j++) {
-        const similar = this.countSimilarPosts(users[i]!.posts, users[j]!.posts);
+        const userA = users[i];
+        const userB = users[j];
+        if (!userA || !userB) {
+          continue;
+        }
+
+        const similar = this.countSimilarPosts(userA.posts, userB.posts);
         if (similar >= 2) {
           patterns.push({
             type: 'chain',
-            members: [users[i]!.handle, users[j]!.handle],
-            description: `@${users[i]!.handle} and @${users[j]!.handle} share ${similar} near-identical posts`,
+            members: [userA.handle, userB.handle],
+            description: `@${userA.handle} and @${userB.handle} share ${similar} near-identical posts`,
             confidence: Math.min(0.8, similar / 5),
           });
         }
@@ -609,14 +607,16 @@ export class GraphBotDetectionService {
 
   private getTemporalPatternDetails(posts: UserPost[]): string[] {
     const details: string[] = [];
-    const timestamps = posts
-      .map((p) => new Date(p.timestamp).getTime())
-      .sort((a, b) => a - b);
+    const timestamps = posts.map((p) => new Date(p.timestamp).getTime()).sort((a, b) => a - b);
 
     // Check for bursts
     for (let i = 0; i < timestamps.length - 4; i++) {
-      const windowMinutes =
-        (timestamps[i + 4]! - timestamps[i]!) / (1000 * 60);
+      const start = timestamps[i];
+      const end = timestamps[i + 4];
+      if (start === undefined || end === undefined) {
+        continue;
+      }
+      const windowMinutes = (end - start) / (1000 * 60);
       if (windowMinutes < 2) {
         details.push('5+ posts within 2 minutes detected');
         break;
@@ -624,9 +624,7 @@ export class GraphBotDetectionService {
     }
 
     // Check for 24h coverage
-    const hours = new Set(
-      posts.map((p) => new Date(p.timestamp).getUTCHours()),
-    );
+    const hours = new Set(posts.map((p) => new Date(p.timestamp).getUTCHours()));
     if (hours.size >= 20) {
       details.push(`Posts span ${hours.size}/24 hours — no apparent sleep cycle`);
     }
@@ -637,26 +635,17 @@ export class GraphBotDetectionService {
   private getBehavioralPatternDetails(posts: UserPost[]): string[] {
     const details: string[] = [];
 
-    const normalizedTexts = posts.map((p) =>
-      p.text.toLowerCase().trim().slice(0, 100),
-    );
+    const normalizedTexts = posts.map((p) => p.text.toLowerCase().trim().slice(0, 100));
     const uniqueTexts = new Set(normalizedTexts);
     if (uniqueTexts.size < normalizedTexts.length * 0.5) {
-      details.push(
-        `Only ${uniqueTexts.size}/${normalizedTexts.length} unique post texts`,
-      );
+      details.push(`Only ${uniqueTexts.size}/${normalizedTexts.length} unique post texts`);
     }
 
     const zeroEngagement = posts.filter(
-      (p) =>
-        p.engagement.likes === 0 &&
-        p.engagement.comments === 0 &&
-        p.engagement.shares === 0,
+      (p) => p.engagement.likes === 0 && p.engagement.comments === 0 && p.engagement.shares === 0,
     ).length;
     if (zeroEngagement > posts.length * 0.5) {
-      details.push(
-        `${zeroEngagement}/${posts.length} posts have zero engagement`,
-      );
+      details.push(`${zeroEngagement}/${posts.length} posts have zero engagement`);
     }
 
     return details;
@@ -673,11 +662,19 @@ export class GraphBotDetectionService {
   private countSimilarPosts(postsA: UserPost[], postsB: UserPost[]): number {
     let count = 0;
     const normalizedA = postsA.map((p) =>
-      p.text.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().slice(0, 100),
+      p.text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim()
+        .slice(0, 100),
     );
     const normalizedB = new Set(
       postsB.map((p) =>
-        p.text.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim().slice(0, 100),
+        p.text
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, '')
+          .trim()
+          .slice(0, 100),
       ),
     );
 
@@ -694,11 +691,7 @@ export class GraphBotDetectionService {
     // Weighted combination: structural gets more weight when graph is available
     const hasGraph = score.structuralScore > 0;
     if (hasGraph) {
-      return (
-        score.temporalScore * 0.3 +
-        score.behavioralScore * 0.3 +
-        score.structuralScore * 0.4
-      );
+      return score.temporalScore * 0.3 + score.behavioralScore * 0.3 + score.structuralScore * 0.4;
     }
     return score.temporalScore * 0.5 + score.behavioralScore * 0.5;
   }

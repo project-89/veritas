@@ -9,11 +9,7 @@
  * @param max Maximum value in the original range
  * @returns Normalized value between 0 and 1
  */
-export function normalizeValue(
-  value: number,
-  min: number,
-  max: number
-): number {
+export function normalizeValue(value: number, min: number, max: number): number {
   if (min === max) {
     return 0.5; // Default to middle value if range is invalid
   }
@@ -56,20 +52,14 @@ export function calculateCredibilityScore(userData: {
   // Followers factor (up to 0.25 points)
   if (userData.followersCount) {
     // Logarithmic scale to handle wide range of follower counts
-    const followersScore = Math.min(
-      Math.log10(userData.followersCount + 1) / 5,
-      1
-    );
+    const followersScore = Math.min(Math.log10(userData.followersCount + 1) / 5, 1);
     score += followersScore * 0.25;
   }
 
   // Activity level factor (up to 0.15 points)
   if (userData.statusesCount) {
     // Logarithmic scale for activity level
-    const activityScore = Math.min(
-      Math.log10(userData.statusesCount + 1) / 4,
-      1
-    );
+    const activityScore = Math.min(Math.log10(userData.statusesCount + 1) / 4, 1);
     score += activityScore * 0.15;
   }
 
@@ -155,7 +145,7 @@ export function calculateWeightedAverage(
       value: number;
       weight: number;
     }
-  >
+  >,
 ): number {
   let totalWeight = 0;
   let weightedSum = 0;

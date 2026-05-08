@@ -1,5 +1,5 @@
-import { SocialGraphIntelligenceService } from './social-graph-intelligence.service';
 import { GraphDatabaseService } from './graph-database.service';
+import { SocialGraphIntelligenceService } from './social-graph-intelligence.service';
 
 /**
  * Unit tests for SocialGraphIntelligenceService.
@@ -32,9 +32,7 @@ describe('SocialGraphIntelligenceService', () => {
 
   describe('extractMentions', () => {
     it('should extract single mention', () => {
-      expect(service.extractMentions('Hello @alice how are you')).toEqual([
-        'alice',
-      ]);
+      expect(service.extractMentions('Hello @alice how are you')).toEqual(['alice']);
     });
 
     it('should extract multiple mentions', () => {
@@ -58,9 +56,7 @@ describe('SocialGraphIntelligenceService', () => {
     });
 
     it('should handle mention at start of text', () => {
-      expect(service.extractMentions('@alice this is a reply')).toEqual([
-        'alice',
-      ]);
+      expect(service.extractMentions('@alice this is a reply')).toEqual(['alice']);
     });
   });
 

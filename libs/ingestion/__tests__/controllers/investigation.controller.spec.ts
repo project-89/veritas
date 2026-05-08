@@ -1,16 +1,16 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import { InvestigationController } from '../../src/lib/controllers/investigation.controller';
-import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
-import { InvestigationEvidenceService } from '../../src/lib/services/investigation-evidence.service';
-import { ProjectDossierRepository } from '../../src/lib/repositories/project-dossier.repository';
-import { MentalModelRepository } from '../../src/lib/repositories/mental-model.repository';
-import { ScanJobRepository } from '../../src/lib/repositories/scan-job.repository';
 import { AlertRepository } from '../../src/lib/repositories/alert.repository';
 import { AnalysisJobRepository } from '../../src/lib/repositories/analysis-job.repository';
-import { ProjectDossierService } from '../../src/lib/services/project-dossier.service';
-import { OnChainCorrelationService } from '../../src/lib/services/onchain-correlation.service';
+import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
+import { MentalModelRepository } from '../../src/lib/repositories/mental-model.repository';
+import { ProjectDossierRepository } from '../../src/lib/repositories/project-dossier.repository';
+import { ScanJobRepository } from '../../src/lib/repositories/scan-job.repository';
+import { InvestigationEvidenceService } from '../../src/lib/services/investigation-evidence.service';
 import { MentalModelService } from '../../src/lib/services/mental-model.service';
+import { OnChainCorrelationService } from '../../src/lib/services/onchain-correlation.service';
+import { ProjectDossierService } from '../../src/lib/services/project-dossier.service';
 
 describe('InvestigationController', () => {
   let controller: InvestigationController;
@@ -64,9 +64,7 @@ describe('InvestigationController', () => {
           displayValue: 'abc',
           sourceCount: 1,
           occurrenceCount: 1,
-          sources: [
-            { seedId: 'seed-1', kind: 'youtube', label: 'Explainer', status: 'processed' },
-          ],
+          sources: [{ seedId: 'seed-1', kind: 'youtube', label: 'Explainer', status: 'processed' }],
         },
       ],
     },
@@ -77,9 +75,7 @@ describe('InvestigationController', () => {
         displayValue: 'abc',
         sourceCount: 1,
         occurrenceCount: 1,
-        sources: [
-          { seedId: 'seed-1', kind: 'youtube', label: 'Explainer', status: 'processed' },
-        ],
+        sources: [{ seedId: 'seed-1', kind: 'youtube', label: 'Explainer', status: 'processed' }],
       },
     ],
     generatedAt: new Date('2026-04-06T00:00:00Z'),
@@ -107,12 +103,15 @@ describe('InvestigationController', () => {
         evidence: ['Explainer'],
       },
     ],
-    decisionRules: ['Prefer claims supported by multiple processed seeds over single-source assertions.'],
+    decisionRules: [
+      'Prefer claims supported by multiple processed seeds over single-source assertions.',
+    ],
     workflowSteps: ['Review attached evidence and notes for explicit claims or hypotheses.'],
     evidencePreferences: ['Long-form transcript evidence and source walkthroughs'],
     blindSpots: ['This model is only as strong as the attached evidence bundle.'],
     signaturePhrases: ['Follow the wallets before trusting the story.'],
-    summary: 'A compact investigative model centered on pinned evidence and reusable entity comparison.',
+    summary:
+      'A compact investigative model centered on pinned evidence and reusable entity comparison.',
     status: 'generated' as const,
     modelUsed: 'gemini-2.0-flash',
     generatedAt: new Date('2026-04-06T00:00:00Z'),
@@ -238,9 +237,7 @@ describe('InvestigationController', () => {
           name: 'rexas finance',
           score: 9,
           matchedTypes: ['domain'],
-          sharedEntities: [
-            { type: 'domain', value: 'rexas.example', sourceCount: 1, weight: 5 },
-          ],
+          sharedEntities: [{ type: 'domain', value: 'rexas.example', sourceCount: 1, weight: 5 }],
         },
       ]),
     };
@@ -380,7 +377,7 @@ describe('InvestigationController', () => {
       await controller.listInvestigations('active');
 
       expect(mockRepository.findAll).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'active' })
+        expect.objectContaining({ status: 'active' }),
       );
     });
 
@@ -388,7 +385,7 @@ describe('InvestigationController', () => {
       await controller.listInvestigations(undefined, '10', '20');
 
       expect(mockRepository.findAll).toHaveBeenCalledWith(
-        expect.objectContaining({ limit: 10, skip: 20 })
+        expect.objectContaining({ limit: 10, skip: 20 }),
       );
     });
   });
@@ -478,9 +475,7 @@ describe('InvestigationController', () => {
     it('should throw NotFoundException when not found', async () => {
       mockRepository.findById.mockResolvedValueOnce(null);
 
-      await expect(
-        controller.getInvestigation('nonexistent')
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getInvestigation('nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -505,9 +500,9 @@ describe('InvestigationController', () => {
     it('should throw NotFoundException when not found', async () => {
       mockRepository.findById.mockResolvedValueOnce(null);
 
-      await expect(
-        controller.updateInvestigation('nonexistent', { name: 'test' })
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.updateInvestigation('nonexistent', { name: 'test' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -522,9 +517,9 @@ describe('InvestigationController', () => {
     it('should throw NotFoundException when not found', async () => {
       mockRepository.findById.mockResolvedValueOnce(null);
 
-      await expect(
-        controller.archiveInvestigation('nonexistent')
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.archiveInvestigation('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -547,7 +542,9 @@ describe('InvestigationController', () => {
     it('should throw NotFoundException when the investigation does not exist', async () => {
       mockRepository.findById.mockResolvedValueOnce(null);
 
-      await expect(controller.deleteInvestigationPermanent('missing')).rejects.toThrow(NotFoundException);
+      await expect(controller.deleteInvestigationPermanent('missing')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -572,9 +569,7 @@ describe('InvestigationController', () => {
     it('should throw NotFoundException when investigation not found', async () => {
       mockRepository.findById.mockResolvedValueOnce(null);
 
-      await expect(
-        controller.listSnapshots('nonexistent')
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.listSnapshots('nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -589,9 +584,9 @@ describe('InvestigationController', () => {
     it('should throw NotFoundException when snapshot not found', async () => {
       mockRepository.getSnapshotById.mockResolvedValueOnce(null);
 
-      await expect(
-        controller.getSnapshot('inv-1', 'nonexistent')
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getSnapshot('inv-1', 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException when snapshot belongs to different investigation', async () => {
@@ -601,9 +596,7 @@ describe('InvestigationController', () => {
       };
       mockRepository.getSnapshotById.mockResolvedValueOnce(wrongSnapshot);
 
-      await expect(
-        controller.getSnapshot('inv-1', 'snap-1')
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getSnapshot('inv-1', 'snap-1')).rejects.toThrow(NotFoundException);
     });
   });
 

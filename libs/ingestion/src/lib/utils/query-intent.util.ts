@@ -115,11 +115,7 @@ export function extractSignificantQueryTerms(query: string): string[] {
       normalizeSearchText(query)
         .split(/\s+/)
         .map((term) => term.trim())
-        .filter(
-          (term) =>
-            term.length >= 3 &&
-            !QUERY_STOPWORDS.has(term),
-        ),
+        .filter((term) => term.length >= 3 && !QUERY_STOPWORDS.has(term)),
     ),
   );
 }
@@ -128,9 +124,7 @@ export function looksLikeClaimQuery(query: string): boolean {
   const plan = buildClaimQueryPlan(query);
   return (
     plan.anchorTerms.length > 0 ||
-    (plan.actorTerms.length >= 2 &&
-      plan.evidenceTerms.length > 0 &&
-      plan.actionTerms.length > 0)
+    (plan.actorTerms.length >= 2 && plan.evidenceTerms.length > 0 && plan.actionTerms.length > 0)
   );
 }
 
@@ -138,16 +132,12 @@ export function buildClaimQueryPlan(query: string): ClaimQueryPlan {
   const normalizedQuery = normalizeSearchText(query);
   const significantTerms = extractSignificantQueryTerms(query);
 
-  const anchorTerms = significantTerms.filter(
-    (term) => /\d/.test(term) || term.includes('-'),
-  );
+  const anchorTerms = significantTerms.filter((term) => /\d/.test(term) || term.includes('-'));
   const actionTerms = significantTerms.filter((term) => ACTION_TERMS.has(term));
   const evidenceTerms = significantTerms.filter((term) => EVIDENCE_TERMS.has(term));
   const actorTerms = significantTerms.filter(
     (term) =>
-      !anchorTerms.includes(term) &&
-      !actionTerms.includes(term) &&
-      !evidenceTerms.includes(term),
+      !anchorTerms.includes(term) && !actionTerms.includes(term) && !evidenceTerms.includes(term),
   );
 
   const searchTerms = Array.from(
