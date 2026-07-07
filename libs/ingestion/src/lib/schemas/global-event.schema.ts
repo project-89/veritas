@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 // ---------------------------------------------------------------------------
 // GeoLocation sub-document
@@ -38,7 +37,7 @@ class GeoLocationEmbed {
     },
   },
 })
-export class GlobalEventSchema extends Document {
+export class GlobalEventSchema {
   /** Unique event identifier (e.g. usgs-<hash>, acled-<hash>) */
   @Prop({ required: true, unique: true, index: true })
   eventId!: string;

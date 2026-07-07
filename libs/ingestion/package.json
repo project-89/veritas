@@ -4,7 +4,8 @@
   "peerDependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
-    "@nestjs/mongoose": "^11.0.0"
+    "@nestjs/mongoose": "^11.0.0",
+    "mongoose": "^8.19.1"
   },
   "dependencies": {
     "@veritas/shared/types": "workspace:*",

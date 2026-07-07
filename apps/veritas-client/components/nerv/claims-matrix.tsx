@@ -172,6 +172,31 @@ export function ClaimsMatrix({
     );
   }
 
+  // No analysis actually ran — say so instead of implying "low manipulation".
+  if (propaganda.analysisMode === 'unavailable') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 px-4">
+        <div className="px-3 py-2 border border-nerv-amber/50 bg-nerv-amber/10 text-nerv-amber text-[10px] font-mono uppercase tracking-widest">
+          PROPAGANDA ANALYSIS UNAVAILABLE
+        </div>
+        <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[320px] text-center leading-relaxed">
+          {propaganda.analysisModeReason ??
+            'The analysis backend could not run. This is NOT a "no propaganda detected" finding.'}
+        </div>
+        {onRunPropaganda && (
+          <button
+            type="button"
+            onClick={onRunPropaganda}
+            disabled={propagandaLoading}
+            className="px-4 py-2 text-[10px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
+          >
+            {propagandaLoading ? 'ANALYZING...' : 'RETRY ANALYSIS'}
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-auto">
       {/* Assessment banner */}
@@ -212,6 +237,14 @@ export function ClaimsMatrix({
       <div className="mt-2 pt-2 border-t border-nerv-border/50">
         {claims ? (
           <div className="flex items-center gap-3 text-[9px] font-mono">
+            {claims.analysisMode === 'heuristic' && (
+              <span
+                className="text-nerv-amber uppercase"
+                title="Verdicts were produced by keyword-matching heuristics (no GEMINI_API_KEY configured), not LLM reasoning. Treat as weak signals."
+              >
+                ⚠ heuristic
+              </span>
+            )}
             <span className="text-nerv-green">{claims.verifiedCount ?? 0} verified</span>
             <span className="text-nerv-red">{claims.disputedCount ?? 0} disputed</span>
             <span className="text-nerv-text-muted">{claims.unverifiedCount ?? 0} unverified</span>

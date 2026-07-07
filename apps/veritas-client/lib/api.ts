@@ -260,10 +260,19 @@ class ApiError extends Error {
   }
 }
 
+// Sent as x-api-key when the backend enforces VERITAS_API_KEY. NEXT_PUBLIC_
+// values are baked into the browser bundle — this gates casual access for
+// self-hosted deployments, it is not a substitute for real user auth.
+const API_KEY = process.env['NEXT_PUBLIC_VERITAS_API_KEY'];
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(API_KEY ? { 'x-api-key': API_KEY } : {}),
+      ...options?.headers,
+    },
   });
 
   if (!res.ok) {
@@ -503,7 +512,7 @@ export interface Investigation {
     platforms: string[];
     timeRange: string;
     limit: number;
-    searchMode?: 'topic' | 'claim';
+    searchMode?: 'topic' | 'claim' | 'person';
   };
   lastSnapshotId: string | null;
   lastScanId: string | null;
@@ -759,7 +768,13 @@ export async function saveSessionState(
  */
 export async function createOrGetInvestigation(
   query: string,
-  settings?: { name?: string; platforms?: string[]; timeRange?: string; limit?: number },
+  settings?: {
+    name?: string;
+    platforms?: string[];
+    timeRange?: string;
+    limit?: number;
+    searchMode?: 'topic' | 'claim' | 'person';
+  },
 ): Promise<Investigation> {
   const result = await request<Investigation>('/api/investigations', {
     method: 'PUT',
@@ -996,7 +1011,16 @@ export interface NarrativeFrame {
   emotionalAppeal: string;
 }
 
+/**
+ * How an analysis result was produced. 'unavailable' means NO analysis ran —
+ * render as "analysis unavailable", never as a clean "nothing detected".
+ * 'heuristic' means keyword-matching fallback, not LLM reasoning.
+ */
+export type AnalysisMode = 'llm' | 'heuristic' | 'skipped' | 'unavailable';
+
 export interface PropagandaAnalysisResult {
+  analysisMode?: AnalysisMode;
+  analysisModeReason?: string;
   techniques: PropagandaTechnique[];
   claims: ExtractedClaim[];
   frames: NarrativeFrame[];
@@ -1354,6 +1378,8 @@ export interface VerificationResult {
   claim: string;
   status: 'verified' | 'disputed' | 'unverified' | 'mixed' | 'false';
   confidence: number;
+  /** 'heuristic' verdicts are keyword matches, not reasoning. */
+  analysisMode?: AnalysisMode;
 
   evidence: {
     supporting: EvidenceItem[];
@@ -1368,6 +1394,8 @@ export interface VerificationResult {
 }
 
 export interface ClaimVerificationBatchResult {
+  /** 'heuristic' when the backend has no GEMINI_API_KEY — treat verdicts as weak. */
+  analysisMode?: AnalysisMode;
   results: VerificationResult[];
   summary: string;
   verifiedCount: number;
@@ -1417,7 +1445,7 @@ export interface ScanJob {
     platforms: string[];
     timeRange: string;
     limit: number;
-    searchMode: 'topic' | 'claim';
+    searchMode: 'topic' | 'claim' | 'person';
   };
   connectors: Record<string, ConnectorStatus>;
   totalPosts: number;
@@ -1441,7 +1469,7 @@ export async function startScan(
   limit?: number,
   timeRange?: string,
   investigationId?: string,
-  searchMode?: 'topic' | 'claim',
+  searchMode?: 'topic' | 'claim' | 'person',
 ): Promise<{ scanId: string }> {
   return request<{ scanId: string }>('/api/scan', {
     method: 'POST',

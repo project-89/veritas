@@ -5,6 +5,7 @@ import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
+import { SourceRateLimiter } from './utils/source-rate-limiter';
 
 interface SearchOptions {
   startDate?: Date;
@@ -251,7 +252,9 @@ export class BlueskyFreeConnector implements DataConnector, OnModuleInit, OnModu
         return [];
       }
       this.logger.error('Error searching Bluesky:', error);
-      return [];
+      throw new Error(
+        `Bluesky search failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -282,22 +285,30 @@ export class BlueskyFreeConnector implements DataConnector, OnModuleInit, OnModu
   private async fetchWithRetry<T>(url: string): Promise<T> {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const response = await fetch(url, {
-          headers: {
-            Accept: 'application/json',
-          },
-          signal: AbortSignal.timeout(15_000),
+        return await SourceRateLimiter.instance.schedule('bluesky', async () => {
+          const response = await fetch(url, {
+            headers: {
+              Accept: 'application/json',
+            },
+            signal: AbortSignal.timeout(15_000),
+          });
+
+          if (!response.ok) {
+            if (response.status === 429) {
+              SourceRateLimiter.instance.notifyRateLimited(
+                'bluesky',
+                SourceRateLimiter.retryAfterMsFrom(response.headers),
+              );
+            }
+            const error = new Error(`HTTP ${response.status}: ${response.statusText}`) as Error & {
+              status?: number;
+            };
+            error.status = response.status;
+            throw error;
+          }
+
+          return (await response.json()) as T;
         });
-
-        if (!response.ok) {
-          const error = new Error(`HTTP ${response.status}: ${response.statusText}`) as Error & {
-            status?: number;
-          };
-          error.status = response.status;
-          throw error;
-        }
-
-        return (await response.json()) as T;
       } catch (err) {
         const status = getErrorStatus(err);
         const retryable = status === null || status >= 500 || status === 429;

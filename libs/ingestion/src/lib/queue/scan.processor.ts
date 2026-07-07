@@ -1,9 +1,10 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { Logger, Optional } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { ConnectorSearchOptions } from '../interfaces/data-connector.interface';
+import { ConnectorFetchCacheRepository } from '../repositories/connector-fetch-cache.repository';
 import { ScanJobRepository } from '../repositories/scan-job.repository';
 import { IngestionService } from '../services/ingestion.service';
 import { buildPostDedupKey } from '../utils/post-dedup.util';
@@ -15,7 +16,7 @@ export interface ScanJobData {
   options: {
     limit?: number;
     timeRange?: string;
-    searchMode?: 'topic' | 'claim';
+    searchMode?: 'topic' | 'claim' | 'person';
   };
   startedAt?: string;
 }
@@ -38,13 +39,16 @@ function serializePostTimestamp(timestamp: string | Date | undefined): string {
   return new Date().toISOString();
 }
 
-@Processor('scan')
+// Each job fetches from one connector; the cap bounds simultaneous outbound
+// fetches across ALL queued scans so external sources are never hammered.
+@Processor('scan', { concurrency: 3 })
 export class ScanProcessor extends WorkerHost {
   private readonly logger = new Logger(ScanProcessor.name);
 
   constructor(
     private readonly ingestionService: IngestionService,
     private readonly scanJobRepository: ScanJobRepository,
+    @Optional() private readonly fetchCache?: ConnectorFetchCacheRepository,
   ) {
     super();
   }
@@ -62,6 +66,25 @@ export class ScanProcessor extends WorkerHost {
     });
 
     try {
+      // Cross-scan dedup: identical fetch within the TTL window is served
+      // from cache instead of re-hitting the source.
+      const cacheKey = ConnectorFetchCacheRepository.buildQueryKey(query, options);
+      const cached = await this.fetchCache?.getFresh(connector, cacheKey);
+      if (cached) {
+        this.logger.log(
+          `[scan:${scanId}] ${connector}: cache hit (${cached.length} posts) — skipping source fetch`,
+        );
+        await this.scanJobRepository.addConnectorResults(scanId, connector, cached);
+        await this.scanJobRepository.updateConnectorStatus(scanId, connector, {
+          status: 'done',
+          postCount: cached.length,
+          insightCount: cached.length,
+          completedAt: new Date().toISOString(),
+          duration: Date.now() - startTime,
+        });
+        return { postCount: cached.length };
+      }
+
       // Get the connector instance
       const connectorInstance = this.ingestionService.getConnector(connector);
       if (!connectorInstance) {
@@ -99,7 +122,36 @@ export class ScanProcessor extends WorkerHost {
       }
 
       const connRec = connectorInstance as unknown as Record<string, unknown>;
-      if (
+
+      if (options.searchMode === 'person') {
+        const handle = query.replace(/^@+/, '').trim();
+        const timelineResult = await (
+          connectorInstance as {
+            getUserTimelineWithRawData?: (
+              h: string,
+              o?: { limit?: number; startDate?: Date; endDate?: Date },
+            ) => Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] } | null>;
+          }
+        ).getUserTimelineWithRawData?.(handle, {
+          limit: searchOptions.limit,
+          startDate: searchOptions.startDate,
+          endDate: searchOptions.endDate,
+        });
+        if (!timelineResult) {
+          this.logger.warn(
+            `[scan:${scanId}] ${connector}: no per-user timeline support — skipping`,
+          );
+          await this.scanJobRepository.updateConnectorStatus(scanId, connector, {
+            status: 'done',
+            postCount: 0,
+            insightCount: 0,
+            completedAt: new Date().toISOString(),
+            duration: Date.now() - startTime,
+          });
+          return { postCount: 0 };
+        }
+        result = timelineResult;
+      } else if (
         'searchWithRawData' in connectorInstance &&
         typeof connRec['searchWithRawData'] === 'function'
       ) {
@@ -169,6 +221,9 @@ export class ScanProcessor extends WorkerHost {
 
       // Save results to MongoDB
       await this.scanJobRepository.addConnectorResults(scanId, connector, serializedPosts);
+
+      // Populate the cross-scan cache (best-effort)
+      await this.fetchCache?.save(connector, cacheKey, serializedPosts);
 
       const duration = Date.now() - startTime;
 

@@ -153,10 +153,12 @@ function makeVerification(
   }>,
 ): ClaimVerificationBatchResult {
   return {
+    analysisMode: 'llm',
     results: results.map((r) => ({
       claim: r.claim,
       status: r.status,
       confidence: r.confidence,
+      analysisMode: 'llm' as const,
       evidence: { supporting: [], contradicting: [] },
       reasoning: '',
       caveats: [],

@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 // ---------------------------------------------------------------------------
 // RssCache schema — caches RSS feed items per-URL to avoid redundant fetches
@@ -34,7 +33,7 @@ class RssCacheItemEmbed {
     },
   },
 })
-export class RssCacheSchema extends Document {
+export class RssCacheSchema {
   /** Feed URL (unique per entry) */
   @Prop({ required: true, unique: true, index: true })
   feedUrl!: string;

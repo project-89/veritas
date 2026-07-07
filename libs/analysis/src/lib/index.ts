@@ -1,6 +1,5 @@
 export * from './analysis.controller';
 export * from './analysis.module';
-export * from './analysis.resolver';
 export * from './analysis.types';
 export * from './interfaces/analysis-service.interface';
 export * from './services/analysis.service';

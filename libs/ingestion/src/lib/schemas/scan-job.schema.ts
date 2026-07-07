@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 // ---------------------------------------------------------------------------
 // Connector status sub-schema
@@ -49,8 +48,8 @@ class ScanSettingsEmbed {
   @Prop({ type: Number, default: 50 })
   limit!: number;
 
-  @Prop({ type: String, enum: ['topic', 'claim'], default: 'topic' })
-  searchMode!: 'topic' | 'claim';
+  @Prop({ type: String, enum: ['topic', 'claim', 'person'], default: 'topic' })
+  searchMode!: 'topic' | 'claim' | 'person';
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +67,7 @@ class ScanSettingsEmbed {
     },
   },
 })
-export class ScanJobSchema extends Document {
+export class ScanJobSchema {
   @Prop({ required: true, index: true })
   query!: string;
 
@@ -96,6 +95,11 @@ export class ScanJobSchema extends Document {
   @Prop({ type: Number, default: 0 })
   totalInsights!: number;
 
+  /**
+   * @deprecated Posts now live in the scan_posts collection (one document
+   * per post). This embedded array is only read as a fallback for scans
+   * created before the migration; new scans never write to it.
+   */
   @Prop({ type: Array, default: [] })
   posts!: unknown[];
 
@@ -131,7 +135,7 @@ export interface ScanSettings {
   platforms: string[];
   timeRange: string;
   limit: number;
-  searchMode?: 'topic' | 'claim';
+  searchMode?: 'topic' | 'claim' | 'person';
 }
 
 export interface ScanJob {

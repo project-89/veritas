@@ -189,6 +189,7 @@ describe('InvestigationController', () => {
 
     mockProjectDossierRepository = {
       findByInvestigationId: jest.fn().mockResolvedValue(null),
+      findByInvestigationIds: jest.fn().mockResolvedValue([]),
       findAll: jest.fn().mockResolvedValue([]),
       save: jest.fn().mockResolvedValue(mockProjectDossier),
       deleteByInvestigationId: jest.fn().mockResolvedValue(undefined),
@@ -276,6 +277,7 @@ describe('InvestigationController', () => {
     mockRepository = {
       findAll: jest.fn().mockResolvedValue([mockInvestigation]),
       findById: jest.fn().mockResolvedValue(mockInvestigation),
+      findByIds: jest.fn().mockResolvedValue([mockInvestigation]),
       findOrCreateByQuery: jest.fn().mockResolvedValue(mockInvestigation),
       createInvestigation: jest.fn().mockResolvedValue({
         ...mockInvestigation,
@@ -392,7 +394,9 @@ describe('InvestigationController', () => {
 
   describe('listAtlasLenses', () => {
     it('should return saved mental models with their backing investigations', async () => {
-      mockProjectDossierRepository.findByInvestigationId.mockResolvedValueOnce(mockProjectDossier);
+      mockProjectDossierRepository.findByInvestigationIds.mockResolvedValueOnce([
+        mockProjectDossier,
+      ]);
 
       const result = await controller.listAtlasLenses('10', '5');
 
@@ -400,8 +404,8 @@ describe('InvestigationController', () => {
         limit: 10,
         skip: 5,
       });
-      expect(mockRepository.findById).toHaveBeenCalledWith('inv-1');
-      expect(mockProjectDossierRepository.findByInvestigationId).toHaveBeenCalledWith('inv-1');
+      expect(mockRepository.findByIds).toHaveBeenCalledWith(['inv-1']);
+      expect(mockProjectDossierRepository.findByInvestigationIds).toHaveBeenCalledWith(['inv-1']);
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
         investigation: expect.objectContaining({
@@ -435,6 +439,7 @@ describe('InvestigationController', () => {
           platforms: ['twitter', 'youtube'],
           timeRange: '30d',
           limit: 250,
+          searchMode: 'topic',
         },
       });
       expect(mockRepository.findOrCreateByQuery).not.toHaveBeenCalled();
@@ -453,6 +458,7 @@ describe('InvestigationController', () => {
         platforms: ['rss'],
         timeRange: '7d',
         limit: 100,
+        searchMode: 'topic',
       });
       expect(mockRepository.createInvestigation).not.toHaveBeenCalled();
     });

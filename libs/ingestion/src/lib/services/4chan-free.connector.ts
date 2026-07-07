@@ -5,6 +5,7 @@ import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
+import { SourceRateLimiter } from './utils/source-rate-limiter';
 
 interface SearchOptions {
   startDate?: Date;
@@ -46,7 +47,6 @@ export class FourChanFreeConnector implements DataConnector, OnModuleInit, OnMod
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 600000; // 10 minutes
   private readonly logger = new Logger(FourChanFreeConnector.name);
-  private lastRequestTime = 0;
 
   constructor(private transformService: TransformOnIngestService) {}
 
@@ -157,10 +157,10 @@ export class FourChanFreeConnector implements DataConnector, OnModuleInit, OnMod
     if (keywords.length === 0) return [];
 
     const allThreads: Array<{ thread: ChanThread; board: string }> = [];
+    const failures: string[] = [];
 
     for (const board of INTEL_BOARDS) {
       try {
-        await this.rateLimit();
         const url = `https://a.4cdn.org/${board}/catalog.json`;
         const catalog = await this.fetchJson<CatalogPage[]>(url);
 
@@ -179,8 +179,18 @@ export class FourChanFreeConnector implements DataConnector, OnModuleInit, OnMod
           }
         }
       } catch (error) {
-        this.logger.debug(`4chan catalog fetch failed for /${board}/: ${error}`);
+        const message = error instanceof Error ? error.message : String(error);
+        failures.push(message);
+        this.logger.warn(`4chan catalog fetch failed for /${board}/: ${message}`);
       }
+    }
+
+    // Total failure: every board catalog fetch errored — fail loudly instead
+    // of reporting a misleading "0 results".
+    if (failures.length === INTEL_BOARDS.length) {
+      throw new Error(
+        `4chan search failed: all ${INTEL_BOARDS.length} board catalogs failed: ${failures[0]}`,
+      );
     }
 
     // Sort by time descending (newest first)
@@ -225,26 +235,25 @@ export class FourChanFreeConnector implements DataConnector, OnModuleInit, OnMod
   }
 
   private async fetchJson<T>(url: string): Promise<T> {
-    const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(10_000),
+    // The shared limiter enforces 4chan's max 1 request/second guideline.
+    return SourceRateLimiter.instance.schedule('4chan', async () => {
+      const response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          SourceRateLimiter.instance.notifyRateLimited(
+            '4chan',
+            SourceRateLimiter.retryAfterMsFrom(response.headers),
+          );
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return (await response.json()) as T;
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    return (await response.json()) as T;
-  }
-
-  /** Enforce 4chan's 1 request/second rate limit. */
-  private async rateLimit(): Promise<void> {
-    const now = Date.now();
-    const elapsed = now - this.lastRequestTime;
-    if (elapsed < 1000) {
-      await new Promise((resolve) => setTimeout(resolve, 1000 - elapsed));
-    }
-    this.lastRequestTime = Date.now();
   }
 
   /** Strip HTML tags and decode common entities. */

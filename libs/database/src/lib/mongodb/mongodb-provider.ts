@@ -30,6 +30,13 @@ export class MongoDBProvider implements DatabaseProvider {
         dbName: this.options.databaseName,
         user: this.options.username,
         pass: this.options.password,
+        // Explicit pool + timeout defaults so load spikes fail fast instead
+        // of hanging; overridable via providerOptions.options.
+        maxPoolSize: 25,
+        minPoolSize: 2,
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+        waitQueueTimeoutMS: 10000,
         ...this.options.options,
       });
 

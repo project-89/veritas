@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
+import { SourceRateLimiter } from '../../src/lib/services/utils/source-rate-limiter';
 import { SubprocessUtil } from '../../src/lib/services/utils/subprocess.util';
 import { YouTubeFreeConnector } from '../../src/lib/services/youtube-free.connector';
 
@@ -38,6 +39,11 @@ describe('YouTubeFreeConnector', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    // Use a zero-delay limiter so tests don't wait out the real pacing.
+    SourceRateLimiter.setInstance(
+      new SourceRateLimiter({ youtube: { minIntervalMs: 0, maxConcurrent: 100 } }),
+    );
+
     configService = {
       get: jest.fn().mockReturnValue(undefined),
     };
@@ -61,6 +67,10 @@ describe('YouTubeFreeConnector', () => {
       transformService as TransformOnIngestService,
       subprocessUtil as SubprocessUtil,
     );
+  });
+
+  afterAll(() => {
+    SourceRateLimiter.setInstance(null);
   });
 
   describe('constructor', () => {
@@ -229,6 +239,16 @@ describe('YouTubeFreeConnector', () => {
       );
 
       await expect(connector.searchAndTransform('test')).rejects.toThrow('yt-dlp error');
+    });
+
+    it('should return empty results when the search succeeds but finds nothing', async () => {
+      (subprocessUtil.execJsonLines as jest.Mock).mockResolvedValue([]);
+      (transformService.transformBatch as jest.Mock).mockResolvedValue([]);
+
+      const insights = await connector.searchAndTransform('nothing here');
+
+      expect(insights).toEqual([]);
+      expect(transformService.transformBatch).toHaveBeenCalledWith([]);
     });
   });
 

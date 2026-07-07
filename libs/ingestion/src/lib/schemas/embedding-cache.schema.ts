@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 // ---------------------------------------------------------------------------
 // EmbeddingCache schema — caches Gemini embedding results by content hash
@@ -16,7 +15,7 @@ import { Document } from 'mongoose';
     },
   },
 })
-export class EmbeddingCacheSchema extends Document {
+export class EmbeddingCacheSchema {
   /** Hash of the text content (first 2000 chars) */
   @Prop({ required: true, index: true })
   contentHash!: string;

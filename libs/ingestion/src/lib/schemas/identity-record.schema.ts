@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 import type { PsychologicalProfileMode } from './analysis-job.schema';
 
 // ---------------------------------------------------------------------------
@@ -279,7 +278,7 @@ class PsychologicalProfileEmbed {
     },
   },
 })
-export class IdentityRecordSchema extends Document {
+export class IdentityRecordSchema {
   @Prop({ required: true })
   primaryHandle!: string;
 

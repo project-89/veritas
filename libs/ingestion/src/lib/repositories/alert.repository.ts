@@ -64,11 +64,10 @@ export class AlertRepository implements OnModuleInit {
   async saveAlerts(alerts: Partial<Alert>[]): Promise<Alert[]> {
     this.ensureInitialized();
     try {
-      const saved: Alert[] = [];
-      for (const alert of alerts) {
-        saved.push(await this.alertRepo.create(alert));
+      if (alerts.length === 0) {
+        return [];
       }
-      return saved;
+      return await this.alertRepo.createMany(alerts);
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error in saveAlerts: ${err.message}`, err.stack);
@@ -123,16 +122,7 @@ export class AlertRepository implements OnModuleInit {
         filter['investigationId'] = investigationId;
       }
 
-      // Get unread alerts and update each one
-      const unreadAlerts = await this.alertRepo.find(filter);
-      let count = 0;
-      for (const alert of unreadAlerts) {
-        const id =
-          alert._id?.toString() ?? ((alert as unknown as Record<string, unknown>)['id'] as string);
-        await this.alertRepo.updateById(id, { read: true } as Partial<Alert>);
-        count++;
-      }
-      return count;
+      return await this.alertRepo.updateMany(filter, { read: true } as Partial<Alert>);
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error in markAllRead: ${err.message}`, err.stack);
@@ -147,8 +137,7 @@ export class AlertRepository implements OnModuleInit {
       if (investigationId) {
         filter['investigationId'] = investigationId;
       }
-      const alerts = await this.alertRepo.find(filter);
-      return alerts.length;
+      return await this.alertRepo.count(filter);
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error in getUnreadCount: ${err.message}`, err.stack);

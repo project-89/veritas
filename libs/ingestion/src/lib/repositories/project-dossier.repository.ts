@@ -50,6 +50,16 @@ export class ProjectDossierRepository implements OnModuleInit {
     return this.repo.findOne({ investigationId } as Record<string, unknown>);
   }
 
+  /** Batch-load dossiers for many investigations in one query. */
+  async findByInvestigationIds(investigationIds: string[]): Promise<ProjectDossier[]> {
+    this.ensureInitialized();
+    if (investigationIds.length === 0) return [];
+    return this.repo.find({ investigationId: { $in: investigationIds } } as Record<
+      string,
+      unknown
+    >);
+  }
+
   async findAll(limit = 50): Promise<ProjectDossier[]> {
     this.ensureInitialized();
     return this.repo.find({} as Record<string, unknown>, {

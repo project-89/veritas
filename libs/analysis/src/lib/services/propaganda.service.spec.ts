@@ -72,17 +72,18 @@ describe('PropagandaAnalysisService', () => {
       if (original) process.env['GEMINI_API_KEY'] = original;
     });
 
-    it('returns empty result with explanatory reasoning', async () => {
+    it('marks the result unavailable instead of returning a silent empty finding', async () => {
       const narratives = [makeNarrative({ id: 'n-0' })];
       const posts = makePosts(5);
       const result = await service.analyze(narratives, posts);
 
+      expect(result.analysisMode).toBe('unavailable');
+      expect(result.analysisModeReason).toContain('GEMINI_API_KEY');
       expect(result.techniques).toEqual([]);
       expect(result.claims).toEqual([]);
       expect(result.frames).toEqual([]);
       expect(result.overallAssessment.manipulationLikelihood).toBe('low');
       expect(result.overallAssessment.confidence).toBe(0);
-      expect(result.overallAssessment.reasoning).toContain('could not be completed');
       expect(result.overallAssessment.caveats.length).toBeGreaterThan(0);
     });
   });

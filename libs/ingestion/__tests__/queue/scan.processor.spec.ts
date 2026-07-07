@@ -33,7 +33,8 @@ describe('ScanProcessor', () => {
   };
 
   beforeEach(() => {
-    // Reset the mock to default success behavior before each test
+    // Reset call history AND default success behavior before each test
+    mockConnector.searchWithRawData.mockClear();
     mockConnector.searchWithRawData.mockResolvedValue({
       posts: [
         {
@@ -85,6 +86,56 @@ describe('ScanProcessor', () => {
     expect(scanJobRepo.updateConnectorStatus).toHaveBeenCalledTimes(2); // running + done
     expect(scanJobRepo.addConnectorResults).toHaveBeenCalledTimes(1);
     expect(result).toHaveProperty('postCount', 1);
+  });
+
+  it('serves a fresh cache entry without hitting the connector', async () => {
+    const cachedPosts = [{ id: 'cached-1', text: 'cached post', platform: 'reddit' }];
+    const fetchCache = {
+      getFresh: jest.fn().mockResolvedValue(cachedPosts),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    processor = new ScanProcessor(
+      ingestionService,
+      scanJobRepo,
+      fetchCache as unknown as ConstructorParameters<typeof ScanProcessor>[2],
+    );
+
+    const job = {
+      data: { scanId: 'scan-1', connector: 'reddit', query: 'test', options: {} },
+    } as any;
+
+    const result = await processor.process(job);
+
+    expect(fetchCache.getFresh).toHaveBeenCalledTimes(1);
+    expect(result).toHaveProperty('postCount', 1);
+    expect(mockConnector.searchWithRawData).not.toHaveBeenCalled();
+    expect(scanJobRepo.addConnectorResults).toHaveBeenCalledWith('scan-1', 'reddit', cachedPosts);
+    expect(fetchCache.save).not.toHaveBeenCalled();
+  });
+
+  it('populates the cache after a fresh fetch', async () => {
+    const fetchCache = {
+      getFresh: jest.fn().mockResolvedValue(null),
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    processor = new ScanProcessor(
+      ingestionService,
+      scanJobRepo,
+      fetchCache as unknown as ConstructorParameters<typeof ScanProcessor>[2],
+    );
+
+    const job = {
+      data: { scanId: 'scan-1', connector: 'reddit', query: 'test', options: {} },
+    } as any;
+
+    await processor.process(job);
+
+    expect(mockConnector.searchWithRawData).toHaveBeenCalled();
+    expect(fetchCache.save).toHaveBeenCalledWith(
+      'reddit',
+      expect.any(String),
+      expect.arrayContaining([expect.objectContaining({ id: 'p1' })]),
+    );
   });
 
   it('should handle connector not found', async () => {

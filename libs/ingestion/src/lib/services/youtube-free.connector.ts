@@ -13,6 +13,7 @@ import {
   type SearchMode,
 } from '../utils/query-intent.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
+import { SourceRateLimiter } from './utils/source-rate-limiter';
 import { SubprocessUtil } from './utils/subprocess.util';
 
 interface SearchOptions {
@@ -210,16 +211,18 @@ export class YouTubeFreeConnector implements DataConnector, OnModuleInit, OnModu
 
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
     try {
-      const result = await this.subprocessUtil.exec(
-        this.ytDlpPath,
-        [
-          `https://www.youtube.com/channel/${authorId}`,
-          '--dump-json',
-          '--playlist-items',
-          '0',
-          '--no-download',
-        ],
-        { timeout: 30000 },
+      const result = await SourceRateLimiter.instance.schedule('youtube', () =>
+        this.subprocessUtil.exec(
+          this.ytDlpPath,
+          [
+            `https://www.youtube.com/channel/${authorId}`,
+            '--dump-json',
+            '--playlist-items',
+            '0',
+            '--no-download',
+          ],
+          { timeout: 30000 },
+        ),
       );
 
       if (result.exitCode !== 0) {
@@ -366,9 +369,11 @@ export class YouTubeFreeConnector implements DataConnector, OnModuleInit, OnModu
       args.push('--datebefore', this.formatYtDlpDate(options.endDate));
     }
 
-    return this.subprocessUtil.execJsonLines<YtDlpVideoInfo>(this.ytDlpPath, args, {
-      timeout: 60000,
-    });
+    return SourceRateLimiter.instance.schedule('youtube', () =>
+      this.subprocessUtil.execJsonLines<YtDlpVideoInfo>(this.ytDlpPath, args, {
+        timeout: 60000,
+      }),
+    );
   }
 
   private async executeClaimSearch(
@@ -466,21 +471,23 @@ export class YouTubeFreeConnector implements DataConnector, OnModuleInit, OnModu
     const url = `https://www.youtube.com/watch?v=${videoId}`;
 
     try {
-      const result = await this.subprocessUtil.exec(
-        this.ytDlpPath,
-        [
-          '--skip-download',
-          '--write-subs',
-          '--write-auto-subs',
-          '--sub-lang',
-          'en',
-          '--sub-format',
-          'vtt',
-          '-o',
-          outputTemplate,
-          url,
-        ],
-        { timeout: 30000 },
+      const result = await SourceRateLimiter.instance.schedule('youtube', () =>
+        this.subprocessUtil.exec(
+          this.ytDlpPath,
+          [
+            '--skip-download',
+            '--write-subs',
+            '--write-auto-subs',
+            '--sub-lang',
+            'en',
+            '--sub-format',
+            'vtt',
+            '-o',
+            outputTemplate,
+            url,
+          ],
+          { timeout: 30000 },
+        ),
       );
 
       if (result.exitCode !== 0) {

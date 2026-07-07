@@ -24,7 +24,7 @@ This directory contains technical documentation for developers working on the Ve
 - [Transform-on-Ingest Architecture](./transform-on-ingest-consolidated.md) - Comprehensive documentation of the transform-on-ingest architecture
 - [Narrative Repository Pattern](./narrative-repository-pattern.md) - Explains the repository pattern used for narrative insights
 - [Data Deletion Strategy](./data-deletion-strategy.md) - Data retention and deletion strategy
-- [GraphQL Integration](./transform-on-ingest-graphql.md) - Details how GraphQL integrates with the transform-on-ingest architecture
+- [GraphQL Integration](./transform-on-ingest-graphql.md) - Historical: the GraphQL API has been removed; the API is now REST-only
 
 ## Transform-on-Ingest Architecture
 
@@ -40,7 +40,7 @@ Veritas is built with a transform-on-ingest architecture for social media data t
 
 4. **[Narrative Repository Pattern](./narrative-repository-pattern.md)** - Explains the repository pattern used for narrative insights and its advantages over direct database access.
 
-5. **[GraphQL Integration](./transform-on-ingest-graphql.md)** - Details how the GraphQL API has been integrated with the transform-on-ingest architecture to maintain security.
+5. **[GraphQL Integration](./transform-on-ingest-graphql.md)** - Historical: the GraphQL API has since been removed in favor of the REST controllers.
 
 ### Core Principles
 

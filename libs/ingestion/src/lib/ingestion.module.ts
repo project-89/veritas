@@ -38,10 +38,10 @@ import {
   NarrativeRepository,
 } from './repositories/narrative-insight.repository';
 import { ProjectDossierRepository } from './repositories/project-dossier.repository';
+import { ConnectorFetchCacheRepository } from './repositories/connector-fetch-cache.repository';
 import { RssCacheRepository } from './repositories/rss-cache.repository';
 import { ScanJobRepository } from './repositories/scan-job.repository';
 import { SignalCacheRepository } from './repositories/signal-cache.repository';
-import { IngestionResolver } from './resolvers/ingestion.resolver';
 import { FourChanFreeConnector } from './services/4chan-free.connector';
 import { BlueskyFreeConnector } from './services/bluesky-free.connector';
 import { FacebookJinaConnector } from './services/facebook-jina.connector';
@@ -193,7 +193,6 @@ export class IngestionModule {
     const providers: Provider[] = [
       IngestionService,
       TransformOnIngestService,
-      IngestionResolver,
       InvestigationRepository,
       ScanJobRepository,
       ScanProcessor,
@@ -210,6 +209,7 @@ export class IngestionModule {
       MentalModelService,
       EmbeddingCacheRepository,
       RssCacheRepository,
+      ConnectorFetchCacheRepository,
     ];
 
     // Configure repository
@@ -316,6 +316,7 @@ export class IngestionModule {
       GlobalEventRepository,
       EmbeddingCacheRepository,
       RssCacheRepository,
+      ConnectorFetchCacheRepository,
       BullModule,
       // Only export EmbeddingsService if it's enabled
       ...(options?.enableEmbeddings ? [EmbeddingsService] : []),

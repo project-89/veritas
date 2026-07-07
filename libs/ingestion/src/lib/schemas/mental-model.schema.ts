@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 @Schema({ _id: false })
 class MentalModelSourceSummaryEmbed {
@@ -39,7 +38,7 @@ class MentalModelHeuristicEmbed {
     },
   },
 })
-export class MentalModelSchema extends Document {
+export class MentalModelSchema {
   @Prop({ required: true, type: String, index: true, unique: true })
   investigationId!: string;
 

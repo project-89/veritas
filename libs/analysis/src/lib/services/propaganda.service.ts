@@ -33,7 +33,16 @@ export interface NarrativeFrame {
   emotionalAppeal: string;
 }
 
+/**
+ * How an analysis result was produced. 'unavailable' means NO analysis ran —
+ * consumers must render this as "analysis unavailable", never as a clean
+ * "nothing detected" finding.
+ */
+export type AnalysisMode = 'llm' | 'heuristic' | 'skipped' | 'unavailable';
+
 export interface PropagandaAnalysisResult {
+  analysisMode: AnalysisMode;
+  analysisModeReason?: string;
   techniques: PropagandaTechnique[];
   claims: ExtractedClaim[];
   frames: NarrativeFrame[];
@@ -100,12 +109,15 @@ export class PropagandaAnalysisService {
     posts: RawPost[],
   ): Promise<PropagandaAnalysisResult> {
     if (narratives.length === 0) {
-      return this.emptyResult();
+      return this.emptyResult('skipped', 'No narratives to analyze.');
     }
 
     if (!this.genAI) {
-      this.logger.warn('No Gemini key -- returning empty propaganda analysis');
-      return this.emptyResult();
+      this.logger.warn('No Gemini key -- propaganda analysis unavailable');
+      return this.emptyResult(
+        'unavailable',
+        'GEMINI_API_KEY is not configured — propaganda analysis did not run.',
+      );
     }
 
     const model = this.genAI.getGenerativeModel({ model: this.chatModel });
@@ -195,7 +207,7 @@ Rules for the JSON:
       return parsed;
     } catch (err) {
       this.logger.error(`Propaganda analysis LLM call failed: ${err}`);
-      return this.emptyResult();
+      return this.emptyResult('unavailable', 'LLM call failed — propaganda analysis did not run.');
     }
   }
 
@@ -208,7 +220,7 @@ Rules for the JSON:
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       this.logger.warn('Could not extract JSON from LLM response');
-      return this.emptyResult();
+      return this.emptyResult('unavailable', 'LLM returned an unparseable response.');
     }
 
     try {
@@ -216,7 +228,7 @@ Rules for the JSON:
       return this.validateAndNormalize(raw);
     } catch (err) {
       this.logger.warn(`Failed to parse propaganda analysis JSON: ${err}`);
-      return this.emptyResult();
+      return this.emptyResult('unavailable', 'LLM returned an unparseable response.');
     }
   }
 
@@ -226,7 +238,7 @@ Rules for the JSON:
     const frames = this.validateFrames(raw['frames']);
     const overallAssessment = this.validateAssessment(raw['overallAssessment']);
 
-    return { techniques, claims, frames, overallAssessment };
+    return { analysisMode: 'llm', techniques, claims, frames, overallAssessment };
   }
 
   private validateTechniques(raw: unknown): PropagandaTechnique[] {
@@ -324,18 +336,18 @@ Rules for the JSON:
     return Math.min(Math.max(value, min), max);
   }
 
-  private emptyResult(): PropagandaAnalysisResult {
+  private emptyResult(mode: AnalysisMode, reason: string): PropagandaAnalysisResult {
     return {
+      analysisMode: mode,
+      analysisModeReason: reason,
       techniques: [],
       claims: [],
       frames: [],
       overallAssessment: {
         manipulationLikelihood: 'low',
         confidence: 0,
-        reasoning: 'Analysis could not be completed (no Gemini API key or no narratives provided).',
-        caveats: [
-          'No analysis was performed. Configure GEMINI_API_KEY for full propaganda technique detection.',
-        ],
+        reasoning: reason,
+        caveats: ['No analysis was performed. This is not a "no propaganda detected" finding.'],
       },
     };
   }

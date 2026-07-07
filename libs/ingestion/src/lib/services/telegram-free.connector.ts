@@ -6,6 +6,7 @@ import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
+import { SourceRateLimiter } from './utils/source-rate-limiter';
 
 interface SearchOptions {
   startDate?: Date;
@@ -39,7 +40,7 @@ interface TelegramChannelInfo {
 
 /**
  * Curated list of OSINT / crypto / geopolitical Telegram channels.
- * Used when searching across channels for narrative content.
+ * Used as the default channel set when TELEGRAM_CHANNELS is not configured.
  */
 const CURATED_CHANNELS = [
   // Crypto
@@ -56,7 +57,14 @@ const CURATED_CHANNELS = [
 ];
 
 /**
- * API-free Telegram connector using public web preview scraping.
+ * CHANNEL-MONITORING connector for Telegram — NOT platform-wide search.
+ *
+ * IMPORTANT: "search" here means fetching recent messages from a fixed set of
+ * configured channels and filtering them by the query keywords. The query does
+ * NOT drive discovery — results can only ever come from the configured
+ * channels. Configure the channel list via the TELEGRAM_CHANNELS env var
+ * (comma-separated channel handles, e.g. `bbcnews,reuters`); when unset, a
+ * curated OSINT/crypto/news channel list is used.
  *
  * Primary method: Parse HTML from `https://t.me/s/{channel_username}` — the
  * public web preview of any Telegram channel. No API key or bot token required.
@@ -74,6 +82,7 @@ export class TelegramFreeConnector implements DataConnector, OnModuleInit, OnMod
   private available = false;
   private readonly fetchTimeout = 15000; // 15s per request
   private readonly maxRetries = 2;
+  private readonly channels: string[];
 
   constructor(
     private configService: ConfigService,
@@ -81,6 +90,14 @@ export class TelegramFreeConnector implements DataConnector, OnModuleInit, OnMod
   ) {
     this.botToken =
       this.configService.get<string>('TELEGRAM_BOT_TOKEN') || process.env['TELEGRAM_BOT_TOKEN'];
+
+    const channelsConfig =
+      this.configService.get<string>('TELEGRAM_CHANNELS') || process.env['TELEGRAM_CHANNELS'];
+    const configuredChannels = (channelsConfig ?? '')
+      .split(',')
+      .map((channel) => channel.trim().replace(/^@/, ''))
+      .filter(Boolean);
+    this.channels = configuredChannels.length > 0 ? configuredChannels : [...CURATED_CHANNELS];
   }
 
   async onModuleInit() {
@@ -247,75 +264,90 @@ export class TelegramFreeConnector implements DataConnector, OnModuleInit, OnMod
   // ---------------------------------------------------------------------------
 
   private async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
-    if (!this.available) return [];
+    if (!this.available) {
+      throw new Error(
+        'Telegram search failed: connector unavailable (t.me web preview unreachable)',
+      );
+    }
 
     const limit = options?.maxResults || options?.limit || 20;
     const keywords = query.toLowerCase().split(/\s+/).filter(Boolean);
 
-    try {
-      // Fetch messages from all curated channels in parallel
-      const channelResults = await Promise.allSettled(
-        CURATED_CHANNELS.map((ch) => this.fetchChannelMessages(ch)),
-      );
+    this.logger.debug(
+      `Telegram: filtering ${this.channels.length} configured channels for "${query}" — this is channel monitoring, not platform-wide search`,
+    );
 
-      let allMessages: TelegramMessage[] = [];
-      for (const result of channelResults) {
-        if (result.status === 'fulfilled') {
-          allMessages.push(...result.value);
-        }
+    // Fetch messages from all configured channels in parallel
+    const channelResults = await Promise.allSettled(
+      this.channels.map((ch) => this.fetchChannelMessages(ch)),
+    );
+
+    let allMessages: TelegramMessage[] = [];
+    const failures: string[] = [];
+    for (const result of channelResults) {
+      if (result.status === 'fulfilled') {
+        allMessages.push(...result.value);
+      } else {
+        failures.push(
+          result.reason instanceof Error ? result.reason.message : String(result.reason),
+        );
       }
-
-      // Filter by keywords
-      if (keywords.length > 0) {
-        allMessages = allMessages.filter((msg) => {
-          const text = msg.text.toLowerCase();
-          return keywords.some((kw) => text.includes(kw));
-        });
-      }
-
-      // Date filter
-      if (options?.startDate || options?.endDate) {
-        const start = options?.startDate?.getTime() ?? 0;
-        const end = options?.endDate?.getTime() ?? Date.now();
-        allMessages = allMessages.filter((msg) => {
-          const ts = new Date(msg.datetime).getTime();
-          return ts >= start && ts <= end;
-        });
-      }
-
-      // Sort by date descending
-      allMessages.sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime());
-
-      return allMessages.slice(0, limit).map((m) => this.transformToSocialMediaPost(m));
-    } catch (error) {
-      this.logger.error('Error searching Telegram:', error);
-      return [];
     }
+
+    if (channelResults.length > 0 && failures.length === channelResults.length) {
+      throw new Error(
+        `Telegram search failed: all ${channelResults.length} channels failed: ${failures[0]}`,
+      );
+    }
+    if (failures.length > 0) {
+      this.logger.warn(
+        `Telegram: ${failures.length}/${channelResults.length} channels failed (first error: ${failures[0]})`,
+      );
+    }
+
+    // Filter by keywords
+    if (keywords.length > 0) {
+      allMessages = allMessages.filter((msg) => {
+        const text = msg.text.toLowerCase();
+        return keywords.some((kw) => text.includes(kw));
+      });
+    }
+
+    // Date filter
+    if (options?.startDate || options?.endDate) {
+      const start = options?.startDate?.getTime() ?? 0;
+      const end = options?.endDate?.getTime() ?? Date.now();
+      allMessages = allMessages.filter((msg) => {
+        const ts = new Date(msg.datetime).getTime();
+        return ts >= start && ts <= end;
+      });
+    }
+
+    // Sort by date descending
+    allMessages.sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime());
+
+    return allMessages.slice(0, limit).map((m) => this.transformToSocialMediaPost(m));
   }
 
   /**
    * Fetch recent messages from a Telegram channel's public web preview.
    * Parses HTML from `https://t.me/s/{channel}`.
+   * Throws when the channel cannot be fetched so callers can distinguish
+   * fetch failures from genuinely empty channels.
    */
   private async fetchChannelMessages(channel: string): Promise<TelegramMessage[]> {
     const url = `https://t.me/s/${channel}`;
 
-    try {
-      const res = await this.fetchWithRetry(url, {
-        timeout: this.fetchTimeout,
-      });
+    const res = await this.fetchWithRetry(url, {
+      timeout: this.fetchTimeout,
+    });
 
-      if (!res.ok) {
-        this.logger.debug(`Failed to fetch channel ${channel}: HTTP ${res.status}`);
-        return [];
-      }
-
-      const html = await res.text();
-      return this.parseChannelHtml(html, channel);
-    } catch (error) {
-      this.logger.debug(`Error fetching channel ${channel}:`, error);
-      return [];
+    if (!res.ok) {
+      throw new Error(`Failed to fetch channel @${channel}: HTTP ${res.status}`);
     }
+
+    const html = await res.text();
+    return this.parseChannelHtml(html, channel);
   }
 
   /**
@@ -519,21 +551,34 @@ export class TelegramFreeConnector implements DataConnector, OnModuleInit, OnMod
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeout);
+        // Schedule inside the retry loop so retries are also paced.
+        return await SourceRateLimiter.instance.schedule('telegram', async () => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), timeout);
 
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-          },
+          try {
+            const res = await fetch(url, {
+              signal: controller.signal,
+              headers: {
+                'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+              },
+            });
+
+            if (res.status === 429) {
+              SourceRateLimiter.instance.notifyRateLimited(
+                'telegram',
+                SourceRateLimiter.retryAfterMsFrom(res.headers),
+              );
+            }
+
+            return res;
+          } finally {
+            clearTimeout(timer);
+          }
         });
-
-        clearTimeout(timer);
-        return res;
       } catch (error) {
         lastError = error as Error;
         if (attempt < this.maxRetries) {

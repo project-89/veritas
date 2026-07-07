@@ -3,7 +3,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import type { DatabaseProvider, DatabaseProviderOptions, Repository } from '@veritas/database';
 import { ContentController } from './controllers/content.controller';
 import { getContentModel } from './models';
-import { ContentResolver } from './resolvers/content.resolver';
 import { ContentService } from './services/content.service';
 import { ContentClassificationService } from './services/content-classification.service';
 import { EmbeddingsService } from './services/embeddings.service';
@@ -89,7 +88,7 @@ export interface ContentClassificationModuleOptions {
  */
 @Module({
   controllers: [ContentController],
-  providers: [ContentClassificationService, ContentService, ContentResolver],
+  providers: [ContentClassificationService, ContentService],
   exports: [ContentClassificationService, ContentService],
 })
 export class ContentClassificationModule {
@@ -159,7 +158,6 @@ export class ContentClassificationModule {
         useExisting: ContentClassificationService,
       },
       ContentService,
-      ContentResolver,
     ];
 
     // If database is specified, add database provider

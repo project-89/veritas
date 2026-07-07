@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 // Investigation settings sub-schema (internal Mongoose class)
 @Schema({ _id: false })
@@ -13,8 +12,8 @@ class InvestigationSettingsEmbed {
   @Prop({ type: Number, default: 50 })
   limit!: number;
 
-  @Prop({ type: String, enum: ['topic', 'claim'], default: 'topic' })
-  searchMode!: 'topic' | 'claim';
+  @Prop({ type: String, enum: ['topic', 'claim', 'person'], default: 'topic' })
+  searchMode!: 'topic' | 'claim' | 'person';
 }
 
 // Snapshot summary sub-schema (internal Mongoose class)
@@ -108,7 +107,7 @@ class EvidenceSeedEmbed {
     },
   },
 })
-export class InvestigationSchema extends Document {
+export class InvestigationSchema {
   @Prop({ required: true, unique: true, index: true })
   query!: string;
 
@@ -162,7 +161,7 @@ InvestigationModel.index({ status: 1, updatedAt: -1 });
     },
   },
 })
-export class SnapshotSchema extends Document {
+export class SnapshotSchema {
   @Prop({ required: true, index: true })
   investigationId!: string;
 
@@ -198,7 +197,7 @@ export interface InvestigationSettings {
   platforms: string[];
   timeRange: string;
   limit: number;
-  searchMode?: 'topic' | 'claim';
+  searchMode?: 'topic' | 'claim' | 'person';
 }
 
 export interface Investigation {

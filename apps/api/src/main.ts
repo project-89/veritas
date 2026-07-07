@@ -7,6 +7,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app/app.module';
+import { parseCorsOrigins, validateEnv } from './app/config/validate-env';
 import { GlobalExceptionFilter } from './filters/global-exception.filter';
 
 // Catch unhandled errors so we can see what's killing the process
@@ -19,6 +20,9 @@ process.on('unhandledRejection', (reason) => {
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Fail fast on unsafe configuration before any service spins up
+  validateEnv();
 
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug'],
@@ -58,9 +62,12 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  // Enable CORS for development
+  // CORS: explicit origin list only. validateEnv() guarantees CORS_ORIGIN is
+  // set in production; in dev we default to the local client + API origins.
+  // (Wildcard + credentials is both invalid per the fetch spec and unsafe.)
+  const corsOrigins = parseCorsOrigins();
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: corsOrigins.length > 0 ? corsOrigins : ['http://localhost:4200', 'http://localhost:3000'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });

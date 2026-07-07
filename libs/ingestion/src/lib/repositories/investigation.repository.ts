@@ -90,6 +90,7 @@ export class InvestigationRepository implements OnModuleInit {
           platforms: settings?.platforms ?? [],
           timeRange: settings?.timeRange ?? '7d',
           limit: settings?.limit ?? 50,
+          searchMode: settings?.searchMode ?? 'topic',
         },
         lastSnapshotId: null,
         lastScanId: null,
@@ -180,6 +181,21 @@ export class InvestigationRepository implements OnModuleInit {
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error in findById: ${err.message}`, err.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Batch-load investigations by ID in one query (avoids N+1 lookups).
+   */
+  async findByIds(ids: string[]): Promise<Investigation[]> {
+    this.ensureInitialized();
+    if (ids.length === 0) return [];
+    try {
+      return await this.investigationRepo.find({ _id: { $in: ids } } as Record<string, unknown>);
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error in findByIds: ${err.message}`, err.stack);
       throw error;
     }
   }

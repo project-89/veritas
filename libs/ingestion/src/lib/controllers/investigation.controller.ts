@@ -85,16 +85,23 @@ export class InvestigationController {
       skip: skip ? Number(skip) : undefined,
     });
 
+    // Batch-load backing investigations and dossiers (2 queries, not 2N)
+    const investigationIds = [...new Set(mentalModels.map((m) => m.investigationId))];
+    const [investigations, dossiers] = await Promise.all([
+      this.investigationRepository.findByIds(investigationIds),
+      this.projectDossierRepository.findByInvestigationIds(investigationIds),
+    ]);
+    const investigationById = new Map(
+      investigations.map((inv) => [inv._id?.toString() ?? inv.id, inv]),
+    );
+    const dossierByInvestigationId = new Map(dossiers.map((d) => [d.investigationId, d]));
+
     const records: Array<{ investigation: InvestigationWithDossier; mentalModel: MentalModel }> =
       [];
     for (const mentalModel of mentalModels) {
-      const investigation = await this.investigationRepository.findById(
-        mentalModel.investigationId,
-      );
+      const investigation = investigationById.get(mentalModel.investigationId);
       if (!investigation) continue;
-      const projectDossier = await this.projectDossierRepository.findByInvestigationId(
-        mentalModel.investigationId,
-      );
+      const projectDossier = dossierByInvestigationId.get(mentalModel.investigationId) ?? null;
       records.push({
         investigation: this.withEvidenceDossier(investigation, projectDossier),
         mentalModel,
@@ -115,9 +122,10 @@ export class InvestigationController {
       platforms?: string[];
       timeRange?: string;
       limit?: number;
+      searchMode?: 'topic' | 'claim' | 'person';
     },
   ): Promise<Investigation> {
-    const { query, name, platforms, timeRange, limit } = body;
+    const { query, name, platforms, timeRange, limit, searchMode } = body;
     if (!query?.trim()) {
       throw new NotFoundException('Query is required');
     }
@@ -129,6 +137,7 @@ export class InvestigationController {
           platforms: platforms ?? [],
           timeRange: timeRange ?? '7d',
           limit: limit ?? 100,
+          searchMode: searchMode ?? 'topic',
         },
       });
     }
@@ -136,6 +145,7 @@ export class InvestigationController {
       platforms: platforms ?? [],
       timeRange: timeRange ?? '7d',
       limit: limit ?? 100,
+      searchMode: searchMode ?? 'topic',
     });
   }
 

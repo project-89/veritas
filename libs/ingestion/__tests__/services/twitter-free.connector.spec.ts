@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
 import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
 import { TwitterFreeConnector } from '../../src/lib/services/twitter-free.connector';
+import { SourceRateLimiter } from '../../src/lib/services/utils/source-rate-limiter';
 
 // Mock the scraper module
 const mockSearchTweets = jest.fn();
@@ -50,6 +51,10 @@ describe('TwitterFreeConnector', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Use a zero-delay limiter so tests don't wait out the real pacing.
+    SourceRateLimiter.setInstance(
+      new SourceRateLimiter({ twitter: { minIntervalMs: 0, maxConcurrent: 100 } }),
+    );
     mockConfigService = {
       get: jest.fn((key: string) => {
         const config: Record<string, string> = {
@@ -67,6 +72,10 @@ describe('TwitterFreeConnector', () => {
       mockConfigService as ConfigService,
       mockTransformService as unknown as TransformOnIngestService,
     );
+  });
+
+  afterAll(() => {
+    SourceRateLimiter.setInstance(null);
   });
 
   describe('connectToApi', () => {
@@ -118,6 +127,43 @@ describe('TwitterFreeConnector', () => {
   });
 
   describe('searchContent', () => {
+    beforeEach(async () => {
+      // searchContent now fails loudly when the connector is not
+      // authenticated, so connect the mock scraper first.
+      mockLogin.mockResolvedValue(undefined);
+      await connector.connect();
+    });
+
+    it('should throw when the connector is not authenticated', async () => {
+      const unauthenticated = new TwitterFreeConnector(
+        mockConfigService as ConfigService,
+        mockTransformService as unknown as TransformOnIngestService,
+      );
+
+      await expect(unauthenticated.searchContent('test')).rejects.toThrow(
+        'Twitter search failed: connector is not authenticated',
+      );
+      expect(mockSearchTweets).not.toHaveBeenCalled();
+    });
+
+    it('should throw when every query variation fails and nothing was collected', async () => {
+      mockSearchTweets.mockImplementation(() => {
+        throw new Error('authentication expired');
+      });
+
+      await expect(connector.searchContent('project89')).rejects.toThrow(
+        /Twitter search failed: all \d+ query variations failed: authentication expired/,
+      );
+    });
+
+    it('should return an empty array when searches succeed but find nothing', async () => {
+      mockSearchTweets.mockImplementation(() => (async function* () {})());
+
+      const results = await connector.searchContent('no-matches-here');
+
+      expect(results).toEqual([]);
+    });
+
     it('should search tweets and return SocialMediaPost array', async () => {
       async function* gen() {
         yield mockTweet;

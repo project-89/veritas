@@ -53,8 +53,6 @@ export * from './lib/repositories/narrative-insight.repository';
 export { RssCacheRepository } from './lib/repositories/rss-cache.repository';
 export { ScanJobRepository } from './lib/repositories/scan-job.repository';
 export { SignalCacheRepository } from './lib/repositories/signal-cache.repository';
-// Resolvers
-export * from './lib/resolvers/ingestion.resolver';
 // Schemas
 export * from './lib/schemas/alert.schema';
 // Analysis job schema + types

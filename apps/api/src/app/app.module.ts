@@ -1,9 +1,7 @@
-import { join } from 'node:path';
-import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { BullModule } from '@nestjs/bullmq';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { GraphQLModule } from '@nestjs/graphql';
+import { APP_GUARD } from '@nestjs/core';
 import {
   AnalysisModule,
   ClaimVerificationService,
@@ -34,6 +32,7 @@ import {
   SOURCE_CREDIBILITY_SERVICE,
 } from '@veritas/ingestion';
 import { EventsController } from './controllers/events.controller';
+import { HealthController } from './controllers/health.controller';
 import { InvestigationController } from './controllers/investigation.controller';
 import { MonitorController } from './controllers/monitor.controller';
 import { PluginsController } from './controllers/plugins.controller';
@@ -41,6 +40,7 @@ import {
   GENERATED_PLUGIN_APP_PROVIDERS,
   GENERATED_PLUGIN_CONTROLLERS,
 } from './generated-plugin-backend';
+import { ApiKeyGuard } from './guards/api-key.guard';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { LoggingService } from './services/logging.service';
 import { RefreshService } from './services/refresh.service';
@@ -60,14 +60,6 @@ import { SchedulerService } from './services/scheduler.service';
         host: process.env.REDIS_HOST || 'localhost',
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
       },
-    }),
-
-    // GraphQL
-    GraphQLModule.forRoot<ApolloDriverConfig>({
-      driver: ApolloDriver,
-      autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
-      sortSchema: true,
-      playground: process.env.NODE_ENV !== 'production',
     }),
 
     // Database Modules
@@ -100,6 +92,9 @@ import { SchedulerService } from './services/scheduler.service';
     ContentClassificationModule.forRoot(),
   ],
   providers: [
+    // API-key auth on every route when VERITAS_API_KEY is set (validate-env
+    // refuses to start production without it)
+    { provide: APP_GUARD, useClass: ApiKeyGuard },
     LoggingService,
     RefreshService,
     SchedulerService,
@@ -128,6 +123,7 @@ import { SchedulerService } from './services/scheduler.service';
     // { provide: 'REDIS_SERVICE', useFactory: (db: DatabaseService) => db, inject: [DatabaseService] },
   ],
   controllers: [
+    HealthController,
     InvestigationController,
     MonitorController,
     EventsController,

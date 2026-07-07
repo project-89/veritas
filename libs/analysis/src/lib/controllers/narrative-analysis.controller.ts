@@ -495,6 +495,7 @@ export class NarrativeAnalysisController {
       }
       case 'legitimacy': {
         const verification = body.claims ?? {
+          analysisMode: 'skipped' as const,
           results: [],
           summary: '',
           verifiedCount: 0,

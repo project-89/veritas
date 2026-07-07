@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 @Schema({
   collection: 'narrative_trends',
@@ -11,9 +10,9 @@ import { Document } from 'mongoose';
     },
   },
 })
-export class NarrativeTrendSchema extends Document {
+export class NarrativeTrendSchema {
   @Prop({ required: true, unique: true })
-  override id!: string;
+  id!: string;
 
   @Prop({ required: true, index: true })
   timeframe!: string;

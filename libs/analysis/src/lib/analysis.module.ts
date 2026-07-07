@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AnalysisController } from './analysis.controller';
-import { AnalysisResolver } from './analysis.resolver';
 import { NarrativeAnalysisController } from './controllers/narrative-analysis.controller';
 import { ANALYSIS_SERVICE } from './interfaces/analysis-service.interface';
 import { AnalysisService } from './services/analysis.service';
@@ -63,7 +62,6 @@ import { SourceCredibilityService } from './services/source-credibility.service'
       provide: ANALYSIS_SERVICE,
       useExisting: AnalysisService,
     },
-    AnalysisResolver,
   ],
   controllers: [AnalysisController, NarrativeAnalysisController],
   exports: [

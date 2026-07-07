@@ -95,26 +95,19 @@ export class EmbeddingCacheRepository implements OnModuleInit {
   async setEmbedding(contentHash: string, model: string, embedding: number[]): Promise<void> {
     this.ensureInitialized();
     try {
-      // Delete any existing entry for this hash + model
-      try {
-        const old = await this.repo.find(
-          { contentHash, modelName: model } as Record<string, unknown>,
-          { limit: 1 },
-        );
-        for (const entry of old) {
-          const id = entry._id?.toString() ?? entry.id;
-          if (id) await this.repo.deleteById(id);
-        }
-      } catch {
-        // Best effort cleanup
-      }
-
-      await this.repo.create({
-        contentHash,
-        modelName: model,
+      // Update-then-insert instead of find/delete/insert; the unique
+      // (contentHash, modelName) index makes a lost race harmless.
+      const data = {
         embedding,
         expiresAt: new Date(Date.now() + TTL_MS),
-      } as Partial<EmbeddingCacheEntry>);
+      } as Partial<EmbeddingCacheEntry>;
+      const updated = await this.repo.updateMany(
+        { contentHash, modelName: model } as Record<string, unknown>,
+        data,
+      );
+      if (updated === 0) {
+        await this.repo.create({ contentHash, modelName: model, ...data });
+      }
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(`Error in setEmbedding: ${err.message}`);

@@ -160,15 +160,9 @@ export class SignalCacheRepository implements OnModuleInit {
         filter['keywords'] = sortedKeywords;
       }
 
-      // Delete stale entries first
+      // Delete stale entries in one query (best effort)
       try {
-        const old = await this.repo.find(filter, {});
-        for (const entry of old) {
-          const id = entry._id?.toString() ?? entry.id;
-          if (id) {
-            await this.repo.deleteById(id);
-          }
-        }
+        await this.repo.deleteMany(filter);
       } catch {
         // Best effort cleanup
       }

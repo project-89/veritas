@@ -7,6 +7,7 @@ import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { JinaReaderService } from './utils/jina-reader.service';
+import { SourceRateLimiter } from './utils/source-rate-limiter';
 
 interface SearchOptions {
   startDate?: Date;
@@ -15,15 +16,18 @@ interface SearchOptions {
 }
 
 /**
- * API-free Facebook connector using Jina Reader for public pages.
+ * PAGE-MONITORING connector for public Facebook pages via Jina Reader — NOT search.
  *
- * Limitations:
- * - Only works with public Facebook pages/posts
- * - No search within Facebook (monitors configured page URLs)
- * - Limited engagement data (mostly zeroed)
- * - Best effort — Facebook may block scraping of some pages
+ * IMPORTANT: this connector cannot search Facebook. "search" here means reading
+ * the pages configured in FACEBOOK_PAGE_URLS (JSON array of URLs) and filtering
+ * their content by the query — results only ever come from those pages.
  *
- * Configure monitored pages via FACEBOOK_PAGE_URLS env var (JSON array of URLs).
+ * Data-quality caveats:
+ * - Timestamps are RETRIEVAL times (when the page was read), NOT publication
+ *   times — Jina Reader output does not expose post dates.
+ * - Engagement metrics are unavailable and always zero.
+ * - Only works with public Facebook pages/posts; Facebook may block scraping
+ *   of some pages (best effort).
  */
 @Injectable()
 export class FacebookJinaConnector implements DataConnector, OnModuleInit, OnModuleDestroy {
@@ -135,7 +139,9 @@ export class FacebookJinaConnector implements DataConnector, OnModuleInit, OnMod
     // Limited — try to read the page via Jina Reader
     try {
       const url = `https://www.facebook.com/${authorId}`;
-      const result = await this.jinaReader.readUrl(url);
+      const result = await SourceRateLimiter.instance.schedule('facebook', () =>
+        this.jinaReader.readUrl(url),
+      );
 
       return {
         id: authorId,
@@ -176,19 +182,34 @@ export class FacebookJinaConnector implements DataConnector, OnModuleInit, OnMod
   // --- Private helpers ---
 
   async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
+    if (this.pageUrls.length === 0) {
+      throw new Error('Facebook monitoring not configured: set FACEBOOK_PAGE_URLS');
+    }
+
     const allPosts: SocialMediaPost[] = [];
     const limit = options?.limit || 50;
+    const failures: string[] = [];
+    let attempted = 0;
 
     for (const pageUrl of this.pageUrls) {
+      attempted++;
       try {
-        const result = await this.jinaReader.readUrl(pageUrl);
+        const result = await SourceRateLimiter.instance.schedule('facebook', () =>
+          this.jinaReader.readUrl(pageUrl),
+        );
         const posts = this.extractPostsFromContent(result.content, pageUrl, query);
         allPosts.push(...posts);
 
         if (allPosts.length >= limit) break;
       } catch (error) {
-        this.logger.warn(`Failed to read Facebook page ${pageUrl}: ${(error as Error).message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        failures.push(message);
+        this.logger.warn(`Failed to read Facebook page ${pageUrl}: ${message}`);
       }
+    }
+
+    if (failures.length === attempted && allPosts.length === 0) {
+      throw new Error(`Facebook search failed: all ${attempted} pages failed: ${failures[0]}`);
     }
 
     return allPosts.slice(0, limit);

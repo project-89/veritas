@@ -13,6 +13,7 @@ import { Queue } from 'bullmq';
 import type { AnalysisJobData } from '../queue/analysis.processor';
 import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
 import type { AnalysisJob, AnalysisJobType } from '../schemas/analysis-job.schema';
+import { jitteredBackoff } from '../utils/queue-backoff.util';
 
 interface BatchJobRequest {
   type: AnalysisJobType;
@@ -81,7 +82,7 @@ export class AnalysisJobController {
 
       await this.analysisQueue.add(`analysis-${jobReq.type}`, jobData, {
         attempts: 2,
-        backoff: { type: 'exponential', delay: 10000 },
+        backoff: jitteredBackoff(10000),
         removeOnComplete: 200,
         removeOnFail: 100,
       });

@@ -35,6 +35,15 @@ interface FeedFailureState {
   suppressedUntil: number;
 }
 
+interface FeedFetchResult {
+  items: RSSItem[];
+  /**
+   * Human-readable failure summary when the feed could not be fetched this
+   * run (including feeds suppressed by the failure cooldown). Null on success.
+   */
+  failure: string | null;
+}
+
 interface SearchOptions {
   startDate?: Date;
   endDate?: Date;
@@ -171,6 +180,7 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
 
       // Fetch in parallel batches of 10 (don't overwhelm network)
       const allItems: RSSItem[] = [];
+      const failures: string[] = [];
       const entries = Array.from(feedsToUse.entries());
       const BATCH_SIZE = 10;
 
@@ -178,20 +188,36 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
         const batch = entries.slice(i, i + BATCH_SIZE);
         const results = await Promise.allSettled(
           batch.map(async ([feedName, feedUrl]) => {
-            const items = await this.fetchFeedItems(feedUrl, options);
-            items.forEach((item) => {
+            const result = await this.fetchFeedItems(feedUrl, options);
+            result.items.forEach((item) => {
               item.sourceName = feedName;
               item.sourceUrl = feedUrl;
             });
-            return items;
+            return result;
           }),
         );
 
         for (const result of results) {
           if (result.status === 'fulfilled') {
-            allItems.push(...result.value);
+            if (result.value.failure) {
+              failures.push(result.value.failure);
+            }
+            allItems.push(...result.value.items);
+          } else {
+            failures.push(
+              result.reason instanceof Error ? result.reason.message : String(result.reason),
+            );
           }
         }
+      }
+
+      // Total failure: every feed failed or was suppressed by the failure
+      // cooldown and nothing was collected — fail loudly instead of reporting
+      // a misleading "0 results".
+      if (feedsToUse.size > 0 && failures.length >= feedsToUse.size && allItems.length === 0) {
+        throw new Error(
+          `RSS search failed: all ${feedsToUse.size} feeds failed or were suppressed: ${failures[0]}`,
+        );
       }
 
       // Filter items by query if provided
@@ -262,9 +288,12 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
   }
 
   /**
-   * Fetch items from a feed URL (with RSS cache layer)
+   * Fetch items from a feed URL (with RSS cache layer).
+   * Never rejects — failures (including cooldown-suppressed feeds) are
+   * reported via the `failure` field so callers can distinguish a genuinely
+   * empty feed from one that could not be fetched this run.
    */
-  private async fetchFeedItems(feedUrl: string, options?: SearchOptions): Promise<RSSItem[]> {
+  private async fetchFeedItems(feedUrl: string, options?: SearchOptions): Promise<FeedFetchResult> {
     try {
       // --- Check RSS cache first ---
       if (this.rssCacheRepo) {
@@ -285,7 +314,7 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
             if (options?.limit && items.length > options.limit) {
               items = items.slice(0, options.limit);
             }
-            return items;
+            return { items, failure: null };
           }
         } catch {
           // Cache miss — fetch fresh
@@ -293,7 +322,11 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
       }
 
       if (this.isFeedTemporarilySuppressed(feedUrl)) {
-        return [];
+        const state = this.feedFailureState.get(feedUrl);
+        return {
+          items: [],
+          failure: `${feedUrl} suppressed after repeated failures (${state?.lastErrorSignature ?? 'unknown error'})`,
+        };
       }
 
       const feedXml = await this.fetchFeedXml(feedUrl);
@@ -324,10 +357,13 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
         items = items.slice(0, options.limit);
       }
 
-      return items;
+      return { items, failure: null };
     } catch (error) {
       this.recordFeedFailure(feedUrl, error);
-      return [];
+      return {
+        items: [],
+        failure: `${feedUrl} failed (${this.summarizeFeedError(error)})`,
+      };
     }
   }
 
@@ -565,7 +601,7 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
         // Fetch recent items from all feeds
         const allItems: RSSItem[] = [];
         for (const [feedName, feedUrl] of this.feedUrls.entries()) {
-          const items = await this.fetchFeedItems(feedUrl, {
+          const { items } = await this.fetchFeedItems(feedUrl, {
             startDate: new Date(Date.now() - 3600000 * 24), // Last 24 hours
           });
 
@@ -625,7 +661,7 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
         // Fetch recent items from all feeds
         const allItems: RSSItem[] = [];
         for (const [feedName, feedUrl] of this.feedUrls.entries()) {
-          const items = await this.fetchFeedItems(feedUrl, {
+          const { items } = await this.fetchFeedItems(feedUrl, {
             startDate: new Date(Date.now() - 3600000 * 24), // Last 24 hours
           });
 

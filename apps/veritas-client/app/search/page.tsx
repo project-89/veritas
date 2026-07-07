@@ -77,7 +77,7 @@ export default function SearchPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [caseMode, setCaseMode] = useState<'new' | 'existing'>('new');
-  const [searchMode, setSearchMode] = useState<'topic' | 'claim'>('topic');
+  const [searchMode, setSearchMode] = useState<'topic' | 'claim' | 'person'>('topic');
   const [caseTitle, setCaseTitle] = useState('');
   const [query, setQuery] = useState('');
   const [platforms, setPlatforms] = useState<string[]>([
@@ -163,10 +163,13 @@ export default function SearchPage() {
       }
 
       const inv = await createOrGetInvestigation(q, {
-        name: trimmedCaseTitle || undefined,
+        name:
+          trimmedCaseTitle ||
+          (searchMode === 'person' ? `User: @${q.replace(/^@+/, '')}` : undefined),
         platforms: platforms.length > 0 ? platforms : undefined,
         timeRange: timeRange === 'custom' ? `${customStart}_${customEnd}` : timeRange,
         limit,
+        searchMode,
       });
       const investigationId = inv._id ?? inv.id;
       if (!investigationId) {
@@ -306,13 +309,23 @@ export default function SearchPage() {
                     label: 'Claim Search',
                     hint: 'Anchored allegation or factual claim',
                   },
+                  {
+                    id: 'person',
+                    label: 'Person Search',
+                    hint: "Pull a user's timeline across platforms",
+                  },
                 ].map((mode) => {
                   const selected = searchMode === mode.id;
                   return (
                     <button
                       key={mode.id}
                       type="button"
-                      onClick={() => setSearchMode(mode.id as 'topic' | 'claim')}
+                      onClick={() => {
+                        const next = mode.id as 'topic' | 'claim' | 'person';
+                        setSearchMode(next);
+                        // Person mode defaults to a tight 3d window; user can extend later
+                        if (next === 'person') setTimeRange('3d');
+                      }}
                       className={[
                         'px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest border rounded-sm transition-all',
                         selected
@@ -330,7 +343,11 @@ export default function SearchPage() {
                 htmlFor="scan-query"
                 className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5"
               >
-                {searchMode === 'claim' ? 'Claim Query' : 'Scan Query'}
+                {searchMode === 'claim'
+                  ? 'Claim Query'
+                  : searchMode === 'person'
+                    ? 'Target Username'
+                    : 'Scan Query'}
               </label>
               <div className="flex gap-2">
                 <input
@@ -343,7 +360,9 @@ export default function SearchPage() {
                   placeholder={
                     searchMode === 'claim'
                       ? 'Enter a factual claim or allegation...'
-                      : 'Enter narrative topic...'
+                      : searchMode === 'person'
+                        ? '@handle or username'
+                        : 'Enter narrative topic...'
                   }
                   className="flex-1 px-3 py-2.5 font-mono text-sm bg-nerv-bg border border-nerv-border text-nerv-green placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-green/50 focus:shadow-[0_0_8px_rgba(0,255,65,0.15)] transition-all"
                 />
@@ -353,13 +372,19 @@ export default function SearchPage() {
                   disabled={!query.trim() || (caseMode === 'existing' && !selectedInvestigationId)}
                   className="px-6 py-2.5 bg-nerv-orange/20 border border-nerv-orange/50 text-nerv-orange text-[11px] font-mono uppercase tracking-widest hover:bg-nerv-orange/30 hover:border-nerv-orange disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 >
-                  {caseMode === 'existing' ? 'Append Scan' : 'Create Case'}
+                  {caseMode === 'existing'
+                    ? 'Append Scan'
+                    : searchMode === 'person'
+                      ? 'Investigate User'
+                      : 'Create Case'}
                 </button>
               </div>
               <div className="mt-1 text-[8px] font-mono text-nerv-text-muted">
                 {searchMode === 'claim'
                   ? 'Claim mode prioritizes anchors, event terms, and stricter post matching.'
-                  : 'Topic mode is broader and better for campaign or entity discovery.'}
+                  : searchMode === 'person'
+                    ? "Pulls the user's recent timeline across every connector that supports per-user fetches. Starts narrow (3d) — extend depth from the results page."
+                    : 'Topic mode is broader and better for campaign or entity discovery.'}
               </div>
             </div>
 

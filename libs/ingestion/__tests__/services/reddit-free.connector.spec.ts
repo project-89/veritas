@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { RedditFreeConnector } from '../../src/lib/services/reddit-free.connector';
 import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
+import { SourceRateLimiter } from '../../src/lib/services/utils/source-rate-limiter';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -68,6 +69,11 @@ describe('RedditFreeConnector', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    // Use a zero-delay limiter so tests don't wait out the real pacing.
+    SourceRateLimiter.setInstance(
+      new SourceRateLimiter({ reddit: { minIntervalMs: 0, maxConcurrent: 100 } }),
+    );
+
     mockAxiosInstance = {
       get: jest.fn(),
     };
@@ -88,9 +94,10 @@ describe('RedditFreeConnector', () => {
       configService as ConfigService,
       transformService as TransformOnIngestService,
     );
+  });
 
-    // Reset the internal rate limit timer
-    (connector as any).lastRequestTime = 0;
+  afterAll(() => {
+    SourceRateLimiter.setInstance(null);
   });
 
   describe('constructor', () => {
@@ -469,20 +476,36 @@ describe('RedditFreeConnector', () => {
   });
 
   describe('rate limiting', () => {
-    it('should enforce minimum request interval', async () => {
-      jest.useFakeTimers();
+    it('should route every request through the shared per-source rate limiter', async () => {
+      const scheduleSpy = jest.spyOn(SourceRateLimiter.instance, 'schedule');
       mockAxiosInstance.get.mockResolvedValue({ data: mockRedditResponse });
 
-      // Set lastRequestTime to now
-      (connector as any).lastRequestTime = Date.now();
+      await connector.searchContent('test');
 
-      const promise = connector.searchContent('test');
+      expect(scheduleSpy).toHaveBeenCalledWith('reddit', expect.any(Function));
+      expect(scheduleSpy).toHaveBeenCalledTimes(mockAxiosInstance.get.mock.calls.length);
+    });
 
-      // The request should be delayed
-      await jest.advanceTimersByTimeAsync(2000);
-      await promise;
+    it('should notify the limiter when Reddit responds with HTTP 429', async () => {
+      const notifySpy = jest.spyOn(SourceRateLimiter.instance, 'notifyRateLimited');
+      const rateLimitError = Object.assign(new Error('Request failed with status code 429'), {
+        isAxiosError: true,
+        response: { status: 429, headers: { 'retry-after': '30' } },
+      });
+      mockAxiosInstance.get.mockRejectedValue(rateLimitError);
 
-      jest.useRealTimers();
+      await expect(connector.searchContent('test')).rejects.toThrow('429');
+
+      expect(notifySpy).toHaveBeenCalledWith('reddit', 30_000);
+    });
+
+    it('should not notify the limiter for non-429 errors', async () => {
+      const notifySpy = jest.spyOn(SourceRateLimiter.instance, 'notifyRateLimited');
+      mockAxiosInstance.get.mockRejectedValue(new Error('Network error'));
+
+      await expect(connector.searchContent('test')).rejects.toThrow('Network error');
+
+      expect(notifySpy).not.toHaveBeenCalled();
     });
   });
 });

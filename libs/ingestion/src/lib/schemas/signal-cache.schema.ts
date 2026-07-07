@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 // ---------------------------------------------------------------------------
 // SignalCache schema — persists external signals from adapters to MongoDB
@@ -16,7 +15,7 @@ import { Document } from 'mongoose';
     },
   },
 })
-export class SignalCacheSchema extends Document {
+export class SignalCacheSchema {
   /** Adapter name (e.g. "Yahoo Finance", "FRED", "World Bank", "GDELT") */
   @Prop({ required: true, index: true })
   adapterName!: string;

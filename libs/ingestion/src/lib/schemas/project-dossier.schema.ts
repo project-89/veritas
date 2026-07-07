@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 import { EvidenceSeed } from './investigation.schema';
 
 @Schema({ _id: false })
@@ -132,7 +131,7 @@ class ProjectDossierOnChainSummaryEmbed {
     },
   },
 })
-export class ProjectDossierSchema extends Document {
+export class ProjectDossierSchema {
   @Prop({ required: true, type: String, index: true, unique: true })
   investigationId!: string;
 

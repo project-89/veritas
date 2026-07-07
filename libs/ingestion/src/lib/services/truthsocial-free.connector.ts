@@ -250,7 +250,12 @@ export class TruthSocialFreeConnector implements DataConnector, OnModuleInit, On
   // ---------------------------------------------------------------------------
 
   private async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
-    if (!this.available) return [];
+    if (!this.available) {
+      throw new Error(
+        'Truth Social search failed: connector unavailable — install truthbrush and set ' +
+          'TRUTHSOCIAL_USERNAME + TRUTHSOCIAL_PASSWORD or TRUTHSOCIAL_TOKEN',
+      );
+    }
 
     const limit = options?.maxResults || options?.limit || 20;
 
@@ -263,8 +268,7 @@ export class TruthSocialFreeConnector implements DataConnector, OnModuleInit, On
       );
 
       if (result.exitCode !== 0) {
-        this.logger.warn(`Truth Social search failed: ${result.stderr}`);
-        return [];
+        throw new Error(`truthbrush search exited with code ${result.exitCode}: ${result.stderr}`);
       }
 
       let posts = this.parseJsonLines(result.stdout);
@@ -282,7 +286,11 @@ export class TruthSocialFreeConnector implements DataConnector, OnModuleInit, On
       return posts.slice(0, limit).map((p) => this.transformToSocialMediaPost(p));
     } catch (error) {
       this.logger.error('Error searching Truth Social:', error);
-      return [];
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith('Truth Social search failed')) {
+        throw error;
+      }
+      throw new Error(`Truth Social search failed: ${message}`);
     }
   }
 

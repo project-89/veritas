@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 // Sentiment Analysis Schema
 @Schema({ _id: false })
@@ -48,9 +47,9 @@ class Engagement {
     },
   },
 })
-export class NarrativeInsightSchema extends Document {
+export class NarrativeInsightSchema {
   @Prop({ required: true, unique: true })
-  override id!: string;
+  id!: string;
 
   @Prop({ required: true, index: true })
   contentHash!: string;

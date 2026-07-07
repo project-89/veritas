@@ -307,11 +307,25 @@ export class MongoDBRepository<T> implements Repository<T> {
     limit: number,
     minScore: number,
   ): Promise<VectorSearchResult<R>[]> {
-    // Get all documents that have the vector field
+    // Get documents that have the vector field. Hard-capped: this fallback
+    // loads vectors into memory, so an unbounded collection would OOM the
+    // process. Beyond the cap results degrade (most-recent docs only) —
+    // use Atlas Vector Search for real corpora.
+    const MAX_SCAN = 10_000;
     const filter: Record<string, unknown> = {};
     filter[field] = { $exists: true };
 
-    const documents = await this.model.find(filter).lean().exec();
+    const documents = await this.model
+      .find(filter)
+      .sort({ _id: -1 })
+      .limit(MAX_SCAN)
+      .lean()
+      .exec();
+    if (documents.length === MAX_SCAN) {
+      this.logger.warn(
+        `In-memory vector search hit its ${MAX_SCAN}-document scan cap — results are partial. Use Atlas Vector Search for this collection.`,
+      );
+    }
 
     // Calculate cosine similarity for each document
     const results = documents

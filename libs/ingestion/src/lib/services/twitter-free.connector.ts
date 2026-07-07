@@ -6,6 +6,7 @@ import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '../schemas';
 import { BaseSocialMediaConnector } from './base-social-media.connector';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
+import { SourceRateLimiter } from './utils/source-rate-limiter';
 
 /**
  * API-free Twitter/X connector using @haruhunab1320/twitter-scraper.
@@ -98,12 +99,20 @@ export class TwitterFreeConnector
       [key: string]: unknown;
     },
   ): Promise<SocialMediaPost[]> {
+    if (!this.isConnected) {
+      throw new Error(
+        'Twitter search failed: connector is not authenticated. ' +
+          'Set TWITTER_COOKIES or TWITTER_USERNAME + TWITTER_PASSWORD.',
+      );
+    }
+
     const limit = options?.limit || 50;
     const perQueryLimit = Math.ceil(limit / 3);
 
     try {
       const seenIds = new Set<string>();
       const allTweets: Tweet[] = [];
+      const queryFailures: string[] = [];
 
       // Search multiple query variations to cast a wider net
       const baseQuery = query.replace(/^[@#]/, '');
@@ -130,28 +139,27 @@ export class TwitterFreeConnector
         `Searching Twitter with ${uniqueQueries.length} query variations: ${uniqueQueries.join(', ')}`,
       );
 
-      for (let qi = 0; qi < uniqueQueries.length; qi++) {
-        const q = uniqueQueries[qi];
+      for (const q of uniqueQueries) {
         if (!q) {
           continue;
         }
-        // Delay between queries to avoid rate limiting (skip first)
-        if (qi > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
         try {
-          const generator = this.scraper.searchTweets(q, perQueryLimit, SearchMode.Latest);
-          for await (const tweet of generator) {
-            if (tweet.id && !seenIds.has(tweet.id)) {
-              seenIds.add(tweet.id);
-              allTweets.push(tweet);
+          // The shared limiter paces query variations; one schedule() per
+          // query since generator pulls can't be individually wrapped.
+          await SourceRateLimiter.instance.schedule('twitter', async () => {
+            const generator = this.scraper.searchTweets(q, perQueryLimit, SearchMode.Latest);
+            for await (const tweet of generator) {
+              if (tweet.id && !seenIds.has(tweet.id)) {
+                seenIds.add(tweet.id);
+                allTweets.push(tweet);
+              }
+              if (allTweets.length >= limit) break;
             }
-            if (allTweets.length >= limit) break;
-          }
+          });
         } catch (err: unknown) {
-          this.logger.warn(
-            `Twitter search query "${q}" failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
+          const message = err instanceof Error ? err.message : String(err);
+          queryFailures.push(message);
+          this.logger.warn(`Twitter search query "${q}" failed: ${message}`);
         }
         if (allTweets.length >= limit) break;
       }
@@ -165,20 +173,31 @@ export class TwitterFreeConnector
             throw new Error('Username match missing capture group');
           }
           this.logger.log(`Also fetching timeline for @${username}`);
-          let timelineCount = 0;
-          for await (const tweet of this.scraper.getTweets(
-            username,
-            Math.min(30, limit - allTweets.length),
-          )) {
-            if (tweet.id && !seenIds.has(tweet.id)) {
-              seenIds.add(tweet.id);
-              allTweets.push(tweet);
+          await SourceRateLimiter.instance.schedule('twitter', async () => {
+            let timelineCount = 0;
+            for await (const tweet of this.scraper.getTweets(
+              username,
+              Math.min(30, limit - allTweets.length),
+            )) {
+              if (tweet.id && !seenIds.has(tweet.id)) {
+                seenIds.add(tweet.id);
+                allTweets.push(tweet);
+              }
+              if (++timelineCount >= 30 || allTweets.length >= limit) break;
             }
-            if (++timelineCount >= 30 || allTweets.length >= limit) break;
-          }
+          });
         } catch {
           // Timeline fetch is best-effort
         }
+      }
+
+      // Total failure: every query variation errored and nothing was collected
+      // (including the best-effort timeline fetch) — fail loudly instead of
+      // reporting a misleading "0 results".
+      if (allTweets.length === 0 && queryFailures.length === uniqueQueries.length) {
+        throw new Error(
+          `Twitter search failed: all ${uniqueQueries.length} query variations failed: ${queryFailures[0]}`,
+        );
       }
 
       this.logger.log(
@@ -254,30 +273,32 @@ export class TwitterFreeConnector
 
     try {
       const cleanUsername = username.replace(/^@/, '');
-      const tweets = this.scraper.getTweets(cleanUsername, Math.min(limit, 200));
+      await SourceRateLimiter.instance.schedule('twitter', async () => {
+        const tweets = this.scraper.getTweets(cleanUsername, Math.min(limit, 200));
 
-      for await (const tweet of tweets) {
-        if (posts.length >= limit) break;
-        if (!tweet.text) continue;
+        for await (const tweet of tweets) {
+          if (posts.length >= limit) break;
+          if (!tweet.text) continue;
 
-        posts.push({
-          id: tweet.id ?? `tw-${Date.now()}-${posts.length}`,
-          authorId: tweet.userId ?? cleanUsername,
-          authorName: tweet.username ?? cleanUsername,
-          authorHandle: tweet.username ?? cleanUsername,
-          platform: this.platform,
-          text: tweet.text,
-          timestamp: tweet.timeParsed ?? new Date(),
-          url: tweet.id ? `https://x.com/${cleanUsername}/status/${tweet.id}` : undefined,
-          engagementMetrics: {
-            likes: tweet.likes ?? 0,
-            shares: tweet.retweets ?? 0,
-            comments: tweet.replies ?? 0,
-            reach: tweet.views ?? 0,
-            viralityScore: 0,
-          },
-        });
-      }
+          posts.push({
+            id: tweet.id ?? `tw-${Date.now()}-${posts.length}`,
+            authorId: tweet.userId ?? cleanUsername,
+            authorName: tweet.username ?? cleanUsername,
+            authorHandle: tweet.username ?? cleanUsername,
+            platform: this.platform,
+            text: tweet.text,
+            timestamp: tweet.timeParsed ?? new Date(),
+            url: tweet.id ? `https://x.com/${cleanUsername}/status/${tweet.id}` : undefined,
+            engagementMetrics: {
+              likes: tweet.likes ?? 0,
+              shares: tweet.retweets ?? 0,
+              comments: tweet.replies ?? 0,
+              reach: tweet.views ?? 0,
+              viralityScore: 0,
+            },
+          });
+        }
+      });
 
       this.logger.debug(`Fetched ${posts.length} tweets from @${cleanUsername}`);
     } catch (error) {
@@ -290,7 +311,9 @@ export class TwitterFreeConnector
 
   async getAuthorDetails(authorId: string): Promise<Partial<SourceNode>> {
     try {
-      const profile = await this.scraper.getProfile(authorId);
+      const profile = await SourceRateLimiter.instance.schedule('twitter', () =>
+        this.scraper.getProfile(authorId),
+      );
       const profileMedia = profile as Profile & {
         avatar?: string;
         banner?: string;

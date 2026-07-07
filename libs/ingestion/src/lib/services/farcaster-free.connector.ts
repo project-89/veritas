@@ -6,6 +6,7 @@ import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
+import { SourceRateLimiter } from './utils/source-rate-limiter';
 
 interface SearchOptions {
   startDate?: Date;
@@ -68,8 +69,9 @@ const NEYNAR_BASE = 'https://api.neynar.com/v2/farcaster';
 /**
  * Farcaster connector using Neynar v2 API.
  * Requires NEYNAR_API_KEY environment variable (free tier: 1000 req/day).
- * When the key is missing the connector marks itself unavailable and returns
- * empty results gracefully — it will never throw.
+ * When the key is missing (or the Neynar API is unreachable) the connector
+ * marks itself unavailable and search calls fail loudly with a clear error
+ * instead of silently returning empty results.
  */
 @Injectable()
 export class FarcasterFreeConnector implements DataConnector, OnModuleInit, OnModuleDestroy {
@@ -317,7 +319,12 @@ export class FarcasterFreeConnector implements DataConnector, OnModuleInit, OnMo
   // ---------------------------------------------------------------------------
 
   private async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
-    if (!this.available || !this.neynarApiKey) return [];
+    if (!this.neynarApiKey) {
+      throw new Error('Farcaster search failed: NEYNAR_API_KEY is not set');
+    }
+    if (!this.available) {
+      throw new Error('Farcaster search failed: connector unavailable (Neynar API unreachable)');
+    }
 
     const limit = options?.maxResults || options?.limit || 25;
 
@@ -330,8 +337,7 @@ export class FarcasterFreeConnector implements DataConnector, OnModuleInit, OnMo
       });
 
       if (!response.ok) {
-        this.logger.warn(`Neynar search returned status ${response.status}`);
-        return [];
+        throw new Error(`Neynar search returned HTTP ${response.status}`);
       }
 
       const data = (await response.json()) as NeynarSearchResponse;
@@ -350,7 +356,11 @@ export class FarcasterFreeConnector implements DataConnector, OnModuleInit, OnMo
       return casts.slice(0, limit).map((c) => this.transformNeynarCast(c));
     } catch (error) {
       this.logger.error('Error searching Farcaster via Neynar:', error);
-      return [];
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith('Farcaster search failed')) {
+        throw error;
+      }
+      throw new Error(`Farcaster search failed: ${message}`);
     }
   }
 
@@ -414,16 +424,27 @@ export class FarcasterFreeConnector implements DataConnector, OnModuleInit, OnMo
   }
 
   /**
-   * Fetch with a 15s timeout (AbortController).
+   * Fetch with a 15s timeout (AbortController), paced by the shared
+   * per-source rate limiter. Each attempt is scheduled individually so
+   * retries are also paced.
    */
   private async fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.fetchTimeout);
-    try {
-      return await fetch(url, { ...init, signal: controller.signal });
-    } finally {
-      clearTimeout(timer);
-    }
+    return SourceRateLimiter.instance.schedule('farcaster', async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), this.fetchTimeout);
+      try {
+        const response = await fetch(url, { ...init, signal: controller.signal });
+        if (response.status === 429) {
+          SourceRateLimiter.instance.notifyRateLimited(
+            'farcaster',
+            SourceRateLimiter.retryAfterMsFrom(response.headers),
+          );
+        }
+        return response;
+      } finally {
+        clearTimeout(timer);
+      }
+    });
   }
 
   /**

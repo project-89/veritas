@@ -253,7 +253,9 @@ function InvestigationWorkspace() {
   const invId = normalizeRouteId(searchParams.get('inv'));
   const requestedScanId = normalizeRouteId(searchParams.get('scan'));
   const freshSearch = searchParams.get('fresh') === '1';
-  const urlSearchMode = searchParams.get('mode') === 'claim' ? 'claim' : 'topic';
+  const urlModeParam = searchParams.get('mode');
+  const urlSearchMode: 'topic' | 'claim' | 'person' =
+    urlModeParam === 'claim' ? 'claim' : urlModeParam === 'person' ? 'person' : 'topic';
   const urlPlatforms = searchParams.get('platforms')?.split(',').filter(Boolean) ?? undefined;
   const urlTimeRange = searchParams.get('timeRange') ?? '7d';
   const parsedUrlLimit = Number.parseInt(searchParams.get('limit') ?? '', 10);
@@ -1587,10 +1589,12 @@ function InvestigationWorkspace() {
           const updated = await getIdentityByHandle(state.selectedActorHandle);
           dispatch({ type: 'SET_IDENTITY', identity: updated });
         }
-        // Poll until profile is complete
+        // Poll until profile is complete (bounded — generation stuck past 5min is abandoned)
         if (profilePollRef.current) clearInterval(profilePollRef.current);
+        let profilePollCount = 0;
         profilePollRef.current = setInterval(async () => {
-          if (!state.selectedActorHandle) {
+          profilePollCount += 1;
+          if (!state.selectedActorHandle || profilePollCount > 100) {
             if (profilePollRef.current) clearInterval(profilePollRef.current);
             profilePollRef.current = null;
             return;
@@ -1780,6 +1784,11 @@ function InvestigationWorkspace() {
   }, [investigationRecord]);
 
   const handleRefresh = useCallback(async () => {
+    // Ignore refresh while a scan is already in flight — starting a second
+    // scan would double-fetch every source and race the poller.
+    if (scanJob && (scanJob.status === 'pending' || scanJob.status === 'running')) {
+      return;
+    }
     // Reset all state
     scanPostsFetchedRef.current = false;
     setScanJob(null);
@@ -1822,6 +1831,7 @@ function InvestigationWorkspace() {
     investigationRecord,
     state.investigationId,
     urlSearchMode,
+    scanJob,
   ]);
 
   const handleCancelScan = useCallback(async () => {
@@ -2130,19 +2140,49 @@ function InvestigationWorkspace() {
               />
             )}
           </div>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={pipelineRunning}
-            className={[
-              'text-[9px] font-mono uppercase tracking-wider px-2 py-1 border rounded-sm transition-colors shrink-0',
-              pipelineRunning
-                ? 'border-nerv-border text-nerv-text-muted cursor-wait'
-                : 'border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10',
-            ].join(' ')}
-          >
-            REFRESH
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {urlSearchMode === 'person' &&
+              (() => {
+                const depthLadder = ['3d', '14d', '30d', '90d'];
+                const currentIdx = depthLadder.indexOf(urlTimeRange);
+                const nextDepth = currentIdx >= 0 ? depthLadder[currentIdx + 1] : '14d';
+                if (!nextDepth) return null;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = new URLSearchParams(searchParamsString);
+                      next.set('timeRange', nextDepth);
+                      next.set('fresh', '1');
+                      router.push(`/results?${next.toString()}`);
+                    }}
+                    disabled={pipelineRunning}
+                    className={[
+                      'text-[9px] font-mono uppercase tracking-wider px-2 py-1 border rounded-sm transition-colors',
+                      pipelineRunning
+                        ? 'border-nerv-border text-nerv-text-muted cursor-wait'
+                        : 'border-nerv-blue/50 text-nerv-blue hover:bg-nerv-blue/10',
+                    ].join(' ')}
+                    title={`Re-scan with a wider ${nextDepth} window`}
+                  >
+                    Extend → {nextDepth}
+                  </button>
+                );
+              })()}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={pipelineRunning}
+              className={[
+                'text-[9px] font-mono uppercase tracking-wider px-2 py-1 border rounded-sm transition-colors',
+                pipelineRunning
+                  ? 'border-nerv-border text-nerv-text-muted cursor-wait'
+                  : 'border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10',
+              ].join(' ')}
+            >
+              REFRESH
+            </button>
+          </div>
         </div>
 
         {queryTabs.length > 1 && (

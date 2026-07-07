@@ -162,6 +162,43 @@ export abstract class BaseSocialMediaConnector implements SocialMediaConnector, 
   }
 
   /**
+   * Fetch a user's timeline and return both raw posts and transformed insights.
+   * Returns null if the underlying connector does not implement getUserTimeline.
+   */
+  async getUserTimelineWithRawData(
+    handle: string,
+    options?: { limit?: number; startDate?: Date; endDate?: Date },
+  ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] } | null> {
+    const fetcher = (
+      this as unknown as {
+        getUserTimeline?: (
+          h: string,
+          o?: { limit?: number; startDate?: Date; endDate?: Date },
+        ) => Promise<SocialMediaPost[]>;
+      }
+    ).getUserTimeline;
+    if (typeof fetcher !== 'function') {
+      return null;
+    }
+    try {
+      this.logger.log(`Fetching ${this.platform} timeline for "${handle}"`);
+      const posts = await fetcher.call(this, handle, options);
+      if (posts.length === 0) {
+        return { posts: [], insights: [] };
+      }
+      const insights = await this.transformService.transformBatch(posts);
+      return { posts, insights };
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(
+        `Error fetching ${this.platform} timeline for "${handle}": ${err.message}`,
+        err.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Stream content and transform it using the transform-on-ingest pattern
    */
   streamAndTransform(keywords: string[]): EventEmitter {

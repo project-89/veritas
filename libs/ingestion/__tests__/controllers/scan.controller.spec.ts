@@ -198,14 +198,13 @@ describe('ScanController', () => {
 
   describe('GET /scan/:id/posts', () => {
     it('should return posts', async () => {
-      const jobWithPosts = {
-        ...mockScanJob,
-        posts: [{ id: '1', text: 'test', platform: 'reddit' }],
-      };
-      (scanJobRepo.getJob as jest.Mock).mockResolvedValue(jobWithPosts);
+      (scanJobRepo.getJobPosts as jest.Mock).mockResolvedValue([
+        { id: '1', text: 'test', platform: 'reddit' },
+      ]);
       const result = await controller.getScanPosts('scan-123');
       expect(result.posts).toHaveLength(1);
       expect(result.totalPosts).toBe(1);
+      expect(scanJobRepo.getJobPosts).toHaveBeenCalledWith('scan-123');
     });
   });
 
@@ -244,18 +243,20 @@ describe('ScanController', () => {
     });
 
     it('persists a snapshot when narratives are saved to the analysis cache', async () => {
+      const scanPosts = [
+        {
+          id: 'post-1',
+          platform: 'reddit',
+          sentiment: { label: 'negative' },
+        },
+      ];
       const jobWithPosts = {
         ...mockScanJob,
         status: 'completed' as const,
-        posts: [
-          {
-            id: 'post-1',
-            platform: 'reddit',
-            sentiment: { label: 'negative' },
-          },
-        ],
+        posts: scanPosts,
       };
       (scanJobRepo.getJob as jest.Mock).mockResolvedValueOnce(jobWithPosts);
+      (scanJobRepo.getJobPosts as jest.Mock).mockResolvedValueOnce(scanPosts);
 
       const result = await controller.saveAnalysisCache('scan-123', {
         narratives: [{ id: 'n-1', summary: 'claim' }],

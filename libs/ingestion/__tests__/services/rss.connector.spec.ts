@@ -61,13 +61,16 @@ describe('RSSConnector', () => {
         },
       ]);
 
-      jest.spyOn(connector as any, 'fetchFeedItems').mockResolvedValue([
-        {
-          title: 'Threat analysis',
-          link: 'https://example.com/posts/1',
-          categories: [{ name: 'Project89' }, { term: 'watchlist' }],
-        },
-      ]);
+      jest.spyOn(connector as any, 'fetchFeedItems').mockResolvedValue({
+        items: [
+          {
+            title: 'Threat analysis',
+            link: 'https://example.com/posts/1',
+            categories: [{ name: 'Project89' }, { term: 'watchlist' }],
+          },
+        ],
+        failure: null,
+      });
 
       const posts = await connector.searchContent('Project89');
 
@@ -89,19 +92,117 @@ describe('RSSConnector', () => {
         },
       ]);
 
-      jest.spyOn(connector as any, 'fetchFeedItems').mockResolvedValue([
-        {
-          title: 'Malformed date item',
-          link: 'https://example.com/posts/2',
-          pubDate: 'not-a-date',
-        },
-      ]);
+      jest.spyOn(connector as any, 'fetchFeedItems').mockResolvedValue({
+        items: [
+          {
+            title: 'Malformed date item',
+            link: 'https://example.com/posts/2',
+            pubDate: 'not-a-date',
+          },
+        ],
+        failure: null,
+      });
 
       const posts = await connector.searchContent('malformed');
 
       expect(posts).toHaveLength(1);
       expect(posts[0]?.timestamp).toBeInstanceOf(Date);
       expect(Number.isFinite(posts[0]!.timestamp.getTime())).toBe(true);
+    });
+
+    it('returns an empty array when feeds respond fine but nothing matches the query', async () => {
+      mockedGetFeedsForQuery.mockReturnValue([
+        {
+          name: 'Mock Feed',
+          url: 'https://example.com/feed.xml',
+          category: 'world_news',
+          tier: 1,
+          language: 'en',
+        },
+      ]);
+
+      jest.spyOn(connector as any, 'fetchFeedItems').mockResolvedValue({
+        items: [
+          {
+            title: 'Unrelated headline',
+            link: 'https://example.com/posts/3',
+          },
+        ],
+        failure: null,
+      });
+
+      const posts = await connector.searchContent('project89');
+
+      expect(posts).toEqual([]);
+    });
+
+    it('throws when every feed fails or is suppressed and nothing was collected', async () => {
+      mockedGetFeedsForQuery.mockReturnValue([
+        {
+          name: 'Feed A',
+          url: 'https://example.com/a.xml',
+          category: 'world_news',
+          tier: 1,
+          language: 'en',
+        },
+        {
+          name: 'Feed B',
+          url: 'https://example.com/b.xml',
+          category: 'world_news',
+          tier: 1,
+          language: 'en',
+        },
+      ]);
+
+      jest
+        .spyOn(connector as any, 'fetchFeedItems')
+        .mockResolvedValueOnce({
+          items: [],
+          failure: 'https://example.com/a.xml failed (HTTP 404)',
+        })
+        .mockResolvedValueOnce({
+          items: [],
+          failure: 'https://example.com/b.xml suppressed after repeated failures (HTTP 404)',
+        });
+
+      await expect(connector.searchContent('project89')).rejects.toThrow(
+        'RSS search failed: all 2 feeds failed or were suppressed: https://example.com/a.xml failed (HTTP 404)',
+      );
+    });
+
+    it('keeps partial results when only some feeds fail', async () => {
+      mockedGetFeedsForQuery.mockReturnValue([
+        {
+          name: 'Feed A',
+          url: 'https://example.com/a.xml',
+          category: 'world_news',
+          tier: 1,
+          language: 'en',
+        },
+        {
+          name: 'Feed B',
+          url: 'https://example.com/b.xml',
+          category: 'world_news',
+          tier: 1,
+          language: 'en',
+        },
+      ]);
+
+      jest
+        .spyOn(connector as any, 'fetchFeedItems')
+        .mockResolvedValueOnce({
+          items: [{ title: 'Project89 update', link: 'https://example.com/posts/4' }],
+          failure: null,
+        })
+        .mockResolvedValueOnce({
+          items: [],
+          failure: 'https://example.com/b.xml failed (HTTP 500)',
+        });
+
+      const posts = await connector.searchContent('project89');
+
+      expect(posts).toHaveLength(1);
+      expect(posts[0]).toMatchObject({ text: 'Project89 update' });
     });
   });
 

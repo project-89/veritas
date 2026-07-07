@@ -18,6 +18,7 @@ import { ScanJobRepository } from '../repositories/scan-job.repository';
 import type { Investigation } from '../schemas/investigation.schema';
 import type { ScanJob } from '../schemas/scan-job.schema';
 import { IngestionService } from '../services/ingestion.service';
+import { jitteredBackoff } from '../utils/queue-backoff.util';
 
 type SerializedScanPost = Record<string, unknown> & {
   sentiment?: { label?: string };
@@ -69,7 +70,7 @@ export class ScanController {
       platforms?: string[];
       limit?: number;
       timeRange?: string;
-      searchMode?: 'topic' | 'claim';
+      searchMode?: 'topic' | 'claim' | 'person';
     },
   ): Promise<{ scanId: string }> {
     const {
@@ -175,10 +176,7 @@ export class ScanController {
 
       await this.scanQueue.add(`scan-${platform}`, jobData, {
         attempts: 2,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
+        backoff: jitteredBackoff(5000),
         removeOnComplete: 100,
         removeOnFail: 50,
       });
@@ -246,7 +244,7 @@ export class ScanController {
       throw new HttpException(`Scan job not found: ${id}`, HttpStatus.NOT_FOUND);
     }
 
-    const posts = Array.isArray(job.posts) ? job.posts : [];
+    const posts = await this.scanJobRepository.getJobPosts(id);
     return { posts, totalPosts: posts.length };
   }
 
@@ -265,9 +263,9 @@ export class ScanController {
     }
     await this.scanJobRepository.updateAnalysisCache(id, body);
 
-    const serializedPosts: SerializedScanPost[] = Array.isArray(job.posts)
-      ? (job.posts as SerializedScanPost[])
-      : [];
+    const serializedPosts = (await this.scanJobRepository.getJobPosts(
+      id,
+    )) as SerializedScanPost[];
     const narratives = Array.isArray(body['narratives']) ? (body['narratives'] as unknown[]) : null;
 
     if (

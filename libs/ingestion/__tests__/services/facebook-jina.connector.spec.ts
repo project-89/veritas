@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { FacebookJinaConnector } from '../../src/lib/services/facebook-jina.connector';
 import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
 import { JinaReaderService } from '../../src/lib/services/utils/jina-reader.service';
+import { SourceRateLimiter } from '../../src/lib/services/utils/source-rate-limiter';
 
 describe('FacebookJinaConnector', () => {
   let connector: FacebookJinaConnector;
@@ -32,6 +33,11 @@ describe('FacebookJinaConnector', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    // Use a zero-delay limiter so tests don't wait out the real pacing.
+    SourceRateLimiter.setInstance(
+      new SourceRateLimiter({ facebook: { minIntervalMs: 0, maxConcurrent: 100 } }),
+    );
+
     configService = {
       get: jest.fn().mockImplementation((key: string) => {
         if (key === 'FACEBOOK_PAGE_URLS') {
@@ -58,6 +64,10 @@ describe('FacebookJinaConnector', () => {
       transformService as TransformOnIngestService,
       jinaReader as JinaReaderService,
     );
+  });
+
+  afterAll(() => {
+    SourceRateLimiter.setInstance(null);
   });
 
   describe('platform', () => {
@@ -171,6 +181,22 @@ describe('FacebookJinaConnector', () => {
       expect(jinaReader.readUrl).toHaveBeenCalledTimes(2);
     });
 
+    it('should throw when every configured page fails to load', async () => {
+      (jinaReader.readUrl as jest.Mock).mockRejectedValue(new Error('Blocked by Facebook'));
+
+      await expect(connector.searchContent('climate')).rejects.toThrow(
+        'Facebook search failed: all 2 pages failed: Blocked by Facebook',
+      );
+    });
+
+    it('should return an empty array when pages load but nothing matches the query', async () => {
+      (jinaReader.readUrl as jest.Mock).mockResolvedValue(mockPageContent);
+
+      const posts = await connector.searchContent('completely-unrelated-query-term');
+
+      expect(posts).toEqual([]);
+    });
+
     it('should ignore short content blocks (< 20 chars)', async () => {
       // Only set one page URL to make the test predictable
       getConnectorState().pageUrls = ['https://www.facebook.com/testpage'];
@@ -221,13 +247,13 @@ describe('FacebookJinaConnector', () => {
       }
     });
 
-    it('should return empty array when no page URLs configured', async () => {
+    it('should throw when no page URLs are configured', async () => {
       getConnectorState().pageUrls = [];
 
-      await connector.searchAndTransform('climate');
-
-      const posts = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
-      expect(posts).toHaveLength(0);
+      await expect(connector.searchAndTransform('climate')).rejects.toThrow(
+        'Facebook monitoring not configured: set FACEBOOK_PAGE_URLS',
+      );
+      expect(transformService.transformBatch).not.toHaveBeenCalled();
     });
   });
 

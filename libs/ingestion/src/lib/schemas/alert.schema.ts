@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 // ---------------------------------------------------------------------------
 // Alert — a notification generated when a monitored investigation changes
@@ -26,7 +25,7 @@ export type AlertSeverity = 'info' | 'warning' | 'critical';
     },
   },
 })
-export class AlertSchema extends Document {
+export class AlertSchema {
   @Prop({ required: true, index: true })
   investigationId!: string;
 
@@ -97,7 +96,7 @@ class AlertThresholdsEmbed {
     },
   },
 })
-export class MonitorConfigSchema extends Document {
+export class MonitorConfigSchema {
   @Prop({ required: true, unique: true, index: true })
   investigationId!: string;
 

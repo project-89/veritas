@@ -15,7 +15,7 @@ import {
   SocialGraphEvidenceAdapter,
 } from './evidence-adapters/social-graph.evidence-adapter';
 import { PlatformCredibilityService } from './platform-credibility.service';
-import type { ExtractedClaim } from './propaganda.service';
+import type { AnalysisMode, ExtractedClaim } from './propaganda.service';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -33,6 +33,8 @@ export interface VerificationResult {
   claim: string;
   status: 'verified' | 'disputed' | 'unverified' | 'mixed' | 'false';
   confidence: number;
+  /** How the verdict was produced — heuristic verdicts are keyword-matching, not reasoning. */
+  analysisMode: AnalysisMode;
 
   evidence: {
     supporting: EvidenceItem[];
@@ -47,6 +49,8 @@ export interface VerificationResult {
 }
 
 export interface ClaimVerificationBatchResult {
+  /** 'heuristic' when GEMINI_API_KEY is missing — verdicts are keyword matches, not reasoning. */
+  analysisMode: AnalysisMode;
   results: VerificationResult[];
   summary: string;
   verifiedCount: number;
@@ -159,6 +163,7 @@ export class ClaimVerificationService {
 
     if (verifiable.length === 0) {
       return {
+        analysisMode: 'skipped',
         results: [],
         summary: 'No verifiable claims found. All claims were either subjective or unfalsifiable.',
         verifiedCount: 0,
@@ -196,7 +201,13 @@ export class ClaimVerificationService {
     // Aggregate all investigative leads from individual results
     const allLeads = results.flatMap((r) => r.investigativeLeads ?? []);
 
+    // Batch is only LLM-grade if every individual verdict was LLM-reasoned.
+    const analysisMode: AnalysisMode = results.every((r) => r.analysisMode === 'llm')
+      ? 'llm'
+      : 'heuristic';
+
     return {
+      analysisMode,
       results,
       summary,
       verifiedCount,
@@ -528,6 +539,7 @@ Rules:
       claim: claimText,
       status,
       confidence,
+      analysisMode: 'llm',
       evidence: { supporting, contradicting },
       reasoning,
       caveats,
@@ -632,6 +644,7 @@ Rules:
       claim: claim.claim,
       status,
       confidence,
+      analysisMode: 'heuristic',
       evidence: { supporting, contradicting },
       reasoning,
       caveats: [
@@ -1070,6 +1083,7 @@ Rules:
       claim: claimText,
       status: 'unverified',
       confidence: 0,
+      analysisMode: 'unavailable',
       evidence: { supporting: [], contradicting: [] },
       reasoning: 'Verification could not be completed due to an error in processing.',
       caveats: [

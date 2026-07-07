@@ -1,18 +1,10 @@
 /* eslint-disable @nx/enforce-module-boundaries -- generated plugin imports are intentionally resolved from installed plugin packages */
-import {
-  AtlasInvestigationPanel as pluginInvestigationPanel0_0,
-  AtlasPage as pluginRoute0_0,
-} from '@veritas/plugin-atlas';
+import { AtlasPage as pluginRoute0_0 } from '@veritas/plugin-atlas';
+import { AtlasInvestigationPanel as pluginInvestigationPanel0_0 } from '@veritas/plugin-atlas';
 import { MagiIdentityPanel as pluginIdentityPanel1_0 } from '@veritas/plugin-magi';
 
 import type { ComponentType } from 'react';
-import type {
-  IdentityRecord,
-  Investigation,
-  InvestigationEvidenceSeed,
-  MagiProfileMode,
-  MentalModel,
-} from './api';
+import type { IdentityRecord, Investigation, InvestigationEvidenceSeed, MagiProfileMode, MentalModel } from './api';
 
 type GeneratedAtlasPageProps = {
   api: {
@@ -42,23 +34,14 @@ type GeneratedIdentityPanelProps = {
   onGenerateProfile?: (id: string, mode: MagiProfileMode) => void;
 };
 
-export const GENERATED_PAGE_ROUTE_COMPONENTS: Record<
-  string,
-  ComponentType<GeneratedAtlasPageProps>
-> = {
+export const GENERATED_PAGE_ROUTE_COMPONENTS: Record<string, ComponentType<GeneratedAtlasPageProps>> = {
   '/atlas': pluginRoute0_0 as ComponentType<GeneratedAtlasPageProps>,
 };
 
-export const GENERATED_INVESTIGATION_PANEL_COMPONENTS: Record<
-  string,
-  ComponentType<GeneratedInvestigationPanelProps>
-> = {
+export const GENERATED_INVESTIGATION_PANEL_COMPONENTS: Record<string, ComponentType<GeneratedInvestigationPanelProps>> = {
   'atlas-lenses': pluginInvestigationPanel0_0 as ComponentType<GeneratedInvestigationPanelProps>,
 };
 
-export const GENERATED_IDENTITY_PANEL_COMPONENTS: Record<
-  string,
-  ComponentType<GeneratedIdentityPanelProps>
-> = {
+export const GENERATED_IDENTITY_PANEL_COMPONENTS: Record<string, ComponentType<GeneratedIdentityPanelProps>> = {
   'magi-profiles': pluginIdentityPanel1_0 as ComponentType<GeneratedIdentityPanelProps>,
 };

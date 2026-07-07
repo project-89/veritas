@@ -89,28 +89,20 @@ export class RssCacheRepository implements OnModuleInit {
   ): Promise<void> {
     this.ensureInitialized();
     try {
-      // Delete existing entry for this feed URL
-      try {
-        const old = await this.repo.find({ feedUrl } as Record<string, unknown>, { limit: 1 });
-        for (const entry of old) {
-          const id = entry._id?.toString() ?? entry.id;
-          if (id) await this.repo.deleteById(id);
-        }
-      } catch {
-        // Best effort cleanup
-      }
-
       // TTL: expire after 2x maxAgeMs (keep around a bit longer for debugging)
-      const expiresAt = new Date(Date.now() + maxAgeMs * 2);
-
-      await this.repo.create({
-        feedUrl,
+      const data = {
         feedName,
         items,
         fetchedAt: new Date(),
         maxAgeMs,
-        expiresAt,
-      } as Partial<RssCacheEntry>);
+        expiresAt: new Date(Date.now() + maxAgeMs * 2),
+      } as Partial<RssCacheEntry>;
+
+      // Update-then-insert; the unique feedUrl index makes a lost race harmless.
+      const updated = await this.repo.updateMany({ feedUrl } as Record<string, unknown>, data);
+      if (updated === 0) {
+        await this.repo.create({ feedUrl, ...data });
+      }
 
       this.logger.debug(
         `Cached ${items.length} items for RSS feed "${feedName}" (maxAge: ${Math.round(maxAgeMs / 60000)}m)`,

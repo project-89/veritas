@@ -196,7 +196,7 @@ export class DownstreamEffectsService {
       this.logger.warn('GEMINI_API_KEY not set — downstream effects will use fallback mode');
     }
 
-    // Register adapters — real-world data sources + LLM hypothesis fallback.
+    // Register adapters — real-world data sources only by default.
     this.adapters.push(new GdeltAdapter());
     this.adapters.push(new YahooFinanceAdapter());
     this.adapters.push(new WorldBankAdapter());
@@ -206,7 +206,16 @@ export class DownstreamEffectsService {
     this.adapters.push(new UsgsAdapter());
     this.adapters.push(new GdacsAdapter());
     this.adapters.push(new ReliefWebAdapter());
-    this.adapters.push(new LlmHypothesisAdapter(this.genAI));
+
+    // The LLM-hypothesis adapter INVENTS plausible signals rather than
+    // fetching real ones. Feeding synthetic signals into causal reasoning
+    // contaminates the evidence chain, so it is opt-in only.
+    if (process.env['ENABLE_LLM_HYPOTHESIS_SIGNALS'] === 'true') {
+      this.logger.warn(
+        'LLM-hypothesis signal adapter ENABLED — downstream-effects output will mix synthetic (hypothesized) signals with real data',
+      );
+      this.adapters.push(new LlmHypothesisAdapter(this.genAI));
+    }
   }
 
   // -------------------------------------------------------------------------

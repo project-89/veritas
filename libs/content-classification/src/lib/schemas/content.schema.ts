@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 // Entity schema for named entities extracted from content
 @Schema({ _id: false })
@@ -68,7 +67,7 @@ class EngagementMetrics {
     },
   },
 })
-export class ContentSchema extends Document {
+export class ContentSchema {
   @Prop({ required: true })
   text!: string;
 

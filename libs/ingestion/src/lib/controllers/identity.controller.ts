@@ -16,6 +16,7 @@ import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
 import { IdentityRecordRepository } from '../repositories/identity-record.repository';
 import type { PsychologicalProfileMode } from '../schemas/analysis-job.schema';
 import type { IdentityRecord } from '../schemas/identity-record.schema';
+import { jitteredBackoff } from '../utils/queue-backoff.util';
 
 interface GenerateProfileBody {
   mode?: PsychologicalProfileMode;
@@ -184,7 +185,7 @@ export class IdentityController {
 
       await this.analysisQueue.add('analysis-psychological-profile', jobData, {
         attempts: 3,
-        backoff: { type: 'exponential', delay: 30000 },
+        backoff: jitteredBackoff(30000),
         removeOnComplete: 100,
         removeOnFail: 50,
       });

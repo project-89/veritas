@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 
 // ---------------------------------------------------------------------------
 // Input sub-schema — what the processor needs to run the job
@@ -62,7 +61,7 @@ class AnalysisJobInputEmbed {
     },
   },
 })
-export class AnalysisJobSchema extends Document {
+export class AnalysisJobSchema {
   /** Links back to the scan job that produced the posts (null for identity-scoped jobs like psychological-profile) */
   @Prop({ type: String, index: true, default: null })
   scanId!: string | null;

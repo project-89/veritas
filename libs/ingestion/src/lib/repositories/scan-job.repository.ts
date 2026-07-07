@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
 import { ConnectorStatus, ScanJob, ScanJobModel } from '../schemas/scan-job.schema';
+import { ScanPost, ScanPostModel, ScanPostSchema } from '../schemas/scan-post.schema';
 import { buildPostDedupKey } from '../utils/post-dedup.util';
 
 interface CachedInvestigationUser {
@@ -18,6 +19,7 @@ interface CachedInvestigationUser {
 export class ScanJobRepository implements OnModuleInit {
   private readonly logger = new Logger(ScanJobRepository.name);
   private scanJobRepo!: Repository<ScanJob>;
+  private scanPostRepo!: Repository<ScanPost>;
   private initialized = false;
 
   constructor(private readonly databaseService: DatabaseService) {}
@@ -30,12 +32,14 @@ export class ScanJobRepository implements OnModuleInit {
     try {
       try {
         this.databaseService.registerModel('ScanJob', ScanJobModel);
-        this.logger.debug('Successfully registered ScanJob model with database service');
+        this.databaseService.registerModel(ScanPostSchema.name, ScanPostModel);
+        this.logger.debug('Successfully registered ScanJob models with database service');
       } catch (error) {
-        this.logger.warn('ScanJob model already registered or error registering', error);
+        this.logger.warn('ScanJob models already registered or error registering', error);
       }
 
       this.scanJobRepo = this.databaseService.getRepository<ScanJob>('ScanJob');
+      this.scanPostRepo = this.databaseService.getRepository<ScanPost>(ScanPostSchema.name);
       this.initialized = true;
       this.logger.log('ScanJob repository initialized');
     } catch (error: unknown) {
@@ -64,7 +68,7 @@ export class ScanJobRepository implements OnModuleInit {
     query: string,
     investigationId: string,
     platforms: string[],
-    settings: { timeRange?: string; limit?: number; searchMode?: 'topic' | 'claim' },
+    settings: { timeRange?: string; limit?: number; searchMode?: 'topic' | 'claim' | 'person' },
   ): Promise<ScanJob> {
     this.ensureInitialized();
 
@@ -190,13 +194,11 @@ export class ScanJobRepository implements OnModuleInit {
   }
 
   /**
-   * Add posts from a connector to the scan job.
+   * Add posts from a connector to the scan job. Posts are stored as
+   * individual documents in the scan_posts collection — appending never
+   * rewrites prior posts and cannot hit the 16MB BSON document limit.
    */
-  async addConnectorResults(
-    scanId: string,
-    _connector: string,
-    posts: unknown[],
-  ): Promise<void> {
+  async addConnectorResults(scanId: string, connector: string, posts: unknown[]): Promise<void> {
     this.ensureInitialized();
     try {
       const job = await this.scanJobRepo.findById(scanId);
@@ -204,17 +206,24 @@ export class ScanJobRepository implements OnModuleInit {
         this.logger.warn(`Skipping connector results append for deleted scan ${scanId}`);
         return;
       }
+      if (posts.length === 0) return;
 
-      const existingPosts = Array.isArray(job.posts) ? job.posts : [];
-      const allPosts = [...existingPosts, ...posts];
+      const existingCount = await this.scanPostRepo.count({ scanId } as Record<string, unknown>);
+      await this.scanPostRepo.createMany(
+        posts.map((post, i) => ({
+          scanId,
+          connector,
+          seq: existingCount + i,
+          post: post as Record<string, unknown>,
+        })),
+      );
 
       await this.scanJobRepo.updateById(scanId, {
-        posts: allPosts,
-        totalPosts: allPosts.length,
+        totalPosts: existingCount + posts.length,
       } as Partial<ScanJob>);
 
       this.logger.debug(
-        `Added ${posts.length} posts to scan ${scanId} (total: ${allPosts.length})`,
+        `Added ${posts.length} posts to scan ${scanId} (total: ${existingCount + posts.length})`,
       );
     } catch (error: unknown) {
       const err = error as Error;
@@ -224,7 +233,9 @@ export class ScanJobRepository implements OnModuleInit {
   }
 
   /**
-   * Get all posts from a scan job.
+   * Get all posts from a scan job. Reads the scan_posts collection; falls
+   * back to the legacy embedded ScanJob.posts array for scans created
+   * before the migration.
    */
   async getJobPosts(scanId: string): Promise<unknown[]> {
     this.ensureInitialized();
@@ -233,6 +244,15 @@ export class ScanJobRepository implements OnModuleInit {
       if (!job) {
         throw new Error(`Scan job not found: ${scanId}`);
       }
+
+      const docs = await this.scanPostRepo.find({ scanId } as Record<string, unknown>, {
+        sort: { seq: 1 },
+      });
+      if (docs.length > 0) {
+        return docs.map((doc) => doc.post);
+      }
+
+      // Legacy scans stored posts embedded on the job document
       return Array.isArray(job.posts) ? job.posts : [];
     } catch (error: unknown) {
       const err = error as Error;
@@ -295,8 +315,22 @@ export class ScanJobRepository implements OnModuleInit {
         { query, status: 'completed' } as Record<string, unknown>,
         { sort: { createdAt: -1 }, limit: 5 }, // Last 5 scans for this query
       );
+      if (scans.length === 0) return [];
+
+      const scanIds = scans
+        .map((scan) => scan._id?.toString() ?? (scan as { id?: string }).id)
+        .filter((id): id is string => Boolean(id));
+      const postDocs = await this.scanPostRepo.find({
+        scanId: { $in: scanIds },
+      } as Record<string, unknown>);
 
       const keys: string[] = [];
+      for (const doc of postDocs) {
+        const key = buildPostDedupKey(doc.post);
+        if (key) keys.push(key);
+      }
+
+      // Legacy scans stored posts embedded on the job document
       for (const scan of scans) {
         const posts = Array.isArray((scan as Partial<ScanJob>).posts)
           ? ((scan as Partial<ScanJob>).posts as Record<string, unknown>[])
@@ -405,6 +439,17 @@ export class ScanJobRepository implements OnModuleInit {
   async deleteByInvestigationId(investigationId: string): Promise<number> {
     this.ensureInitialized();
     try {
+      // Delete the jobs' posts first so scan_posts can't orphan
+      const jobs = await this.scanJobRepo.find({ investigationId } as Record<string, unknown>);
+      const scanIds = jobs
+        .map((job) => job._id?.toString() ?? (job as { id?: string }).id)
+        .filter((id): id is string => Boolean(id));
+      if (scanIds.length > 0) {
+        await this.scanPostRepo.deleteMany({ scanId: { $in: scanIds } } as Record<
+          string,
+          unknown
+        >);
+      }
       return await this.scanJobRepo.deleteMany({ investigationId } as Record<string, unknown>);
     } catch (error: unknown) {
       const err = error as Error;

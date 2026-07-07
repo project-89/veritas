@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import type { NarrativeInsight } from '../../types/narrative-insight.interface';
 import type { ConnectorSearchOptions, DataConnector } from '../interfaces/data-connector.interface';
 import type { SourceNode } from '../schemas';
+import { SourceRateLimiter } from './utils/source-rate-limiter';
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
 
@@ -79,7 +80,9 @@ export class WikipediaEventsConnector implements DataConnector {
       }));
     } catch (err) {
       this.logger.error(`Wikipedia searchAndTransform failed: ${err}`);
-      return [];
+      throw new Error(
+        `Wikipedia search failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -117,7 +120,9 @@ export class WikipediaEventsConnector implements DataConnector {
 
   private async fetchAndParse(query: string, limit?: number): Promise<ParsedEvent[]> {
     const html = await this.fetchCurrentEventsHtml();
-    if (!html) return [];
+    if (!html) {
+      throw new Error('Wikipedia API returned no Current Events page content');
+    }
 
     const events = this.parseEventsFromHtml(html);
 
@@ -142,14 +147,15 @@ export class WikipediaEventsConnector implements DataConnector {
     url.searchParams.set('prop', 'text');
     url.searchParams.set('format', 'json');
 
-    const response = await fetch(url.toString(), {
-      headers: { 'User-Agent': USER_AGENT },
-      signal: AbortSignal.timeout(15_000),
-    });
+    const response = await SourceRateLimiter.instance.schedule('wikipedia', () =>
+      fetch(url.toString(), {
+        headers: { 'User-Agent': USER_AGENT },
+        signal: AbortSignal.timeout(15_000),
+      }),
+    );
 
     if (!response.ok) {
-      this.logger.warn(`Wikipedia API returned HTTP ${response.status}`);
-      return null;
+      throw new Error(`Wikipedia API returned HTTP ${response.status}`);
     }
 
     const data = (await response.json()) as {

@@ -1,6 +1,3 @@
-import { Field, Float, InputType, Int, ObjectType } from '@nestjs/graphql';
-import GraphQLJSON from 'graphql-type-json';
-
 // Use local ContentNode rather than importing from a problematic path
 // import { ContentNode } from '../../../shared/types/src/lib/types';
 
@@ -14,90 +11,61 @@ interface ContentNode {
   updatedAt: Date;
 }
 
-@ObjectType()
 export class TimeFrame {
-  @Field(() => Date)
   start!: Date;
 
-  @Field(() => Date)
   end!: Date;
 }
 
-@InputType()
 export class TimeFrameInput {
-  @Field(() => Date)
   start!: Date;
 
-  @Field(() => Date)
   end!: Date;
 }
 
-@ObjectType()
 export class Pattern {
-  @Field()
   id!: string;
 
-  @Field(() => String)
   type!: 'organic' | 'coordinated' | 'automated';
 
-  @Field(() => Float)
   confidence!: number;
 
-  @Field(() => [String])
   nodes!: string[];
 
-  @Field(() => [String])
   edges!: string[];
 
-  @Field(() => TimeFrame)
   timeframe!: TimeFrame;
 }
 
-@ObjectType()
 export class DeviationMetrics {
-  @Field(() => Float)
   baselineScore!: number;
 
-  @Field(() => Float)
   deviationMagnitude!: number;
 
-  @Field(() => Float)
   propagationVelocity!: number;
 
-  @Field(() => Float)
   crossReferenceScore!: number;
 
-  @Field(() => Float)
   sourceCredibility!: number;
 
-  @Field(() => Float)
   impactScore!: number;
 
-  @Field(() => TimeFrame)
   timeframe!: TimeFrame;
 }
 
-@ObjectType()
 export class ContentMetadata {
-  @Field(() => Int, { nullable: true })
   reach?: number;
 
-  @Field(() => [String], { nullable: true })
   links?: string[];
 
-  @Field(() => [String], { nullable: true })
   media?: string[];
 
-  @Field(() => Boolean, { nullable: true })
   verified?: boolean;
 }
 
-@ObjectType()
 export class ExtendedContentNode implements ContentNode {
-  @Field()
   id!: string;
 
-  @Field()
   text!: string;
 
   // Required fields from ContentNode
@@ -106,31 +74,22 @@ export class ExtendedContentNode implements ContentNode {
   createdAt: Date = new Date();
   updatedAt: Date = new Date();
 
-  @Field(() => Date)
   timestamp!: Date;
 
-  @Field(() => String)
   platform!: 'twitter' | 'facebook' | 'reddit' | 'other';
 
-  @Field(() => String, { nullable: true })
   sourceId = '';
 
-  @Field(() => Float, { nullable: true })
   toxicity?: number;
 
-  @Field(() => String, { nullable: true })
   sentiment?: 'positive' | 'negative' | 'neutral';
 
-  @Field(() => [String], { nullable: true })
   categories?: string[];
 
-  @Field(() => [String], { nullable: true })
   topics?: string[];
 
-  @Field(() => ContentMetadata, { nullable: true })
   metadata?: ContentMetadata;
 
-  @Field(() => GraphQLJSON, { nullable: true })
   classification?: {
     categories: string[];
     sentiment: 'positive' | 'negative' | 'neutral';

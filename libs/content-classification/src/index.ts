@@ -7,8 +7,6 @@
 export { ContentClassificationModule } from './lib/content-classification.module';
 // Export the controller
 export { ContentController } from './lib/controllers/content.controller';
-// Export the resolver
-export { ContentResolver } from './lib/resolvers/content.resolver';
 export type { ContentSearchParams, ExtendedContentNode } from './lib/services/content.service';
 // Export ContentService
 export { ContentService } from './lib/services/content.service';
@@ -29,7 +27,7 @@ export type {
 // Export EmbeddingsService
 export { EmbeddingsService } from './lib/services/embeddings.service';
 
-// Export GraphQL types
+// Export content DTO types
 export {
   ContentClassificationType,
   ContentCreateInputType,

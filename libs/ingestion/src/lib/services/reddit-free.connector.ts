@@ -15,6 +15,7 @@ import {
   type SearchMode,
 } from '../utils/query-intent.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
+import { SourceRateLimiter } from './utils/source-rate-limiter';
 
 interface SearchOptions {
   startDate?: Date;
@@ -89,8 +90,6 @@ export class RedditFreeConnector
   private streamConnections: Map<string, NodeJS.Timeout> = new Map();
   private readonly pollingInterval = 60000; // 1 minute
   private readonly logger = new Logger(RedditFreeConnector.name);
-  private lastRequestTime = 0;
-  private readonly minRequestInterval = 2000; // 2 seconds between requests
 
   constructor(
     private configService: ConfigService,
@@ -441,16 +440,32 @@ export class RedditFreeConnector
   // --- Private helpers ---
 
   private async rateLimitedRequest<T>(path: string): Promise<T> {
-    const now = Date.now();
-    const elapsed = now - this.lastRequestTime;
-
-    if (elapsed < this.minRequestInterval) {
-      await this.sleep(this.minRequestInterval - elapsed);
+    try {
+      const response = await SourceRateLimiter.instance.schedule('reddit', () =>
+        this.client.get<T>(path),
+      );
+      return response.data;
+    } catch (error) {
+      this.notifyIfRateLimited(error);
+      throw error;
     }
+  }
 
-    this.lastRequestTime = Date.now();
-    const response = await this.client.get<T>(path);
-    return response.data;
+  /** Signal the shared limiter when Reddit responds with HTTP 429. */
+  private notifyIfRateLimited(error: unknown): void {
+    if (!error || typeof error !== 'object') return;
+    const response = (
+      error as { response?: { status?: unknown; headers?: Record<string, unknown> } }
+    ).response;
+    if (!response || response.status !== 429) return;
+
+    const retryAfter = response.headers?.['retry-after'];
+    SourceRateLimiter.instance.notifyRateLimited(
+      'reddit',
+      SourceRateLimiter.retryAfterMsFrom({
+        get: () => (typeof retryAfter === 'string' ? retryAfter : null),
+      }),
+    );
   }
 
   private transformPostsToSocialMediaPosts(posts: RedditJsonPost[]): SocialMediaPost[] {
@@ -596,9 +611,5 @@ export class RedditFreeConnector
     if (diffHours <= 24 * 30) return 'month';
     if (diffHours <= 24 * 365) return 'year';
     return 'all';
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

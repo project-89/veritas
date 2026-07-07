@@ -11,8 +11,6 @@ export * from './interfaces';
 // Repository exports
 export * from './repositories';
 
-// Resolver exports
-export * from './resolvers';
 export * from './schemas';
 // Service exports
 export * from './services';
