@@ -117,8 +117,26 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
       this.webScraperConnector,
     ].filter((connector) => connector !== undefined);
 
+    const results: Array<{ platform: string; status: 'live' | 'failed'; detail?: string }> = [];
     for (const connector of connectors) {
-      await this.registerConnector(connector);
+      const error = await this.registerConnector(connector);
+      results.push(
+        error
+          ? { platform: connector.platform, status: 'failed', detail: error }
+          : { platform: connector.platform, status: 'live' },
+      );
+    }
+
+    // Startup capability table — one authoritative log of what this
+    // deployment can actually reach, so degraded sources are visible up
+    // front instead of surfacing as mystery-empty scan results.
+    const live = results.filter((r) => r.status === 'live').map((r) => r.platform);
+    const failed = results.filter((r) => r.status === 'failed');
+    this.logger.log(
+      `Connector capability: ${live.length}/${results.length} live [${live.join(', ') || 'none'}]`,
+    );
+    for (const f of failed) {
+      this.logger.warn(`Connector UNAVAILABLE: ${f.platform} — ${f.detail}`);
     }
   }
 
@@ -130,20 +148,23 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Register a data connector with the service
+   * Register a data connector with the service.
+   * Returns undefined on success, or the failure reason.
    */
-  private async registerConnector(connector: DataConnector): Promise<void> {
+  private async registerConnector(connector: DataConnector): Promise<string | undefined> {
     try {
       await connector.connect();
       this.connectors.set(connector.platform, connector);
 
       this.logger.log(`Registered connector for platform: ${connector.platform}`);
+      return undefined;
     } catch (error: unknown) {
       const err = error as Error;
       this.logger.error(
         `Failed to register connector for platform: ${connector.platform}`,
         err.stack,
       );
+      return err.message;
     }
   }
 

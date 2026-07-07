@@ -1,4 +1,5 @@
 import { Body, Controller, HttpException, HttpStatus, Logger, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { BotDetectionResult, SourceCredibilityScore } from '@veritas/analysis';
 import {
   CrossPlatformIdentityService,
@@ -140,15 +141,32 @@ export class InvestigationController {
    *   4. Pass everything to DeepInvestigationService.investigate()
    */
   @Post()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async investigate(@Body() body: InvestigateRequestBody): Promise<DeepInvestigationResult> {
     const { query, userHandles, platforms, topicPosts } = body;
 
     if (!query?.trim()) {
       throw new HttpException('query is required', HttpStatus.BAD_REQUEST);
     }
+    if (query.length > 500) {
+      throw new HttpException('query must be at most 500 characters', HttpStatus.BAD_REQUEST);
+    }
     if (!userHandles || userHandles.length === 0) {
       throw new HttpException(
         'userHandles must contain at least one handle',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    // Each handle triggers a timeline fetch + LLM profiling — bound the fan-out
+    if (userHandles.length > 25) {
+      throw new HttpException(
+        'userHandles must contain at most 25 handles per request',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (topicPosts && topicPosts.length > 5000) {
+      throw new HttpException(
+        'topicPosts must contain at most 5000 posts',
         HttpStatus.BAD_REQUEST,
       );
     }

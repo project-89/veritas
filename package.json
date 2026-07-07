@@ -113,6 +113,7 @@
     "@nestjs/mongoose": "^11.0.4",
     "@nestjs/platform-express": "^11.1.19",
     "@nestjs/swagger": "^11.3.2",
+    "@nestjs/throttler": "^6.5.0",
     "@nx/next": "^22.6.5",
     "@types/three": "^0.184.0",
     "afinn-165": "^2.0.2",

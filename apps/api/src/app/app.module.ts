@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import {
   AnalysisModule,
   ClaimVerificationService,
@@ -54,6 +55,16 @@ import { SchedulerService } from './services/scheduler.service';
       envFilePath: '.env',
     }),
 
+    // Rate limiting — generous global ceiling per client IP; expensive
+    // endpoints declare stricter @Throttle overrides locally
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60_000,
+        limit: 300,
+      },
+    ]),
+
     // BullMQ — Redis-backed job queue (used by scan workers)
     BullModule.forRoot({
       connection: {
@@ -95,6 +106,7 @@ import { SchedulerService } from './services/scheduler.service';
     // API-key auth on every route when VERITAS_API_KEY is set (validate-env
     // refuses to start production without it)
     { provide: APP_GUARD, useClass: ApiKeyGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     LoggingService,
     RefreshService,
     SchedulerService,

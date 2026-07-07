@@ -1,6 +1,11 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DatabaseService, Repository } from '@veritas/database';
 import { type RssCacheEntry, type RssCacheItem, RssCacheModel } from '../schemas/rss-cache.schema';
+import {
+  type FeedFailureState,
+  RssFeedStateModel,
+  type RssFeedStateEntry,
+} from '../schemas/rss-feed-state.schema';
 
 /**
  * Repository for caching RSS feed items per-URL.
@@ -10,6 +15,7 @@ import { type RssCacheEntry, type RssCacheItem, RssCacheModel } from '../schemas
 export class RssCacheRepository implements OnModuleInit {
   private readonly logger = new Logger(RssCacheRepository.name);
   private repo!: Repository<RssCacheEntry>;
+  private stateRepo!: Repository<RssFeedStateEntry>;
   private initialized = false;
 
   constructor(private readonly databaseService: DatabaseService) {}
@@ -22,12 +28,14 @@ export class RssCacheRepository implements OnModuleInit {
     try {
       try {
         this.databaseService.registerModel('RssCache', RssCacheModel);
-        this.logger.debug('Registered RssCache model');
+        this.databaseService.registerModel('RssFeedState', RssFeedStateModel);
+        this.logger.debug('Registered RssCache models');
       } catch {
-        this.logger.warn('RssCache model already registered');
+        this.logger.warn('RssCache models already registered');
       }
 
       this.repo = this.databaseService.getRepository<RssCacheEntry>('RssCache');
+      this.stateRepo = this.databaseService.getRepository<RssFeedStateEntry>('RssFeedState');
       this.initialized = true;
       this.logger.log('RssCache repository initialized');
     } catch (error: unknown) {
@@ -46,6 +54,62 @@ export class RssCacheRepository implements OnModuleInit {
     }
     if (!this.initialized) {
       throw new Error('RssCacheRepository not initialized — is MongoDB connected?');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Feed failure/suppression state (persisted so cooldowns survive restarts)
+  // ---------------------------------------------------------------------------
+
+  /** Load all still-active feed suppression states. Best-effort — never throws. */
+  async loadFeedFailureStates(): Promise<Map<string, FeedFailureState>> {
+    const states = new Map<string, FeedFailureState>();
+    try {
+      this.ensureInitialized();
+      const entries = await this.stateRepo.find({
+        suppressedUntil: { $gt: Date.now() },
+      } as Record<string, unknown>);
+      for (const entry of entries) {
+        states.set(entry.feedUrl, {
+          consecutiveFailures: entry.consecutiveFailures,
+          lastErrorSignature: entry.lastErrorSignature,
+          suppressedUntil: entry.suppressedUntil,
+        });
+      }
+    } catch (error: unknown) {
+      this.logger.debug(`Could not load feed failure states: ${(error as Error).message}`);
+    }
+    return states;
+  }
+
+  /** Persist one feed's suppression state. Best-effort — never throws. */
+  async saveFeedFailureState(feedUrl: string, state: FeedFailureState): Promise<void> {
+    try {
+      this.ensureInitialized();
+      const data = {
+        ...state,
+        // Self-clean a day after the suppression lapses
+        expiresAt: new Date(state.suppressedUntil + 24 * 60 * 60 * 1000),
+      } as Partial<RssFeedStateEntry>;
+      const updated = await this.stateRepo.updateMany(
+        { feedUrl } as Record<string, unknown>,
+        data,
+      );
+      if (updated === 0) {
+        await this.stateRepo.create({ feedUrl, ...data });
+      }
+    } catch (error: unknown) {
+      this.logger.debug(`Could not persist feed failure state: ${(error as Error).message}`);
+    }
+  }
+
+  /** Remove one feed's suppression state after a successful fetch. */
+  async clearFeedFailureState(feedUrl: string): Promise<void> {
+    try {
+      this.ensureInitialized();
+      await this.stateRepo.deleteMany({ feedUrl } as Record<string, unknown>);
+    } catch (error: unknown) {
+      this.logger.debug(`Could not clear feed failure state: ${(error as Error).message}`);
     }
   }
 

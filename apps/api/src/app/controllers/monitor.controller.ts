@@ -9,6 +9,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Alert, AlertRepository, InvestigationRepository, MonitorConfig } from '@veritas/ingestion';
 import { RefreshService } from '../services/refresh.service';
 
@@ -145,6 +146,7 @@ export class MonitorController {
    * Delegates to RefreshService for the full pipeline.
    */
   @Post('refresh/:investigationId')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async refresh(
     @Param('investigationId') investigationId: string,
   ): Promise<{ alerts: Alert[]; snapshotId: string }> {

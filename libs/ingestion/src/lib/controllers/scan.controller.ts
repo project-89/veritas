@@ -11,7 +11,9 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Queue } from 'bullmq';
+import { StartScanDto } from '../dto/start-scan.dto';
 import type { ScanJobData } from '../queue/scan.processor';
 import { InvestigationRepository } from '../repositories/investigation.repository';
 import { ScanJobRepository } from '../repositories/scan-job.repository';
@@ -62,17 +64,8 @@ export class ScanController {
    * and returns the scanId immediately.
    */
   @Post()
-  async startScan(
-    @Body()
-    body: {
-      query: string;
-      investigationId?: string;
-      platforms?: string[];
-      limit?: number;
-      timeRange?: string;
-      searchMode?: 'topic' | 'claim' | 'person';
-    },
-  ): Promise<{ scanId: string }> {
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async startScan(@Body() body: StartScanDto): Promise<{ scanId: string }> {
     const {
       query,
       investigationId: requestedInvestigationId,

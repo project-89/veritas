@@ -10,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Queue } from 'bullmq';
 import type { AnalysisJobData } from '../queue/analysis.processor';
 import { AnalysisJobRepository } from '../repositories/analysis-job.repository';
@@ -119,6 +120,7 @@ export class IdentityController {
    * POST /identity/:id/generate-profile — Trigger MAGI psychological profile generation.
    */
   @Post(':id/generate-profile')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async generateProfile(
     @Param('id') id: string,
     @Body() body: GenerateProfileBody = {},

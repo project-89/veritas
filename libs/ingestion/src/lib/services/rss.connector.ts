@@ -12,6 +12,7 @@ import {
 import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
 import { RssCacheRepository } from '../repositories/rss-cache.repository';
 import type { RssCacheItem } from '../schemas/rss-cache.schema';
+import type { FeedFailureState } from '../schemas/rss-feed-state.schema';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 
 interface RSSItem {
@@ -29,11 +30,6 @@ interface RSSItem {
   [key: string]: unknown;
 }
 
-interface FeedFailureState {
-  consecutiveFailures: number;
-  lastErrorSignature: string;
-  suppressedUntil: number;
-}
 
 interface FeedFetchResult {
   items: RSSItem[];
@@ -97,6 +93,17 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
 
   async onModuleInit() {
     await this.loadFeedUrls();
+
+    // Hydrate feed suppression state so cooldowns survive restarts
+    if (this.rssCacheRepo) {
+      const persisted = await this.rssCacheRepo.loadFeedFailureStates();
+      for (const [feedUrl, state] of persisted) {
+        this.feedFailureState.set(feedUrl, state);
+      }
+      if (persisted.size > 0) {
+        this.logger.log(`Restored suppression state for ${persisted.size} failing RSS feed(s)`);
+      }
+    }
   }
 
   async onModuleDestroy() {
@@ -530,7 +537,10 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
   }
 
   private clearFeedFailureState(feedUrl: string): void {
-    this.feedFailureState.delete(feedUrl);
+    const hadState = this.feedFailureState.delete(feedUrl);
+    if (hadState) {
+      this.rssCacheRepo?.clearFeedFailureState(feedUrl).catch(() => undefined);
+    }
   }
 
   private recordFeedFailure(feedUrl: string, error: unknown): void {
@@ -543,11 +553,14 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
       RSSConnector.FEED_FAILURE_MAX_COOLDOWN_MS,
     );
 
-    this.feedFailureState.set(feedUrl, {
+    const state: FeedFailureState = {
       consecutiveFailures,
       lastErrorSignature: summary,
       suppressedUntil: Date.now() + cooldownMs,
-    });
+    };
+    this.feedFailureState.set(feedUrl, state);
+    // Write-through so the cooldown survives restarts (best-effort)
+    this.rssCacheRepo?.saveFeedFailureState(feedUrl, state).catch(() => undefined);
 
     const shouldLog =
       !previous || previous.lastErrorSignature !== summary || previous.consecutiveFailures < 2;

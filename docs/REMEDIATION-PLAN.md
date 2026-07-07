@@ -29,7 +29,7 @@ The system is ingestion-heavy and currently has no system-level protection again
 ### 1.2 Shared per-source rate limiter
 - [x] `SourceRateLimiter` (per-platform pacing + concurrency caps + platform-wide 429 cooldowns, env-tunable via `SOURCE_RATE_LIMITS`) — ALL 9 HTTP/subprocess connectors route through it *(done 2026-07-06: `services/utils/source-rate-limiter.ts`)*
 - [x] `Retry-After` parsing + proactive platform cooldown on 429 (Reddit, Bluesky, Farcaster, Telegram, 4chan) *(done 2026-07-06)*
-- [ ] Persist RSS feed-failure suppression state (currently in-memory `rss.connector.ts:75` — resets on restart). Move to Mongo.
+- [x] Persist RSS feed-failure suppression state — `rss_feed_state` collection, hydrated on startup, write-through on record/clear *(done 2026-07-07)*
 
 ### 1.3 Cross-scan dedup & caching
 - [x] **Cross-scan fetch cache**: identical (platform, query, mode, window, limit) fetches within a TTL (default 30 min, `CONNECTOR_CACHE_TTL_MINUTES`) are served from Mongo instead of re-hitting sources *(done 2026-07-06: `connector-fetch-cache` schema/repo + scan processor integration)*
@@ -39,7 +39,7 @@ The system is ingestion-heavy and currently has no system-level protection again
 ### 1.4 Connector unification (pattern consistency)
 - [ ] All connectors extend/compose one base (`base-social-media.connector.ts`) — today only Twitter uses it; the rest reimplement connect/retry/transform ad hoc.
 - [x] **Consistent error surface** — every connector now THROWS on total failure (auth dead, all sub-requests failed, binary/config missing) instead of returning `[]`; partial failures keep results + warn; genuine empties still return `[]`. Failures flow to the scan job and the client's existing per-connector FAILED display. Every connector has total-failure + genuine-empty tests *(done 2026-07-07)*
-- [ ] Per-connector Zod-validated env config at startup; log a startup capability table (which connectors are live, degraded, disabled and why).
+- [x] Startup capability table — `IngestionService` logs `N/M live [platforms]` + per-connector UNAVAILABLE warnings at boot *(done 2026-07-07)*. Still todo: Zod-validated per-connector env config.
 - [ ] "Streaming" methods poll on intervals (Twitter/Reddit every 60s per stream) — either implement real streaming or rename and consolidate the polling.
 
 ### 1.5 Connector-by-connector verdicts & actions
@@ -112,8 +112,8 @@ Audit verdict: uneven. Clustering and bot detection are real; several "detection
 - [x] **Auth** — global `ApiKeyGuard`: when `VERITAS_API_KEY` is set every request needs `x-api-key` (or Bearer, or `?apiKey=` for SSE); production refuses to start without it; client sends `NEXT_PUBLIC_VERITAS_API_KEY` *(done 2026-07-07)*. Real per-user auth remains future work.
 - [x] **CORS** — explicit origin list from `CORS_ORIGIN`; dev defaults to localhost:4200/3000; production startup fails on wildcard/unset *(done 2026-07-07)*
 - [x] **Env validation** — `validateEnv()` at bootstrap: malformed MONGODB_URI / missing prod requirements fail fast; missing optional keys log capability warnings *(done 2026-07-07)*
-- [ ] **Input bounds**: class-validator DTOs — query length, `limit ≤ 1000`, `userHandles ≤ 100`, timeRange whitelist (scan processor currently accepts anything).
-- [ ] **Rate limiting**: `@nestjs/throttler` on `/investigate` and scan-triggering endpoints.
+- [x] **Input bounds** — `StartScanDto` (query ≤500, limit ≤1000, platforms ≤16, timeRange whitelist, searchMode enum) enforced by the global ValidationPipe; `/investigate` bounded to 25 handles / 5000 topicPosts *(done 2026-07-07)*
+- [x] **Rate limiting** — `@nestjs/throttler`: global 300/min per IP; `POST /scan` 10/min; `POST /investigate` 5/min; monitor refresh + profile generation 10/min *(done 2026-07-07)*
 - [x] **Health endpoint** — `GET /health` (auth-exempt) reporting mongo connectivity + uptime *(done 2026-07-07)*
 - [ ] Move `DeepInvestigationService.investigate()` off the synchronous HTTP path onto the queue.
 
