@@ -61,7 +61,7 @@ Audit ranked them (out of the box, only 5 work with zero config: Reddit, RSS, Bl
 | Web scraper | ❌ Placeholder (example.com selectors), fake search | Remove default config; make config-driven only, or delete |
 
 - [x] Per-connector unit tests for failure semantics — every connector has at least one total-failure-throw test and one genuine-empty test *(done 2026-07-07)*. Still todo: on-demand LIVE smoke tests against real sources.
-- [ ] Surface engagement-metric provenance: mark each metric real / inferred / unavailable (many are hardcoded 0 today, which poisons analytics downstream).
+- [x] Engagement-metric provenance — per-platform `real`/`inferred`/`unavailable` map (`utils/engagement-provenance.ts`), attached to each post at serialization, exposed on the client `RawPost` type *(done 2026-07-08)*. Client per-metric display lands with the dashboard redesign (engagement isn't surfaced per-metric in the current UI).
 
 ---
 
@@ -126,7 +126,7 @@ Audit verdict: uneven. Clustering and bot detection are real; several "detection
 - [ ] **Client typecheck in CI**: 33 pre-existing strict TS errors in client components (nerv/*) — `tsc --noEmit` isn't enforced anywhere.
 - [ ] **Decompose `results/page.tsx`** (2,433 lines) into panel components; add error boundaries.
 - [ ] **Share types with backend**: `lib/api.ts` hand-duplicates ~350 lines of DTOs — move to `libs/shared/types`.
-- [ ] Surface honesty signals in UI: connector failures, `unavailable` analysis states, hypothesized-signal labels, saturation report (already computed, never shown).
+- [~] Surface honesty signals in UI — connector failures (shown via scan-progress), `unavailable` analysis states (claims-matrix), and saturation report (SaturationIndicator) are ALREADY shown. Remaining: hypothesized-signal labels (only relevant when the opt-in LLM-hypothesis adapter is enabled) and per-metric engagement provenance (with the redesign).
 
 ## Workstream 6 — Dead code, consistency, hygiene
 
