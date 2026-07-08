@@ -15,6 +15,7 @@ import type { ExternalSignal, SignalAdapter } from './signal-adapters/signal-ada
 import { UsgsAdapter } from './signal-adapters/usgs.adapter';
 import { WorldBankAdapter } from './signal-adapters/worldbank.adapter';
 import { YahooFinanceAdapter } from './signal-adapters/yahoo-finance.adapter';
+import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
 
 /** Injection token for the causal reasoning service (avoids circular dependency). */
 export const CAUSAL_REASONING_SERVICE = Symbol('CAUSAL_REASONING_SERVICE');
@@ -177,7 +178,7 @@ const CLUSTER_COLORS = [
 export class DownstreamEffectsService {
   private readonly logger = new Logger(DownstreamEffectsService.name);
   private readonly genAI: GoogleGenerativeAI | null = null;
-  private readonly chatModel = 'gemini-2.0-flash';
+  private readonly chatModel = geminiChatModel();
   private readonly adapters: SignalAdapter[] = [];
 
   constructor(
@@ -671,7 +672,10 @@ export class DownstreamEffectsService {
       return this.fallbackTransmissionChains(correlation, topSignals);
     }
 
-    const model = this.genAI.getGenerativeModel({ model: this.chatModel });
+    const model = this.genAI.getGenerativeModel({
+      model: this.chatModel,
+      generationConfig: DETERMINISTIC_JSON_CONFIG,
+    });
 
     const signalSummaries = topSignals
       .map(
@@ -819,7 +823,10 @@ No other text.`;
       return `Analyzed ${correlations.length} narrative(s) against ${signals.length} hypothesized signal(s) across ${domains.size} domain(s). Found ${totalChains} potential transmission chain(s). These are hypothesized correlations — real API integrations are needed for evidence-based analysis.`;
     }
 
-    const model = this.genAI.getGenerativeModel({ model: this.chatModel });
+    const model = this.genAI.getGenerativeModel({
+      model: this.chatModel,
+      generationConfig: DETERMINISTIC_JSON_CONFIG,
+    });
     const chainSummaries = correlations
       .flatMap((c) =>
         c.transmissionChains.map(

@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { BotScore } from './graph-bot-detection.service';
 import type { SourceCredibilityScore } from './source-credibility.service';
+import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -118,7 +119,7 @@ export interface DeepInvestigationResult {
 export class DeepInvestigationService {
   private readonly logger = new Logger(DeepInvestigationService.name);
   private readonly genAI: GoogleGenerativeAI | null = null;
-  private readonly chatModel: string = 'gemini-2.0-flash';
+  private readonly chatModel: string = geminiChatModel();
 
   constructor(private readonly configService: ConfigService) {
     const geminiKey =
@@ -361,7 +362,10 @@ export class DeepInvestigationService {
 
     if (!this.genAI || topicPosts.length === 0) return fallback;
 
-    const model = this.genAI.getGenerativeModel({ model: this.chatModel });
+    const model = this.genAI.getGenerativeModel({
+      model: this.chatModel,
+      generationConfig: DETERMINISTIC_JSON_CONFIG,
+    });
 
     const topicSamples = topicPosts
       .slice(0, 10)
@@ -550,7 +554,10 @@ Respond ONLY with a JSON object:
 
     if (!this.genAI || users.length === 0) return fallback;
 
-    const model = this.genAI.getGenerativeModel({ model: this.chatModel });
+    const model = this.genAI.getGenerativeModel({
+      model: this.chatModel,
+      generationConfig: DETERMINISTIC_JSON_CONFIG,
+    });
 
     // Gather representative posts from the most influential users
     const topUsers = users.slice(0, 10);

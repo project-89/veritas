@@ -1,5 +1,9 @@
 import { ConfigService } from '@nestjs/config';
-import { ClaimVerificationService } from './claim-verification.service';
+import {
+  CLAIM_VERIFICATION_PROMPT_VERSION,
+  ClaimVerificationService,
+  GROUNDING_DOWNGRADE_CAVEAT,
+} from './claim-verification.service';
 import type { ExtractedClaim } from './propaganda.service';
 
 // ---------------------------------------------------------------------------
@@ -48,6 +52,56 @@ function gdeltResponse(articles: Array<{ title: string; url?: string; domain?: s
       domain: a.domain ?? 'example.com',
     })),
   };
+}
+
+/** Route mocked fetch to canned Wikipedia/GDELT payloads. */
+function mockEvidenceFetch(
+  fetchSpy: jest.SpyInstance,
+  wiki: Array<{ title: string; snippet: string }>,
+  gdelt: Array<{ title: string; url?: string; domain?: string }>,
+): void {
+  fetchSpy.mockImplementation((url: string | URL) => {
+    const urlStr = typeof url === 'string' ? url : url.toString();
+
+    if (urlStr.includes('wikipedia.org')) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(wikiResponse(wiki)),
+      });
+    }
+
+    if (urlStr.includes('gdeltproject.org')) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(gdeltResponse(gdelt)),
+      });
+    }
+
+    return Promise.resolve({ ok: false, status: 404 });
+  });
+}
+
+/**
+ * Replace the service's private Gemini client with a stub that returns the
+ * given JSON payload and optionally captures the prompt it was sent.
+ */
+function installMockLlm(
+  service: ClaimVerificationService,
+  responseJson: unknown,
+  capture?: { prompt?: string },
+): void {
+  const mockGenAI = {
+    getGenerativeModel: () => ({
+      generateContent: (prompt: string) => {
+        if (capture) capture.prompt = prompt;
+        return Promise.resolve({
+          response: { text: () => JSON.stringify(responseJson) },
+        });
+      },
+    }),
+  };
+
+  (service as unknown as { genAI: unknown }).genAI = mockGenAI;
 }
 
 // ---------------------------------------------------------------------------
@@ -469,5 +523,189 @@ describe('ClaimVerificationService', () => {
     expect(result.results).toHaveLength(2);
     expect(result.summary).toContain('2 verifiable');
     expect(result.summary).toContain('2 non-verifiable');
+  });
+
+  // -------------------------------------------------------------------------
+  // Citation grounding (LLM mode)
+  // -------------------------------------------------------------------------
+
+  describe('citation grounding', () => {
+    const wikiSnippet = 'The Earth completes one orbit around the Sun every 365.25 days.';
+
+    function makeLlmService(responseJson: unknown, capture?: { prompt?: string }) {
+      const llmService = new ClaimVerificationService(makeConfigService('test-key'));
+      installMockLlm(llmService, responseJson, capture);
+      return llmService;
+    }
+
+    it('should drop fabricated excerpts and downgrade the verdict to unverified', async () => {
+      const llmService = makeLlmService({
+        status: 'verified',
+        confidence: 0.9,
+        supporting: [
+          {
+            source: 'Wikipedia',
+            excerpt: 'NASA officially confirmed heliocentrism in a landmark 2019 press conference',
+            credibility: 'high',
+          },
+        ],
+        contradicting: [],
+        reasoning: 'Evidence suggests the claim is accurate.',
+        caveats: ['Automated assessment.'],
+      });
+
+      mockEvidenceFetch(fetchSpy, [{ title: "Earth's orbit", snippet: wikiSnippet }], []);
+
+      const result = await llmService.verifySingleClaim(makeClaim());
+
+      // The fabricated citation must be dropped and the verdict downgraded.
+      expect(result.analysisMode).toBe('llm');
+      expect(result.evidence.supporting).toHaveLength(0);
+      expect(result.status).toBe('unverified');
+      expect(result.confidence).toBeLessThanOrEqual(0.3);
+      expect(result.caveats).toContain(GROUNDING_DOWNGRADE_CAVEAT);
+      expect(result.droppedUngroundedCitations).toBe(1);
+      expect(result.groundingScore).toBe(0);
+    });
+
+    it('should keep verbatim excerpts grounded and let the verdict stand', async () => {
+      const llmService = makeLlmService({
+        status: 'verified',
+        confidence: 0.85,
+        supporting: [
+          {
+            source: 'Wikipedia',
+            excerpt: wikiSnippet,
+            credibility: 'high',
+          },
+        ],
+        contradicting: [],
+        reasoning: 'Evidence suggests the claim is accurate.',
+        caveats: ['Automated assessment.'],
+      });
+
+      mockEvidenceFetch(fetchSpy, [{ title: "Earth's orbit", snippet: wikiSnippet }], []);
+
+      const result = await llmService.verifySingleClaim(makeClaim());
+
+      expect(result.analysisMode).toBe('llm');
+      expect(result.status).toBe('verified');
+      expect(result.confidence).toBeCloseTo(0.85);
+      expect(result.evidence.supporting).toHaveLength(1);
+      expect(result.evidence.supporting[0]!.excerpt).toBe(wikiSnippet);
+      expect(result.caveats).not.toContain(GROUNDING_DOWNGRADE_CAVEAT);
+      expect(result.droppedUngroundedCitations).toBe(0);
+      expect(result.groundingScore).toBe(1);
+    });
+
+    it('should rank claim-relevant snippets into the prompt over irrelevant ones', async () => {
+      const capture: { prompt?: string } = {};
+      const llmService = makeLlmService(
+        {
+          status: 'unverified',
+          confidence: 0.2,
+          supporting: [],
+          contradicting: [],
+          reasoning: 'Insufficient evidence.',
+          caveats: ['Automated assessment.'],
+        },
+        capture,
+      );
+
+      // 15 snippets total (5 wiki + 10 GDELT), only 12 fit in the prompt.
+      // The 3 relevant ones arrive LAST, so naive first-come ordering would drop them.
+      const irrelevantWiki = [
+        {
+          title: 'Quantum computing',
+          snippet: 'Quantum computing breakthrough announced yesterday',
+        },
+        { title: 'Archaeology', snippet: 'Ancient pottery discovered near coastal village' },
+        { title: 'Entomology', snippet: 'New species of beetle described by entomologists' },
+        { title: 'Music', snippet: 'Symphony orchestra premieres modern composition' },
+        { title: 'Geology', snippet: 'Volcanic activity monitored near remote island' },
+      ];
+      const gdeltArticles = [
+        { title: 'Football transfer window gossip roundup alphamarker' },
+        { title: 'Celebrity chef opens restaurant bravomarker' },
+        { title: 'Vintage car auction draws crowds charliemarker' },
+        { title: 'Gardening tips for spring deltamarker' },
+        { title: 'Knitting festival attracts hobbyists golfmarker' },
+        { title: 'Surfing championship postponed hotelmarker' },
+        { title: 'Cheese rolling contest winners indiamarker' },
+        { title: 'Tokyo population exceeds 13 million residents says census' },
+        { title: 'Census data shows Tokyo population above 13 million' },
+        { title: 'Tokyo residents number more than 13 million people' },
+      ];
+
+      mockEvidenceFetch(fetchSpy, irrelevantWiki, gdeltArticles);
+
+      await llmService.verifySingleClaim(
+        makeClaim({ claim: 'The population of Tokyo exceeds 13 million residents' }),
+      );
+
+      expect(capture.prompt).toBeDefined();
+      const prompt = capture.prompt!;
+
+      // All three relevant snippets survive the cut...
+      expect(prompt).toContain('Tokyo population exceeds 13 million residents says census');
+      expect(prompt).toContain('Census data shows Tokyo population above 13 million');
+      expect(prompt).toContain('Tokyo residents number more than 13 million people');
+
+      // ...displacing the lowest-ranked irrelevant snippets.
+      expect(prompt).not.toContain('golfmarker');
+      expect(prompt).not.toContain('hotelmarker');
+      expect(prompt).not.toContain('indiamarker');
+    });
+
+    it('should stamp promptVersion and model on LLM results', async () => {
+      const llmService = makeLlmService({
+        status: 'unverified',
+        confidence: 0.2,
+        supporting: [],
+        contradicting: [],
+        reasoning: 'Insufficient evidence.',
+        caveats: ['Automated assessment.'],
+      });
+
+      mockEvidenceFetch(fetchSpy, [{ title: "Earth's orbit", snippet: wikiSnippet }], []);
+
+      const result = await llmService.verifySingleClaim(makeClaim());
+
+      expect(CLAIM_VERIFICATION_PROMPT_VERSION).toBe(2);
+      expect(result.promptVersion).toBe(CLAIM_VERIFICATION_PROMPT_VERSION);
+      expect(typeof result.model).toBe('string');
+      expect(result.model!.length).toBeGreaterThan(0);
+      expect(result.model).not.toBe('heuristic');
+    });
+
+    it('should stamp promptVersion, model and groundingScore on heuristic results', async () => {
+      // `service` from beforeEach has no Gemini key -> heuristic path.
+      mockEvidenceFetch(
+        fetchSpy,
+        [
+          {
+            title: "Earth's orbit",
+            snippet: 'The Earth orbits the Sun at a distance of about 150 million km.',
+          },
+          {
+            title: 'Orbital mechanics',
+            snippet: 'Earth orbit around Sun follows Kepler laws of planetary motion.',
+          },
+        ],
+        [],
+      );
+
+      const result = await service.verifySingleClaim(
+        makeClaim({ claim: 'The Earth orbits around the Sun' }),
+      );
+
+      expect(result.analysisMode).toBe('heuristic');
+      expect(result.promptVersion).toBe(CLAIM_VERIFICATION_PROMPT_VERSION);
+      expect(result.model).toBe('heuristic');
+      // Heuristic citations are retrieved snippets, so grounded by construction.
+      expect(result.evidence.supporting.length).toBeGreaterThan(0);
+      expect(result.groundingScore).toBe(1);
+      expect(result.droppedUngroundedCitations).toBe(0);
+    });
   });
 });

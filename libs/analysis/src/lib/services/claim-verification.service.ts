@@ -16,10 +16,22 @@ import {
 } from './evidence-adapters/social-graph.evidence-adapter';
 import { PlatformCredibilityService } from './platform-credibility.service';
 import type { AnalysisMode, ExtractedClaim } from './propaganda.service';
+import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
 
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
+
+/**
+ * Bumped whenever the verification prompt changes in a way that affects
+ * verdicts. v2 added citation grounding: exact-quote excerpts, no outside
+ * knowledge for the status decision.
+ */
+export const CLAIM_VERIFICATION_PROMPT_VERSION = 2;
+
+/** Appended when a verdict is downgraded because its citations failed grounding. */
+export const GROUNDING_DOWNGRADE_CAVEAT =
+  'Original verdict was not supported by verifiable evidence citations and was downgraded.';
 
 export interface EvidenceItem {
   source: string;
@@ -46,6 +58,17 @@ export interface VerificationResult {
   sourcesChecked: string[];
   evidenceSources?: EvidenceSource[];
   investigativeLeads?: InvestigativeLead[];
+  /**
+   * Grounded cited excerpts / total cited excerpts (0-1). Null when the
+   * verdict cited nothing, so there was nothing to ground.
+   */
+  groundingScore?: number | null;
+  /** Citations dropped because their excerpts were not found in the retrieved evidence. */
+  droppedUngroundedCitations?: number;
+  /** Version of the verification prompt that produced this result. */
+  promptVersion?: number;
+  /** Model that produced the verdict ('heuristic' for the keyword fallback). */
+  model?: string;
 }
 
 export interface ClaimVerificationBatchResult {
@@ -88,6 +111,16 @@ interface GdeltResponse {
   articles?: GdeltArticle[];
 }
 
+/** A single retrieved evidence snippet, normalized across wiki/GDELT/adapters. */
+interface RetrievedSnippet {
+  text: string;
+  source: string;
+  url?: string;
+  timestamp?: string;
+  credibility: 'high' | 'medium' | 'low';
+  stance?: 'supports' | 'contradicts' | 'neutral';
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -97,6 +130,81 @@ const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/on
 const WIKIPEDIA_API = 'https://en.wikipedia.org/w/api.php';
 const GDELT_API = 'https://api.gdeltproject.org/api/v2/doc/doc';
 
+/** Max evidence snippets sent to the LLM after relevance ranking. */
+const MAX_PROMPT_SNIPPETS = 12;
+
+/** Minimum token-overlap ratio for a cited excerpt to count as grounded. */
+const GROUNDING_OVERLAP_THRESHOLD = 0.7;
+
+/** Confidence ceiling for verdicts downgraded by the grounding check. */
+const DOWNGRADED_CONFIDENCE_CAP = 0.3;
+
+const STOP_WORDS = new Set([
+  'the',
+  'a',
+  'an',
+  'is',
+  'are',
+  'was',
+  'were',
+  'be',
+  'been',
+  'being',
+  'have',
+  'has',
+  'had',
+  'do',
+  'does',
+  'did',
+  'will',
+  'would',
+  'could',
+  'should',
+  'may',
+  'might',
+  'shall',
+  'can',
+  'that',
+  'this',
+  'these',
+  'those',
+  'it',
+  'its',
+  'of',
+  'in',
+  'on',
+  'at',
+  'to',
+  'for',
+  'with',
+  'by',
+  'from',
+  'and',
+  'or',
+  'not',
+  'no',
+  'but',
+  'if',
+  'about',
+  'than',
+  'very',
+  'just',
+  'also',
+  'more',
+  'some',
+  'they',
+  'them',
+  'their',
+  'there',
+  'here',
+  'when',
+  'where',
+  'what',
+  'which',
+  'who',
+  'how',
+]);
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -105,7 +213,7 @@ const GDELT_API = 'https://api.gdeltproject.org/api/v2/doc/doc';
 export class ClaimVerificationService {
   private readonly logger = new Logger(ClaimVerificationService.name);
   private readonly genAI: GoogleGenerativeAI | null = null;
-  private readonly chatModel: string = 'gemini-2.0-flash';
+  private readonly chatModel: string = geminiChatModel();
   private readonly evidenceAdapters: EvidenceAdapter[] = [];
   private readonly platformCredibility: PlatformCredibilityService | null = null;
 
@@ -322,6 +430,10 @@ export class ClaimVerificationService {
         result.confidence,
         adapterEvidenceSources,
       );
+      // Weighting must not lift a grounding-downgraded verdict back up.
+      if (result.caveats.includes(GROUNDING_DOWNGRADE_CAVEAT)) {
+        result.confidence = Math.min(result.confidence, DOWNGRADED_CONFIDENCE_CAP);
+      }
     }
 
     return result;
@@ -411,23 +523,36 @@ export class ClaimVerificationService {
     evidence: Array<
       | { source: 'Wikipedia'; items: WikiSearchResult[] }
       | { source: 'GDELT'; items: GdeltArticle[] }
-  >,
-  sourcesChecked: string[],
-  adapterEvidence: EvidenceSource[] = [],
+    >,
+    sourcesChecked: string[],
+    adapterEvidence: EvidenceSource[] = [],
   ): Promise<VerificationResult> {
     if (!this.genAI) {
       throw new Error('Gemini client is not initialized');
     }
 
-    const model = this.genAI.getGenerativeModel({ model: this.chatModel });
+    const model = this.genAI.getGenerativeModel({
+      model: this.chatModel,
+      generationConfig: DETERMINISTIC_JSON_CONFIG,
+    });
 
-    const evidenceText = this.formatEvidenceForPrompt(evidence);
-    const adapterEvidenceText = this.formatAdapterEvidenceForPrompt(adapterEvidence);
+    // Rank all retrieved snippets against the claim and keep only the most
+    // relevant ones, so the prompt is focused instead of first-come-first-served.
+    const snippets = this.collectSnippets(evidence, adapterEvidence);
+    const { kept, dropped } = this.rankSnippets(claim.claim, snippets, MAX_PROMPT_SNIPPETS);
+    if (dropped > 0) {
+      this.logger.debug(
+        `Evidence ranking kept ${kept.length}/${snippets.length} snippets (dropped ${dropped}) for claim: "${claim.claim.slice(0, 80)}"`,
+      );
+    }
+    const evidenceText = this.formatRankedEvidenceForPrompt(kept);
 
     const prompt = `You are an evidence-based fact-checking assistant. Given a claim and evidence found from public sources, assess the veracity of the claim.
 
 CRITICAL PRINCIPLES:
-- Evidence-first: base your assessment ONLY on the evidence provided.
+- Evidence-first: base your assessment ONLY on the evidence provided below.
+- If the provided evidence is insufficient, the status is unverified — do NOT use background knowledge to verify or refute.
+- Every cited "excerpt" MUST be an EXACT verbatim quote copied character-for-character from the evidence below. Never paraphrase, summarize, or invent quotes — citations that do not appear in the evidence will be discarded.
 - Use bounded language: "evidence suggests", "sources indicate", not "this is true/false".
 - Absence of evidence is not evidence of absence.
 - Consider source credibility: Wikipedia is generally reliable for well-sourced articles; news articles vary. On-chain data (Etherscan) and regulatory filings (SEC EDGAR) are highly reliable. Market data (DexScreener) reflects current state but not intent.
@@ -437,9 +562,8 @@ CLAIM: "${claim.claim}"
 CLAIM TYPE: ${claim.type}
 SOURCES WHO MADE THIS CLAIM: ${claim.sources.join(', ') || 'Unknown'}
 
-EVIDENCE FOUND:
+EVIDENCE FOUND (the ONLY material you may cite):
 ${evidenceText || 'No relevant evidence found from searched sources.'}
-${adapterEvidenceText ? `\nTARGETED EVIDENCE FROM SPECIALIZED SOURCES:\n${adapterEvidenceText}` : ''}
 
 Respond ONLY with a single JSON object (no markdown fences, no other text):
 
@@ -450,7 +574,7 @@ Respond ONLY with a single JSON object (no markdown fences, no other text):
     {
       "source": "Source name",
       "url": "URL if available",
-      "excerpt": "Relevant excerpt that supports the claim",
+      "excerpt": "Exact verbatim quote from the evidence that supports the claim",
       "credibility": "high|medium|low",
       "timestamp": "ISO timestamp if available"
     }
@@ -459,7 +583,7 @@ Respond ONLY with a single JSON object (no markdown fences, no other text):
     {
       "source": "Source name",
       "url": "URL if available",
-      "excerpt": "Relevant excerpt that contradicts the claim",
+      "excerpt": "Exact verbatim quote from the evidence that contradicts the claim",
       "credibility": "high|medium|low",
       "timestamp": "ISO timestamp if available"
     }
@@ -470,7 +594,10 @@ Respond ONLY with a single JSON object (no markdown fences, no other text):
 
 Rules:
 - "status": verified = strong supporting evidence, disputed = conflicting evidence, unverified = insufficient evidence, mixed = some support + some contradiction, false = strong contradicting evidence
+- "verified" requires at least one exact-quote supporting excerpt; "false" requires at least one exact-quote contradicting excerpt
+- The status decision must rest ONLY on the evidence above — never on background knowledge
 - confidence 0-1: how confident you are in the status assessment
+- Every "excerpt" must be an exact verbatim quote from the EVIDENCE FOUND section
 - Only include evidence items that are actually relevant to the claim
 - Always include at least one caveat
 - Use bounded language throughout
@@ -479,7 +606,12 @@ Rules:
     try {
       const result = await model.generateContent(prompt);
       const responseText = result.response.text();
-      return this.parseLlmResponse(claim.claim, responseText, sourcesChecked);
+      return this.parseLlmResponse(
+        claim.claim,
+        responseText,
+        sourcesChecked,
+        kept.map((s) => s.text),
+      );
     } catch (err) {
       this.logger.error(`LLM verification failed: ${err}`);
       // Fall back to heuristic
@@ -491,6 +623,7 @@ Rules:
     claimText: string,
     responseText: string,
     sourcesChecked: string[],
+    sentSnippets: string[],
   ): VerificationResult {
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
@@ -500,7 +633,7 @@ Rules:
 
     try {
       const raw = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-      return this.validateLlmResult(claimText, raw, sourcesChecked);
+      return this.validateLlmResult(claimText, raw, sourcesChecked, sentSnippets);
     } catch (err) {
       this.logger.warn(`Failed to parse LLM verification JSON: ${err}`);
       return this.unverifiedResult(claimText, sourcesChecked);
@@ -511,6 +644,7 @@ Rules:
     claimText: string,
     raw: Record<string, unknown>,
     sourcesChecked: string[],
+    sentSnippets: string[],
   ): VerificationResult {
     const validStatuses = new Set(['verified', 'disputed', 'unverified', 'mixed', 'false']);
 
@@ -535,7 +669,7 @@ Rules:
           'Evidence was gathered from a limited set of public sources.',
         ];
 
-    return {
+    const result: VerificationResult = {
       claim: claimText,
       status,
       confidence,
@@ -544,7 +678,238 @@ Rules:
       reasoning,
       caveats,
       sourcesChecked,
+      promptVersion: CLAIM_VERIFICATION_PROMPT_VERSION,
+      model: this.chatModel,
     };
+
+    return this.applyGroundingCheck(result, sentSnippets);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Citation grounding: verify LLM-cited excerpts against retrieved evidence
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Drop cited excerpts that cannot be found in the evidence actually sent to
+   * the LLM, then enforce verdict consistency: a verdict that no longer has a
+   * grounded citation backing it is downgraded to 'unverified'.
+   */
+  private applyGroundingCheck(
+    result: VerificationResult,
+    sentSnippets: string[],
+  ): VerificationResult {
+    const citedCount = result.evidence.supporting.length + result.evidence.contradicting.length;
+
+    const groundedSupporting = result.evidence.supporting.filter((item) =>
+      this.checkAndLogGrounding(item, 'supporting', sentSnippets),
+    );
+    const groundedContradicting = result.evidence.contradicting.filter((item) =>
+      this.checkAndLogGrounding(item, 'contradicting', sentSnippets),
+    );
+
+    const groundedCount = groundedSupporting.length + groundedContradicting.length;
+    const dropped = citedCount - groundedCount;
+
+    result.evidence.supporting = groundedSupporting;
+    result.evidence.contradicting = groundedContradicting;
+    result.groundingScore = citedCount > 0 ? groundedCount / citedCount : null;
+    result.droppedUngroundedCitations = dropped;
+
+    const needsDowngrade =
+      (result.status === 'verified' && groundedSupporting.length === 0) ||
+      (result.status === 'false' && groundedContradicting.length === 0) ||
+      ((result.status === 'disputed' || result.status === 'mixed') && groundedCount === 0);
+
+    if (needsDowngrade) {
+      this.logger.debug(
+        `Downgrading '${result.status}' verdict to 'unverified': no grounded citations back it (claim: "${result.claim.slice(0, 80)}")`,
+      );
+      result.status = 'unverified';
+      result.confidence = Math.min(result.confidence, DOWNGRADED_CONFIDENCE_CAP);
+      result.caveats.push(GROUNDING_DOWNGRADE_CAVEAT);
+    }
+
+    return result;
+  }
+
+  private checkAndLogGrounding(
+    item: EvidenceItem,
+    side: 'supporting' | 'contradicting',
+    sentSnippets: string[],
+  ): boolean {
+    const grounded = this.isExcerptGrounded(item.excerpt, sentSnippets);
+    if (!grounded) {
+      this.logger.debug(
+        `Dropping ungrounded ${side} citation from "${item.source}": excerpt not found in retrieved evidence ("${item.excerpt.slice(0, 100)}")`,
+      );
+    }
+    return grounded;
+  }
+
+  /**
+   * An excerpt is grounded if, after whitespace/case/punctuation
+   * normalization, it occurs verbatim inside one of the snippets sent to the
+   * LLM — or if a single snippet contains >= GROUNDING_OVERLAP_THRESHOLD of
+   * its content tokens (tolerates minor elision, not fabrication).
+   */
+  private isExcerptGrounded(excerpt: string, sentSnippets: string[]): boolean {
+    const normalizedExcerpt = this.normalizeForGrounding(excerpt);
+    if (normalizedExcerpt.length === 0) return false;
+
+    const excerptTokens = new Set(this.tokenize(excerpt));
+
+    for (const snippet of sentSnippets) {
+      if (this.normalizeForGrounding(snippet).includes(normalizedExcerpt)) {
+        return true;
+      }
+
+      if (excerptTokens.size > 0) {
+        const snippetTokens = new Set(this.tokenize(snippet));
+        let shared = 0;
+        for (const token of excerptTokens) {
+          if (snippetTokens.has(token)) shared++;
+        }
+        if (shared / excerptTokens.size >= GROUNDING_OVERLAP_THRESHOLD) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /** Lowercase, strip punctuation, collapse whitespace. */
+  private normalizeForGrounding(text: string): string {
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Evidence ranking: focus the prompt on claim-relevant snippets
+  // ---------------------------------------------------------------------------
+
+  /** Normalize every retrieved evidence item into a flat snippet list. */
+  private collectSnippets(
+    evidence: Array<
+      | { source: 'Wikipedia'; items: WikiSearchResult[] }
+      | { source: 'GDELT'; items: GdeltArticle[] }
+    >,
+    adapterEvidence: EvidenceSource[],
+  ): RetrievedSnippet[] {
+    const snippets: RetrievedSnippet[] = [];
+
+    for (const group of evidence) {
+      if (group.source === 'Wikipedia') {
+        for (const item of group.items) {
+          const text = this.stripHtml(item.snippet);
+          if (!text) continue;
+          snippets.push({
+            text,
+            source: `Wikipedia: ${item.title}`,
+            url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`,
+            timestamp: item.timestamp,
+            credibility: 'high',
+          });
+        }
+      } else {
+        for (const article of group.items) {
+          if (!article.title) continue;
+          snippets.push({
+            text: article.title,
+            source: `GDELT: ${article.domain ?? 'news'}`,
+            url: article.url,
+            timestamp: article.seendate,
+            credibility: 'medium',
+          });
+        }
+      }
+    }
+
+    for (const es of adapterEvidence) {
+      if (!es.excerpt) continue;
+      snippets.push({
+        text: es.excerpt,
+        source: es.source,
+        url: es.url,
+        timestamp: es.retrievedAt,
+        credibility: this.mapCredibilityScore(es.credibilityScore),
+        stance: es.stance,
+      });
+    }
+
+    return snippets;
+  }
+
+  /**
+   * Rank snippets by lexical overlap with the claim: shared content tokens,
+   * each weighted by its inverse document frequency across the snippet set
+   * (terms appearing in every snippet carry little signal). Keeps the top
+   * `keep` snippets, preserving retrieval order when nothing must be dropped.
+   */
+  private rankSnippets(
+    claim: string,
+    snippets: RetrievedSnippet[],
+    keep: number,
+  ): { kept: RetrievedSnippet[]; dropped: number } {
+    if (snippets.length <= keep) {
+      return { kept: snippets, dropped: 0 };
+    }
+
+    const claimTokens = new Set(this.tokenize(claim));
+    const snippetTokenSets = snippets.map((s) => new Set(this.tokenize(s.text)));
+
+    // Document frequency of each term across the snippet set
+    const documentFrequency = new Map<string, number>();
+    for (const tokens of snippetTokenSets) {
+      for (const token of tokens) {
+        documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1);
+      }
+    }
+
+    const scored = snippets.map((snippet, index) => {
+      let score = 0;
+      const tokens = snippetTokenSets[index];
+      if (tokens) {
+        for (const token of tokens) {
+          if (claimTokens.has(token)) {
+            score += 1 / (documentFrequency.get(token) ?? 1);
+          }
+        }
+      }
+      return { snippet, score, index };
+    });
+
+    // Highest score first; ties keep retrieval order.
+    scored.sort((a, b) => b.score - a.score || a.index - b.index);
+
+    const kept = scored
+      .slice(0, keep)
+      .sort((a, b) => a.index - b.index)
+      .map((s) => s.snippet);
+
+    return { kept, dropped: snippets.length - keep };
+  }
+
+  /** Lowercase content tokens: no stop words, no tokens shorter than 3 chars. */
+  private tokenize(text: string): string[] {
+    return text
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
+  }
+
+  /** Format ranked snippets into a numbered evidence block for the prompt. */
+  private formatRankedEvidenceForPrompt(snippets: RetrievedSnippet[]): string {
+    return snippets
+      .map((s, i) => {
+        const stance = s.stance ? `, stance: ${s.stance}` : '';
+        return `  [${i + 1}] (${s.source} | credibility: ${s.credibility}${stance}) "${s.text}"${s.url ? ` (${s.url})` : ''}`;
+      })
+      .join('\n');
   }
 
   private validateEvidenceItems(raw: unknown): EvidenceItem[] {
@@ -640,6 +1005,8 @@ Rules:
         ? 'No relevant evidence was found in the searched sources. This does not mean the claim is false -- only that it could not be verified with available data.'
         : `Heuristic assessment based on ${supporting.length} supporting and ${contradicting.length} contradicting evidence items found across ${sourcesChecked.join(', ') || 'searched sources'}.`;
 
+    const citedCount = supporting.length + contradicting.length;
+
     return {
       claim: claim.claim,
       status,
@@ -653,6 +1020,11 @@ Rules:
         'Absence of evidence is not evidence of absence.',
       ],
       sourcesChecked,
+      // Heuristic citations ARE retrieved snippets, so they are grounded by construction.
+      groundingScore: citedCount > 0 ? 1 : null,
+      droppedUngroundedCitations: 0,
+      promptVersion: CLAIM_VERIFICATION_PROMPT_VERSION,
+      model: 'heuristic',
     };
   }
 
@@ -854,35 +1226,6 @@ Rules:
     return this.clamp(blended, 0, 1);
   }
 
-  // ---------------------------------------------------------------------------
-  // Adapter evidence formatting
-  // ---------------------------------------------------------------------------
-
-  private formatAdapterEvidenceForPrompt(adapterEvidence: EvidenceSource[]): string {
-    if (adapterEvidence.length === 0) return '';
-
-    const grouped = new Map<string, EvidenceSource[]>();
-    for (const es of adapterEvidence) {
-      const key = es.sourceType;
-      const list = grouped.get(key) ?? [];
-      list.push(es);
-      grouped.set(key, list);
-    }
-
-    const sections: string[] = [];
-
-    for (const [sourceType, items] of grouped) {
-      const label = sourceType.toUpperCase().replace('-', ' ');
-      const lines = items.map(
-        (es) =>
-          `  - [${es.source}] (credibility: ${es.credibilityScore.toFixed(2)}, stance: ${es.stance}): ${es.excerpt}${es.url ? ` (${es.url})` : ''}`,
-      );
-      sections.push(`${label} EVIDENCE:\n${lines.join('\n')}`);
-    }
-
-    return sections.join('\n\n');
-  }
-
   private mapCredibilityScore(score: number): 'high' | 'medium' | 'low' {
     if (score >= 0.8) return 'high';
     if (score >= 0.5) return 'medium';
@@ -898,76 +1241,10 @@ Rules:
    * Removes common stop words and limits to key terms.
    */
   extractSearchTerms(claimText: string): string {
-    const stopWords = new Set([
-      'the',
-      'a',
-      'an',
-      'is',
-      'are',
-      'was',
-      'were',
-      'be',
-      'been',
-      'being',
-      'have',
-      'has',
-      'had',
-      'do',
-      'does',
-      'did',
-      'will',
-      'would',
-      'could',
-      'should',
-      'may',
-      'might',
-      'shall',
-      'can',
-      'that',
-      'this',
-      'these',
-      'those',
-      'it',
-      'its',
-      'of',
-      'in',
-      'on',
-      'at',
-      'to',
-      'for',
-      'with',
-      'by',
-      'from',
-      'and',
-      'or',
-      'not',
-      'no',
-      'but',
-      'if',
-      'about',
-      'than',
-      'very',
-      'just',
-      'also',
-      'more',
-      'some',
-      'they',
-      'them',
-      'their',
-      'there',
-      'here',
-      'when',
-      'where',
-      'what',
-      'which',
-      'who',
-      'how',
-    ]);
-
     const words = claimText
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
-      .filter((w) => w.length > 2 && !stopWords.has(w.toLowerCase()));
+      .filter((w) => w.length > 2 && !STOP_WORDS.has(w.toLowerCase()));
 
     // Take the most meaningful terms (up to 6)
     return words.slice(0, 6).join(' ');
@@ -1009,36 +1286,6 @@ Rules:
       .replace(/<[^>]*>/g, '')
       .replace(/&[^;]+;/g, ' ')
       .trim();
-  }
-
-  /** Format evidence groups into a text block for the LLM prompt. */
-  private formatEvidenceForPrompt(
-    evidence: Array<
-      | { source: 'Wikipedia'; items: WikiSearchResult[] }
-      | { source: 'GDELT'; items: GdeltArticle[] }
-    >,
-  ): string {
-    const sections: string[] = [];
-
-    for (const group of evidence) {
-      if (group.source === 'Wikipedia') {
-        const wikiItems = group.items
-          .map(
-            (item) =>
-              `  - "${item.title}": ${this.stripHtml(item.snippet)} (https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))})`,
-          )
-          .join('\n');
-        sections.push(`WIKIPEDIA RESULTS:\n${wikiItems}`);
-      } else if (group.source === 'GDELT') {
-        const gdeltItems = group.items
-          .filter((a) => a.title)
-          .map((a) => `  - "${a.title}" [${a.domain ?? 'unknown source'}] ${a.url ?? ''}`)
-          .join('\n');
-        sections.push(`NEWS ARTICLES (via GDELT):\n${gdeltItems}`);
-      }
-    }
-
-    return sections.join('\n\n');
   }
 
   private buildBatchSummary(
@@ -1090,6 +1337,8 @@ Rules:
         'This claim could not be assessed. This does not indicate truthfulness or falsehood.',
       ],
       sourcesChecked,
+      promptVersion: CLAIM_VERIFICATION_PROMPT_VERSION,
+      model: this.chatModel,
     };
   }
 

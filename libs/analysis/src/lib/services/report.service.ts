@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DeepInvestigationResult } from './deep-investigation.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
+import { geminiChatModel } from './utils/llm-config';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,7 +38,7 @@ export interface ReportResult {
 export class ReportService {
   private readonly logger = new Logger(ReportService.name);
   private readonly genAI: GoogleGenerativeAI | null = null;
-  private readonly chatModel: string = 'gemini-2.0-flash';
+  private readonly chatModel: string = geminiChatModel();
 
   constructor(private readonly configService: ConfigService) {
     const geminiKey =

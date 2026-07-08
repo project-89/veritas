@@ -992,6 +992,10 @@ export interface PropagandaTechnique {
   description: string;
   confidence: number;
   examples: string[];
+  /** Post tags (e.g. "P3") the grounded examples were found in (prompt v2+). */
+  postRefs?: string[];
+  /** Number of examples verified to occur verbatim in the input (prompt v2+). */
+  groundedExampleCount?: number;
   educationalNote: string;
 }
 
@@ -1022,6 +1026,8 @@ export interface PropagandaAnalysisResult {
   analysisMode?: AnalysisMode;
   analysisModeReason?: string;
   techniques: PropagandaTechnique[];
+  /** Network-level coordination signals, separate from per-text rhetoric (prompt v2+). */
+  coordinationIndicators?: PropagandaTechnique[];
   claims: ExtractedClaim[];
   frames: NarrativeFrame[];
   overallAssessment: {
@@ -1030,6 +1036,10 @@ export interface PropagandaAnalysisResult {
     reasoning: string;
     caveats: string[];
   };
+  /** Prompt/method version that produced this result (v2+). */
+  promptVersion?: number;
+  /** Model configured for the run that produced this result (v2+). */
+  model?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1391,6 +1401,14 @@ export interface VerificationResult {
   sourcesChecked: string[];
   evidenceSources?: EvidenceSource[];
   investigativeLeads?: InvestigativeLead[];
+  /** Grounded cited excerpts / total cited excerpts (0-1). Null when nothing was cited. */
+  groundingScore?: number | null;
+  /** Citations dropped because their excerpts were not found in the retrieved evidence. */
+  droppedUngroundedCitations?: number;
+  /** Version of the verification prompt that produced this result. */
+  promptVersion?: number;
+  /** Model that produced the verdict ('heuristic' for the keyword fallback). */
+  model?: string;
 }
 
 export interface ClaimVerificationBatchResult {

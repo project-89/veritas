@@ -32,6 +32,7 @@ import type {
 import { SIGNAL_CACHE_STORE, type SignalCacheStore } from './downstream-effects.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { ExternalSignal, SignalAdapter } from './signal-adapters/signal-adapter.interface';
+import { geminiReasoningModel } from './utils/llm-config';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -99,7 +100,7 @@ You have access to tools that let you fetch additional data from financial marke
 @Injectable()
 export class CausalReasoningService {
   private readonly logger = new Logger(CausalReasoningService.name);
-  private readonly reasoningModel = 'gemini-3.1-pro-preview';
+  private readonly reasoningModel = geminiReasoningModel();
   private readonly MAX_ITERATIONS = 5;
   private readonly genAI: GoogleGenerativeAI | null = null;
 
@@ -188,6 +189,8 @@ export class CausalReasoningService {
     const model = this.genAI.getGenerativeModel({
       model: this.reasoningModel,
       systemInstruction: SYSTEM_PROMPT,
+      // Deterministic reasoning; JSON mode is incompatible with tool calling
+      generationConfig: { temperature: 0 },
     });
 
     const dispatcher = new ToolDispatcher(

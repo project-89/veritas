@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { cosineSimilarity } from '../utils/math';
 import type { SaturationReport } from './saturation-metrics.service';
 import { SaturationMetricsService } from './saturation-metrics.service';
+import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
 
 /** Injection token for the EmbeddingCacheRepository (optional — provided by app module) */
 export const EMBEDDING_CACHE_STORE = Symbol('EMBEDDING_CACHE_STORE');
@@ -104,7 +105,7 @@ export class NarrativeAnalysisService {
   private readonly embeddingCharLimit: number;
   private readonly embeddingRetryBaseMs: number;
   private readonly embeddingMaxRetries: number;
-  private readonly chatModel: string = 'gemini-2.0-flash';
+  private readonly chatModel: string = geminiChatModel();
 
   constructor(
     private readonly configService: ConfigService,
@@ -818,7 +819,10 @@ export class NarrativeAnalysisService {
       return;
     }
 
-    const model = this.genAI.getGenerativeModel({ model: this.chatModel });
+    const model = this.genAI.getGenerativeModel({
+      model: this.chatModel,
+      generationConfig: DETERMINISTIC_JSON_CONFIG,
+    });
 
     // Build prompt with sample posts from each narrative
     const sections = narratives.map((n, idx) => {

@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Logger } from '@nestjs/common';
 import type { ExternalSignal, SignalAdapter } from './signal-adapter.interface';
+import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from '../utils/llm-config';
 
 /**
  * MVP signal adapter that uses Gemini to hypothesize downstream effects
@@ -17,7 +18,7 @@ export class LlmHypothesisAdapter implements SignalAdapter {
   readonly name = 'LLM Hypothesis Engine';
 
   private readonly logger = new Logger(LlmHypothesisAdapter.name);
-  private readonly chatModel = 'gemini-2.0-flash';
+  private readonly chatModel = geminiChatModel();
 
   constructor(private readonly genAI: GoogleGenerativeAI | null) {}
 
@@ -31,7 +32,10 @@ export class LlmHypothesisAdapter implements SignalAdapter {
       return this.fallbackSignals(params.keywords);
     }
 
-    const model = this.genAI.getGenerativeModel({ model: this.chatModel });
+    const model = this.genAI.getGenerativeModel({
+      model: this.chatModel,
+      generationConfig: DETERMINISTIC_JSON_CONFIG,
+    });
 
     const prompt = `You are an analyst tracking how online narratives create real-world effects.
 
