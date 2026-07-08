@@ -6,6 +6,7 @@ import { SocialMediaPost } from '../../types/social-media.types';
 import { ConnectorSearchOptions } from '../interfaces/data-connector.interface';
 import { ConnectorFetchCacheRepository } from '../repositories/connector-fetch-cache.repository';
 import { ScanJobRepository } from '../repositories/scan-job.repository';
+import { getEngagementProvenance } from '../utils/engagement-provenance';
 import { IngestionService } from '../services/ingestion.service';
 import { ScanEventsService, ScanStatusEvent } from '../services/scan-events.service';
 import { buildPostDedupKey } from '../utils/post-dedup.util';
@@ -225,6 +226,9 @@ export class ScanProcessor extends WorkerHost {
         }
       }
 
+      // Provenance is per-platform, so compute it once for this connector run.
+      const engagementProvenance = getEngagementProvenance(connector);
+
       // Serialize posts for storage (same format as narrative.controller.ts)
       const serializedPosts = dedupedPosts.map((post: SocialMediaPost, idx: number) => {
         const insight = dedupedInsights[idx];
@@ -246,6 +250,9 @@ export class ScanProcessor extends WorkerHost {
             reach: post.engagementMetrics?.reach ?? 0,
             viralityScore: post.engagementMetrics?.viralityScore ?? 0,
           },
+          // Which of the above numbers are real vs inferred vs placeholder 0s,
+          // so the UI never presents an unavailable metric as a real count.
+          engagementProvenance,
         };
       });
 

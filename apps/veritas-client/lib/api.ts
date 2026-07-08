@@ -22,7 +22,15 @@ export interface RawPost {
     reach: number;
     viralityScore: number;
   };
+  /**
+   * Which engagement numbers are real platform counts vs inferred vs
+   * placeholder zeros. Absent on older cached posts. See the backend
+   * engagement-provenance map.
+   */
+  engagementProvenance?: Partial<Record<'likes' | 'shares' | 'comments' | 'reach' | 'views', MetricProvenance>>;
 }
+
+export type MetricProvenance = 'real' | 'inferred' | 'unavailable';
 
 export interface NarrativeInsight {
   id: string;
