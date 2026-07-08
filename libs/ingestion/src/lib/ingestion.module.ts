@@ -53,6 +53,7 @@ import { OnChainCorrelationService } from './services/onchain-correlation.servic
 import { ProjectDossierService } from './services/project-dossier.service';
 import { RedditFreeConnector } from './services/reddit-free.connector';
 import { RSSConnector } from './services/rss.connector';
+import { ScanEventsService } from './services/scan-events.service';
 import { TelegramFreeConnector } from './services/telegram-free.connector';
 import { TransformOnIngestService } from './services/transform/transform-on-ingest.service';
 import { TruthSocialFreeConnector } from './services/truthsocial-free.connector';
@@ -195,6 +196,7 @@ export class IngestionModule {
       TransformOnIngestService,
       InvestigationRepository,
       ScanJobRepository,
+      ScanEventsService,
       ScanProcessor,
       AlertRepository,
       SignalCacheRepository,
@@ -309,6 +311,7 @@ export class IngestionModule {
       TransformOnIngestService,
       InvestigationRepository,
       ScanJobRepository,
+      ScanEventsService,
       AlertRepository,
       SignalCacheRepository,
       AnalysisJobRepository,

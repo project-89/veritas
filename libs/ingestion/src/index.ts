@@ -71,6 +71,13 @@ export { FacebookJinaConnector } from './lib/services/facebook-jina.connector';
 export * from './lib/services/ingestion.service';
 // API-free connectors
 export { RedditFreeConnector } from './lib/services/reddit-free.connector';
+// Scan progress events (SSE bus)
+export type {
+  AnalysisJobEvent,
+  ScanProgressEvent,
+  ScanStatusEvent,
+} from './lib/services/scan-events.service';
+export { ScanEventsService } from './lib/services/scan-events.service';
 export { TelegramFreeConnector } from './lib/services/telegram-free.connector';
 export * from './lib/services/transform/transform-on-ingest.service';
 export { TwitterFreeConnector } from './lib/services/twitter-free.connector';

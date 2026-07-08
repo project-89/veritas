@@ -4,7 +4,7 @@ Track, analyze, and visualize how narratives emerge, evolve, and impact the real
 
 ## What Veritas Does
 
-- **Discovers narratives** across 7 platforms + 177 RSS feeds by clustering semantically similar content using Gemini embeddings
+- **Discovers narratives** across 12 connectors (10 social/news platforms, Wikipedia current events, and 177 RSS feeds) by clustering semantically similar content using Gemini embeddings
 - **Investigates actors** with per-user timeline analysis, cross-platform identity discovery (400+ networks via Sherlock), coordination detection, and cui bono analysis
 - **Profiles identities** with the MAGI system — persistent psychological profiles analyzing communication style, beliefs, emotional triggers, influence patterns, and risk indicators
 - **Detects manipulation** through 17 propaganda techniques, evidence-based claim verification (on-chain + financial + social), bot detection, and platform credibility scoring
@@ -15,7 +15,7 @@ Track, analyze, and visualize how narratives emerge, evolve, and impact the real
 ## Architecture
 
 ```
-7 Social Connectors → BullMQ Scan Queue → MongoDB
+12 Data Connectors → BullMQ Scan Queue → MongoDB
   → Gemini Embedding Clustering → 19 Analysis Services
   → 8 Signal Adapters + 5 Evidence Adapters
   → Memgraph Social Graph → NERV Dashboard (11 viz modes)
@@ -25,16 +25,21 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full technical architec
 
 ## Data Sources
 
-### Social Platforms (7 connectors)
+### Data Connectors (12)
 | Platform | Method | Auth Required |
 |----------|--------|---------------|
 | Twitter/X | @haruhunab1320/twitter-scraper | Cookies or login |
 | Reddit | Public JSON API | None |
+| Bluesky | Public AppView API | None |
+| 4chan | Public JSON API | None |
 | YouTube | yt-dlp CLI | None |
 | RSS/News | 177 curated feeds across 15 categories | None |
 | Farcaster | Neynar API v2 | Free API key |
-| Telegram | Public channel web scrape | None |
+| Telegram | Channel monitoring (t.me web preview scrape) | None |
 | Truth Social | truthbrush CLI | Account required |
+| Facebook | Page monitoring via Jina Reader (`FACEBOOK_PAGE_URLS`) — no search | None |
+| Wikipedia | Current Events portal API | None |
+| Web Scraper | Direct article scraping | None |
 
 ### Real-World Signal Adapters (8)
 CoinGecko (crypto), GDELT (news), Yahoo Finance (markets), World Bank (development), FRED (US economy), ACLED (conflicts), USGS (earthquakes), LLM Hypothesis (AI)
@@ -129,6 +134,10 @@ npx nx test api                    # 187 tests
 npx nx test analysis               # 58+ tests
 npx tsc --noEmit                   # Zero type errors
 ```
+
+## Development Status
+
+The current hardening roadmap lives in [docs/REMEDIATION-PLAN.md](docs/REMEDIATION-PLAN.md) — it tracks known gaps, security items, and cleanup work in progress.
 
 ## License
 

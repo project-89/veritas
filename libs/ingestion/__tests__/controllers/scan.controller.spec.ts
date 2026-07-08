@@ -1,13 +1,17 @@
 import { getQueueToken } from '@nestjs/bullmq';
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { firstValueFrom } from 'rxjs';
 import { ScanController } from '../../src/lib/controllers/scan.controller';
 import { InvestigationRepository } from '../../src/lib/repositories/investigation.repository';
 import { ScanJobRepository } from '../../src/lib/repositories/scan-job.repository';
 import { IngestionService } from '../../src/lib/services/ingestion.service';
+import { ScanEventsService } from '../../src/lib/services/scan-events.service';
 
 describe('ScanController', () => {
   let controller: ScanController;
   let scanJobRepo: ScanJobRepository;
+  let scanEvents: ScanEventsService;
   let investigationRepo: {
     findOrCreateByQuery: jest.Mock;
     findById: jest.Mock;
@@ -128,11 +132,13 @@ describe('ScanController', () => {
           provide: getQueueToken('scan'),
           useValue: scanQueue,
         },
+        ScanEventsService,
       ],
     }).compile();
 
     controller = module.get<ScanController>(ScanController);
     scanJobRepo = module.get<ScanJobRepository>(ScanJobRepository);
+    scanEvents = module.get<ScanEventsService>(ScanEventsService);
   });
 
   it('should be defined', () => {
@@ -193,6 +199,54 @@ describe('ScanController', () => {
     it('should throw 404 for unknown scan', async () => {
       (scanJobRepo.getJob as jest.Mock).mockResolvedValue(null);
       await expect(controller.getScanStatus('unknown')).rejects.toThrow();
+    });
+  });
+
+  describe('GET /scan/:id/stream (SSE)', () => {
+    it('should throw 404 for an unknown scan', async () => {
+      (scanJobRepo.getJob as jest.Mock).mockResolvedValue(null);
+      await expect(controller.streamScanProgress('unknown')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should stream progress events for the scan as MessageEvents', async () => {
+      const stream$ = await controller.streamScanProgress('scan-123');
+
+      const firstMessage = firstValueFrom(stream$);
+      scanEvents.emit({
+        kind: 'scan-status',
+        scanId: 'scan-123',
+        connector: 'reddit',
+        status: 'done',
+        postCount: 50,
+        timestamp: new Date().toISOString(),
+      });
+
+      const message = await firstMessage;
+      expect(message.type).toBe('scan-status');
+      expect(message.data).toMatchObject({
+        kind: 'scan-status',
+        scanId: 'scan-123',
+        connector: 'reddit',
+        status: 'done',
+        postCount: 50,
+      });
+    });
+
+    it('should not deliver events from other scans', async () => {
+      const stream$ = await controller.streamScanProgress('scan-123');
+
+      const received: unknown[] = [];
+      const subscription = stream$.subscribe((message) => received.push(message));
+      scanEvents.emit({
+        kind: 'scan-status',
+        scanId: 'other-scan',
+        connector: 'reddit',
+        status: 'done',
+        timestamp: new Date().toISOString(),
+      });
+      subscription.unsubscribe();
+
+      expect(received).toHaveLength(0);
     });
   });
 

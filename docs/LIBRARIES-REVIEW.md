@@ -1,5 +1,7 @@
 # Veritas Libraries Review
 
+> Last reviewed: 2026-07-07
+
 This document tracks our understanding of each library in the Veritas project, including its purpose, dependencies, current state, and potential improvements.
 
 ## Analysis Plan
@@ -60,15 +62,14 @@ Only after completing this analysis phase will we proceed with code changes, pri
 
 | Library | Purpose | Dependencies | Status |
 |---------|---------|--------------|--------|
-| ingestion | Data ingestion from various sources | content-classification, database, shared/types | Active development |
-| content-classification | Content analysis and classification | shared/types | Active development |
-| database | Database access and models | shared/types | Active development |
+| ingestion | Data ingestion from various sources (12 connectors) | content-classification, database, shared/types | Active |
+| content-classification | Content analysis and classification | shared/types | Active |
+| database | Database access and models | shared/types | Active |
 | analysis | Data analysis and metrics | content-classification, database | Active |
-| data-access | Data access patterns and repositories | database | Active |
-| visualization | Data visualization components | - | Active |
 | shared | Shared utilities and types | - | Active |
-| monitoring | System monitoring and logging | - | Active |
-| sources | Source management | database | Active |
+| visualization | Data visualization components | shared/types | Unused by the client — pending keep/remove decision |
+
+> Note: `sources` was deleted, and `monitoring`/`data-access` do not exist in the current tree. Earlier revisions of this document listed them as active in error.
 
 ## Detailed Library Reviews
 
@@ -172,26 +173,6 @@ Only after completing this analysis phase will we proceed with code changes, pri
 **Improvement Opportunities**:
 - To be determined
 
-### data-access
-
-**Purpose**: Provides data access patterns and repositories.
-
-**Key Components**:
-- To be determined
-
-**Dependencies**:
-- `@veritas/database`
-- `@veritas/shared/types`
-
-**Current State**:
-- Active development
-
-**Potential Issues**:
-- To be determined
-
-**Improvement Opportunities**:
-- To be determined
-
 ### visualization
 
 **Purpose**: Provides visualization components for displaying data.
@@ -203,7 +184,7 @@ Only after completing this analysis phase will we proceed with code changes, pri
 - `@veritas/shared/types`
 
 **Current State**:
-- Active development
+- Currently unused by the client (pending keep/remove decision)
 
 **Potential Issues**:
 - To be determined
@@ -232,45 +213,6 @@ Only after completing this analysis phase will we proceed with code changes, pri
 **Improvement Opportunities**:
 - To be determined
 
-### monitoring
-
-**Purpose**: Provides system monitoring and logging functionality.
-
-**Key Components**:
-- To be determined
-
-**Dependencies**:
-- `@veritas/shared/types`
-
-**Current State**:
-- Active development
-
-**Potential Issues**:
-- To be determined
-
-**Improvement Opportunities**:
-- To be determined
-
-### sources
-
-**Purpose**: Manages external data sources and their configurations.
-
-**Key Components**:
-- To be determined
-
-**Dependencies**:
-- `@veritas/database`
-- `@veritas/shared/types`
-
-**Current State**:
-- Active development
-
-**Potential Issues**:
-- To be determined
-
-**Improvement Opportunities**:
-- To be determined
-
 ## Analysis Timeline & Priority
 
 1. **First Phase** (High Priority)
@@ -281,12 +223,9 @@ Only after completing this analysis phase will we proceed with code changes, pri
 2. **Second Phase** (Medium Priority)
    - `ingestion` - Data collection capabilities
    - `analysis` - Insight generation
-   - `monitoring` - Operational visibility
    
 3. **Third Phase** (Lower Priority)
-   - `visualization` - UI components
-   - `data-access` - Additional data patterns
-   - `sources` - Source management
+   - `visualization` - UI components (pending keep/remove decision)
 
 ## General Observations
 

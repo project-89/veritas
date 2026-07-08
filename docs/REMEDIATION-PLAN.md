@@ -119,7 +119,7 @@ Audit verdict: uneven. Clustering and bot detection are real; several "detection
 
 ## Workstream 5 — Client (dashboard)
 
-- [ ] **Kill polling storms**: `results/page.tsx` runs scan-status (2s) + analysis-jobs (2s) + profile (3s, no timeout) loops concurrently. Replace with SSE (an `use-event-stream.ts` exists — wire it up) or at minimum: single coordinated poller, backoff, hard timeout.
+- [x] **Kill polling storms** — scan-progress SSE end-to-end: `ScanEventsService` bus, processors emit on every connector/job transition, `GET /scan/:id/stream` (heartbeat, 404 on unknown), client `useScanProgress` hook; both 2s pollers replaced with event-driven refetch + 15s fallback poll only while the stream errors. Monitor alert poll 30s→2min. Profile poll capped earlier. *(done 2026-07-07)*
 - [ ] **Adopt SWR/React Query** for all fetches (dedup, cache, stale-while-revalidate); add AbortController + timeout to `lib/api.ts` `request()`.
 - [x] **Bound profile polling**: stale-closure interval polled forever if generation stalled — now capped at 5 min *(done 2026-07-06)*
 - [x] **Fix refresh race**: `handleRefresh` could start a scan while one runs — now guarded *(done 2026-07-06)*
@@ -141,11 +141,11 @@ Audit verdict: uneven. Clustering and bot detection are real; several "detection
 - [ ] k8s/terraform — templates reference Kafka (doesn't exist in code) and placeholder image registries. Update or mark as reference-only.
 
 **Pattern unification:**
-- [ ] Error handling: 132 plain `throw new Error` vs 19 `HttpException` — services throw domain errors, controllers map to HTTP; add a global exception filter.
-- [ ] Config: migrate remaining direct `process.env` reads (`main.ts`, `app.module.ts`) to ConfigService.
-- [ ] Logging: replace `console.*` with NestJS Logger; add request-correlated structured logging.
+- [x] Error handling: controllers now use HttpException subclasses (analysis controller ×4 converted); services throw domain errors mapped by the existing GlobalExceptionFilter *(done 2026-07-07)*
+- [x] Config: BullMQ → `forRootAsync` w/ ConfigService; DatabaseModule direct env access documented as intentional (sync register at decorator time) *(done 2026-07-07)*
+- [x] Logging: `console.*` → NestJS Logger in apps/api *(done 2026-07-07)*. Still todo: request-correlated structured logging.
 - [x] Plugin codegen: `plugins:sync` now runs before `build` and `dev` *(done 2026-07-06)*; still todo: CI check that generated files are clean.
-- [ ] Update `docs/LIBRARIES-REVIEW.md` (lists dead/nonexistent libs as "Active") and README (claims Kafka streaming; describes 11 viz modes the client doesn't render).
+- [x] `docs/LIBRARIES-REVIEW.md` updated to real libs; README connector table corrected (12 connectors, monitoring-only labels), Kafka claims gone, REMEDIATION-PLAN linked; k8s manifest cleaned (KAFKA_BROKERS removed, CORS_ORIGIN/VERITAS_API_KEY documented); `.env.example` reconciled against actually-used vars *(done 2026-07-07)*
 
 **Test gaps:**
 - [x] Fix 2 stale `createOrGet` tests (searchMode default) — *done 2026-07-06*

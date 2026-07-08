@@ -11,11 +11,15 @@ import { parseCorsOrigins, validateEnv } from './app/config/validate-env';
 import { GlobalExceptionFilter } from './filters/global-exception.filter';
 
 // Catch unhandled errors so we can see what's killing the process
+const processLogger = new Logger('Process');
 process.on('uncaughtException', (err) => {
-  console.error('[FATAL] Uncaught exception:', err);
+  processLogger.error('[FATAL] Uncaught exception', err.stack ?? String(err));
 });
 process.on('unhandledRejection', (reason) => {
-  console.error('[FATAL] Unhandled rejection:', reason);
+  processLogger.error(
+    '[FATAL] Unhandled rejection',
+    reason instanceof Error ? reason.stack : String(reason),
+  );
 });
 
 async function bootstrap() {

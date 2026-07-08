@@ -91,6 +91,7 @@ import {
   type PipelineStage,
   useInvestigation,
 } from '../../lib/investigation-context';
+import { useScanProgress } from '../../lib/use-scan-progress';
 
 const NarrativeGlobeLazy = dynamic(
   () =>
@@ -334,7 +335,6 @@ function InvestigationWorkspace() {
   const [mentalModelSaving, setMentalModelSaving] = useState(false);
   const [scanJob, setScanJob] = useState<ScanJob | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanJob[]>([]);
-  const scanPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const scanPostsFetchedRef = useRef(false);
   const mergeUniqueByKey = useCallback(<T,>(items: T[], keyFn: (item: T) => string): T[] => {
     const seen = new Set<string>();
@@ -711,90 +711,105 @@ function InvestigationWorkspace() {
     [],
   );
 
-  // ---- Analysis queue setup (must be before handlers that start polling) ----
-  const analysisJobPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // ---- Analysis queue setup (must be before handlers that start tracking) ----
   const mergedJobIdsRef = useRef<Set<string>>(new Set());
+  // Scan whose analysis jobs are currently tracked over the SSE stream.
+  // Null means no jobs are in flight (stream closes once the scan is done too).
+  const [analysisTrackingScanId, setAnalysisTrackingScanId] = useState<string | null>(null);
 
-  /** Start polling for analysis job results. Merges completed jobs into state as they finish. */
-  const startAnalysisPolling = useCallback(
-    (scanId: string) => {
-      if (analysisJobPollRef.current) return;
+  /**
+   * Refetch analysis jobs for a scan and merge completed results into state.
+   * Runs once per SSE analysis-job event (event-driven, not time-driven) and
+   * from the slow fallback poll while the stream is down.
+   */
+  const refreshAnalysisJobs = useCallback(
+    async (scanId: string) => {
+      try {
+        const allJobs = await getAnalysisJobsByScan(scanId);
+        dispatch({ type: 'SET_ANALYSIS_JOBS', jobs: allJobs });
 
-      analysisJobPollRef.current = setInterval(async () => {
-        try {
-          const allJobs = await getAnalysisJobsByScan(scanId);
-          dispatch({ type: 'SET_ANALYSIS_JOBS', jobs: allJobs });
+        for (const j of allJobs) {
+          const jId = j._id ?? j.id;
+          if (j.status !== 'completed' || !j.result || mergedJobIdsRef.current.has(jId)) continue;
 
-          for (const j of allJobs) {
-            const jId = j._id ?? j.id;
-            if (j.status !== 'completed' || !j.result || mergedJobIdsRef.current.has(jId)) continue;
-
-            mergedJobIdsRef.current.add(jId);
-            if (j.type === 'investigation') {
-              dispatch({
-                type: 'SET_INVESTIGATION',
-                data: j.result as unknown as InvestigationResult,
-                narrativeId: j.narrativeIds[0] ?? '',
-              });
-            } else if (j.type === 'propaganda') {
-              dispatch({
-                type: 'SET_PROPAGANDA',
-                data: j.result as unknown as PropagandaAnalysisResult,
-              });
-              dispatch({ type: 'SET_PIPELINE', stage: 'propaganda', status: 'done' });
-            } else if (j.type === 'downstream') {
-              const dsResult = j.result as unknown as DownstreamEffectsResult;
-              if (dsResult?.narrativeCorrelations?.length > 0) {
-                dispatch({ type: 'SET_DOWNSTREAM', data: dsResult });
-                dispatch({ type: 'SET_PIPELINE', stage: 'downstream', status: 'done' });
-              }
+          mergedJobIdsRef.current.add(jId);
+          if (j.type === 'investigation') {
+            dispatch({
+              type: 'SET_INVESTIGATION',
+              data: j.result as unknown as InvestigationResult,
+              narrativeId: j.narrativeIds[0] ?? '',
+            });
+          } else if (j.type === 'propaganda') {
+            dispatch({
+              type: 'SET_PROPAGANDA',
+              data: j.result as unknown as PropagandaAnalysisResult,
+            });
+            dispatch({ type: 'SET_PIPELINE', stage: 'propaganda', status: 'done' });
+          } else if (j.type === 'downstream') {
+            const dsResult = j.result as unknown as DownstreamEffectsResult;
+            if (dsResult?.narrativeCorrelations?.length > 0) {
+              dispatch({ type: 'SET_DOWNSTREAM', data: dsResult });
+              dispatch({ type: 'SET_PIPELINE', stage: 'downstream', status: 'done' });
             }
           }
-
-          const active = allJobs.filter((j) => j.status === 'pending' || j.status === 'running');
-          if (active.length === 0 && analysisJobPollRef.current) {
-            clearInterval(analysisJobPollRef.current);
-            analysisJobPollRef.current = null;
-
-            const sid = activeScanIdRef.current;
-            if (sid) {
-              const cacheUpdate: Record<string, unknown> = {};
-              let mergedInvestigation: NonNullable<typeof state.investigation> | null = null;
-              for (const j of allJobs) {
-                if (j.status !== 'completed' || !j.result) continue;
-                if (j.type === 'investigation') {
-                  mergedInvestigation = mergeInvestigationResults(
-                    mergedInvestigation,
-                    j.result as unknown as NonNullable<typeof state.investigation>,
-                  );
-                }
-                if (j.type === 'propaganda') cacheUpdate.propaganda = j.result;
-                if (j.type === 'downstream') cacheUpdate.downstream = j.result;
-              }
-              if (mergedInvestigation) {
-                cacheUpdate.investigation = mergedInvestigation;
-                cacheUpdate.investigationNarrativeId =
-                  allJobs.find(
-                    (j) => j.status === 'completed' && j.type === 'investigation' && j.result,
-                  )?.narrativeIds?.[0] ?? '';
-              }
-              if (Object.keys(cacheUpdate).length > 0) {
-                getAnalysisCache(sid)
-                  .then((existing) => {
-                    saveAnalysisCache(sid, { ...(existing ?? {}), ...cacheUpdate }).catch(
-                      () => undefined,
-                    );
-                  })
-                  .catch(() => undefined);
-              }
-            }
-          }
-        } catch {
-          /* polling error */
         }
-      }, 2000);
+
+        const active = allJobs.filter((j) => j.status === 'pending' || j.status === 'running');
+        if (active.length === 0) {
+          // All jobs terminal — stop tracking (closes the stream when the
+          // scan itself is also done) and persist merged results.
+          setAnalysisTrackingScanId(null);
+
+          const sid = activeScanIdRef.current;
+          if (sid) {
+            const cacheUpdate: Record<string, unknown> = {};
+            let mergedInvestigation: NonNullable<typeof state.investigation> | null = null;
+            for (const j of allJobs) {
+              if (j.status !== 'completed' || !j.result) continue;
+              if (j.type === 'investigation') {
+                mergedInvestigation = mergeInvestigationResults(
+                  mergedInvestigation,
+                  j.result as unknown as NonNullable<typeof state.investigation>,
+                );
+              }
+              if (j.type === 'propaganda') cacheUpdate.propaganda = j.result;
+              if (j.type === 'downstream') cacheUpdate.downstream = j.result;
+            }
+            if (mergedInvestigation) {
+              cacheUpdate.investigation = mergedInvestigation;
+              cacheUpdate.investigationNarrativeId =
+                allJobs.find(
+                  (j) => j.status === 'completed' && j.type === 'investigation' && j.result,
+                )?.narrativeIds?.[0] ?? '';
+            }
+            if (Object.keys(cacheUpdate).length > 0) {
+              getAnalysisCache(sid)
+                .then((existing) => {
+                  saveAnalysisCache(sid, { ...(existing ?? {}), ...cacheUpdate }).catch(
+                    () => undefined,
+                  );
+                })
+                .catch(() => undefined);
+            }
+          }
+        }
+      } catch {
+        /* refresh error — the next event or fallback tick retries */
+      }
     },
     [dispatch, mergeInvestigationResults],
+  );
+
+  /**
+   * Begin tracking analysis jobs for a scan. Opens (or keeps open) the SSE
+   * progress stream and does one immediate refetch to catch fast completions.
+   */
+  const startAnalysisTracking = useCallback(
+    (scanId: string) => {
+      setAnalysisTrackingScanId(scanId);
+      void refreshAnalysisJobs(scanId);
+    },
+    [refreshAnalysisJobs],
   );
 
   // ---- Helper: run analysis stages 2-6 on collected posts ----
@@ -843,7 +858,7 @@ function InvestigationWorkspace() {
                 },
               ];
               await startAnalysisJobs(activeScanIdRef.current, investigationJobs);
-              startAnalysisPolling(activeScanIdRef.current);
+              startAnalysisTracking(activeScanIdRef.current);
             }
           } catch {
             /* non-fatal */
@@ -997,7 +1012,7 @@ function InvestigationWorkspace() {
             },
           }));
           await startAnalysisJobs(activeScanIdRef.current, investigationJobs);
-          startAnalysisPolling(activeScanIdRef.current);
+          startAnalysisTracking(activeScanIdRef.current);
           console.log(`Auto-investigating ${urlUsernames.length} usernames from advanced filters`);
         } catch {
           // Non-fatal
@@ -1014,7 +1029,7 @@ function InvestigationWorkspace() {
 
       dispatch({ type: 'SET_LOADING', loading: false });
     },
-    [dispatch, query, startAnalysisPolling, urlUsernames],
+    [dispatch, query, startAnalysisTracking, urlUsernames],
   );
 
   const handleSelectHistoricalScan = useCallback(
@@ -1029,6 +1044,7 @@ function InvestigationWorkspace() {
 
       activeScanIdRef.current = selectedScanId;
       setScanJob(selectedScan);
+      setAnalysisTrackingScanId(null);
       scanPostsFetchedRef.current = false;
 
       const nextParams = new URLSearchParams();
@@ -1044,7 +1060,68 @@ function InvestigationWorkspace() {
     [dispatch, investigationRecord, invId, router],
   );
 
-  // ---- Scan polling: when a scan is active, poll status every 2s ----
+  // ---- Scan progress: SSE stream replaces the old 2s polling loops ----
+  const activeScanId = scanJob ? (scanJob._id ?? scanJob.id) : null;
+  const scanIsActive = scanJob?.status === 'pending' || scanJob?.status === 'running';
+  // Keep the stream open while the scan runs or analysis jobs are in flight.
+  const streamScanId = scanIsActive ? activeScanId : analysisTrackingScanId;
+
+  const { status: scanStreamStatus } = useScanProgress(streamScanId, {
+    // Event-driven refetch: one status fetch per connector transition,
+    // mirroring what the old 2s poll callback did on every tick.
+    onScanStatus: (event) => {
+      getScanStatus(event.scanId)
+        .then(setScanJob)
+        .catch(() => undefined);
+    },
+    onAnalysisJob: (event) => {
+      void refreshAnalysisJobs(event.scanId);
+    },
+  });
+
+  // On (re)connect, refetch once — transitions may have happened before the
+  // stream opened or while it was down.
+  useEffect(() => {
+    if (scanStreamStatus !== 'open') return;
+    if (scanIsActive && activeScanId) {
+      getScanStatus(activeScanId)
+        .then(setScanJob)
+        .catch(() => undefined);
+    }
+    if (analysisTrackingScanId) {
+      void refreshAnalysisJobs(analysisTrackingScanId);
+    }
+  }, [scanStreamStatus, scanIsActive, activeScanId, analysisTrackingScanId, refreshAnalysisJobs]);
+
+  // Fallback: slow poll (15s) that runs ONLY while the SSE stream is in error
+  // state, so a dead stream can't strand a running scan or in-flight jobs.
+  // It stops as soon as the stream recovers or the work reaches a terminal
+  // state (streamScanId becomes null).
+  useEffect(() => {
+    if (!streamScanId || scanStreamStatus !== 'error') return undefined;
+
+    const timer = setInterval(() => {
+      if (scanIsActive && activeScanId) {
+        getScanStatus(activeScanId)
+          .then(setScanJob)
+          .catch(() => undefined);
+      }
+      if (analysisTrackingScanId) {
+        void refreshAnalysisJobs(analysisTrackingScanId);
+      }
+    }, 15_000);
+
+    return () => clearInterval(timer);
+  }, [
+    streamScanId,
+    scanStreamStatus,
+    scanIsActive,
+    activeScanId,
+    analysisTrackingScanId,
+    refreshAnalysisJobs,
+  ]);
+
+  // ---- Scan completion: fetch final posts and kick off analysis ----
   useEffect(() => {
     if (!scanJob) return undefined;
 
@@ -1052,12 +1129,6 @@ function InvestigationWorkspace() {
     const isActive = scanJob.status === 'pending' || scanJob.status === 'running';
 
     if (!isActive) {
-      // Scan is done — clean up and fetch final posts
-      if (scanPollRef.current) {
-        clearInterval(scanPollRef.current);
-        scanPollRef.current = null;
-      }
-
       if (!scanPostsFetchedRef.current) {
         scanPostsFetchedRef.current = true;
         activeScanIdRef.current = scanId;
@@ -1089,27 +1160,10 @@ function InvestigationWorkspace() {
             dispatch({ type: 'SET_LOADING', loading: false });
           });
       }
-      return undefined;
     }
 
-    // Poll every 2s while scan is active
-    if (!scanPollRef.current) {
-      scanPollRef.current = setInterval(async () => {
-        try {
-          const status = await getScanStatus(scanId);
-          setScanJob(status);
-        } catch {
-          // Polling error — will retry next interval
-        }
-      }, 2000);
-    }
-
-    return () => {
-      if (scanPollRef.current) {
-        clearInterval(scanPollRef.current);
-        scanPollRef.current = null;
-      }
-    };
+    // While active, progress arrives via the SSE stream above.
+    return undefined;
   }, [scanJob, dispatch, runAnalysisStages]);
 
   // ---- Run analysis pipeline: load cached data first, then enrich ----
@@ -1392,7 +1446,7 @@ function InvestigationWorkspace() {
 
       try {
         await startAnalysisJobs(scanId, jobs);
-        startAnalysisPolling(scanId);
+        startAnalysisTracking(scanId);
       } catch (err) {
         dispatch({ type: 'SET_INVESTIGATING', narrativeId: null });
         dispatch({
@@ -1407,11 +1461,11 @@ function InvestigationWorkspace() {
       state.query,
       state.selectedNarrativeIds,
       dispatch,
-      startAnalysisPolling,
+      startAnalysisTracking,
     ],
   );
 
-  // ---- Analysis queue handlers (startAnalysisPolling defined above) ----
+  // ---- Analysis queue handlers (startAnalysisTracking defined above) ----
 
   /**
    * Unified "Analyze" — queues investigation + propaganda + downstream for selected narratives.
@@ -1472,7 +1526,7 @@ function InvestigationWorkspace() {
 
     try {
       await startAnalysisJobs(scanId, jobs);
-      startAnalysisPolling(scanId);
+      startAnalysisTracking(scanId);
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: `Failed to start analysis jobs: ${err}` });
     }
@@ -1482,7 +1536,7 @@ function InvestigationWorkspace() {
     state.query,
     state.posts.length,
     dispatch,
-    startAnalysisPolling,
+    startAnalysisTracking,
   ]);
 
   const handleCancelAnalysisJob = useCallback(
@@ -1500,16 +1554,6 @@ function InvestigationWorkspace() {
     },
     [dispatch],
   );
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (analysisJobPollRef.current) {
-        clearInterval(analysisJobPollRef.current);
-        analysisJobPollRef.current = null;
-      }
-    };
-  }, []);
 
   const handleRunPropaganda = useCallback(async () => {
     if (state.narratives.length === 0 || state.posts.length === 0) return;
@@ -1710,15 +1754,7 @@ function InvestigationWorkspace() {
         setEvidenceSeedSaving(false);
       }
     },
-    [
-      investigationRecord,
-      query,
-      urlPlatforms,
-      urlTimeRange,
-      searchParams,
-      router,
-      dispatch,
-    ],
+    [investigationRecord, query, urlPlatforms, urlTimeRange, searchParams, router, dispatch],
   );
 
   const handleBuildProjectDossier = useCallback(async () => {
@@ -1789,13 +1825,10 @@ function InvestigationWorkspace() {
     if (scanJob && (scanJob.status === 'pending' || scanJob.status === 'running')) {
       return;
     }
-    // Reset all state
+    // Reset all state (also closes the previous scan's SSE stream)
     scanPostsFetchedRef.current = false;
     setScanJob(null);
-    if (scanPollRef.current) {
-      clearInterval(scanPollRef.current);
-      scanPollRef.current = null;
-    }
+    setAnalysisTrackingScanId(null);
     dispatch({ type: 'RESET' });
     dispatch({ type: 'SET_QUERY', query });
     dispatch({ type: 'SET_LOADING', loading: true });

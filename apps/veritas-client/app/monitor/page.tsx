@@ -84,7 +84,8 @@ export default function MonitorPage() {
     });
   }, []);
 
-  // Poll alerts every 30s
+  // Poll alerts every 2 minutes — alert delivery isn't latency-critical,
+  // and this page stays open for long stretches.
   useEffect(() => {
     pollRef.current = setInterval(async () => {
       try {
@@ -94,7 +95,7 @@ export default function MonitorPage() {
       } catch {
         /* silent */
       }
-    }, 30000);
+    }, 120_000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };

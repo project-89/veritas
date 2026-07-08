@@ -1,3 +1,5 @@
+# NOTE: This manifest is a REFERENCE TEMPLATE, not a maintained production
+# deployment. Review images, hosts, resources, and secrets before applying.
 ---
 # Namespace
 apiVersion: v1
@@ -23,7 +25,25 @@ data:
   MEMGRAPH_HOST: "memgraph-service"
   MEMGRAPH_PORT: "7687"
   MEMGRAPH_USERNAME: "memgraph"
-  KAFKA_BROKERS: "kafka-service:9092"
+  # REQUIRED in production: explicit comma-separated allowed origins
+  # (startup fails on wildcard/unset — see apps/api/src/app/config/validate-env.ts)
+  CORS_ORIGIN: "https://veritas.example.com"
+
+---
+# Secrets (create out-of-band, e.g. `kubectl create secret generic veritas-secrets ...`)
+# The API deployment references this via secretRef. Required keys:
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: veritas-secrets
+#   namespace: veritas
+# stringData:
+#   # REQUIRED in production: API-key auth for every request (x-api-key header).
+#   # Startup fails without it — see apps/api/src/app/config/validate-env.ts
+#   VERITAS_API_KEY: "generate-a-long-random-string"
+#   MONGODB_URI: "mongodb://..."
+#   GEMINI_API_KEY: "..."
+#   MEMGRAPH_PASSWORD: "..."
 
 ---
 # API Service Deployment

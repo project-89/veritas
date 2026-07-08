@@ -19,6 +19,7 @@ import { ScanJobRepository } from '../repositories/scan-job.repository';
 import type { AnalysisJobType, PsychologicalProfileMode } from '../schemas/analysis-job.schema';
 import type { PsychologicalProfile } from '../schemas/identity-record.schema';
 import { IngestionService } from '../services/ingestion.service';
+import { ScanEventsService } from '../services/scan-events.service';
 
 // Analysis service tokens — injected via forwardRef from app module
 export const PROPAGANDA_SERVICE = Symbol('PROPAGANDA_SERVICE');
@@ -155,16 +156,51 @@ export class AnalysisProcessor extends WorkerHost {
     private readonly scanJobRepo: ScanJobRepository,
     private readonly identityRepo: IdentityRecordRepository,
     private readonly ingestionService: IngestionService,
-    @Optional() @Inject(PROPAGANDA_SERVICE) private readonly propagandaService?: PropagandaServiceLike,
-    @Optional() @Inject(CLAIM_VERIFICATION_SERVICE) private readonly claimService?: ClaimVerificationServiceLike,
-    @Optional() @Inject(DOWNSTREAM_EFFECTS_SERVICE) private readonly downstreamService?: DownstreamServiceLike,
-    @Optional() @Inject(DEEP_INVESTIGATION_SERVICE) private readonly deepInvestigationService?: DeepInvestigationServiceLike,
+    @Optional()
+    @Inject(PROPAGANDA_SERVICE)
+    private readonly propagandaService?: PropagandaServiceLike,
+    @Optional()
+    @Inject(CLAIM_VERIFICATION_SERVICE)
+    private readonly claimService?: ClaimVerificationServiceLike,
+    @Optional()
+    @Inject(DOWNSTREAM_EFFECTS_SERVICE)
+    private readonly downstreamService?: DownstreamServiceLike,
+    @Optional()
+    @Inject(DEEP_INVESTIGATION_SERVICE)
+    private readonly deepInvestigationService?: DeepInvestigationServiceLike,
     @Optional() @Inject(CROSS_PLATFORM_SERVICE) private readonly crossPlatformService?: unknown,
-    @Optional() @Inject(SOURCE_CREDIBILITY_SERVICE) private readonly credibilityService?: CredibilityServiceLike,
-    @Optional() @Inject(GRAPH_BOT_DETECTION_SERVICE) private readonly botDetectionService?: BotDetectionServiceLike,
-    @Optional() @Inject(PSYCHOLOGICAL_PROFILER_SERVICE) private readonly profilerService?: PsychologicalProfilerServiceLike,
+    @Optional()
+    @Inject(SOURCE_CREDIBILITY_SERVICE)
+    private readonly credibilityService?: CredibilityServiceLike,
+    @Optional()
+    @Inject(GRAPH_BOT_DETECTION_SERVICE)
+    private readonly botDetectionService?: BotDetectionServiceLike,
+    @Optional()
+    @Inject(PSYCHOLOGICAL_PROFILER_SERVICE)
+    private readonly profilerService?: PsychologicalProfilerServiceLike,
+    @Optional() private readonly scanEvents?: ScanEventsService,
   ) {
     super();
+  }
+
+  /** Broadcast a job status transition to SSE listeners of the parent scan. */
+  private emitJobStatus(
+    scanId: string | null,
+    jobId: string,
+    jobType: AnalysisJobType,
+    status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled',
+    error?: string,
+  ): void {
+    if (!scanId) return; // No scan to stream against (e.g. psychological-profile)
+    this.scanEvents?.emit({
+      kind: 'analysis-job',
+      scanId,
+      jobId,
+      jobType,
+      status,
+      error: error ?? null,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   async process(job: Job<AnalysisJobData>): Promise<Record<string, unknown>> {
@@ -178,6 +214,7 @@ export class AnalysisProcessor extends WorkerHost {
       status: 'running',
       startedAt: new Date(),
     });
+    this.emitJobStatus(scanId, analysisJobId, type, 'running');
 
     try {
       let result: Record<string, unknown>;
@@ -213,6 +250,7 @@ export class AnalysisProcessor extends WorkerHost {
         duration,
         result,
       });
+      this.emitJobStatus(scanId, analysisJobId, type, 'completed');
 
       this.logger.log(`Analysis job ${analysisJobId} [${type}] completed in ${duration}ms`);
       return result;
@@ -227,6 +265,7 @@ export class AnalysisProcessor extends WorkerHost {
         duration,
         error: error.message,
       });
+      this.emitJobStatus(scanId, analysisJobId, type, 'failed', error.message);
       this.logger.error(`Analysis job ${analysisJobId} [${type}] failed: ${error.message}`);
 
       // For psychological-profile jobs, also update the identity record status
@@ -597,7 +636,8 @@ export class AnalysisProcessor extends WorkerHost {
       // Cache miss — fetch fresh
     }
 
-    const allConnectors = this.ingestionService.getAllConnectors() as unknown as TimelineConnector[];
+    const allConnectors =
+      this.ingestionService.getAllConnectors() as unknown as TimelineConnector[];
     const allPosts: UserPost[] = [];
     const platforms: string[] = [];
 
@@ -1039,9 +1079,7 @@ export class AnalysisProcessor extends WorkerHost {
     };
   }
 
-  private getCredibilityScore(
-    userResult: UserInvestigationResult,
-  ): SourceCredibilityScore | null {
+  private getCredibilityScore(userResult: UserInvestigationResult): SourceCredibilityScore | null {
     const credibility = (
       userResult as UserInvestigationResult & {
         credibility?: SourceCredibilityScore | null;

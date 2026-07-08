@@ -1,4 +1,4 @@
-import { Body, Controller, Logger, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Logger, Post } from '@nestjs/common';
 import type { ClaimVerificationBatchResult } from '../services/claim-verification.service';
 import { ClaimVerificationService } from '../services/claim-verification.service';
 import type {
@@ -345,7 +345,9 @@ export class NarrativeAnalysisController {
     switch (body.type) {
       case 'narrative': {
         if (!body.narrativeA || !body.narrativeB) {
-          throw new Error('narrativeA and narrativeB are required for narrative comparison');
+          throw new BadRequestException(
+            'narrativeA and narrativeB are required for narrative comparison',
+          );
         }
         return this.comparisonService.compareNarratives(
           body.narrativeA,
@@ -356,7 +358,7 @@ export class NarrativeAnalysisController {
       }
       case 'period': {
         if (!body.periodA || !body.periodB) {
-          throw new Error('periodA and periodB are required for period comparison');
+          throw new BadRequestException('periodA and periodB are required for period comparison');
         }
         return this.comparisonService.compareTimePeriods(body.periodA, body.periodB);
       }
@@ -364,7 +366,7 @@ export class NarrativeAnalysisController {
         return this.comparisonService.comparePlatforms(body.narratives ?? [], body.posts ?? []);
       }
       default:
-        throw new Error(`Unknown comparison type: ${body.type}`);
+        throw new BadRequestException(`Unknown comparison type: ${body.type}`);
     }
   }
 
@@ -515,7 +517,7 @@ export class NarrativeAnalysisController {
         return { type: 'legitimacy', report };
       }
       default:
-        throw new Error(`Unknown intelligence assessment type: ${type}`);
+        throw new BadRequestException(`Unknown intelligence assessment type: ${type}`);
     }
   }
 }

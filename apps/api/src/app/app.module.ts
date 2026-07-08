@@ -66,14 +66,22 @@ import { SchedulerService } from './services/scheduler.service';
     ]),
 
     // BullMQ — Redis-backed job queue (used by scan workers)
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      },
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>('REDIS_HOST') || 'localhost',
+          port: parseInt(config.get<string>('REDIS_PORT') || '6379', 10),
+        },
+      }),
     }),
 
     // Database Modules
+    // NOTE: DatabaseModule only exposes a synchronous register() (no async/
+    // factory variant), so its options are evaluated at decorator time —
+    // before Nest DI exists. Direct process.env access is intentional here;
+    // dotenv is loaded in main.ts before AppModule is imported.
     DatabaseModule.register({
       providerType: 'mongodb',
       providerOptions: {

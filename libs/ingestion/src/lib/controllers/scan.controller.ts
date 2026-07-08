@@ -6,13 +6,17 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  MessageEvent,
+  NotFoundException,
   Param,
   Post,
   Put,
   Query,
+  Sse,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Queue } from 'bullmq';
+import { interval, map, merge, Observable } from 'rxjs';
 import { StartScanDto } from '../dto/start-scan.dto';
 import type { ScanJobData } from '../queue/scan.processor';
 import { InvestigationRepository } from '../repositories/investigation.repository';
@@ -20,6 +24,7 @@ import { ScanJobRepository } from '../repositories/scan-job.repository';
 import type { Investigation } from '../schemas/investigation.schema';
 import type { ScanJob } from '../schemas/scan-job.schema';
 import { IngestionService } from '../services/ingestion.service';
+import { ScanEventsService, ScanProgressEvent } from '../services/scan-events.service';
 import { jitteredBackoff } from '../utils/queue-backoff.util';
 
 type SerializedScanPost = Record<string, unknown> & {
@@ -36,6 +41,7 @@ export class ScanController {
     private readonly scanJobRepository: ScanJobRepository,
     private readonly investigationRepository: InvestigationRepository,
     private readonly ingestionService: IngestionService,
+    private readonly scanEvents: ScanEventsService,
   ) {}
 
   private buildSummaryFromPosts(posts: SerializedScanPost[]): {
@@ -228,6 +234,47 @@ export class ScanController {
   }
 
   /**
+   * GET /scan/:id/stream — SSE progress channel for a scan.
+   *
+   * Streams per-connector scan-status transitions and analysis-job status
+   * transitions as they happen, replacing client-side polling. A 25s
+   * heartbeat keeps intermediaries from closing the idle connection.
+   *
+   * The stream stays open until the client disconnects — the client decides
+   * when it has seen a terminal state (all connectors done + jobs finished)
+   * and closes the EventSource. Keeping it open is harmless: it only costs
+   * one idle subscription and the heartbeat timer.
+   */
+  @Sse(':id/stream')
+  async streamScanProgress(@Param('id') id: string): Promise<Observable<MessageEvent>> {
+    const job = await this.scanJobRepository.getJob(id);
+    if (!job) {
+      throw new NotFoundException(`Scan job not found: ${id}`);
+    }
+
+    const events$ = this.scanEvents.streamFor(id).pipe(
+      map(
+        (event: ScanProgressEvent): MessageEvent => ({
+          data: event,
+          type: event.kind,
+        }),
+      ),
+    );
+
+    // 25-second heartbeat to keep the connection alive
+    const heartbeat$ = interval(25_000).pipe(
+      map(
+        (): MessageEvent => ({
+          data: { type: 'heartbeat', timestamp: new Date().toISOString() },
+          type: 'heartbeat',
+        }),
+      ),
+    );
+
+    return merge(events$, heartbeat$);
+  }
+
+  /**
    * GET /scan/:id/posts — Get all posts collected so far.
    */
   @Get(':id/posts')
@@ -256,9 +303,7 @@ export class ScanController {
     }
     await this.scanJobRepository.updateAnalysisCache(id, body);
 
-    const serializedPosts = (await this.scanJobRepository.getJobPosts(
-      id,
-    )) as SerializedScanPost[];
+    const serializedPosts = (await this.scanJobRepository.getJobPosts(id)) as SerializedScanPost[];
     const narratives = Array.isArray(body['narratives']) ? (body['narratives'] as unknown[]) : null;
 
     if (

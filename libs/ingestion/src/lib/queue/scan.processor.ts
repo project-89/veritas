@@ -7,6 +7,7 @@ import { ConnectorSearchOptions } from '../interfaces/data-connector.interface';
 import { ConnectorFetchCacheRepository } from '../repositories/connector-fetch-cache.repository';
 import { ScanJobRepository } from '../repositories/scan-job.repository';
 import { IngestionService } from '../services/ingestion.service';
+import { ScanEventsService, ScanStatusEvent } from '../services/scan-events.service';
 import { buildPostDedupKey } from '../utils/post-dedup.util';
 
 export interface ScanJobData {
@@ -49,8 +50,24 @@ export class ScanProcessor extends WorkerHost {
     private readonly ingestionService: IngestionService,
     private readonly scanJobRepository: ScanJobRepository,
     @Optional() private readonly fetchCache?: ConnectorFetchCacheRepository,
+    @Optional() private readonly scanEvents?: ScanEventsService,
   ) {
     super();
+  }
+
+  /** Broadcast a connector status transition to any SSE listeners (best-effort). */
+  private emitStatus(
+    scanId: string,
+    connector: string,
+    patch: Omit<ScanStatusEvent, 'kind' | 'scanId' | 'connector' | 'timestamp'>,
+  ): void {
+    this.scanEvents?.emit({
+      kind: 'scan-status',
+      scanId,
+      connector,
+      timestamp: new Date().toISOString(),
+      ...patch,
+    });
   }
 
   async process(job: Job<ScanJobData>): Promise<{ postCount: number }> {
@@ -64,6 +81,7 @@ export class ScanProcessor extends WorkerHost {
       status: 'running',
       startedAt: new Date().toISOString(),
     });
+    this.emitStatus(scanId, connector, { status: 'running' });
 
     try {
       // Cross-scan dedup: identical fetch within the TTL window is served
@@ -80,6 +98,12 @@ export class ScanProcessor extends WorkerHost {
           postCount: cached.length,
           insightCount: cached.length,
           completedAt: new Date().toISOString(),
+          duration: Date.now() - startTime,
+        });
+        this.emitStatus(scanId, connector, {
+          status: 'done',
+          postCount: cached.length,
+          insightCount: cached.length,
           duration: Date.now() - startTime,
         });
         return { postCount: cached.length };
@@ -146,6 +170,12 @@ export class ScanProcessor extends WorkerHost {
             postCount: 0,
             insightCount: 0,
             completedAt: new Date().toISOString(),
+            duration: Date.now() - startTime,
+          });
+          this.emitStatus(scanId, connector, {
+            status: 'done',
+            postCount: 0,
+            insightCount: 0,
             duration: Date.now() - startTime,
           });
           return { postCount: 0 };
@@ -235,6 +265,12 @@ export class ScanProcessor extends WorkerHost {
         completedAt: new Date().toISOString(),
         duration,
       });
+      this.emitStatus(scanId, connector, {
+        status: 'done',
+        postCount: serializedPosts.length,
+        insightCount: dedupedInsights.length,
+        duration,
+      });
 
       this.logger.log(
         `[scan:${scanId}] ${connector}: completed with ${serializedPosts.length} posts in ${(duration / 1000).toFixed(1)}s`,
@@ -251,6 +287,11 @@ export class ScanProcessor extends WorkerHost {
         status: 'failed',
         error: err.message,
         completedAt: new Date().toISOString(),
+        duration,
+      });
+      this.emitStatus(scanId, connector, {
+        status: 'failed',
+        error: err.message,
         duration,
       });
 

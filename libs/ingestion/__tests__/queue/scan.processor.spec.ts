@@ -273,4 +273,97 @@ describe('ScanProcessor', () => {
     expect(addedPosts).toHaveLength(1);
     expect(addedPosts[0]).toHaveProperty('id', 'p1');
   });
+
+  describe('progress events', () => {
+    let scanEvents: { emit: jest.Mock };
+
+    beforeEach(() => {
+      scanEvents = { emit: jest.fn() };
+      processor = new ScanProcessor(
+        ingestionService,
+        scanJobRepo,
+        undefined,
+        scanEvents as unknown as ConstructorParameters<typeof ScanProcessor>[3],
+      );
+    });
+
+    it('emits running and done events on a successful run', async () => {
+      const job = {
+        data: { scanId: 'scan-1', connector: 'reddit', query: 'test', options: {} },
+      } as any;
+
+      await processor.process(job);
+
+      expect(scanEvents.emit).toHaveBeenCalledTimes(2);
+      expect(scanEvents.emit).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          kind: 'scan-status',
+          scanId: 'scan-1',
+          connector: 'reddit',
+          status: 'running',
+        }),
+      );
+      expect(scanEvents.emit).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          kind: 'scan-status',
+          scanId: 'scan-1',
+          connector: 'reddit',
+          status: 'done',
+          postCount: 1,
+        }),
+      );
+    });
+
+    it('emits a failed event when the connector throws', async () => {
+      mockConnector.searchWithRawData.mockRejectedValue(new Error('Network error'));
+
+      const job = {
+        data: { scanId: 'scan-1', connector: 'reddit', query: 'test', options: {} },
+      } as any;
+
+      await expect(processor.process(job)).rejects.toThrow('Network error');
+
+      expect(scanEvents.emit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: 'scan-status',
+          scanId: 'scan-1',
+          connector: 'reddit',
+          status: 'failed',
+          error: 'Network error',
+        }),
+      );
+    });
+
+    it('emits a done event on a cache hit', async () => {
+      const cachedPosts = [{ id: 'cached-1', text: 'cached post', platform: 'reddit' }];
+      const fetchCache = {
+        getFresh: jest.fn().mockResolvedValue(cachedPosts),
+        save: jest.fn().mockResolvedValue(undefined),
+      };
+      processor = new ScanProcessor(
+        ingestionService,
+        scanJobRepo,
+        fetchCache as unknown as ConstructorParameters<typeof ScanProcessor>[2],
+        scanEvents as unknown as ConstructorParameters<typeof ScanProcessor>[3],
+      );
+
+      const job = {
+        data: { scanId: 'scan-1', connector: 'reddit', query: 'test', options: {} },
+      } as any;
+
+      await processor.process(job);
+
+      expect(scanEvents.emit).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          kind: 'scan-status',
+          scanId: 'scan-1',
+          connector: 'reddit',
+          status: 'done',
+          postCount: 1,
+        }),
+      );
+    });
+  });
 });
