@@ -89,9 +89,9 @@ Audit verdict: uneven. Clustering and bot detection are real; several "detection
 - [x] **Quarantine LLM-Hypothesis adapter** — now opt-in only via `ENABLE_LLM_HYPOTHESIS_SIGNALS=true` *(done 2026-07-06)*
 - [x] **Propaganda detection v2** *(done 2026-07-07, prompt v2)*: SemEval-2020 Task 11 taxonomy (14 techniques) + separate coordination-indicators channel; deterministic stratified sampling (top-engagement/recent/seeded-random, 12 posts, 500-char excerpts); verbatim-quote span evidence with programmatic grounding (fabricated quotes dropped, evidence-less techniques removed, post refs corrected); confidence rubric with 0.4 floor; promptVersion+model stamping. Still todo: calibration against a labeled corpus (eval harness below).
 - [x] **Claim verification v2** *(done 2026-07-07, prompt v2)*: lexical-overlap evidence ranking (top-12 snippets); citation grounding — every cited excerpt must appear (verbatim or ≥0.7 token overlap) in the evidence actually sent, ungrounded citations dropped; verdicts without grounded citations downgraded to `unverified` w/ confidence capped 0.3; prompt forbids background-knowledge verdicts; groundingScore + promptVersion/model stamping. Still todo: true semantic retrieval (embeddings) + fact-check-API sources.
-- [ ] **Fix entity extraction quality** — CORRECTED FINDING 2026-07-07: entities ARE populated (audit said stub), but by toy regexes in `content-classification.service.ts:1025` — any two capitalized words = "person" @0.7 confidence, orgs need an Inc/Corp suffix, locations from an 8-item hardcoded list. Entity analysis downstream inherits this garbage. Fix = real NER (e.g. wink-nlp, offline + fast) in the transform path.
+- [x] **Entity extraction quality** — replaced the toy regex with offline NER (`compromise`: `.people()`/`.organizations()`/`.places()`, hashtags/mentions kept); no more "any two capitalized words = person" false positives; honest 0.85 confidence; also fixed a latent bug feeding lowercased text to the extractor *(done 2026-07-08)*. (wink-nlp evaluated first but its `entities()` only tags numeric/temporal spans, no PERSON/ORG.)
 - [x] **Determinism & versioning** — temperature 0 + native JSON mode on all 8 JSON-parsing Gemini call sites; models env-configurable (`GEMINI_CHAT_MODEL`, `GEMINI_REASONING_MODEL`) via `services/utils/llm-config.ts` *(done 2026-07-07)*. Prompt-version stamping ships with propaganda/claims v2.
-- [ ] **LLM cost control**: per-investigation token budget, LLM-output cache keyed (input-hash, model, prompt-version), semaphore on concurrent Gemini calls. A single 100-post investigation can currently trigger 100+ calls.
+- [x] **LLM cost control** — `LlmGateway` singleton wrapping all 8 Gemini call sites: concurrency semaphore (`LLM_MAX_CONCURRENCY`, default 4), sha256 response cache (`LLM_CACHE_TTL_MINUTES`, default 60, capped 500 entries), per-context token budget (`LLM_MAX_TOKENS_PER_CONTEXT`, default 2M) keyed by claim-batch/investigation/downstream/causal; budget exhaustion throws into each service's existing heuristic/fallback path (no 500s) *(done 2026-07-08)*
 - [ ] **Ground-truth evaluation harness**: small labeled sets per capability (bot/no-bot, propaganda/normal, fact-checked claims) + a script reporting precision/recall so quality claims are measurable. Validate bot detection against a public bot dataset.
 
 ---
@@ -101,11 +101,11 @@ Audit verdict: uneven. Clustering and bot detection are real; several "detection
 - [x] **ScanJob posts array** — posts now live in the `scan_posts` collection (one doc per post, indexed by scanId+seq); appends are bulk inserts, no more full-array rewrites or 16MB ceiling. Legacy embedded arrays still readable as fallback *(done 2026-07-06)*
 - [x] **N+1s** — `listAtlasLenses` now 2 batch queries via `findByIds`/`findByInvestigationIds`; alert repo uses `updateMany`/`count`/`createMany` *(done 2026-07-06)*
 - [x] **Cache upserts** — embedding/rss caches now update-then-insert; signal cache uses `deleteMany` *(done 2026-07-06)*
-- [ ] **Indexes**: text index for handle search (regex scan today at `identity-record.repository.ts:90`), compound `{status, investigationId, createdAt}` on scan jobs. (`lastInvestigatedAt` index already existed — audit overcall.)
+- [x] **Indexes** — handle search now uses an index-backed anchored prefix (handles are stored lowercased) with substring fallback; compound `{status, investigationId, createdAt}` added to scan jobs *(done 2026-07-08)*
 - [x] **In-memory vector search** — hard-capped at 10k docs with loud partial-results warning *(done 2026-07-06)*
-- [ ] **Redis repository** uses blocking `KEYS` + client-side filtering (`redis-repository.ts:41-111`) — restrict Redis to real KV caching or use `SCAN`.
+- [x] **Redis repository** — `find()` now collects keys with a non-blocking `SCAN` cursor (COUNT 250) instead of blocking `KEYS` *(done 2026-07-08)*. (Client-side filtering remains — acceptable for the cache-scale usage; documented.)
 - [x] **Connection hygiene** — explicit pool sizes + timeouts in `mongodb-provider.ts` *(done 2026-07-06)*
-- [ ] **Analysis cache size guard** (`scan-job.repository.ts:247-285`): enforce hard limit after trimming; surface write failures.
+- [x] **Analysis cache size guard** — re-measures after trimming, drops heaviest sections if still over, and refuses the write (loud error) rather than attempting a doomed 16MB+ update that silently failed before *(done 2026-07-08)*
 
 ## Workstream 4 — Security & production readiness
 
@@ -120,7 +120,7 @@ Audit verdict: uneven. Clustering and bot detection are real; several "detection
 ## Workstream 5 — Client (dashboard)
 
 - [x] **Kill polling storms** — scan-progress SSE end-to-end: `ScanEventsService` bus, processors emit on every connector/job transition, `GET /scan/:id/stream` (heartbeat, 404 on unknown), client `useScanProgress` hook; both 2s pollers replaced with event-driven refetch + 15s fallback poll only while the stream errors. Monitor alert poll 30s→2min. Profile poll capped earlier. *(done 2026-07-07)*
-- [ ] **Adopt SWR/React Query** for all fetches (dedup, cache, stale-while-revalidate); add AbortController + timeout to `lib/api.ts` `request()`.
+- [x] AbortController + 60s timeout added to `lib/api.ts` `request()` (multi-signal aware; times out as 408) *(done 2026-07-08)*. Still todo: full SWR/React Query adoption for dedup/cache across call sites.
 - [x] **Bound profile polling**: stale-closure interval polled forever if generation stalled — now capped at 5 min *(done 2026-07-06)*
 - [x] **Fix refresh race**: `handleRefresh` could start a scan while one runs — now guarded *(done 2026-07-06)*
 - [ ] **Client typecheck in CI**: 33 pre-existing strict TS errors in client components (nerv/*) — `tsc --noEmit` isn't enforced anywhere.

@@ -2,8 +2,16 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { afinn165 } from 'afinn-165';
+import nlp from 'compromise';
 import * as francMin from 'franc-min';
 import { NlpServiceResponse } from '../types/content.types';
+
+/**
+ * Maximum number of characters fed to the NER pipeline. Named-entity
+ * extraction cost scales with document length, so we bound it to keep
+ * per-call latency predictable on very long content.
+ */
+const MAX_NER_CHARS = 10_000;
 
 /**
  * Result of content classification including all analysis aspects
@@ -351,7 +359,9 @@ export class ContentClassificationService {
       subjectivity: this.calculateSubjectivity(normalizedText),
       language: this.detectLanguage(normalizedText),
       topics: this.extractTopics(normalizedText),
-      entities: this.extractEntities(normalizedText),
+      // Entity extraction needs the original casing (proper nouns), so it
+      // receives the un-normalized text rather than the lowercased copy.
+      entities: this.extractEntities(text),
     };
   }
 
@@ -1020,71 +1030,72 @@ ${numberedTexts}`;
   }
 
   /**
-   * Extract named entities from text
+   * Extract named entities from text using an offline NER pipeline.
+   *
+   * Uses `compromise`, a pure-JS NLP library (no native deps, no network),
+   * to tag people, organizations and places, and maps those onto the
+   * existing entity vocabulary (`person` | `organization` | `location`).
+   * Social tokens (`#hashtag`, `@mention`) are still extracted with a regex
+   * because they are structural, not linguistic, entities.
+   *
+   * Confidence reflects the detector: model-tagged named entities get 0.85,
+   * social tokens (unambiguous by syntax) get 0.9. Entities are deduped by
+   * normalized (lowercased) text + type, keeping the highest confidence.
    */
   private extractEntities(text: string): ContentClassification['entities'] {
-    const entities: ContentClassification['entities'] = [];
-
-    // Extract simple entity patterns (simplified implementation)
-    // People: capitalized names
-    const namePattern = /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)+)\b/g;
-    const nameMatches = text.match(namePattern) || [];
-
-    for (const name of nameMatches) {
-      entities.push({
-        text: name,
-        type: 'person',
-        confidence: 0.7,
-      });
+    if (!text || !text.trim()) {
+      return [];
     }
 
-    // Organizations: capitalized multi-word phrases ending in Inc, Corp, etc.
-    const orgPattern =
-      /\b([A-Z][a-z]*(?:\s[A-Z][a-z]*)+(?:\s(?:Inc|Corp|LLC|Company|Organization|Association)))\b/g;
-    const orgMatches = text.match(orgPattern) || [];
+    // Bound NER cost on very long content.
+    const bounded = text.length > MAX_NER_CHARS ? text.slice(0, MAX_NER_CHARS) : text;
 
-    for (const org of orgMatches) {
-      entities.push({
-        text: org,
-        type: 'organization',
-        confidence: 0.8,
-      });
-    }
+    // Dedupe by `${type}:${normalizedText}`, keeping the highest confidence.
+    const byKey = new Map<string, ContentClassification['entities'][number]>();
 
-    // Locations: known place names
-    const locationKeywords = [
-      'New York',
-      'London',
-      'Paris',
-      'Tokyo',
-      'California',
-      'Texas',
-      'Europe',
-      'Asia',
-    ];
-    for (const location of locationKeywords) {
-      if (text.includes(location)) {
-        entities.push({
-          text: location,
-          type: 'location',
-          confidence: 0.8,
-        });
+    const add = (raw: string, type: string, confidence: number): void => {
+      // Trim surrounding whitespace and trailing punctuation that the NER
+      // sometimes attaches to entity spans (e.g. "London.").
+      const cleaned = raw.trim().replace(/^[\s"'.,;:]+|[\s"'.,;:]+$/g, '');
+      if (!cleaned) return;
+
+      const key = `${type}:${cleaned.toLowerCase()}`;
+      const existing = byKey.get(key);
+      if (!existing || confidence > existing.confidence) {
+        byKey.set(key, { text: cleaned, type, confidence });
       }
+    };
+
+    try {
+      const doc = nlp(bounded);
+
+      for (const person of doc.people().out('array') as string[]) {
+        add(person, 'person', 0.85);
+      }
+      for (const org of doc.organizations().out('array') as string[]) {
+        add(org, 'organization', 0.85);
+      }
+      for (const place of doc.places().out('array') as string[]) {
+        add(place, 'location', 0.85);
+      }
+    } catch (error) {
+      // A model hiccup should degrade to "no named entities", not throw and
+      // abort the whole classification.
+      this.logger.warn(
+        `NER entity extraction failed, returning social tokens only: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
 
-    // Hashtags and mentions for social media
+    // Hashtags and mentions for social media (structural, casing-independent).
     const socialPattern = /(?:#|@)([a-zA-Z0-9_]+)/g;
-    const socialMatches = text.match(socialPattern) || [];
-
+    const socialMatches = bounded.match(socialPattern) || [];
     for (const social of socialMatches) {
-      entities.push({
-        text: social,
-        type: social.startsWith('#') ? 'hashtag' : 'mention',
-        confidence: 0.9,
-      });
+      add(social, social.startsWith('#') ? 'hashtag' : 'mention', 0.9);
     }
 
-    return entities;
+    return Array.from(byKey.values());
   }
 
   /**

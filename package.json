@@ -121,6 +121,7 @@
     "bullmq": "^5.75.2",
     "cheerio": "^1.2.0",
     "class-transformer": "^0.5.1",
+    "compromise": "^14.15.1",
     "d3": "^7.9.0",
     "franc-min": "^6.2.0",
     "mongoose": "^8.19.1",

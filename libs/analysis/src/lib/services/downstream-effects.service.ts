@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -16,6 +17,7 @@ import { UsgsAdapter } from './signal-adapters/usgs.adapter';
 import { WorldBankAdapter } from './signal-adapters/worldbank.adapter';
 import { YahooFinanceAdapter } from './signal-adapters/yahoo-finance.adapter';
 import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
+import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 /** Injection token for the causal reasoning service (avoids circular dependency). */
 export const CAUSAL_REASONING_SERVICE = Symbol('CAUSAL_REASONING_SERVICE');
@@ -278,10 +280,13 @@ export class DownstreamEffectsService {
       }
     }
 
-    // 5. FALLBACK: Simple correlation + LLM chain generation
+    // 5. FALLBACK: Simple correlation + LLM chain generation.
+    // One budget scope for every LLM call in this run so a wide narrative set
+    // can't fan out into unbounded chain/summary generation.
+    const contextKey = this.contextKeyFor(narratives);
     const correlations = this.correlateSignals(narratives, externalSignals);
-    await this.generateTransmissionChains(correlations, posts);
-    const summary = await this.generateSummary(correlations, externalSignals);
+    await this.generateTransmissionChains(correlations, posts, contextKey);
+    const summary = await this.generateSummary(correlations, externalSignals, contextKey);
 
     return {
       narrativeCorrelations: correlations,
@@ -652,18 +657,28 @@ export class DownstreamEffectsService {
   async generateTransmissionChains(
     correlations: NarrativeCorrelation[],
     posts: RawPost[],
+    contextKey?: string,
   ): Promise<void> {
     for (const correlation of correlations) {
       if (correlation.correlatedSignals.length === 0) continue;
 
-      const chains = await this.buildChainForCorrelation(correlation, posts);
+      const chains = await this.buildChainForCorrelation(correlation, posts, contextKey);
       correlation.transmissionChains = chains;
     }
+  }
+
+  /** Stable per-run budget key derived from the narrative set. */
+  private contextKeyFor(narratives: AnalyzedNarrative[]): string {
+    return `downstream:${createHash('sha256')
+      .update(narratives.map((n) => n.id).join(','))
+      .digest('hex')
+      .slice(0, 16)}`;
   }
 
   private async buildChainForCorrelation(
     correlation: NarrativeCorrelation,
     posts: RawPost[],
+    contextKey?: string,
   ): Promise<TransmissionChain[]> {
     const topSignals = correlation.correlatedSignals.slice(0, 5);
     if (topSignals.length === 0) return [];
@@ -725,8 +740,13 @@ Respond ONLY with a JSON array of objects:
 No other text.`;
 
     try {
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
+      const text = await LlmGateway.instance.run({
+        model: this.chatModel,
+        promptVersion: 1,
+        prompt,
+        contextKey,
+        generate: () => model.generateContent(prompt).then((r) => r.response.text()),
+      });
       const jsonMatch = text.match(/\[[\s\S]*\]/);
 
       if (!jsonMatch) {
@@ -759,7 +779,11 @@ No other text.`;
         overallConfidence: Math.max(0, Math.min(1, item.overallConfidence ?? 0.5)),
       }));
     } catch (err) {
-      this.logger.warn(`Transmission chain LLM call failed: ${err}`);
+      if (err instanceof LlmBudgetExceededError) {
+        this.logger.warn(`Transmission chain generation skipped — ${err.message}`);
+      } else {
+        this.logger.warn(`Transmission chain LLM call failed: ${err}`);
+      }
       return this.fallbackTransmissionChains(correlation, topSignals);
     }
   }
@@ -811,6 +835,7 @@ No other text.`;
   private async generateSummary(
     correlations: NarrativeCorrelation[],
     signals: ExternalSignal[],
+    contextKey?: string,
   ): Promise<string> {
     const totalChains = correlations.reduce((sum, c) => sum + c.transmissionChains.length, 0);
 
@@ -842,9 +867,18 @@ No other text.`;
 ${chainSummaries}`;
 
     try {
-      const result = await model.generateContent(prompt);
-      return result.response.text().trim();
-    } catch {
+      const text = await LlmGateway.instance.run({
+        model: this.chatModel,
+        promptVersion: 1,
+        prompt,
+        contextKey,
+        generate: () => model.generateContent(prompt).then((r) => r.response.text()),
+      });
+      return text.trim();
+    } catch (err) {
+      if (err instanceof LlmBudgetExceededError) {
+        this.logger.warn(`Downstream summary generation skipped — ${err.message}`);
+      }
       return `Identified ${totalChains} potential transmission chain(s) across ${correlations.length} narrative(s). Further analysis with real-world data sources recommended.`;
     }
   }

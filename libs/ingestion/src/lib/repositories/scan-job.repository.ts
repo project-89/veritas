@@ -273,12 +273,14 @@ export class ScanJobRepository implements OnModuleInit {
         return;
       }
 
-      // Estimate size — MongoDB has a 16MB BSON document limit.
-      // Strip large fields if needed.
-      const json = JSON.stringify(cache);
-      if (json.length > 14_000_000) {
+      // MongoDB has a hard 16MB BSON document limit. Trim large fields, then
+      // RE-MEASURE — the old code trimmed once and wrote blindly, so a cache
+      // still over the limit after trimming produced a silent write failure
+      // that looked like success.
+      const HARD_LIMIT = 14_000_000;
+      if (JSON.stringify(cache).length > HARD_LIMIT) {
         this.logger.warn(
-          `Analysis cache too large (${(json.length / 1_000_000).toFixed(1)}MB) — trimming`,
+          `Analysis cache too large (${(JSON.stringify(cache).length / 1_000_000).toFixed(1)}MB) — trimming`,
         );
         const inv = cache['investigation'] as Record<string, unknown> | undefined;
         if (inv && Array.isArray(inv['users'])) {
@@ -288,12 +290,30 @@ export class ScanJobRepository implements OnModuleInit {
           }
         }
         const ds = cache['downstream'] as Record<string, unknown> | undefined;
-        if (
-          ds &&
-          Array.isArray(ds['externalSignals']) &&
-          ds['externalSignals'].length > 50
-        ) {
+        if (ds && Array.isArray(ds['externalSignals']) && ds['externalSignals'].length > 50) {
           ds['externalSignals'] = ds['externalSignals'].slice(0, 50);
+        }
+
+        // Second pass: if still over the limit, drop the heaviest remaining
+        // section entirely rather than attempt a doomed 16MB+ write.
+        if (JSON.stringify(cache).length > HARD_LIMIT) {
+          for (const heavyKey of ['downstream', 'investigation', 'propaganda']) {
+            if (JSON.stringify(cache).length <= HARD_LIMIT) break;
+            if (cache[heavyKey] !== undefined) {
+              this.logger.warn(
+                `Analysis cache still over limit after trimming — dropping "${heavyKey}" section`,
+              );
+              delete cache[heavyKey];
+            }
+          }
+        }
+
+        // If it STILL won't fit, refuse the write instead of failing silently.
+        if (JSON.stringify(cache).length > HARD_LIMIT) {
+          this.logger.error(
+            `Analysis cache for scan ${scanId} exceeds ${HARD_LIMIT} bytes even after trimming — skipping cache write`,
+          );
+          return;
         }
       }
 

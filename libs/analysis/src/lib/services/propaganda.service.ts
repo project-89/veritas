@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { RawPost } from './deviation.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
 import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
+import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 // ---------------------------------------------------------------------------
 // Versioning
@@ -302,10 +303,21 @@ export class PropagandaAnalysisService {
     const prompt = this.buildPrompt(sampledByNarrative);
 
     try {
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
+      const responseText = await LlmGateway.instance.run({
+        model: this.chatModel,
+        promptVersion: PROPAGANDA_PROMPT_VERSION,
+        prompt,
+        generate: () => model.generateContent(prompt).then((r) => r.response.text()),
+      });
       return this.parseResponse(responseText, sampledPosts);
     } catch (err) {
+      if (err instanceof LlmBudgetExceededError) {
+        this.logger.warn(`Propaganda analysis skipped — ${err.message}`);
+        return this.emptyResult(
+          'unavailable',
+          'LLM token budget for this run was exhausted — propaganda analysis did not run.',
+        );
+      }
       this.logger.error(`Propaganda analysis LLM call failed: ${err}`);
       return this.emptyResult('unavailable', 'LLM call failed — propaganda analysis did not run.');
     }

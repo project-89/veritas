@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { BotScore } from './graph-bot-detection.service';
 import type { SourceCredibilityScore } from './source-credibility.service';
 import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
+import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -397,8 +398,13 @@ Respond ONLY with a JSON object:
 }`;
 
     try {
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
+      const text = await LlmGateway.instance.run({
+        model: this.chatModel,
+        promptVersion: 1,
+        prompt,
+        contextKey: `investigation:${topic}`,
+        generate: () => model.generateContent(prompt).then((r) => r.response.text()),
+      });
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]) as Partial<UserProfile>;
@@ -411,7 +417,11 @@ Respond ONLY with a JSON object:
         };
       }
     } catch (err) {
-      this.logger.warn(`User profile LLM failed for @${handle}: ${err}`);
+      if (err instanceof LlmBudgetExceededError) {
+        this.logger.warn(`User profile skipped for @${handle} — ${err.message}`);
+      } else {
+        this.logger.warn(`User profile LLM failed for @${handle}: ${err}`);
+      }
     }
 
     return fallback;
@@ -594,8 +604,13 @@ Respond ONLY with JSON:
 }`;
 
     try {
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
+      const text = await LlmGateway.instance.run({
+        model: this.chatModel,
+        promptVersion: 1,
+        prompt,
+        contextKey: `investigation:${topic}`,
+        generate: () => model.generateContent(prompt).then((r) => r.response.text()),
+      });
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]) as DeepInvestigationResult['cuiBono'];
@@ -606,7 +621,11 @@ Respond ONLY with JSON:
         };
       }
     } catch (err) {
-      this.logger.warn(`Cui bono analysis failed: ${err}`);
+      if (err instanceof LlmBudgetExceededError) {
+        this.logger.warn(`Cui bono analysis skipped — ${err.message}`);
+      } else {
+        this.logger.warn(`Cui bono analysis failed: ${err}`);
+      }
     }
 
     return fallback;

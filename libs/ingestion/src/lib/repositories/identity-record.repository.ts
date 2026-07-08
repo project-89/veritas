@@ -89,11 +89,23 @@ export class IdentityRecordRepository implements OnModuleInit {
 
   async search(query: string, limit = 20): Promise<IdentityRecord[]> {
     this.ensureInitialized();
-    const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-    return this.repo.find({ primaryHandle: { $regex: regex } } as Record<string, unknown>, {
-      limit,
-      sort: { lastInvestigatedAt: -1 },
-    });
+    // primaryHandle is stored lowercased, so a case-sensitive anchored prefix
+    // regex on the lowercased query is index-backed (uses the leading field of
+    // the { primaryHandle, primaryPlatform } compound index) — no collection
+    // scan. Fall back to an unanchored substring match only when the prefix
+    // search finds nothing (e.g. "musk" should still match "elonmusk").
+    const escaped = query.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const prefixMatches = await this.repo.find(
+      { primaryHandle: { $regex: `^${escaped}` } } as Record<string, unknown>,
+      { limit, sort: { lastInvestigatedAt: -1 } },
+    );
+    if (prefixMatches.length > 0) {
+      return prefixMatches;
+    }
+    return this.repo.find(
+      { primaryHandle: { $regex: escaped } } as Record<string, unknown>,
+      { limit, sort: { lastInvestigatedAt: -1 } },
+    );
   }
 
   async getRecentlyInvestigated(limit = 20): Promise<IdentityRecord[]> {

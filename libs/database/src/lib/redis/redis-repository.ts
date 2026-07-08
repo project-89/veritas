@@ -34,14 +34,31 @@ export class RedisRepository<T extends { id: string }> implements Repository<T> 
   }
 
   /**
+   * Collect keys matching a pattern using a non-blocking SCAN cursor instead
+   * of the blocking KEYS command.
+   */
+  private async scanKeys(pattern: string): Promise<string[]> {
+    const keys: string[] = [];
+    let cursor = 0;
+    do {
+      const reply = await this.client.scan(cursor, { MATCH: pattern, COUNT: 250 });
+      cursor = Number(reply.cursor);
+      keys.push(...reply.keys);
+    } while (cursor !== 0);
+    return keys;
+  }
+
+  /**
    * Find all entities matching the given filter
    * Note: Redis doesn't have native filtering capabilities, so this
    * performs a scan + client-side filtering
    */
   async find(filter: FilterQuery<T> = {}, options?: FindOptions): Promise<T[]> {
     try {
-      // Get all keys with our prefix
-      const keys = await this.client.keys(`${this.prefix}*`);
+      // Collect keys with a non-blocking cursor scan. KEYS blocks the entire
+      // Redis server for the duration of the scan and is unsafe in production;
+      // SCAN yields in bounded batches.
+      const keys = await this.scanKeys(`${this.prefix}*`);
 
       if (keys.length === 0) {
         return [];

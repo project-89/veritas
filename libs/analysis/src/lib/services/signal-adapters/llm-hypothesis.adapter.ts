@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Logger } from '@nestjs/common';
 import type { ExternalSignal, SignalAdapter } from './signal-adapter.interface';
 import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from '../utils/llm-config';
+import { LlmBudgetExceededError, LlmGateway } from '../utils/llm-gateway';
 
 /**
  * MVP signal adapter that uses Gemini to hypothesize downstream effects
@@ -58,8 +59,12 @@ Respond ONLY with a JSON array of objects with these fields:
 No other text outside the JSON array.`;
 
     try {
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
+      const text = await LlmGateway.instance.run({
+        model: this.chatModel,
+        promptVersion: 1,
+        prompt,
+        generate: () => model.generateContent(prompt).then((r) => r.response.text()),
+      });
       const jsonMatch = text.match(/\[[\s\S]*\]/);
 
       if (!jsonMatch) {
@@ -88,7 +93,11 @@ No other text outside the JSON array.`;
         metadata: { ...item.metadata, hypothesized: true },
       }));
     } catch (err) {
-      this.logger.warn(`LLM hypothesis generation failed: ${err}`);
+      if (err instanceof LlmBudgetExceededError) {
+        this.logger.warn(`LLM hypothesis generation skipped — ${err.message}`);
+      } else {
+        this.logger.warn(`LLM hypothesis generation failed: ${err}`);
+      }
       return this.fallbackSignals(params.keywords);
     }
   }

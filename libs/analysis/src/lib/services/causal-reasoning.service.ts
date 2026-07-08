@@ -33,6 +33,7 @@ import { SIGNAL_CACHE_STORE, type SignalCacheStore } from './downstream-effects.
 import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { ExternalSignal, SignalAdapter } from './signal-adapters/signal-adapter.interface';
 import { geminiReasoningModel } from './utils/llm-config';
+import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -103,6 +104,8 @@ export class CausalReasoningService {
   private readonly reasoningModel = geminiReasoningModel();
   private readonly MAX_ITERATIONS = 5;
   private readonly genAI: GoogleGenerativeAI | null = null;
+  /** Monotonic per-turn counter so gateway cache keys never collide across the stateful chat. */
+  private turnCounter = 0;
 
   constructor(
     private readonly configService: ConfigService,
@@ -160,7 +163,11 @@ export class CausalReasoningService {
         iterationsUsed,
       };
     } catch (err) {
-      this.logger.error(`Causal reasoning agent failed: ${err}`);
+      if (err instanceof LlmBudgetExceededError) {
+        this.logger.warn(`Causal reasoning agent stopped — ${err.message}`);
+      } else {
+        this.logger.error(`Causal reasoning agent failed: ${err}`);
+      }
       return null;
     }
   }
@@ -219,8 +226,12 @@ export class CausalReasoningService {
     let summary = '';
     let iterationsUsed = 0;
 
+    // Every turn of the tool-calling loop shares one budget scope so the whole
+    // multi-turn reasoning chain is bounded as a single unit.
+    const contextKey = `causal:${params.narratives.map((n) => n.id).join(',')}`;
+
     // Send initial message and start the loop
-    let response = await chat.sendMessage(initialMessage);
+    let response = await this.sendThroughGateway(chat, initialMessage, contextKey);
     iterationsUsed++;
 
     for (let i = 0; i < this.MAX_ITERATIONS; i++) {
@@ -309,7 +320,7 @@ export class CausalReasoningService {
       }
 
       // Send function responses back to continue conversation
-      response = await chat.sendMessage(functionResponses);
+      response = await this.sendThroughGateway(chat, functionResponses, contextKey);
       iterationsUsed++;
     }
 
@@ -325,6 +336,49 @@ export class CausalReasoningService {
     );
 
     return { chains, rejections, summary, iterationsUsed, dispatcher };
+  }
+
+  /**
+   * Route one tool-calling turn through the gateway so the whole reasoning loop
+   * shares one concurrency slot + budget scope, without disturbing the stateful
+   * chat structure. Each turn gets a unique promptVersion (the chat is
+   * stateful, so identical message text on different turns is NOT the same
+   * call) to keep the response cache from producing false hits. The full
+   * GenerateContentResult is captured out-of-band; the gateway only sees the
+   * response text for token accounting.
+   */
+  private async sendThroughGateway(
+    chat: ReturnType<ReturnType<GoogleGenerativeAI['getGenerativeModel']>['startChat']>,
+    message: string | Array<string | Part>,
+    contextKey: string,
+  ): Promise<Awaited<ReturnType<typeof chat.sendMessage>>> {
+    this.turnCounter++;
+    const promptForAccounting =
+      typeof message === 'string' ? message : JSON.stringify(message);
+    let captured: Awaited<ReturnType<typeof chat.sendMessage>> | undefined;
+
+    await LlmGateway.instance.run({
+      model: this.reasoningModel,
+      promptVersion: `causal-turn-${this.turnCounter}`,
+      prompt: promptForAccounting,
+      contextKey,
+      generate: async () => {
+        captured = await chat.sendMessage(message);
+        let text = '';
+        try {
+          text = captured.response.text();
+        } catch {
+          // Tool-call turns often have no text part — accounting falls back to
+          // the prompt-side estimate only.
+        }
+        return text;
+      },
+    });
+
+    if (!captured) {
+      throw new Error('Gateway did not execute the causal reasoning turn');
+    }
+    return captured;
   }
 
   // -------------------------------------------------------------------------

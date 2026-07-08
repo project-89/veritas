@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -17,6 +18,7 @@ import {
 import { PlatformCredibilityService } from './platform-credibility.service';
 import type { AnalysisMode, ExtractedClaim } from './propaganda.service';
 import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
+import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -269,6 +271,13 @@ export class ClaimVerificationService {
   async verifyBatch(claims: ExtractedClaim[]): Promise<ClaimVerificationBatchResult> {
     const verifiable = claims.filter((c) => c.verifiability === 'verifiable');
 
+    // One budget scope per batch: every claim in a verification run shares a
+    // context so a large batch can't fan out into unbounded LLM spend.
+    const contextKey = `claim-batch:${createHash('sha256')
+      .update(verifiable.map((c) => c.claim).join(' '))
+      .digest('hex')
+      .slice(0, 16)}`;
+
     if (verifiable.length === 0) {
       return {
         analysisMode: 'skipped',
@@ -290,7 +299,9 @@ export class ClaimVerificationService {
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
       const batch = verifiable.slice(i, i + batchSize);
-      const batchResults = await Promise.all(batch.map((claim) => this.verifySingleClaim(claim)));
+      const batchResults = await Promise.all(
+        batch.map((claim) => this.verifySingleClaim(claim, contextKey)),
+      );
       results.push(...batchResults);
     }
 
@@ -329,7 +340,10 @@ export class ClaimVerificationService {
   // Single claim verification
   // ---------------------------------------------------------------------------
 
-  async verifySingleClaim(claim: ExtractedClaim): Promise<VerificationResult> {
+  async verifySingleClaim(
+    claim: ExtractedClaim,
+    contextKey?: string,
+  ): Promise<VerificationResult> {
     const sourcesChecked: string[] = [];
 
     // Search for evidence from multiple free sources
@@ -413,6 +427,7 @@ export class ClaimVerificationService {
         allEvidence,
         sourcesChecked,
         adapterEvidenceSources,
+        contextKey,
       );
     } else {
       result = this.heuristicVerification(claim, allEvidence, sourcesChecked);
@@ -526,6 +541,7 @@ export class ClaimVerificationService {
     >,
     sourcesChecked: string[],
     adapterEvidence: EvidenceSource[] = [],
+    contextKey?: string,
   ): Promise<VerificationResult> {
     if (!this.genAI) {
       throw new Error('Gemini client is not initialized');
@@ -604,8 +620,13 @@ Rules:
 - Weight on-chain and governmental evidence higher than social media claims`;
 
     try {
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
+      const responseText = await LlmGateway.instance.run({
+        model: this.chatModel,
+        promptVersion: CLAIM_VERIFICATION_PROMPT_VERSION,
+        prompt,
+        contextKey,
+        generate: () => model.generateContent(prompt).then((r) => r.response.text()),
+      });
       return this.parseLlmResponse(
         claim.claim,
         responseText,
@@ -613,7 +634,11 @@ Rules:
         kept.map((s) => s.text),
       );
     } catch (err) {
-      this.logger.error(`LLM verification failed: ${err}`);
+      if (err instanceof LlmBudgetExceededError) {
+        this.logger.warn(`Claim verification degraded to heuristic — ${err.message}`);
+      } else {
+        this.logger.error(`LLM verification failed: ${err}`);
+      }
       // Fall back to heuristic
       return this.heuristicVerification(claim, evidence, sourcesChecked);
     }

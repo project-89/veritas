@@ -161,4 +161,58 @@ describe('ContentClassificationService', () => {
       expect(classification.subjectivity).toBeDefined();
     });
   });
+
+  describe('extractEntities', () => {
+    const extract = (text: string): Array<{ text: string; type: string; confidence: number }> =>
+      service['extractEntities'](text);
+
+    it('detects a real person name as a person entity', () => {
+      const entities = extract('Barack Obama gave a speech yesterday.');
+      const person = entities.find((e) => e.type === 'person');
+      expect(person).toBeDefined();
+      expect(person?.text.toLowerCase()).toContain('obama');
+      expect(person?.confidence).toBeGreaterThan(0.7);
+    });
+
+    it('detects an organization', () => {
+      const entities = extract('Apple Inc reported record earnings this quarter.');
+      const org = entities.find((e) => e.type === 'organization');
+      expect(org).toBeDefined();
+      expect(org?.text.toLowerCase()).toContain('apple');
+    });
+
+    it('detects a location', () => {
+      const entities = extract('The summit was held in London this week.');
+      const location = entities.find((e) => e.type === 'location');
+      expect(location).toBeDefined();
+      expect(location?.text.toLowerCase()).toContain('london');
+    });
+
+    it('does NOT misclassify a non-person capitalized phrase as a person', () => {
+      // The old regex tagged any two capitalized words as a person @0.7.
+      const entities = extract('Breaking News reported that a New Report shows growth.');
+      const people = entities.filter((e) => e.type === 'person');
+      expect(people.map((e) => e.text)).not.toContain('Breaking News');
+      expect(people.map((e) => e.text)).not.toContain('New Report');
+    });
+
+    it('extracts hashtags and mentions from social content', () => {
+      const entities = extract('Loving the #election coverage from @newsdesk today.');
+      const hashtag = entities.find((e) => e.type === 'hashtag');
+      const mention = entities.find((e) => e.type === 'mention');
+      expect(hashtag?.text).toBe('#election');
+      expect(mention?.text).toBe('@newsdesk');
+    });
+
+    it('returns an empty array for empty or whitespace text', () => {
+      expect(extract('')).toEqual([]);
+      expect(extract('   \n  ')).toEqual([]);
+    });
+
+    it('dedupes repeated entities keeping a single entry per type/text', () => {
+      const entities = extract('Barack Obama spoke. Barack Obama waved. Barack Obama left.');
+      const obamas = entities.filter((e) => e.text.toLowerCase() === 'barack obama');
+      expect(obamas.length).toBe(1);
+    });
+  });
 });

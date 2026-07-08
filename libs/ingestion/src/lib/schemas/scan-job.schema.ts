@@ -116,6 +116,8 @@ export const ScanJobModel = SchemaFactory.createForClass(ScanJobSchema);
 // Indices for common queries
 ScanJobModel.index({ status: 1, createdAt: -1 });
 ScanJobModel.index({ investigationId: 1, createdAt: -1 });
+// Covers getCompletedJobsForQueries and status+investigation filters
+ScanJobModel.index({ status: 1, investigationId: 1, createdAt: -1 });
 
 // ---------------------------------------------------------------------------
 // TypeScript interfaces

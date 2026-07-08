@@ -5,6 +5,7 @@ import { cosineSimilarity } from '../utils/math';
 import type { SaturationReport } from './saturation-metrics.service';
 import { SaturationMetricsService } from './saturation-metrics.service';
 import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
+import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 /** Injection token for the EmbeddingCacheRepository (optional — provided by app module) */
 export const EMBEDDING_CACHE_STORE = Symbol('EMBEDDING_CACHE_STORE');
@@ -850,8 +851,12 @@ Respond ONLY with a JSON array of strings, one per narrative, in order. No other
 ${sections.join('\n\n')}`;
 
     try {
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
+      const responseText = await LlmGateway.instance.run({
+        model: this.chatModel,
+        promptVersion: 1,
+        prompt,
+        generate: () => model.generateContent(prompt).then((r) => r.response.text()),
+      });
       const jsonMatch = responseText.match(/\[[\s\S]*\]/);
 
       if (jsonMatch) {
@@ -869,7 +874,11 @@ ${sections.join('\n\n')}`;
         }
       }
     } catch (err) {
-      this.logger.warn(`LLM summarization failed: ${err}`);
+      if (err instanceof LlmBudgetExceededError) {
+        this.logger.warn(`LLM summarization skipped — ${err.message}`);
+      } else {
+        this.logger.warn(`LLM summarization failed: ${err}`);
+      }
     }
 
     // Fill any missing summaries with fallback

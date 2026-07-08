@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { DeepInvestigationResult } from './deep-investigation.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
 import { geminiChatModel } from './utils/llm-config';
+import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -158,13 +159,24 @@ Do NOT use markdown formatting. Just write clean prose paragraphs separated by n
 
     try {
       const model = this.genAI.getGenerativeModel({ model: this.chatModel });
-      const result = await model.generateContent(prompt);
-      const text = result.response.text().trim();
+      const text = (
+        await LlmGateway.instance.run({
+          model: this.chatModel,
+          promptVersion: 1,
+          prompt,
+          contextKey: `report:${query}`,
+          generate: () => model.generateContent(prompt).then((r) => r.response.text()),
+        })
+      ).trim();
       if (text.length > 50) {
         return text;
       }
     } catch (err) {
-      this.logger.warn(`Executive summary LLM failed: ${err}`);
+      if (err instanceof LlmBudgetExceededError) {
+        this.logger.warn(`Executive summary skipped — ${err.message}`);
+      } else {
+        this.logger.warn(`Executive summary LLM failed: ${err}`);
+      }
     }
 
     return fallback;

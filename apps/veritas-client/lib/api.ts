@@ -265,22 +265,61 @@ class ApiError extends Error {
 // self-hosted deployments, it is not a substitute for real user auth.
 const API_KEY = process.env['NEXT_PUBLIC_VERITAS_API_KEY'];
 
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(API_KEY ? { 'x-api-key': API_KEY } : {}),
-      ...options?.headers,
-    },
-  });
+// Default per-request timeout. A hung backend/connector must not leave the UI
+// waiting forever; callers can override via options.signal or the timeoutMs arg.
+const DEFAULT_TIMEOUT_MS = 60_000;
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => undefined);
-    throw new ApiError(`API request failed: ${res.status} ${res.statusText}`, res.status, body);
+async function request<T>(
+  url: string,
+  options?: RequestInit & { timeoutMs?: number },
+): Promise<T> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, signal: callerSignal, ...init } = options ?? {};
+
+  // Abort on timeout, but still honor a caller-supplied signal if present.
+  const timeoutController = new AbortController();
+  const timer = setTimeout(() => timeoutController.abort(), timeoutMs);
+  const signal = callerSignal
+    ? anySignal([callerSignal, timeoutController.signal])
+    : timeoutController.signal;
+
+  try {
+    const res = await fetch(url, {
+      ...init,
+      signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(API_KEY ? { 'x-api-key': API_KEY } : {}),
+        ...options?.headers,
+      },
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => undefined);
+      throw new ApiError(`API request failed: ${res.status} ${res.statusText}`, res.status, body);
+    }
+
+    return res.json() as Promise<T>;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError' && timeoutController.signal.aborted) {
+      throw new ApiError(`API request timed out after ${timeoutMs}ms`, 408);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
+}
 
-  return res.json() as Promise<T>;
+/** Combine multiple AbortSignals — aborts as soon as any of them aborts. */
+function anySignal(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController();
+  for (const s of signals) {
+    if (s.aborted) {
+      controller.abort();
+      break;
+    }
+    s.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+  return controller.signal;
 }
 
 function normalizeIdValue(value: unknown): string | undefined {
