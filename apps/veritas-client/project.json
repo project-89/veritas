@@ -14,17 +14,11 @@
       }
     },
     "serve": {
-      "executor": "@nx/next:server",
-      "defaultConfiguration": "development",
+      "//": "Uses `next dev --webpack` because Next 16 defaults to Turbopack, which refuses the private-plugins symlink (points outside the repo root) and the ESM plugin packages. The @nx/next:server `turbo:false` option does not force webpack under Next 16.",
+      "executor": "nx:run-commands",
       "options": {
-        "buildTarget": "veritas-client:build",
-        "dev": true,
-        "port": 4200,
-        "turbo": false
-      },
-      "configurations": {
-        "development": { "buildTarget": "veritas-client:build:development", "dev": true },
-        "production": { "buildTarget": "veritas-client:build:production", "dev": false }
+        "command": "npx next dev --webpack --port 4200",
+        "cwd": "apps/veritas-client"
       }
     },
     "test": {
