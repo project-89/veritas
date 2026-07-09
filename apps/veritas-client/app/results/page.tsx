@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   NervBadge,
+  NervErrorBoundary,
   NervProgress,
   type NervProgressStage,
   NervStatus,
@@ -2452,7 +2453,9 @@ function InvestigationWorkspace() {
 function InvestigationPage() {
   return (
     <InvestigationProvider>
-      <InvestigationWorkspace />
+      <NervErrorBoundary label="Investigation workspace">
+        <InvestigationWorkspace />
+      </NervErrorBoundary>
     </InvestigationProvider>
   );
 }

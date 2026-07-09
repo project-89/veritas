@@ -4,6 +4,7 @@ export type { EventFilterPanelProps, EventFilters } from './event-filter-panel';
 export { EventFilterPanel } from './event-filter-panel';
 export type { EventGlobeProps } from './event-globe';
 export { EventGlobe } from './event-globe';
+export { NervErrorBoundary } from './nerv-error-boundary';
 export type { EvidenceChainPanelProps } from './evidence-chain-panel';
 export { EvidenceChainPanel } from './evidence-chain-panel';
 export type { IntelligenceReportPanelProps } from './intelligence-report-panel';
