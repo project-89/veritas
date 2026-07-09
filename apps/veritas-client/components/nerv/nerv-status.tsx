@@ -25,9 +25,9 @@ const sizeMap: Record<string, string> = {
 };
 
 const labelSizeMap: Record<string, string> = {
-  sm: 'text-[11px]',
-  md: 'text-[12px]',
-  lg: 'text-[13px]',
+  sm: 'text-[13px]',
+  md: 'text-[14px]',
+  lg: 'text-[15px]',
 };
 
 export function NervStatus({ status, label, size = 'md' }: NervStatusProps) {

@@ -9,7 +9,7 @@ function LoadingState() {
     <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
       <div className="text-center space-y-3">
         <div className="w-6 h-6 border-2 border-nerv-border border-t-nerv-orange rounded-full animate-spin mx-auto" />
-        <span className="text-[10px] font-mono text-nerv-text-muted uppercase tracking-widest">
+        <span className="text-[12px] font-mono text-nerv-text-muted uppercase tracking-widest">
           Loading Investigation...
         </span>
       </div>
@@ -66,7 +66,7 @@ function InvestigatePageInner() {
           <button
             type="button"
             onClick={() => router.push('/monitor')}
-            className="block text-[10px] font-mono text-nerv-orange uppercase tracking-widest hover:underline mx-auto"
+            className="block text-[12px] font-mono text-nerv-orange uppercase tracking-widest hover:underline mx-auto"
           >
             Back to Monitor
           </button>

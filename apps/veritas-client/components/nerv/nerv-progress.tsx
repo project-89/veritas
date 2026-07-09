@@ -35,7 +35,7 @@ export function NervProgress({ stages }: NervProgressProps) {
             >
               <span
                 className={[
-                  'text-[9px] font-mono uppercase tracking-wider truncate',
+                  'text-[11px] font-mono uppercase tracking-wider truncate',
                   style.text,
                 ].join(' ')}
               >
@@ -43,7 +43,7 @@ export function NervProgress({ stages }: NervProgressProps) {
               </span>
             </div>
             {i < stages.length - 1 && (
-              <span className="text-nerv-text-muted text-[8px] shrink-0">{'\u25B8'}</span>
+              <span className="text-nerv-text-muted text-[10px] shrink-0">{'\u25B8'}</span>
             )}
           </div>
         );

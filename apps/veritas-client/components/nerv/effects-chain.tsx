@@ -321,10 +321,10 @@ export function EffectsChain({
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <div className="text-center">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
             DOWNSTREAM EFFECTS ANALYSIS
           </div>
-          <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed mb-4">
+          <div className="text-[12px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed mb-4">
             Correlates narrative timelines with real-world signals from GDELT, Yahoo Finance, World
             Bank, and FRED.
           </div>
@@ -334,7 +334,7 @@ export function EffectsChain({
               onClick={onRunDownstream}
               disabled={downstreamLoading}
               className={[
-                'px-4 py-2 text-[10px] font-mono uppercase tracking-wider border rounded-sm transition-colors',
+                'px-4 py-2 text-[12px] font-mono uppercase tracking-wider border rounded-sm transition-colors',
                 downstreamLoading
                   ? 'border-nerv-border text-nerv-text-muted cursor-wait'
                   : 'border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10',
@@ -352,14 +352,14 @@ export function EffectsChain({
     <div className="h-full flex flex-col">
       {/* Controls */}
       <div className="px-3 py-2 border-b border-nerv-border flex items-center gap-4 shrink-0 flex-wrap">
-        <span className="text-[9px] font-mono text-nerv-text-muted uppercase tracking-widest">
+        <span className="text-[11px] font-mono text-nerv-text-muted uppercase tracking-widest">
           {totalChains} chains / {totalSignals} signals / showing top{' '}
           {Math.min(maxChains, totalChains)}
         </span>
         <div className="flex items-center gap-2 ml-auto">
           <label
             htmlFor={showSelectId}
-            className="text-[9px] font-mono text-nerv-text-muted uppercase"
+            className="text-[11px] font-mono text-nerv-text-muted uppercase"
           >
             Show:
           </label>
@@ -367,7 +367,7 @@ export function EffectsChain({
             id={showSelectId}
             value={maxChains}
             onChange={(e) => setMaxChains(Number(e.target.value))}
-            className="bg-nerv-bg-elevated border border-nerv-border text-nerv-text text-[10px] font-mono px-1.5 py-0.5 rounded-sm"
+            className="bg-nerv-bg-elevated border border-nerv-border text-nerv-text text-[12px] font-mono px-1.5 py-0.5 rounded-sm"
           >
             <option value={5}>Top 5</option>
             <option value={10}>Top 10</option>
@@ -378,7 +378,7 @@ export function EffectsChain({
             <button
               type="button"
               onClick={() => setSelectedNarrativeId(null)}
-              className="text-[9px] font-mono text-nerv-orange hover:underline ml-2"
+              className="text-[11px] font-mono text-nerv-orange hover:underline ml-2"
             >
               CLEAR FILTER
             </button>
@@ -387,7 +387,7 @@ export function EffectsChain({
       </div>
 
       {!selectedNarrativeId && nodes.length > 0 && (
-        <div className="px-3 py-1 text-[9px] font-mono text-nerv-text-muted border-b border-nerv-border/50 shrink-0">
+        <div className="px-3 py-1 text-[11px] font-mono text-nerv-text-muted border-b border-nerv-border/50 shrink-0">
           Click a narrative to trace its causal chain: narrative → intermediary cause → real-world
           effect
         </div>
@@ -398,15 +398,15 @@ export function EffectsChain({
         <button
           type="button"
           onClick={() => setZoom((z) => Math.min(3, z * 1.2))}
-          className="text-[10px] font-mono text-nerv-text-muted hover:text-nerv-text px-1"
+          className="text-[12px] font-mono text-nerv-text-muted hover:text-nerv-text px-1"
         >
           +
         </button>
-        <span className="text-[9px] font-mono text-nerv-text-muted">{Math.round(zoom * 100)}%</span>
+        <span className="text-[11px] font-mono text-nerv-text-muted">{Math.round(zoom * 100)}%</span>
         <button
           type="button"
           onClick={() => setZoom((z) => Math.max(0.3, z * 0.8))}
-          className="text-[10px] font-mono text-nerv-text-muted hover:text-nerv-text px-1"
+          className="text-[12px] font-mono text-nerv-text-muted hover:text-nerv-text px-1"
         >
           -
         </button>
@@ -416,11 +416,11 @@ export function EffectsChain({
             setZoom(1);
             setPan({ x: 0, y: 0 });
           }}
-          className="text-[9px] font-mono text-nerv-text-muted hover:text-nerv-text ml-1"
+          className="text-[11px] font-mono text-nerv-text-muted hover:text-nerv-text ml-1"
         >
           RESET
         </button>
-        <span className="text-[9px] font-mono text-nerv-text-muted/50 ml-2">
+        <span className="text-[11px] font-mono text-nerv-text-muted/50 ml-2">
           scroll to zoom, drag to pan
         </span>
       </div>
@@ -454,7 +454,7 @@ export function EffectsChain({
             x={COL_POSITIONS[0] + NODE_WIDTH / 2}
             y={16}
             textAnchor="middle"
-            className="text-[9px] font-mono uppercase tracking-widest"
+            className="text-[11px] font-mono uppercase tracking-widest"
             fill="var(--nerv-text-muted)"
           >
             NARRATIVES
@@ -463,7 +463,7 @@ export function EffectsChain({
             x={COL_POSITIONS[1] + NODE_WIDTH / 2}
             y={16}
             textAnchor="middle"
-            className="text-[9px] font-mono uppercase tracking-widest"
+            className="text-[11px] font-mono uppercase tracking-widest"
             fill="var(--nerv-text-muted)"
           >
             CAUSAL MECHANISM
@@ -472,7 +472,7 @@ export function EffectsChain({
             x={COL_POSITIONS[2] + NODE_WIDTH / 2}
             y={16}
             textAnchor="middle"
-            className="text-[9px] font-mono uppercase tracking-widest"
+            className="text-[11px] font-mono uppercase tracking-widest"
             fill="var(--nerv-text-muted)"
           >
             REAL-WORLD EFFECT
@@ -541,7 +541,7 @@ export function EffectsChain({
                     <button
                       type="button"
                       aria-label={`Filter causal chains for narrative ${node.label}`}
-                      className="w-full h-full text-left text-[9px] font-mono leading-tight bg-transparent border-0 p-0 cursor-pointer"
+                      className="w-full h-full text-left text-[11px] font-mono leading-tight bg-transparent border-0 p-0 cursor-pointer"
                       style={{
                         color: highlighted
                           ? 'rgb(var(--nerv-text))'
@@ -552,7 +552,7 @@ export function EffectsChain({
                       <span style={{ color }}>{DOMAIN_ICONS[node.domain] ?? '\u25CB'}</span>{' '}
                       {node.label}
                       <div
-                        className="text-[8px] mt-0.5"
+                        className="text-[10px] mt-0.5"
                         style={{ color: 'rgb(var(--nerv-text-muted))' }}
                       >
                         {node.domain.toUpperCase()}
@@ -560,7 +560,7 @@ export function EffectsChain({
                     </button>
                   ) : (
                     <div
-                      className="text-[9px] font-mono leading-tight"
+                      className="text-[11px] font-mono leading-tight"
                       style={{
                         color: highlighted
                           ? 'rgb(var(--nerv-text))'
@@ -571,7 +571,7 @@ export function EffectsChain({
                       <span style={{ color }}>{DOMAIN_ICONS[node.domain] ?? '\u25CB'}</span>{' '}
                       {node.label}
                       <div
-                        className="text-[8px] mt-0.5"
+                        className="text-[10px] mt-0.5"
                         style={{ color: 'rgb(var(--nerv-text-muted))' }}
                       >
                         {node.domain.toUpperCase()}
@@ -589,13 +589,13 @@ export function EffectsChain({
       {selectedNarrativeId && selectedChains.length > 0 && (
         <div className="shrink-0 border-t border-nerv-orange/30 bg-nerv-bg-panel max-h-[40%] overflow-y-auto">
           <div className="px-3 py-2 border-b border-nerv-border flex items-center justify-between">
-            <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-orange">
+            <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-orange">
               CAUSAL CHAINS — {selectedChains.length} chain(s)
             </span>
             <button
               type="button"
               onClick={() => setSelectedNarrativeId(null)}
-              className="text-[9px] font-mono text-nerv-text-muted hover:text-nerv-text"
+              className="text-[11px] font-mono text-nerv-text-muted hover:text-nerv-text"
             >
               CLOSE
             </button>
@@ -606,7 +606,7 @@ export function EffectsChain({
                 key={`${chain.confidence}-${chain.steps.map((step) => `${step.domain}:${step.label}`).join('|')}`}
                 className="space-y-1"
               >
-                <div className="text-[9px] font-mono text-nerv-text-muted">
+                <div className="text-[11px] font-mono text-nerv-text-muted">
                   Chain {ci + 1} — confidence: {(chain.confidence * 100).toFixed(0)}%
                 </div>
                 <div className="flex items-stretch gap-0 overflow-x-auto pb-1">
@@ -627,12 +627,12 @@ export function EffectsChain({
                           }}
                         >
                           <div
-                            className="text-[8px] font-mono uppercase tracking-wider mb-0.5"
+                            className="text-[10px] font-mono uppercase tracking-wider mb-0.5"
                             style={{ color }}
                           >
                             {step.domain === 'narrative' ? 'NARRATIVE' : step.domain.toUpperCase()}
                           </div>
-                          <div className="text-[10px] font-mono text-nerv-text leading-snug break-words">
+                          <div className="text-[12px] font-mono text-nerv-text leading-snug break-words">
                             {step.label}
                           </div>
                         </div>

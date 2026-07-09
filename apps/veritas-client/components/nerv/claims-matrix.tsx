@@ -97,7 +97,7 @@ export function ClaimsMatrix({
         sortable: false,
         render: (val: unknown) => (
           <span
-            className="text-nerv-text font-mono text-[10px] leading-snug line-clamp-2"
+            className="text-nerv-text font-mono text-[12px] leading-snug line-clamp-2"
             title={val as string}
           >
             {val as string}
@@ -145,10 +145,10 @@ export function ClaimsMatrix({
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <div className="text-center">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
             PROPAGANDA ANALYSIS REQUIRED
           </div>
-          <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[300px] leading-relaxed">
+          <div className="text-[12px] font-mono text-nerv-text-secondary max-w-[300px] leading-relaxed">
             Run propaganda analysis to extract claims, detect manipulation techniques, and identify
             narrative frames.
           </div>
@@ -159,7 +159,7 @@ export function ClaimsMatrix({
             onClick={onRunPropaganda}
             disabled={propagandaLoading}
             className={[
-              'px-4 py-2 text-[10px] font-mono uppercase tracking-wider border rounded-sm transition-colors',
+              'px-4 py-2 text-[12px] font-mono uppercase tracking-wider border rounded-sm transition-colors',
               propagandaLoading
                 ? 'border-nerv-border text-nerv-text-muted cursor-wait animate-nerv-pulse'
                 : 'border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10',
@@ -176,10 +176,10 @@ export function ClaimsMatrix({
   if (propaganda.analysisMode === 'unavailable') {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 px-4">
-        <div className="px-3 py-2 border border-nerv-amber/50 bg-nerv-amber/10 text-nerv-amber text-[10px] font-mono uppercase tracking-widest">
+        <div className="px-3 py-2 border border-nerv-amber/50 bg-nerv-amber/10 text-nerv-amber text-[12px] font-mono uppercase tracking-widest">
           PROPAGANDA ANALYSIS UNAVAILABLE
         </div>
-        <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[320px] text-center leading-relaxed">
+        <div className="text-[12px] font-mono text-nerv-text-secondary max-w-[320px] text-center leading-relaxed">
           {propaganda.analysisModeReason ??
             'The analysis backend could not run. This is NOT a "no propaganda detected" finding.'}
         </div>
@@ -188,7 +188,7 @@ export function ClaimsMatrix({
             type="button"
             onClick={onRunPropaganda}
             disabled={propagandaLoading}
-            className="px-4 py-2 text-[10px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
+            className="px-4 py-2 text-[12px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
           >
             {propagandaLoading ? 'ANALYZING...' : 'RETRY ANALYSIS'}
           </button>
@@ -203,7 +203,7 @@ export function ClaimsMatrix({
       {propaganda.overallAssessment && (
         <div
           className={[
-            'px-3 py-2 border-b text-[10px] font-mono',
+            'px-3 py-2 border-b text-[12px] font-mono',
             propaganda.overallAssessment.manipulationLikelihood === 'high'
               ? 'bg-nerv-red/10 border-nerv-red/30 text-nerv-red'
               : propaganda.overallAssessment.manipulationLikelihood === 'medium'
@@ -236,7 +236,7 @@ export function ClaimsMatrix({
       {/* Verify claims button + results summary */}
       <div className="mt-2 pt-2 border-t border-nerv-border/50">
         {claims ? (
-          <div className="flex items-center gap-3 text-[9px] font-mono">
+          <div className="flex items-center gap-3 text-[11px] font-mono">
             {claims.analysisMode === 'heuristic' && (
               <span
                 className="text-nerv-amber uppercase"
@@ -253,7 +253,7 @@ export function ClaimsMatrix({
                 type="button"
                 onClick={onVerifyClaims}
                 disabled={verifyingClaims}
-                className="ml-auto px-2 py-1 text-[8px] font-mono uppercase border border-nerv-blue/50 text-nerv-blue hover:bg-nerv-blue/10 rounded-sm transition-colors"
+                className="ml-auto px-2 py-1 text-[10px] font-mono uppercase border border-nerv-blue/50 text-nerv-blue hover:bg-nerv-blue/10 rounded-sm transition-colors"
               >
                 {verifyingClaims ? 'VERIFYING...' : 'RE-VERIFY'}
               </button>
@@ -265,7 +265,7 @@ export function ClaimsMatrix({
             onClick={onVerifyClaims}
             disabled={verifyingClaims || (propaganda?.claims?.length ?? 0) === 0}
             className={[
-              'w-full px-4 py-2 text-[10px] font-mono uppercase tracking-wider border rounded-sm transition-colors',
+              'w-full px-4 py-2 text-[12px] font-mono uppercase tracking-wider border rounded-sm transition-colors',
               verifyingClaims
                 ? 'border-nerv-border text-nerv-text-muted cursor-wait animate-pulse'
                 : 'border-nerv-blue text-nerv-blue hover:bg-nerv-blue/10',

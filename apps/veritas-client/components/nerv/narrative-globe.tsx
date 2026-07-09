@@ -356,7 +356,7 @@ export function NarrativeGlobe({ points, arcs, width, height, onPointClick }: Na
       {!loaded && !error && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <div className="text-center">
-            <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-orange animate-nerv-pulse">
+            <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-orange animate-nerv-pulse">
               INITIALIZING GLOBE RENDERER...
             </div>
             <div className="mt-2 w-32 h-px bg-nerv-border mx-auto overflow-hidden">
@@ -370,10 +370,10 @@ export function NarrativeGlobe({ points, arcs, width, height, onPointClick }: Na
       {error && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <div className="text-center max-w-sm">
-            <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-red mb-2">
+            <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-red mb-2">
               GLOBE RENDER ERROR
             </div>
-            <div className="text-[9px] font-mono text-nerv-text-muted">{error}</div>
+            <div className="text-[11px] font-mono text-nerv-text-muted">{error}</div>
           </div>
         </div>
       )}
@@ -384,14 +384,14 @@ export function NarrativeGlobe({ points, arcs, width, height, onPointClick }: Na
       {/* HUD overlay — top left info */}
       {loaded && points.length > 0 && (
         <div className="absolute top-3 left-3 pointer-events-none">
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
             GEOGRAPHIC DISTRIBUTION
           </div>
-          <div className="text-[10px] font-mono text-nerv-orange">
+          <div className="text-[12px] font-mono text-nerv-orange">
             {points.length} {points.length === 1 ? 'REGION' : 'REGIONS'} ACTIVE
           </div>
           {arcs.length > 0 && (
-            <div className="text-[9px] font-mono text-nerv-text-muted mt-0.5">
+            <div className="text-[11px] font-mono text-nerv-text-muted mt-0.5">
               {arcs.length} PROPAGATION {arcs.length === 1 ? 'LINK' : 'LINKS'}
             </div>
           )}
@@ -401,7 +401,7 @@ export function NarrativeGlobe({ points, arcs, width, height, onPointClick }: Na
       {/* HUD overlay — legend */}
       {loaded && points.length > 0 && (
         <div className="absolute bottom-3 left-3 pointer-events-none">
-          <div className="flex items-center gap-3 text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted">
+          <div className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">
             <span className="flex items-center gap-1">
               <span
                 className="inline-block w-2 h-2 rounded-full"
@@ -431,10 +431,10 @@ export function NarrativeGlobe({ points, arcs, width, height, onPointClick }: Na
       {loaded && points.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center">
-            <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
+            <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted">
               NO GEOGRAPHIC SIGNALS DETECTED
             </div>
-            <div className="text-[9px] font-mono text-nerv-text-muted mt-1 max-w-xs">
+            <div className="text-[11px] font-mono text-nerv-text-muted mt-1 max-w-xs">
               Geographic data is derived from country mentions in posts, GDELT signals, and
               investigation results.
             </div>

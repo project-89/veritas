@@ -66,10 +66,10 @@ function CollapsibleSection({
         onClick={onToggle}
         className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-nerv-bg-elevated/30 transition-colors"
       >
-        <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
+        <span className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted">
           {title}
         </span>
-        <span className="text-[9px] text-nerv-text-muted">{isOpen ? '\u25B4' : '\u25BE'}</span>
+        <span className="text-[11px] text-nerv-text-muted">{isOpen ? '\u25B4' : '\u25BE'}</span>
       </button>
       {isOpen && <div className="px-2 pb-2 space-y-1">{children}</div>}
     </div>
@@ -90,13 +90,13 @@ function EvidenceItemRow({
   return (
     <div className={`pl-2 py-1 border-l-2 ${borderColor} bg-nerv-bg-elevated/20 rounded-r-sm`}>
       <div className="flex items-center gap-1.5">
-        <span className="text-[10px]">{sourceIcon(item.source)}</span>
-        <span className="text-[9px] font-mono text-nerv-text-secondary font-bold truncate">
+        <span className="text-[12px]">{sourceIcon(item.source)}</span>
+        <span className="text-[11px] font-mono text-nerv-text-secondary font-bold truncate">
           {item.source}
         </span>
         <NervBadge label={item.credibility} variant={credVariant} size="sm" />
       </div>
-      <p className="text-[9px] font-mono text-nerv-text-muted leading-relaxed mt-0.5 line-clamp-3">
+      <p className="text-[11px] font-mono text-nerv-text-muted leading-relaxed mt-0.5 line-clamp-3">
         {item.excerpt}
       </p>
       {item.url && (
@@ -104,7 +104,7 @@ function EvidenceItemRow({
           href={item.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[8px] font-mono text-nerv-blue hover:underline mt-0.5 inline-block truncate max-w-full"
+          className="text-[10px] font-mono text-nerv-blue hover:underline mt-0.5 inline-block truncate max-w-full"
         >
           {item.url}
         </a>
@@ -120,8 +120,8 @@ function LeadCard({ lead }: { lead: InvestigativeLead }) {
   return (
     <div className="p-2 bg-nerv-bg-elevated/30 border border-nerv-border rounded-sm space-y-1">
       <div className="flex items-start gap-1.5">
-        <span className="text-[10px] text-nerv-orange shrink-0">{'\u2753'}</span>
-        <span className="text-[9px] font-mono text-nerv-text-secondary leading-relaxed">
+        <span className="text-[12px] text-nerv-orange shrink-0">{'\u2753'}</span>
+        <span className="text-[11px] font-mono text-nerv-text-secondary leading-relaxed">
           {lead.question}
         </span>
       </div>
@@ -155,13 +155,13 @@ function ClaimCard({ result }: { result: VerificationResult }) {
       {/* Claim header */}
       <div className="space-y-1">
         <div className="flex items-start gap-2">
-          <p className="text-[10px] font-mono text-nerv-text leading-relaxed flex-1">
+          <p className="text-[12px] font-mono text-nerv-text leading-relaxed flex-1">
             {result.claim}
           </p>
           <NervBadge label={result.status} variant={statusVariant} size="sm" />
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[8px] font-mono uppercase text-nerv-text-muted shrink-0">
+          <span className="text-[10px] font-mono uppercase text-nerv-text-muted shrink-0">
             Confidence
           </span>
           <NervBar
@@ -223,14 +223,14 @@ function ClaimCard({ result }: { result: VerificationResult }) {
           isOpen={expanded === 'reasoning'}
           onToggle={() => toggle('reasoning')}
         >
-          <p className="text-[9px] font-mono text-nerv-text-secondary leading-relaxed whitespace-pre-wrap">
+          <p className="text-[11px] font-mono text-nerv-text-secondary leading-relaxed whitespace-pre-wrap">
             {result.reasoning}
           </p>
           {result.caveats.length > 0 && (
             <div className="mt-1 pt-1 border-t border-nerv-border/30">
-              <span className="text-[8px] font-mono uppercase text-nerv-text-muted">Caveats:</span>
+              <span className="text-[10px] font-mono uppercase text-nerv-text-muted">Caveats:</span>
               {result.caveats.map((c) => (
-                <p key={c} className="text-[8px] font-mono text-nerv-amber/80 leading-relaxed">
+                <p key={c} className="text-[10px] font-mono text-nerv-amber/80 leading-relaxed">
                   {'\u25B3'} {c}
                 </p>
               ))}
@@ -256,22 +256,22 @@ export function EvidenceChainPanel({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-nerv-text-muted text-3xl mb-3">{'\u2696'}</div>
-          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
+          <div className="text-[13px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
             EVIDENCE CHAINS
           </div>
-          <div className="text-[11px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed">
+          <div className="text-[13px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed">
             Evidence chains populate after claim verification. Run propaganda analysis first.
           </div>
           {onTriggerAnalysis && (
             <button
               type="button"
               onClick={onTriggerAnalysis}
-              className="mt-4 px-4 py-2 text-[10px] font-mono uppercase tracking-wider border border-nerv-amber text-nerv-amber hover:bg-nerv-amber/10 rounded-sm transition-colors font-bold"
+              className="mt-4 px-4 py-2 text-[12px] font-mono uppercase tracking-wider border border-nerv-amber text-nerv-amber hover:bg-nerv-amber/10 rounded-sm transition-colors font-bold"
             >
               RUN ANALYSIS
             </button>
           )}
-          <div className="text-[11px] font-mono text-nerv-orange mt-3 max-w-[320px] leading-relaxed">
+          <div className="text-[13px] font-mono text-nerv-orange mt-3 max-w-[320px] leading-relaxed">
             {'\u2192'} Click <span className="font-bold">ANALYZE</span> on a scanned narrative to
             generate claims and verify them.
           </div>
@@ -289,7 +289,7 @@ export function EvidenceChainPanel({
       {/* Summary header */}
       <div className="shrink-0 px-3 py-2 border-b border-nerv-border bg-nerv-bg">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-[10px] font-mono font-bold text-nerv-orange uppercase tracking-wider">
+          <span className="text-[12px] font-mono font-bold text-nerv-orange uppercase tracking-wider">
             Evidence Chains
           </span>
           <div className="flex items-center gap-2">
@@ -302,13 +302,13 @@ export function EvidenceChainPanel({
           </div>
         </div>
         {claims.summary && (
-          <p className="text-[9px] font-mono text-nerv-text-secondary leading-relaxed mt-1">
+          <p className="text-[11px] font-mono text-nerv-text-secondary leading-relaxed mt-1">
             {claims.summary}
           </p>
         )}
         {propaganda && (
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-[8px] font-mono uppercase text-nerv-text-muted">
+            <span className="text-[10px] font-mono uppercase text-nerv-text-muted">
               Manipulation:
             </span>
             <NervBadge
@@ -336,7 +336,7 @@ export function EvidenceChainPanel({
         {/* Batch-level investigative leads */}
         {(claims.investigativeLeads ?? []).length > 0 && (
           <div className="border border-nerv-orange/30 bg-nerv-orange/5 rounded-sm p-2 space-y-1.5">
-            <div className="text-[9px] font-mono uppercase tracking-wider text-nerv-orange font-bold">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-nerv-orange font-bold">
               Additional Investigative Leads
             </div>
             {(claims.investigativeLeads ?? []).map((lead) => (
@@ -348,7 +348,7 @@ export function EvidenceChainPanel({
         {/* Propaganda techniques summary */}
         {propaganda && propaganda.techniques.length > 0 && (
           <div className="border border-nerv-border rounded-sm p-2 space-y-1">
-            <div className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted">
               Propaganda Techniques Detected ({propaganda.techniques.length})
             </div>
             <div className="flex flex-wrap gap-1">

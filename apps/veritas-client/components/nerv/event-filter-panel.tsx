@@ -69,14 +69,14 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
     <div className="w-[240px] shrink-0 bg-nerv-bg-panel border-r border-nerv-border flex flex-col overflow-y-auto">
       {/* Header */}
       <div className="px-3 py-2.5 border-b border-nerv-border">
-        <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-secondary">
+        <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-secondary">
           Event Filters
         </div>
       </div>
 
       {/* Category toggles */}
       <div className="px-3 py-3 border-b border-nerv-border">
-        <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
+        <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
           Category
         </div>
         <div className="flex flex-col gap-1.5">
@@ -88,7 +88,7 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
                 key={cat}
                 onClick={() => toggleCategory(cat)}
                 className={[
-                  'flex items-center justify-between px-2 py-1.5 rounded-sm text-[10px] font-mono uppercase tracking-wider transition-colors',
+                  'flex items-center justify-between px-2 py-1.5 rounded-sm text-[12px] font-mono uppercase tracking-wider transition-colors',
                   active
                     ? 'bg-nerv-bg-elevated text-nerv-text'
                     : 'text-nerv-text-muted hover:bg-nerv-bg-elevated/40',
@@ -104,7 +104,7 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
                   />
                   {CATEGORY_LABELS[cat]}
                 </span>
-                <span className="text-[9px] text-nerv-text-muted tabular-nums">
+                <span className="text-[11px] text-nerv-text-muted tabular-nums">
                   {categoryCounts[cat]}
                 </span>
               </button>
@@ -115,7 +115,7 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
 
       {/* Severity toggles */}
       <div className="px-3 py-3 border-b border-nerv-border">
-        <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
+        <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
           Severity
         </div>
         <div className="flex flex-wrap gap-1">
@@ -127,7 +127,7 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
                 key={sev}
                 onClick={() => toggleSeverity(sev)}
                 className={[
-                  'px-2 py-1 rounded-sm text-[9px] font-mono uppercase tracking-wider border transition-colors',
+                  'px-2 py-1 rounded-sm text-[11px] font-mono uppercase tracking-wider border transition-colors',
                   active
                     ? SEVERITY_COLORS[sev]
                     : 'text-nerv-text-muted border-nerv-border/50 hover:border-nerv-border',
@@ -143,7 +143,7 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
 
       {/* Time range */}
       <div className="px-3 py-3">
-        <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
+        <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
           Time Range
         </div>
         <div className="flex gap-1">
@@ -155,7 +155,7 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
                 key={range}
                 onClick={() => setTimeRange(range)}
                 className={[
-                  'flex-1 px-1.5 py-1 rounded-sm text-[9px] font-mono uppercase tracking-wider transition-colors',
+                  'flex-1 px-1.5 py-1 rounded-sm text-[11px] font-mono uppercase tracking-wider transition-colors',
                   active
                     ? 'bg-nerv-orange/15 text-nerv-orange border border-nerv-orange/30'
                     : 'text-nerv-text-muted border border-nerv-border/50 hover:border-nerv-border',

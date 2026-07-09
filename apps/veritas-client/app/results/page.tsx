@@ -1951,13 +1951,13 @@ function InvestigationWorkspace() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-4">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted mb-4">
             NO ACTIVE INVESTIGATION
           </div>
           <button
             type="button"
             onClick={() => router.push('/')}
-            className="px-4 py-2 text-[10px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
+            className="px-4 py-2 text-[12px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
           >
             RETURN TO COMMAND CENTER
           </button>
@@ -2015,7 +2015,7 @@ function InvestigationWorkspace() {
         if (state.posts.length === 0 || state.narratives.length === 0) {
           return (
             <div className="flex items-center justify-center h-full">
-              <span className="text-[10px] font-mono text-nerv-text-muted animate-nerv-pulse uppercase tracking-widest">
+              <span className="text-[12px] font-mono text-nerv-text-muted animate-nerv-pulse uppercase tracking-widest">
                 {state.loading ? 'LOADING GLOBE DATA...' : 'AWAITING NARRATIVE DATA FOR GLOBE'}
               </span>
             </div>
@@ -2131,24 +2131,24 @@ function InvestigationWorkspace() {
         {/* Row 1: query + status badges + refresh — single compact line */}
         <div className="flex items-center justify-between px-4 h-8">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[9px] font-mono text-nerv-text-muted uppercase tracking-wider shrink-0">
+            <span className="text-[11px] font-mono text-nerv-text-muted uppercase tracking-wider shrink-0">
               NERV {'\u25B8'}
             </span>
             {investigationRecord?.name && (
               <span
-                className="text-[10px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted truncate max-w-[260px]"
+                className="text-[12px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted truncate max-w-[260px]"
                 title={investigationRecord.name}
               >
                 {investigationRecord.name}
               </span>
             )}
             {investigationRecord?.name && (
-              <span className="text-[9px] font-mono text-nerv-text-muted/50 shrink-0">
+              <span className="text-[11px] font-mono text-nerv-text-muted/50 shrink-0">
                 {'\u2192'}
               </span>
             )}
             <span
-              className="text-[11px] font-mono font-bold text-nerv-orange truncate max-w-[300px]"
+              className="text-[13px] font-mono font-bold text-nerv-orange truncate max-w-[300px]"
               title={query}
             >
               &quot;{query}&quot;
@@ -2191,7 +2191,7 @@ function InvestigationWorkspace() {
                     }}
                     disabled={pipelineRunning}
                     className={[
-                      'text-[9px] font-mono uppercase tracking-wider px-2 py-1 border rounded-sm transition-colors',
+                      'text-[11px] font-mono uppercase tracking-wider px-2 py-1 border rounded-sm transition-colors',
                       pipelineRunning
                         ? 'border-nerv-border text-nerv-text-muted cursor-wait'
                         : 'border-nerv-blue/50 text-nerv-blue hover:bg-nerv-blue/10',
@@ -2207,7 +2207,7 @@ function InvestigationWorkspace() {
               onClick={handleRefresh}
               disabled={pipelineRunning}
               className={[
-                'text-[9px] font-mono uppercase tracking-wider px-2 py-1 border rounded-sm transition-colors',
+                'text-[11px] font-mono uppercase tracking-wider px-2 py-1 border rounded-sm transition-colors',
                 pipelineRunning
                   ? 'border-nerv-border text-nerv-text-muted cursor-wait'
                   : 'border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10',
@@ -2220,7 +2220,7 @@ function InvestigationWorkspace() {
 
         {queryTabs.length > 1 && (
           <div className="flex items-center gap-2 overflow-x-auto px-4 py-1 border-t border-nerv-border/40 bg-nerv-bg-panel/20">
-            <span className="text-[8px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted shrink-0">
+            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted shrink-0">
               Case Scans
             </span>
             <div className="flex items-center gap-1.5">
@@ -2240,10 +2240,10 @@ function InvestigationWorkspace() {
                     ].join(' ')}
                     title={`${tab.query} • ${new Date(tab.createdAt).toLocaleString()}`}
                   >
-                    <div className="text-[9px] font-mono uppercase tracking-[0.14em] max-w-[220px] truncate">
+                    <div className="text-[11px] font-mono uppercase tracking-[0.14em] max-w-[220px] truncate">
                       {tab.query}
                     </div>
-                    <div className="text-[8px] font-mono opacity-80 mt-0.5">
+                    <div className="text-[10px] font-mono opacity-80 mt-0.5">
                       {tab.totalPosts} posts • {tab.settings?.timeRange ?? '7d'}
                     </div>
                   </button>
@@ -2267,7 +2267,7 @@ function InvestigationWorkspace() {
                     key={mode.key}
                     type="button"
                     onClick={() => setCenterMode(mode.key)}
-                    className={`px-2 py-1 text-[9px] font-mono uppercase tracking-wider transition-all rounded-sm ${
+                    className={`px-2 py-1 text-[11px] font-mono uppercase tracking-wider transition-all rounded-sm ${
                       active
                         ? 'text-nerv-orange bg-nerv-orange/10'
                         : 'text-nerv-text-muted hover:text-nerv-text-secondary hover:bg-nerv-bg-panel/30'
@@ -2328,7 +2328,7 @@ function InvestigationWorkspace() {
       {/* Error banner */}
       {state.error && (
         <div className="shrink-0 px-4 py-2 bg-nerv-red/10 border-b border-nerv-red/30">
-          <span className="text-[10px] font-mono text-nerv-red">
+          <span className="text-[12px] font-mono text-nerv-red">
             {'\u25B3'} ERROR: {state.error}
           </span>
         </div>
@@ -2342,7 +2342,7 @@ function InvestigationWorkspace() {
           style={{ width: leftWidth }}
         >
           <div className="px-3 py-2 border-b border-nerv-border flex items-center justify-between shrink-0">
-            <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+            <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
               NARRATIVES
             </span>
             {state.narratives.length > 0 && (
@@ -2366,7 +2366,7 @@ function InvestigationWorkspace() {
             />
           ) : (
             <div className="flex-1 flex items-center justify-center">
-              <span className="text-[10px] font-mono text-nerv-text-muted animate-nerv-pulse">
+              <span className="text-[12px] font-mono text-nerv-text-muted animate-nerv-pulse">
                 {state.pipeline.search === 'running'
                   ? 'SEARCHING...'
                   : state.pipeline.analyze === 'running'
@@ -2462,7 +2462,7 @@ export default function ResultsPage() {
     <Suspense
       fallback={
         <div className="flex items-center justify-center h-screen bg-nerv-bg-deep">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted animate-nerv-pulse">
+          <span className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted animate-nerv-pulse">
             INITIALIZING INVESTIGATION WORKSPACE...
           </span>
         </div>

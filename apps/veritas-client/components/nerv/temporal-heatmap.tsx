@@ -425,7 +425,7 @@ export function TemporalHeatmap({
   return (
     <div ref={containerRef} className="relative w-full h-full min-h-[200px]">
       {windowLabel && (
-        <div className="absolute left-20 top-1 z-10 text-[9px] font-mono text-nerv-text-muted pointer-events-none">
+        <div className="absolute left-20 top-1 z-10 text-[11px] font-mono text-nerv-text-muted pointer-events-none">
           WINDOW {windowLabel}
         </div>
       )}
@@ -446,19 +446,19 @@ export function TemporalHeatmap({
             maxWidth: 200,
           }}
         >
-          <div className="text-[9px] font-mono text-nerv-text-muted uppercase tracking-wider">
+          <div className="text-[11px] font-mono text-nerv-text-muted uppercase tracking-wider">
             {tooltip.timeLabel}
           </div>
-          <div className="text-[10px] font-mono text-nerv-text leading-snug mt-0.5 line-clamp-2">
+          <div className="text-[12px] font-mono text-nerv-text leading-snug mt-0.5 line-clamp-2">
             {tooltip.narrativeSummary}
           </div>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-[9px] font-mono text-nerv-text-secondary tabular-nums">
+            <span className="text-[11px] font-mono text-nerv-text-secondary tabular-nums">
               {tooltip.postCount} posts
             </span>
             <span
               className={[
-                'text-[9px] font-mono tabular-nums',
+                'text-[11px] font-mono tabular-nums',
                 tooltip.avgSentiment > 0.1
                   ? 'text-nerv-green'
                   : tooltip.avgSentiment < -0.1
@@ -470,7 +470,7 @@ export function TemporalHeatmap({
               {tooltip.avgSentiment.toFixed(2)}
             </span>
           </div>
-          <div className="text-[9px] font-mono text-nerv-text-muted mt-0.5">
+          <div className="text-[11px] font-mono text-nerv-text-muted mt-0.5">
             top: @{tooltip.topAuthor}
           </div>
         </div>

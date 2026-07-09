@@ -62,7 +62,7 @@ function TypeProgressRow({
       >
         {/* Type label */}
         <span
-          className="text-[9px] font-mono font-bold uppercase tracking-wider w-20 shrink-0 text-left"
+          className="text-[11px] font-mono font-bold uppercase tracking-wider w-20 shrink-0 text-left"
           style={{ color: config.color }}
         >
           {config.label}
@@ -83,35 +83,35 @@ function TypeProgressRow({
         </div>
 
         {/* Count */}
-        <span className="text-[9px] font-mono text-nerv-text-secondary w-10 text-right shrink-0 tabular-nums">
+        <span className="text-[11px] font-mono text-nerv-text-secondary w-10 text-right shrink-0 tabular-nums">
           {group.completed}/{group.total}
         </span>
 
         {/* Status indicator */}
         {group.running > 0 && (
-          <span className="text-[8px] font-mono text-nerv-orange animate-pulse w-16 text-right shrink-0">
+          <span className="text-[10px] font-mono text-nerv-orange animate-pulse w-16 text-right shrink-0">
             RUNNING
           </span>
         )}
         {allDone && !hasFailures && (
-          <span className="text-[8px] font-mono text-nerv-green w-16 text-right shrink-0">
+          <span className="text-[10px] font-mono text-nerv-green w-16 text-right shrink-0">
             DONE
           </span>
         )}
         {allDone && hasFailures && (
-          <span className="text-[8px] font-mono text-nerv-red w-16 text-right shrink-0">
+          <span className="text-[10px] font-mono text-nerv-red w-16 text-right shrink-0">
             {group.failed} FAILED
           </span>
         )}
         {!allDone && group.running === 0 && (
-          <span className="text-[8px] font-mono text-nerv-text-muted w-16 text-right shrink-0">
+          <span className="text-[10px] font-mono text-nerv-text-muted w-16 text-right shrink-0">
             QUEUED
           </span>
         )}
 
         {/* Expand indicator */}
         {group.total > 1 && (
-          <span className="text-[8px] text-nerv-text-muted shrink-0">
+          <span className="text-[10px] text-nerv-text-muted shrink-0">
             {expanded ? '\u25B4' : '\u25BE'}
           </span>
         )}
@@ -131,7 +131,7 @@ function TypeProgressRow({
             return (
               <div
                 key={jId}
-                className="flex items-center gap-2 px-3 py-1 pl-8 text-[9px] font-mono"
+                className="flex items-center gap-2 px-3 py-1 pl-8 text-[11px] font-mono"
               >
                 <span className="text-nerv-text-muted truncate flex-1">{label}</span>
                 <StatusDot status={job.status} />
@@ -142,7 +142,7 @@ function TypeProgressRow({
                   <button
                     type="button"
                     onClick={() => onRetry(jId)}
-                    className="text-[8px] px-1 py-0.5 border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm"
+                    className="text-[10px] px-1 py-0.5 border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm"
                   >
                     RETRY
                   </button>
@@ -231,10 +231,10 @@ export function AnalysisQueuePanel({ jobs, onCancel, onRetry }: AnalysisQueuePan
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-nerv-border bg-nerv-bg-elevated/30">
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+          <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
             ANALYSIS QUEUE
           </span>
-          <span className="text-[9px] font-mono text-nerv-text-secondary tabular-nums">
+          <span className="text-[11px] font-mono text-nerv-text-secondary tabular-nums">
             {totalCompleted}/{jobs.length}
           </span>
           {totalActive > 0 && (
@@ -242,7 +242,7 @@ export function AnalysisQueuePanel({ jobs, onCancel, onRetry }: AnalysisQueuePan
           )}
         </div>
         {allDone && (
-          <span className="text-[8px] font-mono text-nerv-green uppercase tracking-wider">
+          <span className="text-[10px] font-mono text-nerv-green uppercase tracking-wider">
             COMPLETE
           </span>
         )}

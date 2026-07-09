@@ -94,10 +94,10 @@ export function EntityPanel({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-nerv-text-muted text-3xl mb-3">{'\u2B22'}</div>
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
             ENTITY ANALYSIS
           </div>
-          <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[280px] leading-relaxed">
+          <div className="text-[12px] font-mono text-nerv-text-secondary max-w-[280px] leading-relaxed">
             Entities are analyzed during the pipeline — data will appear once analysis completes.
           </div>
         </div>
@@ -127,7 +127,7 @@ export function EntityPanel({
               type="button"
               onClick={() => setTypeFilter(t)}
               className={[
-                'px-2 py-0.5 text-[8px] font-mono uppercase tracking-wider rounded-sm transition-colors',
+                'px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider rounded-sm transition-colors',
                 typeFilter === t
                   ? 'bg-nerv-orange text-nerv-bg-deep font-bold'
                   : 'text-nerv-text-muted hover:text-nerv-text-secondary hover:bg-nerv-bg-elevated/40',
@@ -141,7 +141,7 @@ export function EntityPanel({
         {/* Entity list */}
         <div className="flex-1 overflow-y-auto nerv-scrollbar">
           {filtered.length === 0 && (
-            <div className="px-3 py-4 text-[10px] font-mono leading-relaxed text-nerv-text-muted">
+            <div className="px-3 py-4 text-[12px] font-mono leading-relaxed text-nerv-text-muted">
               No {ENTITY_TYPE_LABELS[typeFilter].toLowerCase()} were extracted for this
               investigation.
             </div>
@@ -159,7 +159,7 @@ export function EntityPanel({
               ].join(' ')}
             >
               <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-[10px] font-mono text-nerv-text truncate flex-1 font-medium">
+                <span className="text-[12px] font-mono text-nerv-text truncate flex-1 font-medium">
                   {d.name}
                 </span>
                 <NervBadge
@@ -175,7 +175,7 @@ export function EntityPanel({
                     style={{ width: `${(d.totalMentions / maxMentions) * 100}%` }}
                   />
                 </div>
-                <span className="text-[9px] font-mono tabular-nums text-nerv-text-muted">
+                <span className="text-[11px] font-mono tabular-nums text-nerv-text-muted">
                   {d.totalMentions}
                 </span>
               </div>
@@ -184,7 +184,7 @@ export function EntityPanel({
         </div>
 
         <div className="px-2 py-1 border-t border-nerv-border">
-          <span className="text-[9px] font-mono text-nerv-text-muted">
+          <span className="text-[11px] font-mono text-nerv-text-muted">
             {filtered.length}/{dossiers.length} entities
           </span>
         </div>
@@ -242,10 +242,10 @@ export function EntityPanel({
                     showEndDot
                   />
                   <div className="flex justify-between mt-1">
-                    <span className="text-[8px] font-mono text-nerv-text-muted">
+                    <span className="text-[10px] font-mono text-nerv-text-muted">
                       {new Date(firstSentimentPoint.timestamp).toLocaleDateString()}
                     </span>
-                    <span className="text-[8px] font-mono text-nerv-text-muted">
+                    <span className="text-[10px] font-mono text-nerv-text-muted">
                       {new Date(lastSentimentPoint.timestamp).toLocaleDateString()}
                     </span>
                   </div>
@@ -260,7 +260,7 @@ export function EntityPanel({
                 .sort(([, a], [, b]) => b - a)
                 .map(([platform, count]) => (
                   <div key={platform} className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-nerv-text-secondary w-16 truncate uppercase">
+                    <span className="text-[12px] font-mono text-nerv-text-secondary w-16 truncate uppercase">
                       {platform === 'twitter' ? 'X' : platform}
                     </span>
                     <div className="flex-1">
@@ -270,7 +270,7 @@ export function EntityPanel({
                         showLabel
                       />
                     </div>
-                    <span className="text-[10px] font-mono tabular-nums text-nerv-text-muted w-8 text-right">
+                    <span className="text-[12px] font-mono tabular-nums text-nerv-text-muted w-8 text-right">
                       {count}
                     </span>
                   </div>
@@ -291,15 +291,15 @@ export function EntityPanel({
                         : 'text-nerv-text-muted';
                   return (
                     <div key={na.narrativeId} className="px-3 py-2">
-                      <div className="text-[10px] font-mono text-nerv-text leading-relaxed mb-1">
+                      <div className="text-[12px] font-mono text-nerv-text leading-relaxed mb-1">
                         {na.narrativeSummary}
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-[9px] font-mono text-nerv-text-muted">
+                        <span className="text-[11px] font-mono text-nerv-text-muted">
                           {na.mentionCount} mentions
                         </span>
                         <span
-                          className={['text-[9px] font-mono tabular-nums', sentColor].join(' ')}
+                          className={['text-[11px] font-mono tabular-nums', sentColor].join(' ')}
                         >
                           sentiment: {na.avgSentimentTowardEntity.toFixed(2)}
                         </span>
@@ -320,7 +320,7 @@ export function EntityPanel({
                   .slice(0, 15)
                   .map((co) => (
                     <div key={co.entity} className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono text-nerv-text w-28 truncate">
+                      <span className="text-[12px] font-mono text-nerv-text w-28 truncate">
                         {co.entity}
                       </span>
                       <NervBadge
@@ -331,7 +331,7 @@ export function EntityPanel({
                       <div className="flex-1">
                         <NervBar value={co.frequency / maxCoOccurrence} color="#FF6B2B" />
                       </div>
-                      <span className="text-[9px] font-mono tabular-nums text-nerv-text-muted w-6 text-right">
+                      <span className="text-[11px] font-mono tabular-nums text-nerv-text-muted w-6 text-right">
                         {co.frequency}
                       </span>
                     </div>
@@ -362,7 +362,7 @@ export function EntityPanel({
                         : 'hover:bg-nerv-bg-elevated/30',
                     ].join(' ')}
                   >
-                    <span className="text-[10px] font-mono text-nerv-blue flex-1 truncate">
+                    <span className="text-[12px] font-mono text-nerv-blue flex-1 truncate">
                       @{normalizeHandle(a.handle)}
                     </span>
                     <NervBadge
@@ -370,7 +370,7 @@ export function EntityPanel({
                       variant="muted"
                       size="sm"
                     />
-                    <span className="text-[10px] font-mono tabular-nums text-nerv-text-secondary">
+                    <span className="text-[12px] font-mono tabular-nums text-nerv-text-secondary">
                       {a.mentionCount}
                     </span>
                   </button>
@@ -381,7 +381,7 @@ export function EntityPanel({
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center">
-          <span className="text-[10px] font-mono text-nerv-text-muted">SELECT AN ENTITY</span>
+          <span className="text-[12px] font-mono text-nerv-text-muted">SELECT AN ENTITY</span>
         </div>
       )}
     </div>

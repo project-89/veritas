@@ -51,9 +51,9 @@ const PLATFORM_COLORS: Record<string, string> = {
 };
 
 const TIER_STYLES: Record<number, { dotColor: string; textClass: string; label: string }> = {
-  1: { dotColor: '#FF6B2B', textClass: 'text-[10px] font-bold', label: 'Direct' },
-  2: { dotColor: '#0ea5e9', textClass: 'text-[10px]', label: 'Contextual' },
-  3: { dotColor: '#555570', textClass: 'text-[9px]', label: 'Bridge' },
+  1: { dotColor: '#FF6B2B', textClass: 'text-[12px] font-bold', label: 'Direct' },
+  2: { dotColor: '#0ea5e9', textClass: 'text-[12px]', label: 'Contextual' },
+  3: { dotColor: '#555570', textClass: 'text-[11px]', label: 'Bridge' },
 };
 
 function getTierStyle(tier: Connection['tier']) {
@@ -241,12 +241,12 @@ function ConnectionRow({
           backgroundColor: PLATFORM_COLORS[connection.platform.toLowerCase()] ?? '#888',
         }}
       />
-      <span className="text-[8px] font-mono text-nerv-text-muted uppercase shrink-0 w-12 text-left">
+      <span className="text-[10px] font-mono text-nerv-text-muted uppercase shrink-0 w-12 text-left">
         {connection.platform.slice(0, 6)}
       </span>
 
       {/* Interaction count */}
-      <span className="text-[9px] font-mono tabular-nums text-nerv-text-muted shrink-0 w-6 text-right">
+      <span className="text-[11px] font-mono tabular-nums text-nerv-text-muted shrink-0 w-6 text-right">
         {connection.interactionCount}
       </span>
 
@@ -284,7 +284,7 @@ function UserConnectionGroup({
             backgroundColor: PLATFORM_COLORS[node.platform.toLowerCase()] ?? '#888',
           }}
         />
-        <span className="text-[10px] font-mono font-bold text-nerv-text truncate flex-1 text-left">
+        <span className="text-[12px] font-mono font-bold text-nerv-text truncate flex-1 text-left">
           @{node.handle}
         </span>
         <div className="flex items-center gap-1">
@@ -304,7 +304,7 @@ function UserConnectionGroup({
           const style = getTierStyle(tier);
           return (
             <div key={tier}>
-              <div className="text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted px-2 pt-1">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted px-2 pt-1">
                 {style.label} ({tierConns.length})
               </div>
               {tierConns.map((c) => (
@@ -341,22 +341,22 @@ export function SocialGraphPanel({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-nerv-text-muted text-3xl mb-3">{'\u25CE'}</div>
-          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
+          <div className="text-[13px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
             SOCIAL GRAPH
           </div>
-          <div className="text-[11px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed">
+          <div className="text-[13px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed">
             Run an investigation on a narrative to map social connections.
           </div>
           {onTriggerAnalysis && (
             <button
               type="button"
               onClick={onTriggerAnalysis}
-              className="mt-4 px-4 py-2 text-[10px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors font-bold"
+              className="mt-4 px-4 py-2 text-[12px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors font-bold"
             >
               ANALYZE TOP NARRATIVE
             </button>
           )}
-          <div className="text-[11px] font-mono text-nerv-orange mt-3 max-w-[320px] leading-relaxed">
+          <div className="text-[13px] font-mono text-nerv-orange mt-3 max-w-[320px] leading-relaxed">
             {'\u2192'} Select a narrative in the left panel, then click{' '}
             <span className="font-bold">INVESTIGATE THIS NARRATIVE</span> in the right panel.
           </div>
@@ -370,10 +370,10 @@ export function SocialGraphPanel({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-nerv-text-muted text-3xl mb-3">{'\u25CE'}</div>
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
             NO CONNECTIONS FOUND
           </div>
-          <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[280px] leading-relaxed">
+          <div className="text-[12px] font-mono text-nerv-text-secondary max-w-[280px] leading-relaxed">
             Investigation completed but no social connections could be derived from the data.
           </div>
         </div>
@@ -389,7 +389,7 @@ export function SocialGraphPanel({
       {/* Community summary header */}
       <div className="shrink-0 px-3 py-2 border-b border-nerv-border bg-nerv-bg">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-[10px] font-mono font-bold text-nerv-orange uppercase tracking-wider">
+          <span className="text-[12px] font-mono font-bold text-nerv-orange uppercase tracking-wider">
             Social Graph
           </span>
           <div className="flex items-center gap-2">
@@ -406,7 +406,7 @@ export function SocialGraphPanel({
 
         {/* Legend */}
         <div className="flex items-center gap-3 mt-1.5">
-          <span className="text-[8px] font-mono uppercase tracking-widest text-nerv-text-muted">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
             TIERS:
           </span>
           {([1, 2, 3] as const).map((tier) => {
@@ -414,7 +414,7 @@ export function SocialGraphPanel({
             return (
               <span
                 key={tier}
-                className="flex items-center gap-1 text-[8px] font-mono text-nerv-text-muted"
+                className="flex items-center gap-1 text-[10px] font-mono text-nerv-text-muted"
               >
                 <span
                   className="inline-block w-1.5 h-1.5 rounded-full"
@@ -429,7 +429,7 @@ export function SocialGraphPanel({
         {/* Bridge node callout */}
         {community.bridgeNodes.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1.5">
-            <span className="text-[8px] font-mono uppercase text-nerv-amber shrink-0">
+            <span className="text-[10px] font-mono uppercase text-nerv-amber shrink-0">
               Bridges:
             </span>
             {community.bridgeNodes.map((handle) => (
@@ -437,7 +437,7 @@ export function SocialGraphPanel({
                 key={handle}
                 type="button"
                 onClick={() => onSelectActor?.(handle)}
-                className="text-[8px] font-mono text-nerv-text-secondary hover:text-nerv-orange transition-colors"
+                className="text-[10px] font-mono text-nerv-text-secondary hover:text-nerv-orange transition-colors"
               >
                 @{handle}
               </button>

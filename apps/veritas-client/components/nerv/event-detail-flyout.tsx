@@ -36,7 +36,7 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
     <div className="w-[320px] shrink-0 bg-nerv-bg-panel border-l border-nerv-border flex flex-col overflow-y-auto animate-in slide-in-from-right duration-200">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-nerv-border">
-        <span className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-secondary">
+        <span className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-secondary">
           Event Detail
         </span>
         <button
@@ -58,7 +58,7 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
           {/* Severity badge */}
           <span
             className={[
-              'px-2 py-0.5 rounded-sm text-[9px] font-mono uppercase tracking-wider',
+              'px-2 py-0.5 rounded-sm text-[11px] font-mono uppercase tracking-wider',
               SEVERITY_STYLES[event.severity] ?? SEVERITY_STYLES.low,
             ].join(' ')}
           >
@@ -67,7 +67,7 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
 
           {/* Category badge */}
           <span
-            className="px-2 py-0.5 rounded-sm text-[9px] font-mono uppercase tracking-wider"
+            className="px-2 py-0.5 rounded-sm text-[11px] font-mono uppercase tracking-wider"
             style={{
               background: `${EVENT_COLORS[event.category]}20`,
               color: EVENT_COLORS[event.category],
@@ -80,16 +80,16 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
         {/* Source + Timestamp */}
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted w-14">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted w-14">
               Source
             </span>
-            <span className="text-[10px] font-mono text-nerv-text-secondary">{event.source}</span>
+            <span className="text-[12px] font-mono text-nerv-text-secondary">{event.source}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted w-14">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted w-14">
               Time
             </span>
-            <span className="text-[10px] font-mono text-nerv-text-secondary tabular-nums">
+            <span className="text-[12px] font-mono text-nerv-text-secondary tabular-nums">
               {formatTimestamp(event.timestamp)}
             </span>
           </div>
@@ -97,11 +97,11 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
 
         {/* Location */}
         <div className="bg-nerv-bg border border-nerv-border rounded-sm p-2.5">
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
             Location
           </div>
-          <div className="text-[11px] font-mono text-nerv-text">{event.location.label}</div>
-          <div className="text-[9px] font-mono text-nerv-text-muted mt-0.5 tabular-nums">
+          <div className="text-[13px] font-mono text-nerv-text">{event.location.label}</div>
+          <div className="text-[11px] font-mono text-nerv-text-muted mt-0.5 tabular-nums">
             {event.location.lat.toFixed(4)}, {event.location.lng.toFixed(4)}
             {event.location.countryCode && ` (${event.location.countryCode})`}
           </div>
@@ -109,10 +109,10 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
 
         {/* Description */}
         <div>
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
             Description
           </div>
-          <p className="text-[11px] font-mono text-nerv-text-secondary leading-relaxed">
+          <p className="text-[13px] font-mono text-nerv-text-secondary leading-relaxed">
             {event.description}
           </p>
         </div>
@@ -120,16 +120,16 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
         {/* Metadata */}
         {metaEntries.length > 0 && (
           <div>
-            <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+            <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
               Metadata
             </div>
             <div className="bg-nerv-bg border border-nerv-border rounded-sm divide-y divide-nerv-border">
               {metaEntries.map(([key, value]) => (
                 <div key={key} className="flex items-center justify-between px-2.5 py-1.5">
-                  <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted">
                     {key}
                   </span>
-                  <span className="text-[10px] font-mono text-nerv-text-secondary tabular-nums">
+                  <span className="text-[12px] font-mono text-nerv-text-secondary tabular-nums">
                     {String(value)}
                   </span>
                 </div>
@@ -141,7 +141,7 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
         {/* Investigate button */}
         <Link
           href={`/search?q=${encodeURIComponent(event.title)}`}
-          className="flex items-center justify-center w-full px-4 py-2.5 bg-nerv-orange/15 border border-nerv-orange/30 rounded-sm text-[10px] font-mono uppercase tracking-widest text-nerv-orange hover:bg-nerv-orange/25 transition-colors"
+          className="flex items-center justify-center w-full px-4 py-2.5 bg-nerv-orange/15 border border-nerv-orange/30 rounded-sm text-[12px] font-mono uppercase tracking-widest text-nerv-orange hover:bg-nerv-orange/25 transition-colors"
         >
           Investigate This
         </Link>

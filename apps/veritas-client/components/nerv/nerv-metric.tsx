@@ -32,7 +32,7 @@ export function NervMetric({
   const trendIcon = trend ? trendIcons[trend] : null;
   return (
     <div className="flex flex-col gap-0.5 px-3 py-2">
-      <span className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
+      <span className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted">
         {label}
       </span>
       <div className="flex items-baseline gap-1.5">
@@ -44,10 +44,10 @@ export function NervMetric({
           {value}
         </span>
         {unit && (
-          <span className="text-[10px] font-mono text-nerv-text-muted uppercase">{unit}</span>
+          <span className="text-[12px] font-mono text-nerv-text-muted uppercase">{unit}</span>
         )}
         {trendIcon && (
-          <span className={['text-[10px]', trendIcon.color].join(' ')}>
+          <span className={['text-[12px]', trendIcon.color].join(' ')}>
             {trendIcon.symbol}
           </span>
         )}

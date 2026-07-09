@@ -20,8 +20,8 @@ const variantStyles: Record<string, string> = {
 };
 
 const sizeStyles: Record<string, string> = {
-  sm: 'text-[10px] px-1.5 py-0.5',
-  md: 'text-[11px] px-2.5 py-1',
+  sm: 'text-[12px] px-1.5 py-0.5',
+  md: 'text-[13px] px-2.5 py-1',
 };
 
 export function NervBadge({ label, variant, size = 'sm', pulse = false }: NervBadgeProps) {

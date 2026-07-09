@@ -40,14 +40,14 @@ export function SaturationIndicator({ saturation, onSuggestDeepScan }: Saturatio
       </div>
 
       {/* Metrics summary */}
-      <span className="text-[9px] text-nerv-text-secondary tracking-wide">
+      <span className="text-[11px] text-nerv-text-secondary tracking-wide">
         {saturation.narrativeCount} narratives {'\u00B7'} {saturation.postCount} posts {'\u00B7'}{' '}
         {Math.round(saturation.unclusteredRatio * 100)}% unclustered
       </span>
 
       {/* Recommendation (only for low/moderate) */}
       {(saturation.saturationLevel === 'low' || saturation.saturationLevel === 'moderate') && (
-        <span className="text-[8px] text-nerv-text-muted italic max-w-[200px] truncate">
+        <span className="text-[10px] text-nerv-text-muted italic max-w-[200px] truncate">
           {saturation.recommendation}
         </span>
       )}
@@ -57,7 +57,7 @@ export function SaturationIndicator({ saturation, onSuggestDeepScan }: Saturatio
         <button
           type="button"
           onClick={onSuggestDeepScan}
-          className="text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 border border-nerv-orange/40 text-nerv-orange rounded-sm hover:bg-nerv-orange/10 transition-colors"
+          className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 border border-nerv-orange/40 text-nerv-orange rounded-sm hover:bg-nerv-orange/10 transition-colors"
         >
           Deep Scan
         </button>

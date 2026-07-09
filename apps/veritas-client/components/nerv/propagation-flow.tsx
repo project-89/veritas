@@ -359,13 +359,13 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-nerv-text-muted text-3xl mb-3">{'\u25CE'}</div>
-          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
+          <div className="text-[13px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
             PROPAGATION FLOW
           </div>
-          <div className="text-[11px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed">
+          <div className="text-[13px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed">
             Shows how a narrative spreads from origin through amplifiers across platforms.
           </div>
-          <div className="text-[11px] font-mono text-nerv-orange mt-3 max-w-[320px] leading-relaxed">
+          <div className="text-[13px] font-mono text-nerv-orange mt-3 max-w-[320px] leading-relaxed">
             {'\u2192'} Select a narrative in the left panel, then click the{' '}
             <span className="font-bold">INVESTIGATE THIS NARRATIVE</span> button in the right panel.
           </div>
@@ -379,10 +379,10 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-nerv-text-muted text-3xl mb-3">{'\u25CE'}</div>
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
             INSUFFICIENT DATA
           </div>
-          <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[280px] leading-relaxed">
+          <div className="text-[12px] font-mono text-nerv-text-secondary max-w-[280px] leading-relaxed">
             Investigation completed but no propagation data could be extracted.
           </div>
         </div>
@@ -397,23 +397,23 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       </div>
       {/* Legend bar */}
       <div className="shrink-0 px-3 py-1.5 border-t border-nerv-border bg-nerv-bg flex items-center gap-4 flex-wrap">
-        <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+        <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
           LEGEND:
         </span>
-        <span className="text-[9px] font-mono text-nerv-orange flex items-center gap-1">
+        <span className="text-[11px] font-mono text-nerv-orange flex items-center gap-1">
           <span className="inline-block w-2 h-2 rounded-full bg-nerv-orange shadow-[0_0_6px_rgba(255,107,43,0.6)]" />
           ORIGIN
         </span>
-        <span className="text-[9px] font-mono text-nerv-red flex items-center gap-1">
+        <span className="text-[11px] font-mono text-nerv-red flex items-center gap-1">
           <span className="inline-block w-2 h-2 rounded-full border border-nerv-red animate-pulse" />
           BOT
         </span>
-        <span className="text-[9px] font-mono text-nerv-red/60 flex items-center gap-1">
+        <span className="text-[11px] font-mono text-nerv-red/60 flex items-center gap-1">
           <span className="inline-block w-3 h-2 border border-dashed border-nerv-red/40" />
           COORD CLUSTER
         </span>
         {platforms.map((p) => (
-          <span key={p} className="text-[9px] font-mono flex items-center gap-1">
+          <span key={p} className="text-[11px] font-mono flex items-center gap-1">
             <span
               className="inline-block w-2 h-2"
               style={{ backgroundColor: PLATFORM_COLORS[p] ?? '#8888a0' }}

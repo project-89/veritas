@@ -75,7 +75,7 @@ export function PlatformCredibilityBadge({ platform, size = 'sm' }: PlatformCred
 
   const isSm = size === 'sm';
   const barH = isSm ? 3 : 4;
-  const textSize = isSm ? 'text-[9px]' : 'text-[10px]';
+  const textSize = isSm ? 'text-[11px]' : 'text-[12px]';
 
   return (
     <div className="group relative inline-flex flex-col items-center">
@@ -106,7 +106,7 @@ export function PlatformCredibilityBadge({ platform, size = 'sm' }: PlatformCred
 
       {/* Tooltip */}
       <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-sm border border-nerv-border bg-nerv-bg-elevated px-2 py-1 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-        <span className="text-[9px] font-mono text-nerv-text">
+        <span className="text-[11px] font-mono text-nerv-text">
           {platform.charAt(0).toUpperCase() + platform.slice(1)} &mdash; Credibility: {credPct}% |
           Influence: {inflPct}% | Manipulation Risk: {risk}
         </span>

@@ -249,7 +249,7 @@ export default function MonitorPage() {
         <div className="w-[260px] shrink-0 border-r border-nerv-border overflow-y-auto">
           <div className="p-2">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+              <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
                 Investigations
               </span>
               <div className="flex items-center gap-3">
@@ -257,7 +257,7 @@ export default function MonitorPage() {
                   <button
                     type="button"
                     onClick={() => router.push('/atlas')}
-                    className="text-[8px] font-mono uppercase text-nerv-text-muted hover:text-nerv-orange"
+                    className="text-[10px] font-mono uppercase text-nerv-text-muted hover:text-nerv-orange"
                   >
                     ATLAS
                   </button>
@@ -265,7 +265,7 @@ export default function MonitorPage() {
                 <button
                   type="button"
                   onClick={() => router.push('/search')}
-                  className="text-[8px] font-mono uppercase text-nerv-orange hover:underline"
+                  className="text-[10px] font-mono uppercase text-nerv-orange hover:underline"
                 >
                   + New Scan
                 </button>
@@ -277,7 +277,7 @@ export default function MonitorPage() {
                 <div className="w-4 h-4 border-2 border-nerv-border border-t-nerv-blue rounded-full animate-spin" />
               </div>
             ) : investigations.length === 0 ? (
-              <div className="py-8 text-center text-[10px] font-mono text-nerv-text-muted">
+              <div className="py-8 text-center text-[12px] font-mono text-nerv-text-muted">
                 No investigations yet
               </div>
             ) : (
@@ -300,7 +300,7 @@ export default function MonitorPage() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-mono text-nerv-text truncate">
+                        <span className="text-[13px] font-mono text-nerv-text truncate">
                           {inv.name || inv.query}
                         </span>
                         <NervBadge
@@ -310,11 +310,11 @@ export default function MonitorPage() {
                         />
                       </div>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[8px] font-mono text-nerv-text-muted">
+                        <span className="text-[10px] font-mono text-nerv-text-muted">
                           {timeAgo(inv.updatedAt as unknown as string)}
                         </span>
                         {inv.settings?.platforms?.length > 0 && (
-                          <span className="text-[8px] font-mono text-nerv-text-muted">
+                          <span className="text-[10px] font-mono text-nerv-text-muted">
                             {inv.settings.platforms.length} sources
                           </span>
                         )}
@@ -365,7 +365,7 @@ export default function MonitorPage() {
                           <span className="text-xs font-mono text-nerv-text">
                             {inv.name || inv.query}
                           </span>
-                          <span className="text-[9px] font-mono text-nerv-text-muted ml-2">
+                          <span className="text-[11px] font-mono text-nerv-text-muted ml-2">
                             {timeAgo(inv.updatedAt as unknown as string)}
                           </span>
                         </div>
@@ -377,7 +377,7 @@ export default function MonitorPage() {
                               if (!investigationId) return;
                               router.push(`/investigate/${investigationId}`);
                             }}
-                            className="text-[9px] font-mono uppercase text-nerv-orange hover:underline tracking-widest"
+                            className="text-[11px] font-mono uppercase text-nerv-orange hover:underline tracking-widest"
                           >
                             Investigate
                           </button>
@@ -391,7 +391,7 @@ export default function MonitorPage() {
                                 current === investigationId ? null : investigationId,
                               );
                             }}
-                            className="w-6 h-6 flex items-center justify-center border border-nerv-border text-nerv-text-muted hover:text-nerv-text hover:border-nerv-text-muted rounded-sm text-[12px] font-mono"
+                            className="w-6 h-6 flex items-center justify-center border border-nerv-border text-nerv-text-muted hover:text-nerv-text hover:border-nerv-text-muted rounded-sm text-[14px] font-mono"
                             aria-label={`Actions for ${inv.name || inv.query}`}
                           >
                             ...
@@ -408,28 +408,28 @@ export default function MonitorPage() {
                                 setMenuOpenInvId(null);
                                 router.push(`/investigate/${investigationId}`);
                               }}
-                              className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
+                              className="w-full px-3 py-2 text-left text-[12px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
                             >
                               Open
                             </button>
                             <button
                               type="button"
                               onClick={() => void handleRenameInvestigation(inv)}
-                              className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
+                              className="w-full px-3 py-2 text-left text-[12px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
                             >
                               Rename
                             </button>
                             <button
                               type="button"
                               onClick={() => void handleArchiveInvestigation(inv)}
-                              className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
+                              className="w-full px-3 py-2 text-left text-[12px] font-mono uppercase tracking-widest text-nerv-text hover:bg-nerv-bg-elevated/30"
                             >
                               Archive
                             </button>
                             <button
                               type="button"
                               onClick={() => void handleDeleteInvestigation(inv)}
-                              className="w-full px-3 py-2 text-left text-[10px] font-mono uppercase tracking-widest text-nerv-red hover:bg-nerv-red/10"
+                              className="w-full px-3 py-2 text-left text-[12px] font-mono uppercase tracking-widest text-nerv-red hover:bg-nerv-red/10"
                             >
                               Delete
                             </button>
@@ -450,7 +450,7 @@ export default function MonitorPage() {
               >
                 <div className="p-4 space-y-3">
                   {previewError && (
-                    <div className="px-3 py-2 border border-nerv-red/40 bg-nerv-red/10 text-[10px] font-mono text-nerv-red">
+                    <div className="px-3 py-2 border border-nerv-red/40 bg-nerv-red/10 text-[12px] font-mono text-nerv-red">
                       Preview load issue: {previewError}
                     </div>
                   )}
@@ -494,7 +494,7 @@ export default function MonitorPage() {
                             if (!investigationId) return;
                             router.push(`/investigate/${investigationId}`);
                           }}
-                          className="px-4 py-2 bg-nerv-orange/20 border border-nerv-orange/50 text-nerv-orange text-[10px] font-mono uppercase tracking-widest hover:bg-nerv-orange/30 transition-all"
+                          className="px-4 py-2 bg-nerv-orange/20 border border-nerv-orange/50 text-nerv-orange text-[12px] font-mono uppercase tracking-widest hover:bg-nerv-orange/30 transition-all"
                         >
                           Open Investigation
                         </button>
@@ -505,14 +505,14 @@ export default function MonitorPage() {
                               `/search?q=${encodeURIComponent(preview.investigation.query)}`,
                             )
                           }
-                          className="px-4 py-2 bg-nerv-bg border border-nerv-border text-nerv-text-muted text-[10px] font-mono uppercase tracking-widest hover:border-nerv-text-muted transition-all"
+                          className="px-4 py-2 bg-nerv-bg border border-nerv-border text-nerv-text-muted text-[12px] font-mono uppercase tracking-widest hover:border-nerv-text-muted transition-all"
                         >
                           Re-scan
                         </button>
                       </div>
 
                       {previewLoading && (
-                        <div className="flex items-center gap-2 text-[9px] font-mono text-nerv-text-muted uppercase tracking-widest">
+                        <div className="flex items-center gap-2 text-[11px] font-mono text-nerv-text-muted uppercase tracking-widest">
                           <div className="w-3 h-3 border-2 border-nerv-border border-t-nerv-orange rounded-full animate-spin" />
                           Refreshing Preview
                         </div>
@@ -533,7 +533,7 @@ export default function MonitorPage() {
         <div className="w-[320px] shrink-0 border-l border-nerv-border overflow-y-auto">
           <div className="p-2">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+              <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
                 Alert Feed{' '}
                 {unreadCount > 0 && (
                   <NervBadge label={String(unreadCount)} variant="red" size="sm" />
@@ -543,7 +543,7 @@ export default function MonitorPage() {
                 <button
                   type="button"
                   onClick={handleMarkAllRead}
-                  className="text-[8px] font-mono uppercase text-nerv-text-muted hover:text-nerv-text-secondary"
+                  className="text-[10px] font-mono uppercase text-nerv-text-muted hover:text-nerv-text-secondary"
                 >
                   Mark All Read
                 </button>
@@ -557,7 +557,7 @@ export default function MonitorPage() {
                   key={f}
                   type="button"
                   onClick={() => setAlertFilter(f)}
-                  className={`text-[8px] font-mono uppercase px-2 py-0.5 border rounded-sm transition-all ${
+                  className={`text-[10px] font-mono uppercase px-2 py-0.5 border rounded-sm transition-all ${
                     alertFilter === f
                       ? 'border-nerv-orange text-nerv-orange'
                       : 'border-nerv-border text-nerv-text-muted hover:border-nerv-text-muted'
@@ -571,7 +571,7 @@ export default function MonitorPage() {
             {/* Alert list */}
             <div className="space-y-1">
               {filteredAlerts.length === 0 ? (
-                <div className="py-6 text-center text-[10px] font-mono text-nerv-text-muted">
+                <div className="py-6 text-center text-[12px] font-mono text-nerv-text-muted">
                   No alerts
                 </div>
               ) : (

@@ -75,7 +75,7 @@ export function NervTable<T>({
                 key={col.key}
                 style={col.width ? { width: col.width } : undefined}
                 className={[
-                  'px-3 py-1.5 text-left text-[10px] uppercase tracking-widest text-nerv-text-muted font-normal',
+                  'px-3 py-1.5 text-left text-[12px] uppercase tracking-widest text-nerv-text-muted font-normal',
                   col.sortable ? 'cursor-pointer hover:text-nerv-text-secondary select-none' : '',
                 ].join(' ')}
                 onClick={col.sortable ? () => handleSort(col.key) : undefined}

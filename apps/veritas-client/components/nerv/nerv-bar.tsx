@@ -27,7 +27,7 @@ export function NervBar({
         />
       </div>
       {showLabel && (
-        <span className="text-[10px] font-mono tabular-nums text-nerv-text-secondary w-8 text-right shrink-0">
+        <span className="text-[12px] font-mono tabular-nums text-nerv-text-secondary w-8 text-right shrink-0">
           {pct}%
         </span>
       )}

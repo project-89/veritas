@@ -134,7 +134,7 @@ export function ScanHistoryBar({
     <div className="px-4 py-1.5 border-b border-nerv-border/50 bg-nerv-bg">
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+        <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
           Data Coverage &middot; {dataSegments.length} scans
           {segments.some((s) => s.type === 'gap') && (
             <span className="text-nerv-amber ml-1">
@@ -145,7 +145,7 @@ export function ScanHistoryBar({
         </span>
         {hovered ? (
           <span
-            className={`text-[9px] font-mono tabular-nums ${
+            className={`text-[11px] font-mono tabular-nums ${
               hovered.type === 'gap'
                 ? 'text-nerv-amber'
                 : hovered.isCurrent
@@ -158,7 +158,7 @@ export function ScanHistoryBar({
               : `${shortDateTime(hovered.start)} \u2192 ${shortDateTime(hovered.end)} \u00B7 ${hovered.posts} posts \u00B7 ${hovered.timeRange}`}
           </span>
         ) : (
-          <span className="text-[9px] font-mono text-nerv-text-muted tabular-nums">
+          <span className="text-[11px] font-mono text-nerv-text-muted tabular-nums">
             {shortDate(totalStart)} {'\u2192'} {shortDate(totalEnd)}
           </span>
         )}

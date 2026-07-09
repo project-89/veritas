@@ -162,7 +162,7 @@ export function ActorsMatrix({
               <NervBar value={v} color={color} showLabel height={5} />
               {isDefault && (
                 <div className="hidden group-hover:block absolute z-10 bottom-full left-0 mb-1 px-2 py-1 bg-nerv-bg-elevated border border-nerv-border rounded-sm shadow-lg whitespace-nowrap">
-                  <span className="text-[9px] font-mono text-nerv-text-secondary">
+                  <span className="text-[11px] font-mono text-nerv-text-secondary">
                     Run INVESTIGATE on a narrative for detailed credibility analysis
                   </span>
                 </div>
@@ -217,7 +217,7 @@ export function ActorsMatrix({
                 <NervBadge key={f} label={f} variant="red" size="sm" />
               ))}
               {flags.length > 3 && (
-                <span className="text-[8px] text-nerv-text-muted">+{flags.length - 3}</span>
+                <span className="text-[10px] text-nerv-text-muted">+{flags.length - 3}</span>
               )}
             </div>
           );
@@ -236,10 +236,10 @@ export function ActorsMatrix({
           <div className="flex items-start gap-2">
             <span className="text-nerv-orange text-sm mt-0.5">{'\u26A0'}</span>
             <div>
-              <p className="text-[11px] font-mono text-nerv-orange font-bold uppercase tracking-wider">
+              <p className="text-[13px] font-mono text-nerv-orange font-bold uppercase tracking-wider">
                 Limited data — no investigation run
               </p>
-              <p className="text-[10px] font-mono text-nerv-text-muted mt-1 leading-relaxed">
+              <p className="text-[12px] font-mono text-nerv-text-muted mt-1 leading-relaxed">
                 Credibility, bot detection, and influence scores require a deep investigation.
                 Select a narrative in the left panel, then click{' '}
                 <span className="text-nerv-orange">INVESTIGATE THIS NARRATIVE</span> in the detail

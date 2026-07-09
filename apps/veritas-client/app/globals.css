@@ -12,25 +12,27 @@
   [data-theme="dark"] {
     --font-jetbrains: "JetBrains Mono";
     --font-inter: "Inter";
-    --nerv-bg-deep: 8 11 20;
-    --nerv-bg: 14 18 31;
-    --nerv-bg-panel: 24 30 50;
-    --nerv-bg-elevated: 35 43 72;
-    --nerv-border: 63 74 112;
-    --nerv-border-active: 95 109 160;
-    --nerv-text: 238 242 255;
-    --nerv-text-secondary: 178 188 226;
-    --nerv-text-muted: 124 136 179;
-    --nerv-orange: 255 133 61;
-    --nerv-green: 61 255 133;
-    --nerv-red: 255 102 127;
-    --nerv-blue: 72 194 255;
-    --nerv-amber: 255 191 74;
-    --nerv-purple: 191 122 255;
-    --nerv-scanline-color: rgba(61, 255, 133, 0.018);
-    --nerv-scrollbar-track: #09101d;
-    --nerv-scrollbar-thumb: #3f4d75;
-    --nerv-scrollbar-thumb-hover: #566792;
+    /* Lifted off pure-black and greys brightened for readability — keeps the
+       tactical dark identity but with real contrast (was too dark/low-contrast). */
+    --nerv-bg-deep: 13 17 28;
+    --nerv-bg: 20 25 40;
+    --nerv-bg-panel: 32 39 62;
+    --nerv-bg-elevated: 46 56 88;
+    --nerv-border: 88 100 142;
+    --nerv-border-active: 122 137 188;
+    --nerv-text: 240 244 255;
+    --nerv-text-secondary: 200 210 240;
+    --nerv-text-muted: 158 170 210;
+    --nerv-orange: 255 146 74;
+    --nerv-green: 74 240 140;
+    --nerv-red: 255 112 136;
+    --nerv-blue: 96 200 255;
+    --nerv-amber: 255 198 92;
+    --nerv-purple: 200 140 255;
+    --nerv-scanline-color: rgba(74, 240, 140, 0.016);
+    --nerv-scrollbar-track: #0d111c;
+    --nerv-scrollbar-thumb: #58648e;
+    --nerv-scrollbar-thumb-hover: #7a89bc;
   }
 
   /* ── LIGHT THEME (NERV — clean white command center) ── */

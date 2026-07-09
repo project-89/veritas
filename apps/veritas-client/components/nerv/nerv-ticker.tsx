@@ -30,7 +30,7 @@ export function NervTicker({ items, onItemClick }: NervTickerProps) {
               key={`${item.id}:${item.timestamp}:${pass}`}
               type="button"
               onClick={onItemClick ? () => onItemClick(item.id) : undefined}
-              className="inline-flex items-center gap-2 px-5 text-[11px] font-mono shrink-0 hover:bg-nerv-bg-elevated/40 transition-colors h-8"
+              className="inline-flex items-center gap-2 px-5 text-[13px] font-mono shrink-0 hover:bg-nerv-bg-elevated/40 transition-colors h-8"
             >
               <span
                 className={[

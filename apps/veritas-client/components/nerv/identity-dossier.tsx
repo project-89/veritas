@@ -79,14 +79,14 @@ function ProfileImageDisplay({ identity }: { identity: IdentityRecord }) {
           )}
         </div>
         {identity.displayName && identity.displayName !== identity.primaryHandle && (
-          <span className="text-[10px] font-mono text-nerv-text-secondary">
+          <span className="text-[12px] font-mono text-nerv-text-secondary">
             {identity.displayName}
           </span>
         )}
         <div className="flex items-center gap-2 mt-0.5">
           <NervBadge label={identity.primaryPlatform} variant="blue" size="sm" />
           {identity.totalInvestigations > 0 && (
-            <span className="text-[9px] font-mono text-nerv-text-muted">
+            <span className="text-[11px] font-mono text-nerv-text-muted">
               {identity.totalInvestigations} investigation
               {identity.totalInvestigations !== 1 ? 's' : ''}
             </span>
@@ -108,7 +108,7 @@ function AuthorStats({ identity }: { identity: IdentityRecord }) {
           <div className="text-xs font-mono font-bold text-nerv-text">
             {formatNumber(ap.followersCount)}
           </div>
-          <div className="text-[8px] font-mono text-nerv-text-muted uppercase">Followers</div>
+          <div className="text-[10px] font-mono text-nerv-text-muted uppercase">Followers</div>
         </div>
       )}
       {ap.followingCount != null && (
@@ -116,7 +116,7 @@ function AuthorStats({ identity }: { identity: IdentityRecord }) {
           <div className="text-xs font-mono font-bold text-nerv-text">
             {formatNumber(ap.followingCount)}
           </div>
-          <div className="text-[8px] font-mono text-nerv-text-muted uppercase">Following</div>
+          <div className="text-[10px] font-mono text-nerv-text-muted uppercase">Following</div>
         </div>
       )}
       {ap.postsCount != null && (
@@ -124,7 +124,7 @@ function AuthorStats({ identity }: { identity: IdentityRecord }) {
           <div className="text-xs font-mono font-bold text-nerv-text">
             {formatNumber(ap.postsCount)}
           </div>
-          <div className="text-[8px] font-mono text-nerv-text-muted uppercase">Posts</div>
+          <div className="text-[10px] font-mono text-nerv-text-muted uppercase">Posts</div>
         </div>
       )}
     </div>
@@ -157,11 +157,11 @@ function CrossPlatformMap({ identity }: { identity: IdentityRecord }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
+        <div className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted">
           Cross-Platform Presence
         </div>
         {grouped.extended.length > 0 && (
-          <div className="text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">
             +{grouped.extended.length} extended match{grouped.extended.length === 1 ? '' : 'es'}
           </div>
         )}
@@ -171,7 +171,7 @@ function CrossPlatformMap({ identity }: { identity: IdentityRecord }) {
           if (accounts.length === 0) return null;
           return (
             <div key={tier} className="space-y-1">
-              <div className="text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">
                 {DISCOVERY_TIER_LABELS[tier]}
               </div>
               <div className="flex flex-wrap gap-1">
@@ -190,14 +190,14 @@ function CrossPlatformMap({ identity }: { identity: IdentityRecord }) {
                         backgroundColor: PLATFORM_COLORS[account.platform] ?? '#888',
                       }}
                     />
-                    <span className="text-[9px] font-mono text-nerv-text-secondary">
+                    <span className="text-[11px] font-mono text-nerv-text-secondary">
                       @{account.handle}
                     </span>
-                    <span className="text-[8px] font-mono uppercase text-nerv-text-muted">
+                    <span className="text-[10px] font-mono uppercase text-nerv-text-muted">
                       {account.platform}
                     </span>
                     {account.verified && (
-                      <span className="text-[8px] text-nerv-green">{'\u2713'}</span>
+                      <span className="text-[10px] text-nerv-green">{'\u2713'}</span>
                     )}
                   </a>
                 ))}
@@ -217,7 +217,7 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
   return (
     <div className="grid grid-cols-2 gap-2">
       <div className="p-2 border border-nerv-border rounded-sm">
-        <div className="text-[8px] font-mono uppercase text-nerv-text-muted mb-1">Credibility</div>
+        <div className="text-[10px] font-mono uppercase text-nerv-text-muted mb-1">Credibility</div>
         <div className="flex items-center gap-2">
           <NervBar
             value={identity.currentCredibility ?? 0}
@@ -230,14 +230,14 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
             }
             height={6}
           />
-          <span className="text-[10px] font-mono text-nerv-text tabular-nums w-8 text-right">
+          <span className="text-[12px] font-mono text-nerv-text tabular-nums w-8 text-right">
             {((identity.currentCredibility ?? 0) * 100).toFixed(0)}%
           </span>
         </div>
         {credHistory.length > 1 && <NervSparkline data={credHistory} color="#00FF41" height={20} />}
       </div>
       <div className="p-2 border border-nerv-border rounded-sm">
-        <div className="text-[8px] font-mono uppercase text-nerv-text-muted mb-1">
+        <div className="text-[10px] font-mono uppercase text-nerv-text-muted mb-1">
           Bot Probability
         </div>
         <div className="flex items-center gap-2">
@@ -252,7 +252,7 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
             }
             height={6}
           />
-          <span className="text-[10px] font-mono text-nerv-text tabular-nums w-8 text-right">
+          <span className="text-[12px] font-mono text-nerv-text tabular-nums w-8 text-right">
             {((identity.currentBotProbability ?? 0) * 100).toFixed(0)}%
           </span>
         </div>
@@ -267,14 +267,14 @@ function InvestigationTimeline({ identity }: { identity: IdentityRecord }) {
 
   return (
     <div className="space-y-1">
-      <div className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
+      <div className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted">
         Investigation History ({identity.totalInvestigations})
       </div>
       <div className="space-y-1 max-h-32 overflow-auto">
         {identity.investigations.map((inv) => (
           <div
             key={`${inv.timestamp}-${inv.query}`}
-            className="flex items-center justify-between text-[9px] font-mono px-2 py-1 bg-nerv-bg-elevated/20 rounded-sm"
+            className="flex items-center justify-between text-[11px] font-mono px-2 py-1 bg-nerv-bg-elevated/20 rounded-sm"
           >
             <span className="text-nerv-text-secondary truncate max-w-[150px]">
               &ldquo;{inv.query}&rdquo;
@@ -307,7 +307,7 @@ export function IdentityDossier({ identity, loading, onGenerateProfile }: Identi
   if (loading) {
     return (
       <div className="p-4 text-center">
-        <div className="text-[10px] font-mono text-nerv-amber animate-pulse">
+        <div className="text-[12px] font-mono text-nerv-amber animate-pulse">
           Loading identity record...
         </div>
       </div>
@@ -323,7 +323,7 @@ export function IdentityDossier({ identity, loading, onGenerateProfile }: Identi
 
       {/* Bio */}
       {identity.authorProfile?.bio && (
-        <p className="text-[10px] font-mono text-nerv-text-secondary leading-relaxed">
+        <p className="text-[12px] font-mono text-nerv-text-secondary leading-relaxed">
           {identity.authorProfile.bio}
         </p>
       )}

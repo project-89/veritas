@@ -35,13 +35,13 @@ function ConfidenceBar({ value, label }: { value: number; label?: string }) {
   return (
     <div className="space-y-1">
       {label && (
-        <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
+        <span className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted">
           {label}
         </span>
       )}
       <div className="flex items-center gap-2">
         <NervBar value={value} color={color} />
-        <span className="text-[10px] font-mono tabular-nums text-nerv-text-secondary shrink-0">
+        <span className="text-[12px] font-mono tabular-nums text-nerv-text-secondary shrink-0">
           {(value * 100).toFixed(0)}%
         </span>
       </div>
@@ -51,7 +51,7 @@ function ConfidenceBar({ value, label }: { value: number; label?: string }) {
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted border-b border-nerv-border pb-1 mb-2">
+    <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted border-b border-nerv-border pb-1 mb-2">
       {children}
     </div>
   );
@@ -116,10 +116,10 @@ function EmptyState({ onRunAssessment }: { onRunAssessment?: (type: string) => v
     <div className="flex items-center justify-center h-full">
       <div className="text-center max-w-md space-y-4">
         <div className="text-nerv-text-muted text-3xl mb-2">{'\u2B22'}</div>
-        <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
+        <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted">
           INTELLIGENCE ENGINE
         </div>
-        <div className="text-[10px] font-mono text-nerv-text-secondary leading-relaxed">
+        <div className="text-[12px] font-mono text-nerv-text-secondary leading-relaxed">
           Run an intelligence assessment to analyze narratives for coordinated campaigns, market
           manipulation, crisis signals, influence operations, or legitimacy.
         </div>
@@ -130,7 +130,7 @@ function EmptyState({ onRunAssessment }: { onRunAssessment?: (type: string) => v
               type="button"
               onClick={() => onRunAssessment?.(a.type)}
               disabled={!onRunAssessment}
-              className={`w-full px-4 py-2 text-[9px] font-mono uppercase tracking-wider border ${a.borderColor} ${a.color} ${a.hoverBg} rounded-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2`}
+              className={`w-full px-4 py-2 text-[11px] font-mono uppercase tracking-wider border ${a.borderColor} ${a.color} ${a.hoverBg} rounded-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2`}
             >
               <span>{a.icon}</span>
               <span>{a.label}</span>
@@ -173,7 +173,7 @@ function CampaignReportView({ report }: { report: CoordinatedCampaignReport }) {
         />
       </div>
 
-      <div className="text-[10px] font-mono text-nerv-text-secondary leading-relaxed">
+      <div className="text-[12px] font-mono text-nerv-text-secondary leading-relaxed">
         {report.summary}
       </div>
 
@@ -193,11 +193,11 @@ function CampaignReportView({ report }: { report: CoordinatedCampaignReport }) {
                     variant="amber"
                     size="sm"
                   />
-                  <span className="text-[9px] font-mono tabular-nums text-nerv-text-muted">
+                  <span className="text-[11px] font-mono tabular-nums text-nerv-text-muted">
                     {(signal.confidence * 100).toFixed(0)}% confidence
                   </span>
                 </div>
-                <div className="text-[10px] font-mono text-nerv-text-secondary">
+                <div className="text-[12px] font-mono text-nerv-text-secondary">
                   {signal.description}
                 </div>
                 {signal.actors.length > 0 && (
@@ -205,7 +205,7 @@ function CampaignReportView({ report }: { report: CoordinatedCampaignReport }) {
                     {signal.actors.slice(0, 8).map((a) => (
                       <span
                         key={a}
-                        className="text-[8px] font-mono text-nerv-text-muted bg-nerv-bg-elevated px-1 py-0.5 rounded-sm"
+                        className="text-[10px] font-mono text-nerv-text-muted bg-nerv-bg-elevated px-1 py-0.5 rounded-sm"
                       >
                         @{a}
                       </span>
@@ -223,7 +223,7 @@ function CampaignReportView({ report }: { report: CoordinatedCampaignReport }) {
         <div>
           <SectionHeader>ACTORS ({report.actors.length})</SectionHeader>
           <div className="overflow-x-auto">
-            <table className="w-full text-[9px] font-mono">
+            <table className="w-full text-[11px] font-mono">
               <thead>
                 <tr className="text-nerv-text-muted uppercase tracking-wider">
                   <th className="text-left py-1 pr-2">Handle</th>
@@ -269,11 +269,11 @@ function CampaignReportView({ report }: { report: CoordinatedCampaignReport }) {
                 key={`${ev.timestamp}-${ev.actor}-${ev.event}`}
                 className="flex items-start gap-2"
               >
-                <span className="text-[8px] font-mono tabular-nums text-nerv-text-muted shrink-0 pt-0.5">
+                <span className="text-[10px] font-mono tabular-nums text-nerv-text-muted shrink-0 pt-0.5">
                   {new Date(ev.timestamp).toLocaleString()}
                 </span>
                 <div className="w-1.5 h-1.5 rounded-full bg-nerv-orange mt-1 shrink-0" />
-                <span className="text-[9px] font-mono text-nerv-text-secondary">
+                <span className="text-[11px] font-mono text-nerv-text-secondary">
                   <span className="text-nerv-text-muted">@{ev.actor}</span> {ev.event}
                 </span>
               </div>
@@ -308,7 +308,7 @@ function ManipulationReportView({ report }: { report: MarketManipulationReport }
         />
       </div>
 
-      <div className="text-[10px] font-mono text-nerv-text-secondary leading-relaxed">
+      <div className="text-[12px] font-mono text-nerv-text-secondary leading-relaxed">
         {report.summary}
       </div>
 
@@ -340,17 +340,17 @@ function ManipulationReportView({ report }: { report: MarketManipulationReport }
                     variant={PATTERN_VARIANTS[pattern.type] ?? 'muted'}
                     size="sm"
                   />
-                  <span className="text-[9px] font-mono text-nerv-text-muted">
+                  <span className="text-[11px] font-mono text-nerv-text-muted">
                     ${pattern.ticker}
                   </span>
-                  <span className="text-[9px] font-mono tabular-nums text-nerv-text-muted ml-auto">
+                  <span className="text-[11px] font-mono tabular-nums text-nerv-text-muted ml-auto">
                     {(pattern.confidence * 100).toFixed(0)}% conf
                   </span>
                 </div>
-                <div className="text-[10px] font-mono text-nerv-text-secondary">
+                <div className="text-[12px] font-mono text-nerv-text-secondary">
                   {pattern.description}
                 </div>
-                <div className="flex gap-3 text-[8px] font-mono text-nerv-text-muted">
+                <div className="flex gap-3 text-[10px] font-mono text-nerv-text-muted">
                   <span>Sentiment: {pattern.narrativeSentiment.toFixed(2)}</span>
                   <span>Price: {pattern.priceDirection}</span>
                   <span>Correlation: {pattern.correlation.toFixed(2)}</span>
@@ -389,12 +389,12 @@ function CrisisReportView({ report }: { report: CrisisWarningReport }) {
           variant={SEVERITY_VARIANTS[report.highestSeverity] ?? 'muted'}
           size="md"
         />
-        <span className="text-[9px] font-mono text-nerv-text-muted">
+        <span className="text-[11px] font-mono text-nerv-text-muted">
           {report.totalEventsAnalyzed} events analyzed
         </span>
       </div>
 
-      <div className="text-[10px] font-mono text-nerv-text-secondary leading-relaxed">
+      <div className="text-[12px] font-mono text-nerv-text-secondary leading-relaxed">
         {report.summary}
       </div>
 
@@ -415,15 +415,15 @@ function CrisisReportView({ report }: { report: CrisisWarningReport }) {
                       variant={SEVERITY_VARIANTS[alert.severity] ?? 'muted'}
                       size="sm"
                     />
-                    <span className="text-[10px] font-mono font-bold text-nerv-text-primary">
+                    <span className="text-[12px] font-mono font-bold text-nerv-text-primary">
                       {alert.region}
                     </span>
                   </div>
-                  <span className="text-[8px] font-mono text-nerv-text-muted">
+                  <span className="text-[10px] font-mono text-nerv-text-muted">
                     {alert.sourceCount} source(s)
                   </span>
                 </div>
-                <div className="text-[10px] font-mono text-nerv-text-secondary">
+                <div className="text-[12px] font-mono text-nerv-text-secondary">
                   {alert.description}
                 </div>
                 {alert.narrativeCorrelation > 0.3 && (
@@ -473,7 +473,7 @@ function InfluenceReportView({ report }: { report: InfluenceOperationReport }) {
         />
       </div>
 
-      <div className="text-[10px] font-mono text-nerv-text-secondary leading-relaxed">
+      <div className="text-[12px] font-mono text-nerv-text-secondary leading-relaxed">
         {report.summary}
       </div>
 
@@ -487,18 +487,18 @@ function InfluenceReportView({ report }: { report: InfluenceOperationReport }) {
                 key={`${node.role}-${node.handle}-${node.platform}`}
                 className="flex items-center gap-2"
               >
-                {index > 0 && <span className="text-[8px] text-nerv-text-muted">{'\u2192'}</span>}
+                {index > 0 && <span className="text-[10px] text-nerv-text-muted">{'\u2192'}</span>}
                 <div className="bg-nerv-bg-panel border border-nerv-border rounded-sm px-2 py-1 flex items-center gap-2">
                   <span
-                    className={`text-[9px] font-mono font-bold ${ATTR_ROLE_COLORS[node.role] ?? 'text-nerv-text-muted'}`}
+                    className={`text-[11px] font-mono font-bold ${ATTR_ROLE_COLORS[node.role] ?? 'text-nerv-text-muted'}`}
                   >
                     {node.role.toUpperCase()}
                   </span>
-                  <span className="text-[9px] font-mono text-nerv-text-secondary">
+                  <span className="text-[11px] font-mono text-nerv-text-secondary">
                     @{node.handle}
                   </span>
-                  <span className="text-[8px] font-mono text-nerv-text-muted">{node.platform}</span>
-                  <span className="text-[8px] font-mono tabular-nums text-nerv-text-muted">
+                  <span className="text-[10px] font-mono text-nerv-text-muted">{node.platform}</span>
+                  <span className="text-[10px] font-mono tabular-nums text-nerv-text-muted">
                     {(node.confidence * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -519,14 +519,14 @@ function InfluenceReportView({ report }: { report: InfluenceOperationReport }) {
                 className="bg-nerv-bg-panel border border-nerv-purple/30 rounded-sm p-2 space-y-1"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono font-bold text-nerv-purple">
+                  <span className="text-[12px] font-mono font-bold text-nerv-purple">
                     {b.entity}
                   </span>
-                  <span className="text-[8px] font-mono tabular-nums text-nerv-text-muted">
+                  <span className="text-[10px] font-mono tabular-nums text-nerv-text-muted">
                     {(b.confidence * 100).toFixed(0)}% confidence
                   </span>
                 </div>
-                <div className="text-[9px] font-mono text-nerv-text-secondary">
+                <div className="text-[11px] font-mono text-nerv-text-secondary">
                   {b.howTheyBenefit}
                 </div>
               </div>
@@ -555,7 +555,7 @@ function InfluenceReportView({ report }: { report: InfluenceOperationReport }) {
             {report.investigativeLeads.map((lead) => (
               <div
                 key={`${lead.priority}-${lead.question}`}
-                className="flex items-start gap-2 text-[9px] font-mono"
+                className="flex items-start gap-2 text-[11px] font-mono"
               >
                 <NervBadge
                   label={lead.priority.toUpperCase()}
@@ -628,7 +628,7 @@ function LegitimacyReportView({ report }: { report: NarrativeLegitimacyReport })
         >
           {report.verdict.replace(/_/g, ' ')}
         </div>
-        <div className="text-[9px] font-mono text-nerv-text-muted mt-1">
+        <div className="text-[11px] font-mono text-nerv-text-muted mt-1">
           NARRATIVE LEGITIMACY VERDICT
         </div>
       </div>
@@ -636,14 +636,14 @@ function LegitimacyReportView({ report }: { report: NarrativeLegitimacyReport })
       {/* Score bar */}
       <ConfidenceBar value={report.score} label="LEGITIMACY SCORE" />
 
-      <div className="text-[10px] font-mono text-nerv-text-secondary leading-relaxed">
+      <div className="text-[12px] font-mono text-nerv-text-secondary leading-relaxed">
         {report.summary}
       </div>
 
       {/* Evidence balance */}
       <div>
         <SectionHeader>EVIDENCE BALANCE</SectionHeader>
-        <div className="flex gap-4 text-[10px] font-mono">
+        <div className="flex gap-4 text-[12px] font-mono">
           <div className="flex items-center gap-1">
             <span className="text-nerv-green">{'\u25B2'}</span>
             <span className="text-nerv-text-secondary">{report.verifiedClaimCount} verified</span>
@@ -685,7 +685,7 @@ function LegitimacyReportView({ report }: { report: NarrativeLegitimacyReport })
                   variant={STATUS_VARIANTS[claim.status] ?? 'muted'}
                   size="sm"
                 />
-                <span className="text-[9px] font-mono text-nerv-text-secondary line-clamp-2">
+                <span className="text-[11px] font-mono text-nerv-text-secondary line-clamp-2">
                   {claim.claim}
                 </span>
               </div>
@@ -717,7 +717,7 @@ export function IntelligenceReportPanel({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-nerv-orange text-2xl mb-3 animate-pulse">{'\u25C9'}</div>
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted">
             RUNNING INTELLIGENCE ASSESSMENT...
           </div>
         </div>
@@ -734,7 +734,7 @@ export function IntelligenceReportPanel({
       {/* Header with type badge + run another */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
+          <span className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted">
             INTELLIGENCE REPORT
           </span>
           <NervBadge
@@ -760,7 +760,7 @@ export function IntelligenceReportPanel({
                 key={a.type}
                 type="button"
                 onClick={() => onRunAssessment(a.type)}
-                className={`px-2 py-1 text-[8px] font-mono uppercase tracking-wider border ${a.borderColor} ${a.color} ${a.hoverBg} rounded-sm transition-colors`}
+                className={`px-2 py-1 text-[10px] font-mono uppercase tracking-wider border ${a.borderColor} ${a.color} ${a.hoverBg} rounded-sm transition-colors`}
                 title={a.label}
               >
                 {a.icon}

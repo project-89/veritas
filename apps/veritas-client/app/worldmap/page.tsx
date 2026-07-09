@@ -95,10 +95,10 @@ export default function WorldMapPage() {
 
           {/* HUD overlay */}
           <div className="absolute top-3 left-3 pointer-events-none z-10">
-            <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
+            <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
               Global Event Intelligence
             </div>
-            <div className="text-[10px] font-mono text-nerv-orange tabular-nums">
+            <div className="text-[12px] font-mono text-nerv-orange tabular-nums">
               {filteredEvents.length} EVENTS TRACKED
             </div>
           </div>
@@ -106,7 +106,7 @@ export default function WorldMapPage() {
           {/* Live indicator */}
           <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
             <NervStatus status={connected ? 'online' : error ? 'critical' : 'offline'} size="sm" />
-            <span className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">
+            <span className="text-[12px] font-mono uppercase tracking-wider text-nerv-text-muted">
               {connected ? 'LIVE' : 'CONNECTING...'}
             </span>
           </div>
@@ -115,14 +115,14 @@ export default function WorldMapPage() {
           {error && (
             <div className="absolute top-10 right-3 z-10">
               <div className="px-2.5 py-1.5 bg-nerv-red/10 border border-nerv-red/30 rounded-sm">
-                <span className="text-[9px] font-mono text-nerv-red">{error}</span>
+                <span className="text-[11px] font-mono text-nerv-red">{error}</span>
               </div>
             </div>
           )}
 
           {/* Legend */}
           <div className="absolute bottom-3 left-3 pointer-events-none z-10">
-            <div className="flex items-center gap-3 text-[8px] font-mono uppercase tracking-wider text-nerv-text-muted">
+            <div className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">
               <span className="flex items-center gap-1">
                 <span
                   className="inline-block w-2 h-2 rounded-full"

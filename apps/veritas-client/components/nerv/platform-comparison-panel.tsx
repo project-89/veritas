@@ -39,7 +39,7 @@ export function PlatformComparisonPanel({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-nerv-orange text-2xl mb-3 animate-pulse">{'\u25C9'}</div>
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted">
             ANALYZING PLATFORMS...
           </div>
         </div>
@@ -52,17 +52,17 @@ export function PlatformComparisonPanel({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-nerv-text-muted text-3xl mb-3">{'\u2B21'}</div>
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
             PLATFORM COMPARISON
           </div>
-          <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed mb-4">
+          <div className="text-[12px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed mb-4">
             Run platform comparison to see cross-platform narrative distribution
           </div>
           {onRunComparison && (
             <button
               type="button"
               onClick={onRunComparison}
-              className="px-4 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
+              className="px-4 py-1.5 text-[11px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
             >
               RUN COMPARISON
             </button>
@@ -78,10 +78,10 @@ export function PlatformComparisonPanel({
     <div className="h-full overflow-auto p-4 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
+        <span className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted">
           PLATFORM ANALYSIS
         </span>
-        <span className="text-[9px] font-mono text-nerv-text-muted">
+        <span className="text-[11px] font-mono text-nerv-text-muted">
           {comparison.platforms.length} platforms
         </span>
       </div>
@@ -100,7 +100,7 @@ export function PlatformComparisonPanel({
                 variant={PLATFORM_VARIANTS[p.platform.toLowerCase()] ?? 'muted'}
                 size="md"
               />
-              <span className="text-[10px] font-mono tabular-nums text-nerv-text-secondary">
+              <span className="text-[12px] font-mono tabular-nums text-nerv-text-secondary">
                 {p.postCount} posts
               </span>
             </div>
@@ -110,7 +110,7 @@ export function PlatformComparisonPanel({
 
             {/* Avg sentiment */}
             <div className="space-y-1">
-              <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted">
                 AVG SENTIMENT
               </span>
               <NervBar
@@ -122,10 +122,10 @@ export function PlatformComparisonPanel({
 
             {/* Dominant narrative */}
             <div className="space-y-1">
-              <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted">
                 DOMINANT NARRATIVE
               </span>
-              <div className="text-[10px] font-mono text-nerv-text-secondary leading-snug line-clamp-2">
+              <div className="text-[12px] font-mono text-nerv-text-secondary leading-snug line-clamp-2">
                 {p.dominantNarrative}
               </div>
             </div>
@@ -133,14 +133,14 @@ export function PlatformComparisonPanel({
             {/* Top authors */}
             {p.topAuthors.length > 0 && (
               <div className="space-y-1">
-                <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted">
                   TOP AUTHORS
                 </span>
                 <div className="flex flex-wrap gap-1">
                   {p.topAuthors.slice(0, 5).map((author) => (
                     <span
                       key={author}
-                      className="text-[9px] font-mono text-nerv-text-secondary bg-nerv-bg-elevated px-1.5 py-0.5 rounded-sm"
+                      className="text-[11px] font-mono text-nerv-text-secondary bg-nerv-bg-elevated px-1.5 py-0.5 rounded-sm"
                     >
                       @{author}
                     </span>
@@ -156,10 +156,10 @@ export function PlatformComparisonPanel({
       {comparison.crossPlatform.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
+            <span className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted">
               CROSS-PLATFORM NARRATIVES
             </span>
-            <span className="text-[9px] font-mono text-nerv-text-muted">
+            <span className="text-[11px] font-mono text-nerv-text-muted">
               {comparison.crossPlatform.length} shared
             </span>
           </div>
@@ -170,7 +170,7 @@ export function PlatformComparisonPanel({
                 key={`${cp.summary}:${cp.platforms.join(',')}`}
                 className="bg-nerv-bg-panel border border-nerv-border rounded-sm p-3 space-y-2"
               >
-                <div className="text-[10px] font-mono text-nerv-text-secondary leading-snug">
+                <div className="text-[12px] font-mono text-nerv-text-secondary leading-snug">
                   {cp.summary}
                 </div>
                 <div className="flex flex-wrap gap-1 mb-1">
@@ -187,7 +187,7 @@ export function PlatformComparisonPanel({
                 <div className="space-y-1">
                   {Object.entries(cp.sentimentByPlatform).map(([pl, sentiment]) => (
                     <div key={pl} className="flex items-center gap-2">
-                      <span className="text-[8px] font-mono text-nerv-text-muted w-16 text-right shrink-0 uppercase">
+                      <span className="text-[10px] font-mono text-nerv-text-muted w-16 text-right shrink-0 uppercase">
                         {pl}
                       </span>
                       <div className="flex-1">

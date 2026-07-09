@@ -52,18 +52,18 @@ export function NervAlert({
       <span className={['text-sm mt-0.5 shrink-0', config.iconColor].join(' ')}>{config.icon}</span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">
+          <span className="text-[12px] font-mono uppercase tracking-wider text-nerv-text-muted">
             {type}
           </span>
           {timestamp && (
-            <span className="text-[10px] font-mono text-nerv-text-muted ml-auto shrink-0">
+            <span className="text-[12px] font-mono text-nerv-text-muted ml-auto shrink-0">
               {timestamp}
             </span>
           )}
         </div>
         <p className="text-xs font-mono text-nerv-text leading-snug mt-0.5 truncate">{title}</p>
         {description && (
-          <p className="text-[10px] font-mono text-nerv-text-secondary leading-snug mt-0.5 line-clamp-2">
+          <p className="text-[12px] font-mono text-nerv-text-secondary leading-snug mt-0.5 line-clamp-2">
             {description}
           </p>
         )}

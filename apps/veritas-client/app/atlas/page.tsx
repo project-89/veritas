@@ -15,7 +15,7 @@ export default function AtlasPageRoute() {
   if (!AtlasPageComponent) {
     return (
       <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center px-6">
-        <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
+        <div className="text-[13px] font-mono uppercase tracking-widest text-nerv-text-muted">
           ATLAS plugin not installed.
         </div>
       </div>

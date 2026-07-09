@@ -120,10 +120,10 @@ export function GenealogyPanel({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-nerv-text-muted text-3xl mb-3">{'\u2394'}</div>
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted mb-2">
             NARRATIVE GENEALOGY
           </div>
-          <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed mb-4">
+          <div className="text-[12px] font-mono text-nerv-text-secondary max-w-[320px] leading-relaxed mb-4">
             Genealogy tracks narrative evolution across multiple scans. Use the REFRESH button above
             to create another snapshot, then genealogy data will appear here.
           </div>
@@ -283,7 +283,7 @@ export function GenealogyPanel({
                 height={16}
               >
                 <div
-                  className="text-[8px] font-mono text-nerv-text-secondary truncate leading-none"
+                  className="text-[10px] font-mono text-nerv-text-secondary truncate leading-none"
                   title={lineage.currentSummary}
                 >
                   {lineage.currentSummary.slice(0, 40)}...
@@ -344,17 +344,17 @@ export function GenealogyPanel({
 
       {/* Legend */}
       <div className="px-3 py-2 border-t border-nerv-border flex flex-wrap items-center gap-3">
-        <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mr-1">
+        <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mr-1">
           STATUS:
         </span>
         {Object.entries(STATUS_BADGE).map(([status, variant]) => (
           <NervBadge key={status} label={status.toUpperCase()} variant={variant} size="sm" />
         ))}
-        <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted ml-3 mr-1">
+        <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted ml-3 mr-1">
           EVENTS:
         </span>
         {Object.entries(EVENT_ICONS).map(([type, icon]) => (
-          <span key={type} className="text-[9px] font-mono" style={{ color: EVENT_COLORS[type] }}>
+          <span key={type} className="text-[11px] font-mono" style={{ color: EVENT_COLORS[type] }}>
             {icon} {type}
           </span>
         ))}

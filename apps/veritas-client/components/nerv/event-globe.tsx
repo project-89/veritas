@@ -635,17 +635,17 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
     <div className="relative w-full h-full min-h-[400px]">
       {!loaded && !error && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-orange animate-nerv-pulse">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-orange animate-nerv-pulse">
             INITIALIZING EVENT GLOBE...
           </div>
         </div>
       )}
       {error && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-red mb-2">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-red mb-2">
             GLOBE RENDER ERROR
           </div>
-          <div className="text-[9px] font-mono text-nerv-text-muted">{error}</div>
+          <div className="text-[11px] font-mono text-nerv-text-muted">{error}</div>
         </div>
       )}
       <div ref={containerRef} className="w-full h-full">

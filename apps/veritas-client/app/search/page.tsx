@@ -221,7 +221,7 @@ export default function SearchPage() {
                       type="button"
                       onClick={() => setCaseMode(mode.id as 'new' | 'existing')}
                       className={[
-                        'px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest border rounded-sm transition-all',
+                        'px-3 py-1.5 text-[11px] font-mono uppercase tracking-widest border rounded-sm transition-all',
                         selected
                           ? 'border-nerv-orange/60 text-nerv-orange bg-nerv-orange/10'
                           : 'border-nerv-border text-nerv-text-muted hover:text-nerv-text hover:border-nerv-text-muted',
@@ -237,7 +237,7 @@ export default function SearchPage() {
                 <div>
                   <label
                     htmlFor="case-title"
-                    className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5"
+                    className="text-[12px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5"
                   >
                     Case Title
                   </label>
@@ -249,7 +249,7 @@ export default function SearchPage() {
                     placeholder="Rexas Finance Scam Investigation"
                     className="w-full px-3 py-2.5 font-mono text-sm bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-orange/50 transition-all"
                   />
-                  <span className="block mt-1 text-[8px] font-mono text-nerv-text-muted">
+                  <span className="block mt-1 text-[10px] font-mono text-nerv-text-muted">
                     Case title for the investigation container. The query below is just the first
                     scan inside that case.
                   </span>
@@ -259,7 +259,7 @@ export default function SearchPage() {
                   <div>
                     <label
                       htmlFor="target-case"
-                      className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5"
+                      className="text-[12px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5"
                     >
                       Target Case
                     </label>
@@ -327,7 +327,7 @@ export default function SearchPage() {
                         if (next === 'person') setTimeRange('3d');
                       }}
                       className={[
-                        'px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest border rounded-sm transition-all',
+                        'px-3 py-1.5 text-[11px] font-mono uppercase tracking-widest border rounded-sm transition-all',
                         selected
                           ? 'border-nerv-blue/60 text-nerv-blue bg-nerv-blue/10'
                           : 'border-nerv-border text-nerv-text-muted hover:text-nerv-text hover:border-nerv-text-muted',
@@ -341,7 +341,7 @@ export default function SearchPage() {
               </div>
               <label
                 htmlFor="scan-query"
-                className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5"
+                className="text-[12px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-1.5"
               >
                 {searchMode === 'claim'
                   ? 'Claim Query'
@@ -370,7 +370,7 @@ export default function SearchPage() {
                   type="button"
                   onClick={handleScan}
                   disabled={!query.trim() || (caseMode === 'existing' && !selectedInvestigationId)}
-                  className="px-6 py-2.5 bg-nerv-orange/20 border border-nerv-orange/50 text-nerv-orange text-[11px] font-mono uppercase tracking-widest hover:bg-nerv-orange/30 hover:border-nerv-orange disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  className="px-6 py-2.5 bg-nerv-orange/20 border border-nerv-orange/50 text-nerv-orange text-[13px] font-mono uppercase tracking-widest hover:bg-nerv-orange/30 hover:border-nerv-orange disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 >
                   {caseMode === 'existing'
                     ? 'Append Scan'
@@ -379,7 +379,7 @@ export default function SearchPage() {
                       : 'Create Case'}
                 </button>
               </div>
-              <div className="mt-1 text-[8px] font-mono text-nerv-text-muted">
+              <div className="mt-1 text-[10px] font-mono text-nerv-text-muted">
                 {searchMode === 'claim'
                   ? 'Claim mode prioritizes anchors, event terms, and stricter post matching.'
                   : searchMode === 'person'
@@ -392,7 +392,7 @@ export default function SearchPage() {
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted hover:text-nerv-text-secondary transition-colors"
+              className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted hover:text-nerv-text-secondary transition-colors"
             >
               {showAdvanced ? '\u25B4' : '\u25BE'} Advanced Filters
             </button>
@@ -403,7 +403,7 @@ export default function SearchPage() {
                 <div>
                   <label
                     htmlFor="advanced-usernames"
-                    className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1"
+                    className="text-[11px] uppercase tracking-widest text-nerv-text-muted block mb-1"
                   >
                     Usernames
                   </label>
@@ -422,7 +422,7 @@ export default function SearchPage() {
                 <div>
                   <label
                     htmlFor="advanced-hashtags"
-                    className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1"
+                    className="text-[11px] uppercase tracking-widest text-nerv-text-muted block mb-1"
                   >
                     Hashtags
                   </label>
@@ -441,7 +441,7 @@ export default function SearchPage() {
                 <div>
                   <label
                     htmlFor="advanced-wallets"
-                    className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1"
+                    className="text-[11px] uppercase tracking-widest text-nerv-text-muted block mb-1"
                   >
                     Wallet / Contract
                   </label>
@@ -460,7 +460,7 @@ export default function SearchPage() {
                 <div>
                   <label
                     htmlFor="advanced-subreddits"
-                    className="text-[9px] uppercase tracking-widest text-nerv-text-muted block mb-1"
+                    className="text-[11px] uppercase tracking-widest text-nerv-text-muted block mb-1"
                   >
                     Subreddits
                   </label>
@@ -483,13 +483,13 @@ export default function SearchPage() {
             <div className="grid grid-cols-3 gap-4">
               {/* Data Sources */}
               <div>
-                <div className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
+                <div className="text-[12px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
                   Data Sources
                 </div>
                 <div className="space-y-3">
                   {PLATFORM_GROUPS.map((group) => (
                     <div key={group.label}>
-                      <div className="text-[8px] uppercase tracking-widest text-nerv-text-muted mb-1">
+                      <div className="text-[10px] uppercase tracking-widest text-nerv-text-muted mb-1">
                         {group.label}
                       </div>
                       <div className="space-y-1">
@@ -504,7 +504,7 @@ export default function SearchPage() {
                             >
                               <span
                                 className={[
-                                  'w-3.5 h-3.5 border flex items-center justify-center text-[8px] font-mono transition-all',
+                                  'w-3.5 h-3.5 border flex items-center justify-center text-[10px] font-mono transition-all',
                                   checked
                                     ? 'border-nerv-green bg-nerv-green/15 text-nerv-green'
                                     : 'border-nerv-border text-transparent hover:border-nerv-text-muted',
@@ -514,7 +514,7 @@ export default function SearchPage() {
                               </span>
                               <span
                                 className={[
-                                  'text-[11px] font-mono transition-colors',
+                                  'text-[13px] font-mono transition-colors',
                                   checked ? 'text-nerv-text' : 'text-nerv-text-muted',
                                 ].join(' ')}
                               >
@@ -530,14 +530,14 @@ export default function SearchPage() {
                     <button
                       type="button"
                       onClick={() => setPlatforms(ALL_PLATFORMS.map((p) => p.id))}
-                      className="text-[8px] font-mono uppercase text-nerv-green hover:underline"
+                      className="text-[10px] font-mono uppercase text-nerv-green hover:underline"
                     >
                       All
                     </button>
                     <button
                       type="button"
                       onClick={() => setPlatforms([])}
-                      className="text-[8px] font-mono uppercase text-nerv-text-muted hover:underline"
+                      className="text-[10px] font-mono uppercase text-nerv-text-muted hover:underline"
                     >
                       None
                     </button>
@@ -547,7 +547,7 @@ export default function SearchPage() {
 
               {/* Time Range */}
               <div>
-                <div className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
+                <div className="text-[12px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
                   Time Range
                 </div>
                 <div className="space-y-1.5">
@@ -587,7 +587,7 @@ export default function SearchPage() {
                     <div>
                       <label
                         htmlFor="custom-start-date"
-                        className="text-[8px] uppercase tracking-widest text-nerv-text-muted block mb-0.5"
+                        className="text-[10px] uppercase tracking-widest text-nerv-text-muted block mb-0.5"
                       >
                         From
                       </label>
@@ -602,7 +602,7 @@ export default function SearchPage() {
                     <div>
                       <label
                         htmlFor="custom-end-date"
-                        className="text-[8px] uppercase tracking-widest text-nerv-text-muted block mb-0.5"
+                        className="text-[10px] uppercase tracking-widest text-nerv-text-muted block mb-0.5"
                       >
                         To
                       </label>
@@ -620,7 +620,7 @@ export default function SearchPage() {
 
               {/* Depth */}
               <div>
-                <div className="text-[10px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
+                <div className="text-[12px] uppercase tracking-[0.15em] text-nerv-text-muted font-display block mb-2">
                   Depth
                 </div>
                 <div className="space-y-1.5">
@@ -652,7 +652,7 @@ export default function SearchPage() {
                           >
                             {preset.label}
                           </span>
-                          <span className="text-[8px] font-mono text-nerv-text-muted leading-tight">
+                          <span className="text-[10px] font-mono text-nerv-text-muted leading-tight">
                             {preset.description}
                           </span>
                         </div>
@@ -676,14 +676,14 @@ export default function SearchPage() {
                 <div className="flex items-center justify-center py-8">
                   <div className="flex items-center gap-3 text-nerv-text-muted">
                     <div className="w-4 h-4 border-2 border-nerv-border border-t-nerv-blue rounded-full animate-spin" />
-                    <span className="text-[10px] font-mono uppercase tracking-widest">
+                    <span className="text-[12px] font-mono uppercase tracking-widest">
                       Loading...
                     </span>
                   </div>
                 </div>
               ) : investigations.length === 0 ? (
                 <div className="px-3 py-6 text-center">
-                  <span className="text-[10px] font-mono text-nerv-text-muted uppercase tracking-widest">
+                  <span className="text-[12px] font-mono text-nerv-text-muted uppercase tracking-widest">
                     No previous investigations
                   </span>
                 </div>
@@ -704,10 +704,10 @@ export default function SearchPage() {
                       {inv.name || inv.query}
                     </span>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] font-mono text-nerv-text-muted">
+                      <span className="text-[12px] font-mono text-nerv-text-muted">
                         {formatDate(inv.updatedAt)}
                       </span>
-                      <span className="text-[10px] font-mono text-nerv-orange opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-widest">
+                      <span className="text-[12px] font-mono text-nerv-orange opacity-0 group-hover:opacity-100 transition-opacity uppercase tracking-widest">
                         Use
                       </span>
                     </div>
@@ -724,8 +724,8 @@ export default function SearchPage() {
             <div className="px-3 py-2 space-y-2">
               {TIPS.map((tip) => (
                 <div key={tip} className="flex items-start gap-2">
-                  <span className="text-nerv-green text-[10px] mt-0.5 shrink-0">&gt;</span>
-                  <span className="text-[11px] font-mono text-nerv-text-secondary leading-snug">
+                  <span className="text-nerv-green text-[12px] mt-0.5 shrink-0">&gt;</span>
+                  <span className="text-[13px] font-mono text-nerv-text-secondary leading-snug">
                     {tip}
                   </span>
                 </div>

@@ -123,7 +123,7 @@ export function NarrativeList({
     <div className="flex flex-col h-full">
       {/* Sort controls */}
       <div className="flex items-center gap-1 px-3 py-2 border-b border-nerv-border shrink-0">
-        <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mr-1">
+        <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mr-1">
           Sort:
         </span>
         {(['velocity', 'sentiment', 'posts', 'recency'] as SortKey[]).map((key) => (
@@ -132,7 +132,7 @@ export function NarrativeList({
             type="button"
             onClick={() => setSortKey(key)}
             className={[
-              'text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-sm transition-colors',
+              'text-[11px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-sm transition-colors',
               sortKey === key
                 ? 'bg-nerv-orange/20 text-nerv-orange'
                 : 'text-nerv-text-muted hover:text-nerv-text-secondary',
@@ -195,7 +195,7 @@ export function NarrativeList({
                     />
                   )}
                   {isInvestigated && !hasRunningJob && !hasPendingJob && (
-                    <span className="text-[8px] text-nerv-green shrink-0" title="Investigated">
+                    <span className="text-[10px] text-nerv-green shrink-0" title="Investigated">
                       {'\u2713'}
                     </span>
                   )}
@@ -222,7 +222,7 @@ export function NarrativeList({
                       VELOCITY_DOT_CLASS[trend],
                     ].join(' ')}
                   />
-                  <span className="text-[11px] font-mono text-nerv-text leading-snug line-clamp-2">
+                  <span className="text-[13px] font-mono text-nerv-text leading-snug line-clamp-2">
                     &quot;{narrative.summary}&quot;
                   </span>
                   {narrative.supportLevel === 'emerging' && (
@@ -233,7 +233,7 @@ export function NarrativeList({
                 {/* Row 2: Velocity label, sentiment, volume bar, count */}
                 <div className="flex items-center gap-2 mt-1.5 ml-4">
                   <span
-                    className="text-[9px] font-mono uppercase tracking-wider"
+                    className="text-[11px] font-mono uppercase tracking-wider"
                     style={{ color: VELOCITY_COLORS[trend] }}
                   >
                     {trend === 'surging'
@@ -247,7 +247,7 @@ export function NarrativeList({
                   </span>
                   <span
                     className={[
-                      'text-[9px] font-mono tabular-nums',
+                      'text-[11px] font-mono tabular-nums',
                       narrative.avgSentiment > 0.1
                         ? 'text-nerv-green'
                         : narrative.avgSentiment < -0.1
@@ -265,7 +265,7 @@ export function NarrativeList({
                       height={4}
                     />
                   </div>
-                  <span className="text-[9px] font-mono text-nerv-text-muted tabular-nums">
+                  <span className="text-[11px] font-mono text-nerv-text-muted tabular-nums">
                     {postCount}
                   </span>
                 </div>
@@ -296,7 +296,7 @@ export function NarrativeList({
       {selectedNarrativeIds.length > 0 && (
         <div className="px-3 py-2 border-t border-nerv-orange/30 bg-nerv-orange/5 shrink-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-mono text-nerv-orange font-bold">
+            <span className="text-[12px] font-mono text-nerv-orange font-bold">
               {selectedNarrativeIds.length} selected
             </span>
             <div className="flex gap-1">
@@ -304,7 +304,7 @@ export function NarrativeList({
                 <button
                   type="button"
                   onClick={onAnalyzeSelected}
-                  className="px-2 py-1 text-[9px] font-mono uppercase bg-nerv-orange/20 text-nerv-orange border border-nerv-orange/40 rounded-sm hover:bg-nerv-orange/30 transition-colors font-bold"
+                  className="px-2 py-1 text-[11px] font-mono uppercase bg-nerv-orange/20 text-nerv-orange border border-nerv-orange/40 rounded-sm hover:bg-nerv-orange/30 transition-colors font-bold"
                 >
                   {'\u25B6'} Analyze
                 </button>
@@ -313,7 +313,7 @@ export function NarrativeList({
                 <button
                   type="button"
                   onClick={onClearSelection}
-                  className="px-2 py-1 text-[9px] font-mono uppercase text-nerv-text-muted border border-nerv-border rounded-sm hover:bg-nerv-bg-elevated transition-colors"
+                  className="px-2 py-1 text-[11px] font-mono uppercase text-nerv-text-muted border border-nerv-border rounded-sm hover:bg-nerv-bg-elevated transition-colors"
                 >
                   Clear
                 </button>
@@ -326,7 +326,7 @@ export function NarrativeList({
       {/* Unclustered count */}
       {(emergingCount > 0 || unclusteredCount > 0) && (
         <div className="px-3 py-2 border-t border-nerv-border shrink-0">
-          <span className="text-[10px] font-mono text-nerv-text-muted">
+          <span className="text-[12px] font-mono text-nerv-text-muted">
             {emergingCount > 0 ? `${emergingCount} emerging` : '0 emerging'}
             {unclusteredCount > 0 ? ` · ${unclusteredCount} still unclustered` : ''}
           </span>

@@ -182,12 +182,12 @@ function NarrativeDetail({
   return (
     <div className="space-y-3 p-3">
       {/* Summary */}
-      <div className="text-[11px] font-mono text-nerv-text leading-relaxed">
+      <div className="text-[13px] font-mono text-nerv-text leading-relaxed">
         {narrative.summary}
       </div>
 
       {/* Date range */}
-      <div className="flex items-center gap-2 text-[10px] font-mono text-nerv-text-muted">
+      <div className="flex items-center gap-2 text-[12px] font-mono text-nerv-text-muted">
         <span>{new Date(narrative.firstSeen).toLocaleDateString()}</span>
         <span className="text-nerv-orange">{'\u2192'}</span>
         <span>{new Date(narrative.lastSeen).toLocaleDateString()}</span>
@@ -238,7 +238,7 @@ function NarrativeDetail({
       {/* Sentiment trajectory */}
       {sentimentData.length > 1 && (
         <div>
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
             SENTIMENT TRAJECTORY
           </div>
           <NervSparkline
@@ -253,7 +253,7 @@ function NarrativeDetail({
 
       {/* Platform breakdown */}
       <div>
-        <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+        <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
           PLATFORM BREAKDOWN
         </div>
         <div className="space-y-1">
@@ -261,7 +261,7 @@ function NarrativeDetail({
             .sort(([, a], [, b]) => b - a)
             .map(([platform, count]) => (
               <div key={platform} className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-nerv-text-secondary w-16">
+                <span className="text-[12px] font-mono text-nerv-text-secondary w-16">
                   {platform === 'twitter' ? 'X' : platform}
                 </span>
                 <div className="flex-1">
@@ -271,7 +271,7 @@ function NarrativeDetail({
                     height={5}
                   />
                 </div>
-                <span className="text-[10px] font-mono tabular-nums text-nerv-text-muted w-6 text-right">
+                <span className="text-[12px] font-mono tabular-nums text-nerv-text-muted w-6 text-right">
                   {count}
                 </span>
               </div>
@@ -281,24 +281,24 @@ function NarrativeDetail({
 
       {/* Top authors */}
       <div>
-        <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+        <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
           TOP AUTHORS
         </div>
         <div className="space-y-1">
           {narrative.authors.slice(0, 6).map((author) => (
             <div key={author.handle || author.name} className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-mono text-nerv-text">
+                <span className="text-[12px] font-mono text-nerv-text">
                   @{author.handle || author.name}
                 </span>
               </div>
-              <span className="text-[10px] font-mono tabular-nums text-nerv-text-muted">
+              <span className="text-[12px] font-mono tabular-nums text-nerv-text-muted">
                 {author.postCount}
               </span>
             </div>
           ))}
           {narrative.authors.length > 6 && (
-            <span className="text-[9px] font-mono text-nerv-text-muted">
+            <span className="text-[11px] font-mono text-nerv-text-muted">
               +{narrative.authors.length - 6} more
             </span>
           )}
@@ -307,7 +307,7 @@ function NarrativeDetail({
 
       {/* Top posts */}
       <div>
-        <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+        <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
           TOP POSTS
         </div>
         <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
@@ -324,7 +324,7 @@ function NarrativeDetail({
                   className="px-2 py-1.5 bg-nerv-bg-elevated/40 border border-nerv-border/30 rounded-sm"
                 >
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="text-[9px] font-mono text-nerv-text-secondary">
+                    <span className="text-[11px] font-mono text-nerv-text-secondary">
                       @{post.authorHandle || post.authorName}
                     </span>
                     <NervBadge
@@ -334,11 +334,11 @@ function NarrativeDetail({
                       variant={PLATFORM_BADGE_VARIANT[post.platform] ?? 'muted'}
                       size="sm"
                     />
-                    <span className="text-[8px] font-mono text-nerv-text-muted ml-auto">
+                    <span className="text-[10px] font-mono text-nerv-text-muted ml-auto">
                       {new Date(post.timestamp).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="text-[10px] font-mono text-nerv-text leading-snug break-words whitespace-pre-wrap">
+                  <p className="text-[12px] font-mono text-nerv-text leading-snug break-words whitespace-pre-wrap">
                     {post.text}
                   </p>
                   {post.url && (
@@ -346,7 +346,7 @@ function NarrativeDetail({
                       href={post.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[9px] font-mono text-nerv-blue hover:underline mt-0.5 inline-block"
+                      className="text-[11px] font-mono text-nerv-blue hover:underline mt-0.5 inline-block"
                     >
                       VIEW SOURCE
                     </a>
@@ -395,7 +395,7 @@ function NarrativeDetail({
                     ? '\u2713 RE-ANALYZE NARRATIVE'
                     : '\u25B6 DEEP DIVE \u2014 ANALYZE NARRATIVE'}
               </button>
-              <p className="text-[10px] font-mono text-nerv-text-muted mt-2 leading-relaxed">
+              <p className="text-[12px] font-mono text-nerv-text-muted mt-2 leading-relaxed">
                 {isInvestigating
                   ? 'Investigating authors, analyzing propaganda techniques, correlating downstream effects...'
                   : isOtherInvestigating
@@ -413,7 +413,7 @@ function NarrativeDetail({
           <button
             type="button"
             onClick={onRunPropaganda}
-            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-amber text-nerv-amber hover:bg-nerv-amber/10 rounded-sm transition-colors"
+            className="px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider border border-nerv-amber text-nerv-amber hover:bg-nerv-amber/10 rounded-sm transition-colors"
           >
             PROPAGANDA SCAN
           </button>
@@ -422,7 +422,7 @@ function NarrativeDetail({
           <button
             type="button"
             onClick={onVerifyClaims}
-            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-blue text-nerv-blue hover:bg-nerv-blue/10 rounded-sm transition-colors"
+            className="px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider border border-nerv-blue text-nerv-blue hover:bg-nerv-blue/10 rounded-sm transition-colors"
           >
             VERIFY CLAIMS
           </button>
@@ -431,7 +431,7 @@ function NarrativeDetail({
           <button
             type="button"
             onClick={onGenerateReport}
-            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-text-muted text-nerv-text-secondary hover:bg-nerv-bg-elevated rounded-sm transition-colors"
+            className="px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider border border-nerv-text-muted text-nerv-text-secondary hover:bg-nerv-bg-elevated rounded-sm transition-colors"
           >
             REPORT
           </button>
@@ -440,7 +440,7 @@ function NarrativeDetail({
           <button
             type="button"
             onClick={() => onRunIntelligence('legitimacy')}
-            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-green text-nerv-green hover:bg-nerv-green/10 rounded-sm transition-colors"
+            className="px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider border border-nerv-green text-nerv-green hover:bg-nerv-green/10 rounded-sm transition-colors"
           >
             LEGITIMACY SCORE
           </button>
@@ -449,7 +449,7 @@ function NarrativeDetail({
           <button
             type="button"
             onClick={() => onRunIntelligence('campaign')}
-            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-red text-nerv-red hover:bg-nerv-red/10 rounded-sm transition-colors"
+            className="px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider border border-nerv-red text-nerv-red hover:bg-nerv-red/10 rounded-sm transition-colors"
           >
             DETECT CAMPAIGN
           </button>
@@ -496,7 +496,7 @@ function ActorDossier({
       {/* Credibility breakdown */}
       {user?.credibility && (
         <div>
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
             CREDIBILITY SIGNALS
           </div>
           <div className="space-y-1">
@@ -504,7 +504,7 @@ function ActorDossier({
               .filter(([, v]) => v !== null)
               .map(([key, value]) => (
                 <div key={key} className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-nerv-text-secondary w-32 truncate">
+                  <span className="text-[12px] font-mono text-nerv-text-secondary w-32 truncate">
                     {key.replace(/([A-Z])/g, ' $1').trim()}
                   </span>
                   <div className="flex-1">
@@ -519,12 +519,12 @@ function ActorDossier({
       {/* Bot probability */}
       {user?.botScore && (
         <div>
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
             BOT PROBABILITY
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono text-nerv-text-secondary w-32">Overall</span>
+              <span className="text-[12px] font-mono text-nerv-text-secondary w-32">Overall</span>
               <div className="flex-1">
                 <NervBar
                   value={user.botScore.botProbability}
@@ -541,7 +541,7 @@ function ActorDossier({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono text-nerv-text-secondary w-32">
+              <span className="text-[12px] font-mono text-nerv-text-secondary w-32">
                 Structural
               </span>
               <div className="flex-1">
@@ -554,13 +554,13 @@ function ActorDossier({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono text-nerv-text-secondary w-32">Temporal</span>
+              <span className="text-[12px] font-mono text-nerv-text-secondary w-32">Temporal</span>
               <div className="flex-1">
                 <NervBar value={user.botScore.temporalScore} color="#f59e0b" height={4} showLabel />
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono text-nerv-text-secondary w-32">
+              <span className="text-[12px] font-mono text-nerv-text-secondary w-32">
                 Behavioral
               </span>
               <div className="flex-1">
@@ -579,7 +579,7 @@ function ActorDossier({
       {/* Flags */}
       {user && user.flags.length > 0 && (
         <div>
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
             FLAGS
           </div>
           <div className="flex flex-wrap gap-1">
@@ -593,14 +593,14 @@ function ActorDossier({
       {/* Narrative evolution */}
       {user && user.user.narrativeEvolution.length > 0 && (
         <div>
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
             STANCE SHIFTS
           </div>
           <div className="space-y-1">
             {user.user.narrativeEvolution.map((ev) => (
               <div
                 key={`${ev.timestamp}:${ev.fromStance}:${ev.toStance}`}
-                className="flex items-start gap-2 text-[10px] font-mono"
+                className="flex items-start gap-2 text-[12px] font-mono"
               >
                 <span className="text-nerv-text-muted shrink-0">
                   {new Date(ev.timestamp).toLocaleDateString()}
@@ -616,7 +616,7 @@ function ActorDossier({
 
       {/* Posts by actor */}
       <div>
-        <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+        <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
           POSTS ({actorPosts.length})
         </div>
         <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
@@ -633,11 +633,11 @@ function ActorDossier({
                   variant={PLATFORM_BADGE_VARIANT[post.platform] ?? 'muted'}
                   size="sm"
                 />
-                <span className="text-[8px] font-mono text-nerv-text-muted ml-auto">
+                <span className="text-[10px] font-mono text-nerv-text-muted ml-auto">
                   {new Date(post.timestamp).toLocaleDateString()}
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-nerv-text leading-snug break-words whitespace-pre-wrap">
+              <p className="text-[12px] font-mono text-nerv-text leading-snug break-words whitespace-pre-wrap">
                 {post.text}
               </p>
             </div>
@@ -664,7 +664,7 @@ function ClaimDetail({
 
   if (!extractedClaim) {
     return (
-      <div className="p-3 text-[10px] font-mono text-nerv-text-muted">
+      <div className="p-3 text-[12px] font-mono text-nerv-text-muted">
         Claim data not available.
       </div>
     );
@@ -681,7 +681,7 @@ function ClaimDetail({
   return (
     <div className="space-y-3 p-3">
       {/* Claim text */}
-      <div className="text-[11px] font-mono text-nerv-text leading-relaxed">
+      <div className="text-[13px] font-mono text-nerv-text leading-relaxed">
         &quot;{extractedClaim.claim}&quot;
       </div>
 
@@ -694,7 +694,7 @@ function ClaimDetail({
         />
         {verification && (
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-mono text-nerv-text-muted">CONF:</span>
+            <span className="text-[11px] font-mono text-nerv-text-muted">CONF:</span>
             <NervBar
               value={verification.confidence}
               color={verification.confidence > 0.7 ? '#00FF41' : '#f59e0b'}
@@ -708,7 +708,7 @@ function ClaimDetail({
       {/* Supporting evidence */}
       {verification?.evidence?.supporting && verification.evidence.supporting.length > 0 && (
         <div>
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-green mb-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-green mb-1.5">
             SUPPORTING EVIDENCE
           </div>
           <div className="space-y-1.5">
@@ -718,10 +718,10 @@ function ClaimDetail({
                 className="px-2 py-1.5 bg-nerv-green/5 border border-nerv-green/20 rounded-sm"
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-[9px] font-mono text-nerv-green">{ev.source}</span>
+                  <span className="text-[11px] font-mono text-nerv-green">{ev.source}</span>
                   <NervBadge label={ev.credibility.toUpperCase()} variant="green" size="sm" />
                 </div>
-                <p className="text-[10px] font-mono text-nerv-text-secondary leading-snug">
+                <p className="text-[12px] font-mono text-nerv-text-secondary leading-snug">
                   {ev.excerpt}
                 </p>
                 {ev.url && (
@@ -729,7 +729,7 @@ function ClaimDetail({
                     href={ev.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[9px] font-mono text-nerv-blue hover:underline mt-0.5 inline-block"
+                    className="text-[11px] font-mono text-nerv-blue hover:underline mt-0.5 inline-block"
                   >
                     SOURCE
                   </a>
@@ -743,7 +743,7 @@ function ClaimDetail({
       {/* Contradicting evidence */}
       {verification?.evidence?.contradicting && verification.evidence.contradicting.length > 0 && (
         <div>
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-red mb-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-red mb-1.5">
             CONTRADICTING EVIDENCE
           </div>
           <div className="space-y-1.5">
@@ -753,10 +753,10 @@ function ClaimDetail({
                 className="px-2 py-1.5 bg-nerv-red/5 border border-nerv-red/20 rounded-sm"
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-[9px] font-mono text-nerv-red">{ev.source}</span>
+                  <span className="text-[11px] font-mono text-nerv-red">{ev.source}</span>
                   <NervBadge label={ev.credibility.toUpperCase()} variant="red" size="sm" />
                 </div>
-                <p className="text-[10px] font-mono text-nerv-text-secondary leading-snug">
+                <p className="text-[12px] font-mono text-nerv-text-secondary leading-snug">
                   {ev.excerpt}
                 </p>
               </div>
@@ -768,11 +768,11 @@ function ClaimDetail({
       {/* Reasoning */}
       {verification?.reasoning && (
         <div>
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
             LLM REASONING
           </div>
           <div className="px-2 py-1.5 bg-nerv-bg-elevated/60 border border-nerv-border rounded-sm">
-            <p className="text-[10px] font-mono text-nerv-green/80 leading-relaxed whitespace-pre-wrap">
+            <p className="text-[12px] font-mono text-nerv-green/80 leading-relaxed whitespace-pre-wrap">
               {verification.reasoning}
             </p>
           </div>
@@ -782,12 +782,12 @@ function ClaimDetail({
       {/* Caveats */}
       {verification?.caveats && verification.caveats.length > 0 && (
         <div>
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-amber mb-1.5">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-amber mb-1.5">
             CAVEATS
           </div>
           <ul className="space-y-0.5">
             {verification.caveats.map((c: string) => (
-              <li key={c} className="text-[10px] font-mono text-nerv-text-secondary leading-snug">
+              <li key={c} className="text-[12px] font-mono text-nerv-text-secondary leading-snug">
                 {'\u25B8'} {c}
               </li>
             ))}
@@ -893,7 +893,7 @@ function InvestigationSummary({
 
   return (
     <div className="space-y-3 p-3">
-      <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+      <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
         INVESTIGATION OVERVIEW
       </div>
 
@@ -924,7 +924,7 @@ function InvestigationSummary({
           </div>
 
           <div>
-            <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+            <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
               SENTIMENT DISTRIBUTION
             </div>
             <div className="flex h-4 overflow-hidden rounded-sm border border-nerv-border">
@@ -948,21 +948,21 @@ function InvestigationSummary({
               )}
             </div>
             <div className="flex justify-between mt-1">
-              <span className="text-[9px] font-mono text-nerv-green">+{summary.positive}</span>
-              <span className="text-[9px] font-mono text-nerv-text-muted">~{summary.neutral}</span>
-              <span className="text-[9px] font-mono text-nerv-red">-{summary.negative}</span>
+              <span className="text-[11px] font-mono text-nerv-green">+{summary.positive}</span>
+              <span className="text-[11px] font-mono text-nerv-text-muted">~{summary.neutral}</span>
+              <span className="text-[11px] font-mono text-nerv-red">-{summary.negative}</span>
             </div>
           </div>
 
           {platforms.length > 0 && (
             <div>
-              <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
+              <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1.5">
                 PLATFORMS
               </div>
               <div className="space-y-1">
                 {platforms.map(([platform, count]) => (
                   <div key={platform} className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-nerv-text-secondary w-16">
+                    <span className="text-[12px] font-mono text-nerv-text-secondary w-16">
                       {platform === 'twitter' ? 'X' : platform}
                     </span>
                     <div className="flex-1">
@@ -972,7 +972,7 @@ function InvestigationSummary({
                         height={5}
                       />
                     </div>
-                    <span className="text-[10px] font-mono tabular-nums text-nerv-text-muted w-8 text-right">
+                    <span className="text-[12px] font-mono tabular-nums text-nerv-text-muted w-8 text-right">
                       {count}
                     </span>
                   </div>
@@ -982,14 +982,14 @@ function InvestigationSummary({
           )}
         </>
       ) : (
-        <div className="px-3 py-4 border border-dashed border-nerv-border rounded-sm text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
+        <div className="px-3 py-4 border border-dashed border-nerv-border rounded-sm text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
           AWAITING DATA...
         </div>
       )}
 
       <div className="pt-2 border-t border-nerv-border space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
             EVIDENCE SEEDS
           </div>
           <NervBadge
@@ -998,7 +998,7 @@ function InvestigationSummary({
             size="sm"
           />
         </div>
-        <p className="text-[10px] font-mono text-nerv-text-secondary leading-relaxed">
+        <p className="text-[12px] font-mono text-nerv-text-secondary leading-relaxed">
           Attach explicit source material, wallet leads, domains, notes, or videos directly to this
           investigation.
         </p>
@@ -1010,7 +1010,7 @@ function InvestigationSummary({
               onChange={(event) =>
                 setSeedKind(event.target.value as InvestigationEvidenceSeed['kind'])
               }
-              className="px-2 py-2 bg-nerv-bg border border-nerv-border text-[10px] font-mono text-nerv-text focus:outline-none focus:border-nerv-orange/50"
+              className="px-2 py-2 bg-nerv-bg border border-nerv-border text-[12px] font-mono text-nerv-text focus:outline-none focus:border-nerv-orange/50"
             >
               {EVIDENCE_SEED_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -1023,21 +1023,21 @@ function InvestigationSummary({
               onChange={(event) => setSeedValue(event.target.value)}
               rows={3}
               placeholder={selectedSeedOption.placeholder}
-              className="w-full px-2 py-2 bg-nerv-bg border border-nerv-border text-[10px] font-mono text-nerv-text placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-orange/50 resize-none"
+              className="w-full px-2 py-2 bg-nerv-bg border border-nerv-border text-[12px] font-mono text-nerv-text placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-orange/50 resize-none"
             />
           </div>
           <input
             value={seedNotes}
             onChange={(event) => setSeedNotes(event.target.value)}
             placeholder="Optional context, theory, or why this seed matters"
-            className="w-full px-2 py-2 bg-nerv-bg border border-nerv-border text-[10px] font-mono text-nerv-text placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-orange/50"
+            className="w-full px-2 py-2 bg-nerv-bg border border-nerv-border text-[12px] font-mono text-nerv-text placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-orange/50"
           />
-          {seedError && <div className="text-[9px] font-mono text-nerv-red">{seedError}</div>}
+          {seedError && <div className="text-[11px] font-mono text-nerv-red">{seedError}</div>}
           <button
             type="button"
             onClick={handleAttachSeed}
             disabled={evidenceSeedSaving || !onAddEvidenceSeed}
-            className="w-full px-3 py-2 text-[9px] font-mono uppercase tracking-wider border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors disabled:opacity-40 disabled:cursor-wait"
+            className="w-full px-3 py-2 text-[11px] font-mono uppercase tracking-wider border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors disabled:opacity-40 disabled:cursor-wait"
           >
             {evidenceSeedSaving ? 'INGESTING EVIDENCE...' : 'ATTACH EVIDENCE SEED'}
           </button>
@@ -1052,10 +1052,10 @@ function InvestigationSummary({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="text-[10px] font-mono text-nerv-text break-words">
+                    <div className="text-[12px] font-mono text-nerv-text break-words">
                       {seed.label || seed.value}
                     </div>
-                    <div className="text-[9px] font-mono text-nerv-text-muted break-all">
+                    <div className="text-[11px] font-mono text-nerv-text-muted break-all">
                       {seed.value}
                     </div>
                   </div>
@@ -1069,13 +1069,13 @@ function InvestigationSummary({
                   </div>
                 </div>
                 {seed.notes && (
-                  <div className="text-[9px] font-mono text-nerv-text-secondary leading-relaxed">
+                  <div className="text-[11px] font-mono text-nerv-text-secondary leading-relaxed">
                     {seed.notes}
                   </div>
                 )}
                 {typeof seed.metadata?.contentPreview === 'string' &&
                   seed.metadata.contentPreview && (
-                    <div className="text-[9px] font-mono text-nerv-green/80 leading-relaxed whitespace-pre-wrap">
+                    <div className="text-[11px] font-mono text-nerv-green/80 leading-relaxed whitespace-pre-wrap">
                       {seed.metadata.contentPreview}
                     </div>
                   )}
@@ -1095,7 +1095,7 @@ function InvestigationSummary({
               </div>
             ))
           ) : (
-            <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
+            <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
               No explicit evidence seeds attached yet.
             </div>
           )}
@@ -1104,7 +1104,7 @@ function InvestigationSummary({
 
       <div className="pt-2 border-t border-nerv-border space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
             DOSSIER SNAPSHOT
           </div>
           <div className="flex items-center gap-1">
@@ -1129,7 +1129,7 @@ function InvestigationSummary({
                 className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-1.5"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+                  <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
                     {DOSSIER_GROUP_LABELS[group] ?? group}
                   </div>
                   <NervBadge label={String(entities.length)} variant="muted" size="sm" />
@@ -1138,7 +1138,7 @@ function InvestigationSummary({
                   {entities.slice(0, 6).map((entity: InvestigationEvidenceEntity) => (
                     <div
                       key={`${entity.type}:${entity.value}`}
-                      className="flex items-start justify-between gap-2 text-[9px] font-mono"
+                      className="flex items-start justify-between gap-2 text-[11px] font-mono"
                     >
                       <div className="min-w-0">
                         <div className="text-nerv-text break-all">{entity.displayValue}</div>
@@ -1165,7 +1165,7 @@ function InvestigationSummary({
             ))}
           </div>
         ) : (
-          <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
+          <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
             Attach evidence seeds to start building the investigation dossier.
           </div>
         )}
@@ -1173,7 +1173,7 @@ function InvestigationSummary({
 
       <div className="pt-2 border-t border-nerv-border space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+          <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
             PROJECT DOSSIER
           </div>
           <div className="flex items-center gap-1">
@@ -1190,7 +1190,7 @@ function InvestigationSummary({
                 void onBuildProjectDossier?.();
               }}
               disabled={projectDossierSaving || !onBuildProjectDossier}
-              className="px-2 py-1 text-[8px] font-mono uppercase tracking-wider border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors disabled:opacity-40 disabled:cursor-wait"
+              className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors disabled:opacity-40 disabled:cursor-wait"
             >
               {projectDossierSaving
                 ? 'BUILDING...'
@@ -1204,7 +1204,7 @@ function InvestigationSummary({
         {projectDossier ? (
           <div className="space-y-2">
             <div className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-1.5">
-              <div className="text-[10px] font-mono text-nerv-text">{projectDossier.name}</div>
+              <div className="text-[12px] font-mono text-nerv-text">{projectDossier.name}</div>
               <div className="flex flex-wrap gap-1">
                 <NervBadge
                   label={`${projectDossier.summary.totalSeeds} SEEDS`}
@@ -1230,7 +1230,7 @@ function InvestigationSummary({
                 )}
               </div>
               {projectDossier.aliases.length > 1 && (
-                <div className="text-[9px] font-mono text-nerv-text-muted">
+                <div className="text-[11px] font-mono text-nerv-text-muted">
                   Aliases: {projectDossier.aliases.join(' · ')}
                 </div>
               )}
@@ -1239,7 +1239,7 @@ function InvestigationSummary({
             {projectDossier.onChainSummary && (
               <div className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+                  <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
                     ON-CHAIN CORRELATION
                   </div>
                   <div className="flex items-center gap-1">
@@ -1257,7 +1257,7 @@ function InvestigationSummary({
                 </div>
 
                 {projectDossier.onChainSummary.note && (
-                  <div className="text-[9px] font-mono text-nerv-text-muted leading-relaxed">
+                  <div className="text-[11px] font-mono text-nerv-text-muted leading-relaxed">
                     {projectDossier.onChainSummary.note}
                   </div>
                 )}
@@ -1269,7 +1269,7 @@ function InvestigationSummary({
                       .map((addressSummary) => (
                         <div
                           key={addressSummary.address}
-                          className="flex items-start justify-between gap-2 text-[9px] font-mono"
+                          className="flex items-start justify-between gap-2 text-[11px] font-mono"
                         >
                           <div className="min-w-0">
                             <div className="text-nerv-text break-all">{addressSummary.address}</div>
@@ -1301,7 +1301,7 @@ function InvestigationSummary({
                   <div className="space-y-1">
                     {projectDossier.onChainSummary.commonCounterparties.length > 0 && (
                       <div className="space-y-1">
-                        <div className="text-[8px] font-mono uppercase tracking-widest text-nerv-text-muted">
+                        <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
                           COMMON COUNTERPARTIES
                         </div>
                         <div className="flex flex-wrap gap-1">
@@ -1320,7 +1320,7 @@ function InvestigationSummary({
                     )}
                     {projectDossier.onChainSummary.tokenContracts.length > 0 && (
                       <div className="space-y-1">
-                        <div className="text-[8px] font-mono uppercase tracking-widest text-nerv-text-muted">
+                        <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted">
                           TOKEN CONTRACTS
                         </div>
                         <div className="flex flex-wrap gap-1">
@@ -1352,7 +1352,7 @@ function InvestigationSummary({
                     className="border border-nerv-border rounded-sm bg-nerv-bg-elevated/20 p-2 space-y-1"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-[10px] font-mono text-nerv-text">{overlap.name}</div>
+                      <div className="text-[12px] font-mono text-nerv-text">{overlap.name}</div>
                       <NervBadge label={`SCORE ${overlap.score}`} variant="red" size="sm" />
                     </div>
                     <div className="flex flex-wrap gap-1">
@@ -1365,7 +1365,7 @@ function InvestigationSummary({
                         />
                       ))}
                     </div>
-                    <div className="text-[9px] font-mono text-nerv-text-muted break-words">
+                    <div className="text-[11px] font-mono text-nerv-text-muted break-words">
                       {overlap.sharedEntities
                         .slice(0, 4)
                         .map((entity) => `${entity.type}:${entity.value}`)
@@ -1374,7 +1374,7 @@ function InvestigationSummary({
                   </div>
                 ))
               ) : (
-                <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
+                <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
                   No dossier overlaps yet. Build another project dossier to compare against.
                 </div>
               )}
@@ -1385,14 +1385,14 @@ function InvestigationSummary({
                 onClick={() => {
                   void onRefreshProjectDossier();
                 }}
-                className="w-full px-3 py-2 text-[8px] font-mono uppercase tracking-wider border border-nerv-border text-nerv-text-secondary hover:bg-nerv-bg-elevated rounded-sm transition-colors"
+                className="w-full px-3 py-2 text-[10px] font-mono uppercase tracking-wider border border-nerv-border text-nerv-text-secondary hover:bg-nerv-bg-elevated rounded-sm transition-colors"
               >
                 Refresh Overlaps
               </button>
             )}
           </div>
         ) : (
-          <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
+          <div className="px-2 py-3 border border-dashed border-nerv-border rounded-sm text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted text-center">
             Build a dossier from this investigation to compare it against other cases.
           </div>
         )}
@@ -1417,7 +1417,7 @@ function InvestigationSummary({
           <button
             type="button"
             onClick={onGenerateReport}
-            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-text-muted text-nerv-text-secondary hover:bg-nerv-bg-elevated rounded-sm transition-colors"
+            className="px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider border border-nerv-text-muted text-nerv-text-secondary hover:bg-nerv-bg-elevated rounded-sm transition-colors"
           >
             EXPORT REPORT
           </button>
@@ -1426,7 +1426,7 @@ function InvestigationSummary({
           <button
             type="button"
             onClick={onRunPropaganda}
-            className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider border border-nerv-amber text-nerv-amber hover:bg-nerv-amber/10 rounded-sm transition-colors"
+            className="px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider border border-nerv-amber text-nerv-amber hover:bg-nerv-amber/10 rounded-sm transition-colors"
           >
             PROPAGANDA ANALYSIS
           </button>

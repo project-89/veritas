@@ -286,10 +286,10 @@ export function NarrativeRadar({
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
           <div className="text-nerv-text-muted text-3xl mb-3">{'\u25C9'}</div>
-          <div className="text-[10px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
+          <div className="text-[12px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
             NARRATIVE RADAR
           </div>
-          <div className="text-[10px] font-mono text-nerv-text-secondary max-w-[280px] leading-relaxed">
+          <div className="text-[12px] font-mono text-nerv-text-secondary max-w-[280px] leading-relaxed">
             Select narratives from the left panel to display multi-dimensional radar analysis.
             Shift-click to overlay up to 3 narratives.
           </div>
@@ -309,7 +309,7 @@ export function NarrativeRadar({
       <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[minmax(460px,560px)_minmax(0,1fr)]">
         <div className="flex flex-col items-center justify-center rounded border border-nerv-border bg-nerv-bg-alt/20 p-3">
           <div className="mb-3 w-full max-w-[520px]">
-            <div className="text-[11px] font-mono uppercase tracking-[0.22em] text-nerv-text-muted">
+            <div className="text-[13px] font-mono uppercase tracking-[0.22em] text-nerv-text-muted">
               Narrative Radar
             </div>
             <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
@@ -426,12 +426,12 @@ export function NarrativeRadar({
         <div className="min-h-0 rounded border border-nerv-border bg-nerv-bg-alt/20 p-4 overflow-y-auto">
           <div className="grid gap-4">
             <section className="rounded border border-nerv-border/70 bg-nerv-bg/60 p-4">
-              <div className="text-[12px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted">
+              <div className="text-[14px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted">
                 How To Read This
               </div>
               <div className="mt-3 grid gap-3 lg:grid-cols-3">
                 <div className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3">
-                  <div className="text-[13px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
+                  <div className="text-[15px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
                     Spokes
                   </div>
                   <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
@@ -440,7 +440,7 @@ export function NarrativeRadar({
                   </div>
                 </div>
                 <div className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3">
-                  <div className="text-[13px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
+                  <div className="text-[15px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
                     Distance From Center
                   </div>
                   <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
@@ -449,7 +449,7 @@ export function NarrativeRadar({
                   </div>
                 </div>
                 <div className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3">
-                  <div className="text-[13px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
+                  <div className="text-[15px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
                     Overlays
                   </div>
                   <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
@@ -471,7 +471,7 @@ export function NarrativeRadar({
                     style={{ backgroundColor: item.color }}
                   />
                   <div className="min-w-0">
-                    <div className="text-[12px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted">
+                    <div className="text-[14px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted">
                       Selected Narrative
                     </div>
                     <div className="mt-1 text-[17px] leading-relaxed text-nerv-text-primary">
@@ -487,23 +487,23 @@ export function NarrativeRadar({
                       className="rounded border border-nerv-border/70 bg-nerv-bg-alt/30 px-4 py-4"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="text-[13px] font-mono uppercase tracking-[0.14em] text-nerv-text-secondary">
+                        <div className="text-[15px] font-mono uppercase tracking-[0.14em] text-nerv-text-secondary">
                           {metric.detailLabel}
                         </div>
-                        <div className="rounded border border-nerv-orange/40 bg-nerv-orange/8 px-2.5 py-1 text-[12px] font-mono text-nerv-orange tabular-nums">
+                        <div className="rounded border border-nerv-orange/40 bg-nerv-orange/8 px-2.5 py-1 text-[14px] font-mono text-nerv-orange tabular-nums">
                           Relative Score {metric.scoreLabel}
                         </div>
                       </div>
                       <div className="mt-3 text-[16px] leading-snug text-nerv-text-primary">
                         {metric.rawLabel}
                       </div>
-                      <div className="mt-2 text-[12px] font-mono uppercase tracking-[0.12em] text-nerv-orange/90">
+                      <div className="mt-2 text-[14px] font-mono uppercase tracking-[0.12em] text-nerv-orange/90">
                         {metric.emphasisLabel}
                       </div>
                       <div className="mt-3 text-[14px] leading-relaxed text-nerv-text-secondary">
                         {metric.description}
                       </div>
-                      <div className="mt-2 text-[13px] leading-relaxed text-nerv-text-primary/85">
+                      <div className="mt-2 text-[15px] leading-relaxed text-nerv-text-primary/85">
                         High values: {metric.whatHighMeans}
                       </div>
                     </div>
@@ -513,7 +513,7 @@ export function NarrativeRadar({
             ))}
 
             <section className="rounded border border-nerv-border/70 bg-nerv-bg/60 p-4">
-              <div className="text-[12px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted">
+              <div className="text-[14px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted">
                 Axis Guide
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -522,13 +522,13 @@ export function NarrativeRadar({
                     key={axis.key}
                     className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3"
                   >
-                    <div className="text-[13px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
+                    <div className="text-[15px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
                       {axis.detailLabel}
                     </div>
                     <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
                       {axis.description}
                     </div>
-                    <div className="mt-2 text-[13px] leading-relaxed text-nerv-text-primary/85">
+                    <div className="mt-2 text-[15px] leading-relaxed text-nerv-text-primary/85">
                       High values: {axis.whatHighMeans}
                     </div>
                   </div>
@@ -538,7 +538,7 @@ export function NarrativeRadar({
 
             <div className="flex flex-wrap items-center gap-4">
               {radarData.length < 3 && (
-                <span className="text-[11px] font-mono text-nerv-text-muted italic">
+                <span className="text-[13px] font-mono text-nerv-text-muted italic">
                   Shift-click narratives to compare up to 3 overlays.
                 </span>
               )}
@@ -546,7 +546,7 @@ export function NarrativeRadar({
                 <button
                   type="button"
                   onClick={() => onCompare(radarData.map((d) => d.id))}
-                  className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
+                  className="px-3 py-1.5 text-[12px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
                 >
                   Compare Selected Narratives
                 </button>

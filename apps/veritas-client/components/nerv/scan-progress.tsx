@@ -36,7 +36,7 @@ function StatusBadge({ status }: { status: ConnectorStatus['status'] }) {
   return (
     <span
       className={[
-        'px-1.5 py-0.5 text-[8px] font-mono uppercase tracking-wider rounded-sm',
+        'px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider rounded-sm',
         c.bg,
         c.text,
         c.animate ? 'animate-nerv-pulse' : '',
@@ -104,7 +104,7 @@ function ConnectorRow({
     <div className="flex items-center gap-2 px-3 py-1.5">
       {/* Platform label */}
       <span
-        className="text-[9px] font-mono font-bold uppercase tracking-wider w-16 shrink-0"
+        className="text-[11px] font-mono font-bold uppercase tracking-wider w-16 shrink-0"
         style={{ color: config.color }}
       >
         {config.label}
@@ -117,12 +117,12 @@ function ConnectorRow({
       <StatusBadge status={connector.status} />
 
       {/* Post count */}
-      <span className="text-[9px] font-mono text-nerv-text-secondary w-14 text-right shrink-0 tabular-nums">
+      <span className="text-[11px] font-mono text-nerv-text-secondary w-14 text-right shrink-0 tabular-nums">
         {connector.postCount > 0 ? `${connector.postCount} posts` : ''}
       </span>
 
       {/* Duration */}
-      <span className="text-[8px] font-mono text-nerv-text-muted w-10 text-right shrink-0 tabular-nums">
+      <span className="text-[10px] font-mono text-nerv-text-muted w-10 text-right shrink-0 tabular-nums">
         {durationStr ?? ''}
       </span>
 
@@ -131,7 +131,7 @@ function ConnectorRow({
         <button
           type="button"
           onClick={() => onRetry(platform)}
-          className="text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors shrink-0"
+          className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 border border-nerv-orange/50 text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors shrink-0"
         >
           RETRY
         </button>
@@ -173,10 +173,10 @@ export function ScanProgress({ scanJob, onCancel, onRetry }: ScanProgressProps) 
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-nerv-border bg-nerv-bg-elevated/30">
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-mono uppercase tracking-widest text-nerv-text-muted">
+          <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
             SCAN PROGRESS
           </span>
-          <span className="text-[9px] font-mono text-nerv-text-secondary tabular-nums">
+          <span className="text-[11px] font-mono text-nerv-text-secondary tabular-nums">
             {doneCount}/{totalCount}
           </span>
           {isActive && (
@@ -185,7 +185,7 @@ export function ScanProgress({ scanJob, onCancel, onRetry }: ScanProgressProps) 
         </div>
         <div className="flex items-center gap-2">
           {scanJob.totalPosts > 0 && (
-            <span className="text-[9px] font-mono text-nerv-orange tabular-nums">
+            <span className="text-[11px] font-mono text-nerv-orange tabular-nums">
               {scanJob.totalPosts} posts
             </span>
           )}
@@ -193,18 +193,18 @@ export function ScanProgress({ scanJob, onCancel, onRetry }: ScanProgressProps) 
             <button
               type="button"
               onClick={onCancel}
-              className="text-[8px] font-mono uppercase tracking-wider px-1.5 py-0.5 border border-nerv-red/50 text-nerv-red hover:bg-nerv-red/10 rounded-sm transition-colors"
+              className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 border border-nerv-red/50 text-nerv-red hover:bg-nerv-red/10 rounded-sm transition-colors"
             >
               CANCEL
             </button>
           )}
           {hasFailures && !isActive && (
-            <span className="text-[8px] font-mono text-nerv-red uppercase tracking-wider">
+            <span className="text-[10px] font-mono text-nerv-red uppercase tracking-wider">
               PARTIAL FAILURE
             </span>
           )}
           {scanJob.status === 'completed' && (
-            <span className="text-[8px] font-mono text-nerv-green uppercase tracking-wider">
+            <span className="text-[10px] font-mono text-nerv-green uppercase tracking-wider">
               COMPLETE
             </span>
           )}
@@ -231,7 +231,7 @@ export function ScanProgress({ scanJob, onCancel, onRetry }: ScanProgressProps) 
             key={`error-${platform}`}
             className="px-3 py-1 bg-nerv-red/5 border-t border-nerv-red/20"
           >
-            <span className="text-[8px] font-mono text-nerv-red">
+            <span className="text-[10px] font-mono text-nerv-red">
               {getPlatformConfig(platform).label}: {c.error}
             </span>
           </div>

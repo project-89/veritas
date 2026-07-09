@@ -10,6 +10,7 @@ import { NervBadge } from './nerv-badge';
 import { NervStatus } from './nerv-status';
 
 const DEFAULT_NAV_LINKS: ReadonlyArray<{ href: string; label: string }> = [
+  { href: '/', label: 'Command' },
   { href: '/monitor', label: 'Monitor' },
   { href: '/search', label: 'Search' },
   { href: '/worldmap', label: 'World Map' },
@@ -29,7 +30,7 @@ function UtcClock() {
   }, []);
 
   return (
-    <span className="text-[11px] font-mono tabular-nums text-nerv-text-secondary">
+    <span className="text-[13px] font-mono tabular-nums text-nerv-text-secondary">
       {time} <span className="text-nerv-text-muted/80">UTC</span>
     </span>
   );
@@ -113,11 +114,11 @@ export function NervNav() {
       <div className="px-4 h-12 flex items-center justify-between gap-4">
         {/* Left: Logo */}
         <Link href="/" className="flex items-center gap-2 shrink-0 group">
-          <span className="text-[11px] font-mono text-nerv-orange/75 tracking-widest">{'//'}</span>
+          <span className="text-[13px] font-mono text-nerv-orange/75 tracking-widest">{'//'}</span>
           <span className="text-base font-mono font-bold tracking-[0.22em] text-nerv-text group-hover:text-nerv-orange transition-colors">
             VERITAS
           </span>
-          <span className="text-[10px] font-mono text-nerv-text-secondary/75 tracking-wider hidden sm:inline">
+          <span className="text-[12px] font-mono text-nerv-text-secondary/75 tracking-wider hidden sm:inline">
             v2.0
           </span>
         </Link>
@@ -127,16 +128,16 @@ export function NervNav() {
           {isInvestigating && (
             <Link
               href="/monitor"
-              className="px-2 py-1.5 text-[11px] font-mono uppercase tracking-[0.18em] text-nerv-text-secondary hover:text-nerv-orange transition-colors"
+              className="px-2 py-1.5 text-[13px] font-mono uppercase tracking-[0.18em] text-nerv-text-secondary hover:text-nerv-orange transition-colors"
             >
               {'\u2190'} Monitor
             </Link>
           )}
           {isInvestigating && (
-            <span className="text-[11px] font-mono text-nerv-orange/70 px-1">{'\u25B8'}</span>
+            <span className="text-[13px] font-mono text-nerv-orange/70 px-1">{'\u25B8'}</span>
           )}
           {isInvestigating && (
-            <span className="text-[11px] font-mono text-nerv-orange uppercase tracking-[0.18em]">
+            <span className="text-[13px] font-mono text-nerv-orange uppercase tracking-[0.18em]">
               Investigation
             </span>
           )}
@@ -155,7 +156,7 @@ export function NervNav() {
                         : undefined
                     }
                     className={[
-                      'relative px-3 py-1.5 text-[11px] font-mono uppercase tracking-[0.18em] transition-colors rounded-sm',
+                      'relative px-3 py-1.5 text-[13px] font-mono uppercase tracking-[0.18em] transition-colors rounded-sm',
                       active
                         ? 'text-nerv-orange bg-nerv-orange/14 shadow-[0_0_14px_rgba(255,133,61,0.14)]'
                         : 'text-nerv-text-secondary hover:text-nerv-text hover:bg-nerv-bg-panel/70',
@@ -191,7 +192,7 @@ export function NervNav() {
           <div className="w-px h-4 bg-nerv-border hidden sm:block" />
           <div className="hidden sm:flex items-center gap-1.5">
             <NervStatus status="online" size="sm" />
-            <span className="text-[11px] font-mono uppercase tracking-[0.18em] text-nerv-text-secondary">
+            <span className="text-[13px] font-mono uppercase tracking-[0.18em] text-nerv-text-secondary">
               SYS:ONLINE
             </span>
           </div>
