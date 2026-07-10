@@ -41,7 +41,10 @@ function InvestigatePageInner() {
           // Preserve any URL params from the search page (fresh, platforms, etc.)
           const existingParams = new URLSearchParams(searchParams.toString());
           if (!existingParams.has('q')) {
-            existingParams.set('q', inv.query);
+            // URLSearchParams.set coerces undefined -> the string "undefined";
+            // fall back to the investigation name and only set a real value.
+            const q = (inv.query ?? '').trim() || (inv.name ?? '').trim();
+            if (q) existingParams.set('q', q);
           }
           const resolvedInvestigationId = inv._id ?? inv.id;
           if (!resolvedInvestigationId) {

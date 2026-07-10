@@ -251,7 +251,11 @@ function InvestigationWorkspace() {
     if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return null;
     return trimmed;
   };
-  const query = searchParams.get('q') ?? '';
+  const rawQuery = searchParams.get('q');
+  // Guard against a literal "undefined"/"null" reaching the URL from a stray
+  // stringified value upstream.
+  const query =
+    rawQuery && rawQuery !== 'undefined' && rawQuery !== 'null' ? rawQuery : '';
   const invId = normalizeRouteId(searchParams.get('inv'));
   const requestedScanId = normalizeRouteId(searchParams.get('scan'));
   const freshSearch = searchParams.get('fresh') === '1';
@@ -2148,12 +2152,14 @@ function InvestigationWorkspace() {
                 {'\u2192'}
               </span>
             )}
-            <span
-              className="text-[13px] font-mono font-bold text-nerv-orange truncate max-w-[300px]"
-              title={query}
-            >
-              &quot;{query}&quot;
-            </span>
+            {query && (
+              <span
+                className="text-[13px] font-mono font-bold text-nerv-orange truncate max-w-[300px]"
+                title={query}
+              >
+                &quot;{query}&quot;
+              </span>
+            )}
             <NervStatus
               status={pipelineRunning ? 'warning' : state.error ? 'critical' : 'online'}
               label={pipelineRunning ? 'PROCESSING' : state.error ? 'ERROR' : 'ACTIVE'}
