@@ -5,6 +5,7 @@ import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
+import { buildSearchQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 
@@ -341,7 +342,10 @@ export class FarcasterFreeConnector implements DataConnector, OnModuleInit, OnMo
 
     try {
       const neynarLimit = Math.min(limit, 25);
-      const url = `${NEYNAR_BASE}/cast/search?q=${encodeURIComponent(query)}&limit=${neynarLimit}`;
+      // Reduce natural-language questions to significant terms; Neynar cast
+      // search is literal, so the raw question returns almost nothing.
+      const searchQuery = buildSearchQuery(query);
+      const url = `${NEYNAR_BASE}/cast/search?q=${encodeURIComponent(searchQuery)}&limit=${neynarLimit}`;
 
       const response = await this.fetchWithRetry(url, {
         headers: this.neynarHeaders(),

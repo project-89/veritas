@@ -4,6 +4,7 @@ import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
+import { buildSearchQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 
@@ -227,7 +228,10 @@ export class BlueskyFreeConnector implements DataConnector, OnModuleInit, OnModu
     const limit = options?.maxResults || options?.limit || 25;
 
     try {
-      const url = `${BSKY_PUBLIC_API}/app.bsky.feed.searchPosts?q=${encodeURIComponent(query)}&limit=${Math.min(limit, 100)}`;
+      // Reduce natural-language questions to significant terms; Bluesky search
+      // is literal, so the raw question returns almost nothing.
+      const searchQuery = buildSearchQuery(query);
+      const url = `${BSKY_PUBLIC_API}/app.bsky.feed.searchPosts?q=${encodeURIComponent(searchQuery)}&limit=${Math.min(limit, 100)}`;
       const data = await this.fetchWithRetry<BlueskySearchResponse>(url);
 
       if (!Array.isArray(data.posts)) return [];

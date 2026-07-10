@@ -12,6 +12,7 @@ import {
   normalizeSearchMode,
   type SearchMode,
 } from '../utils/query-intent.util';
+import { buildSearchQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 import { SubprocessUtil } from './utils/subprocess.util';
@@ -289,17 +290,18 @@ export class YouTubeFreeConnector implements DataConnector, OnModuleInit, OnModu
     );
 
     try {
+      // Topic search: reduce a natural-language question to significant terms
+      // up front (YouTube search is literal). Fall back to the raw query if the
+      // reduced form finds nothing — short queries can match verbatim.
+      const topicQuery = searchMode === 'claim' ? query : buildSearchQuery(query);
       let videos =
         searchMode === 'claim'
           ? await this.executeClaimSearch(query, limit, options)
-          : await this.executeSearch(query, limit, options);
+          : await this.executeSearch(topicQuery, limit, options);
 
-      if (videos.length === 0 && searchMode !== 'claim') {
-        const compactQuery = this.buildCompactSearchQuery(query);
-        if (compactQuery && compactQuery !== query) {
-          this.logger.debug(`Retrying YouTube search with compact query: "${compactQuery}"`);
-          videos = await this.executeSearch(compactQuery, limit, options);
-        }
+      if (videos.length === 0 && searchMode !== 'claim' && topicQuery !== query) {
+        this.logger.debug(`Retrying YouTube search with raw query: "${query}"`);
+        videos = await this.executeSearch(query, limit, options);
       }
 
       // Second pass: fetch transcripts in batches of 5 to limit concurrency

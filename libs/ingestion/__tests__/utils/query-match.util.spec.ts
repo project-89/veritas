@@ -1,4 +1,5 @@
 import {
+  buildSearchQuery,
   extractSignificantTerms,
   matchesQuery,
   requiredTermMatches,
@@ -67,5 +68,41 @@ describe('matchesQuery', () => {
     expect(matchesQuery('completely unrelated cooking recipe', 'ukraine war russia invasion')).toBe(
       false,
     );
+  });
+});
+
+describe('buildSearchQuery', () => {
+  it('reduces a natural-language question to significant terms', () => {
+    // The exact case that returned 0 tweets raw but 11 when reduced.
+    expect(buildSearchQuery('Who is truly behind the Alberta separatist movement in Canada?')).toBe(
+      'alberta separatist movement canada',
+    );
+  });
+
+  it('drops low-signal filler words that over-constrain AND-based search', () => {
+    // "truly" and "behind" survive stopword stripping but are dropped as filler.
+    const out = buildSearchQuery('what is truly really going on behind the scenes');
+    expect(out).not.toMatch(/\b(truly|really|going|behind)\b/);
+    expect(out).toContain('scenes');
+  });
+
+  it('caps the number of terms to keep recall (AND semantics)', () => {
+    const out = buildSearchQuery('alpha bravo charlie delta echo foxtrot golf hotel');
+    expect(out.split(' ')).toHaveLength(5);
+    expect(out).toBe('alpha bravo charlie delta echo');
+  });
+
+  it('returns a bare handle/single token unchanged', () => {
+    expect(buildSearchQuery('project89')).toBe('project89');
+    expect(buildSearchQuery('@project_89')).toBe('@project_89');
+    expect(buildSearchQuery('#Bitcoin')).toBe('#Bitcoin');
+  });
+
+  it('keeps short acronyms like "AI" (2 chars)', () => {
+    expect(buildSearchQuery('Is AI conscious?')).toBe('ai conscious');
+  });
+
+  it('falls back to the trimmed original when there are no significant terms', () => {
+    expect(buildSearchQuery('who is it')).toBe('who is it');
   });
 });

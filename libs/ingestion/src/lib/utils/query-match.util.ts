@@ -44,6 +44,45 @@ export function extractSignificantTerms(query: string): string[] {
   return terms;
 }
 
+/**
+ * Low-signal words that survive stopword stripping but hurt platform SEARCH.
+ * Platform search endpoints (Twitter, Bluesky, Farcaster, YouTube) treat
+ * space-separated terms as AND, so every extra weak term further constrains
+ * the result set. Empirically, "truly behind alberta separatist movement
+ * canada" returned 0 tweets while "alberta separatist movement canada"
+ * returned 11 — the filler words "truly"/"behind" were the difference.
+ *
+ * These are dropped ONLY when building a search query, never when relevance-
+ * matching already-fetched content (matchesQuery keeps using STOPWORDS only).
+ */
+const SEARCH_FILLER = new Set([
+  'truly', 'really', 'actually', 'basically', 'literally', 'simply', 'exactly',
+  'behind', 'involved', 'responsible', 'going', 'happening', 'around',
+  'regarding', 'concerning', 'related', 'actual', 'real', 'true', 'thing',
+  'things', 'stuff', 'people', 'someone', 'something', 'anyone', 'anything',
+]);
+
+/**
+ * Turn a raw user query into an effective platform-search string.
+ *
+ * Platform search matches fairly literally, so a natural-language question
+ * ("Who is truly behind the Alberta separatist movement in Canada?") returns
+ * almost nothing. Reducing it to a capped set of significant terms
+ * ("alberta separatist movement canada") turns it into a high-recall keyword
+ * search. Because search is AND-based, we both drop filler AND cap the term
+ * count — more terms means fewer results.
+ *
+ * A bare handle/single token (no whitespace) is returned unchanged so account
+ * and hashtag lookups keep working.
+ */
+export function buildSearchQuery(query: string, maxTerms = 5): string {
+  const trimmed = query.trim();
+  if (!/\s/.test(trimmed)) return trimmed;
+  const terms = extractSignificantTerms(trimmed).filter((t) => !SEARCH_FILLER.has(t));
+  if (terms.length === 0) return trimmed;
+  return terms.slice(0, maxTerms).join(' ');
+}
+
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

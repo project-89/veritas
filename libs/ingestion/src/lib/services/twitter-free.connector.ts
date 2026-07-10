@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '../schemas';
-import { matchesQuery } from '../utils/query-match.util';
+import { buildSearchQuery, matchesQuery } from '../utils/query-match.util';
 import { BaseSocialMediaConnector } from './base-social-media.connector';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
@@ -115,26 +115,38 @@ export class TwitterFreeConnector
       const allTweets: Tweet[] = [];
       const queryFailures: string[] = [];
 
-      // Search multiple query variations to cast a wider net
-      const baseQuery = query.replace(/^[@#]/, '');
-      const withUnderscore = baseQuery.includes('_')
-        ? baseQuery
-        : baseQuery.replace(/(\d+)/, '_$1');
-      const withoutUnderscore = baseQuery.replace(/_/g, '');
-      const uniqueQueries = [
-        ...new Set(
-          [
-            query, // exact as typed
-            baseQuery, // stripped prefix
-            `@${baseQuery}`, // as mention
-            `#${baseQuery}`, // as hashtag
-            withUnderscore !== baseQuery ? `@${withUnderscore}` : null, // @project_89
-            withUnderscore !== baseQuery ? withUnderscore : null, // project_89
-            withoutUnderscore !== baseQuery ? withoutUnderscore : null, // project89
-            `"${baseQuery}"`, // exact phrase match
-          ].filter(Boolean),
-        ),
-      ] as string[];
+      // A bare handle/hashtag (single token, no spaces) gets the
+      // mention/hashtag/underscore variations that help find accounts. A
+      // multi-word topic or natural-language question does NOT — wrapping it in
+      // @/#/quotes and AND-ing every word returns ~0 (Twitter search is
+      // literal). For those we reduce to capped significant terms instead.
+      const isHandleQuery = !/\s/.test(query.trim());
+      let uniqueQueries: string[];
+      if (isHandleQuery) {
+        const baseQuery = query.replace(/^[@#]/, '');
+        const withUnderscore = baseQuery.includes('_')
+          ? baseQuery
+          : baseQuery.replace(/(\d+)/, '_$1');
+        const withoutUnderscore = baseQuery.replace(/_/g, '');
+        uniqueQueries = [
+          ...new Set(
+            [
+              query, // exact as typed
+              baseQuery, // stripped prefix
+              `@${baseQuery}`, // as mention
+              `#${baseQuery}`, // as hashtag
+              withUnderscore !== baseQuery ? `@${withUnderscore}` : null, // @project_89
+              withUnderscore !== baseQuery ? withUnderscore : null, // project_89
+              withoutUnderscore !== baseQuery ? withoutUnderscore : null, // project89
+            ].filter(Boolean),
+          ),
+        ] as string[];
+      } else {
+        // Topic/question: search the capped significant-term string, plus the
+        // raw query as typed (short questions can match verbatim on Twitter).
+        const searchQuery = buildSearchQuery(query);
+        uniqueQueries = [...new Set([searchQuery, query].filter(Boolean))] as string[];
+      }
 
       this.logger.log(
         `Searching Twitter with ${uniqueQueries.length} query variations: ${uniqueQueries.join(', ')}`,
