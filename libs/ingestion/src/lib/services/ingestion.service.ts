@@ -102,7 +102,7 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
    * Register all available connectors from injected instances
    */
   private async registerAvailableConnectors() {
-    const connectors = [
+    const connectors: DataConnector[] = [
       this.redditConnector,
       this.twitterConnector,
       this.facebookConnector,
@@ -117,8 +117,25 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
       this.webScraperConnector,
     ].filter((connector) => connector !== undefined);
 
-    const results: Array<{ platform: string; status: 'live' | 'failed'; detail?: string }> = [];
+    const results: Array<{
+      platform: string;
+      status: 'live' | 'failed' | 'disabled';
+      detail?: string;
+    }> = [];
     for (const connector of connectors) {
+      // Credential gate: if a connector declares required env vars that are
+      // absent, disable it up front instead of registering it and letting
+      // every scan fail per-request (e.g. Reddit 403s without OAuth keys).
+      const missing = connector.getMissingCredentials?.() ?? [];
+      if (missing.length > 0) {
+        results.push({
+          platform: connector.platform,
+          status: 'disabled',
+          detail: `missing ${missing.join(', ')}`,
+        });
+        continue;
+      }
+
       const error = await this.registerConnector(connector);
       results.push(
         error
@@ -131,10 +148,14 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
     // deployment can actually reach, so degraded sources are visible up
     // front instead of surfacing as mystery-empty scan results.
     const live = results.filter((r) => r.status === 'live').map((r) => r.platform);
+    const disabled = results.filter((r) => r.status === 'disabled');
     const failed = results.filter((r) => r.status === 'failed');
     this.logger.log(
       `Connector capability: ${live.length}/${results.length} live [${live.join(', ') || 'none'}]`,
     );
+    for (const d of disabled) {
+      this.logger.warn(`Connector DISABLED: ${d.platform} — ${d.detail}`);
+    }
     for (const f of failed) {
       this.logger.warn(`Connector UNAVAILABLE: ${f.platform} — ${f.detail}`);
     }

@@ -74,6 +74,24 @@ export class TruthSocialFreeConnector implements DataConnector, OnModuleInit, On
     await this.disconnect();
   }
 
+  /**
+   * Truth Social scraping via truthbrush needs account credentials — either
+   * TRUTHSOCIAL_USERNAME (+ TRUTHSOCIAL_PASSWORD) or a TRUTHSOCIAL_TOKEN.
+   * Without them every request fails, so we report them missing and let the
+   * registration gate disable the connector. (The truthbrush binary itself is
+   * verified separately in connect().)
+   */
+  getMissingCredentials(): string[] {
+    const hasUsername = !!(
+      this.configService.get<string>('TRUTHSOCIAL_USERNAME') ||
+      process.env['TRUTHSOCIAL_USERNAME']
+    );
+    const hasToken = !!(
+      this.configService.get<string>('TRUTHSOCIAL_TOKEN') || process.env['TRUTHSOCIAL_TOKEN']
+    );
+    return hasUsername || hasToken ? [] : ['TRUTHSOCIAL_USERNAME or TRUTHSOCIAL_TOKEN'];
+  }
+
   async connect(): Promise<void> {
     const result = await this.subprocessUtil.exec(this.truthbrushPath, ['--help'], {
       timeout: 10000,

@@ -64,4 +64,15 @@ export interface DataConnector {
    * @returns Promise resolving to a boolean indicating if credentials are valid
    */
   validateCredentials(): Promise<boolean>;
+
+  /**
+   * Optional. Report required credentials/config that are absent from the
+   * environment. When this returns a non-empty list, the connector is
+   * auto-disabled at registration (excluded from every scan) rather than
+   * being attempted and failing per-request (e.g. repeated 403s). Connectors
+   * that work keyless should not implement this, or return an empty array.
+   *
+   * @returns Names of the missing environment variables, e.g. ['REDDIT_CLIENT_ID']
+   */
+  getMissingCredentials?(): string[];
 }

@@ -97,6 +97,17 @@ export class FarcasterFreeConnector implements DataConnector, OnModuleInit, OnMo
     await this.disconnect();
   }
 
+  /**
+   * Farcaster access here goes through the Neynar API, which requires an API
+   * key (free tier available). Without it the connector cannot fetch anything,
+   * so we report it missing and let the registration gate disable it.
+   */
+  getMissingCredentials(): string[] {
+    const key =
+      this.configService.get<string>('NEYNAR_API_KEY') || process.env['NEYNAR_API_KEY'] || null;
+    return key ? [] : ['NEYNAR_API_KEY'];
+  }
+
   async connect(): Promise<void> {
     if (!this.neynarApiKey) {
       this.logger.debug('NEYNAR_API_KEY not set — Farcaster connector unavailable');

@@ -177,6 +177,19 @@ export class RedditFreeConnector
     await this.disconnect();
   }
 
+  /**
+   * reddit.com now returns HTTP 403 for unauthenticated JSON access from most
+   * networks, so application-only OAuth credentials are effectively required.
+   * Without them this connector would 403 on every scan, so we report the
+   * missing keys and let the registration gate disable it cleanly.
+   */
+  getMissingCredentials(): string[] {
+    const missing: string[] = [];
+    if (!this.clientId) missing.push('REDDIT_CLIENT_ID');
+    if (!this.clientSecret) missing.push('REDDIT_CLIENT_SECRET');
+    return missing;
+  }
+
   async connect(): Promise<void> {
     // No-op for API-free connector; verify reachability
     try {
