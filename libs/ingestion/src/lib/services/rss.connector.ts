@@ -13,6 +13,7 @@ import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-co
 import { RssCacheRepository } from '../repositories/rss-cache.repository';
 import type { RssCacheItem } from '../schemas/rss-cache.schema';
 import type { FeedFailureState } from '../schemas/rss-feed-state.schema';
+import { matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 
 interface RSSItem {
@@ -435,11 +436,6 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
    * Check if an item matches the search query
    */
   private itemMatchesQuery(item: RSSItem, query: string): boolean {
-    const searchTerms = query
-      .toLowerCase()
-      .split(/\s+/)
-      .map((term) => term.trim())
-      .filter(Boolean);
     const itemText = [
       this.coerceToSearchText(item.title),
       this.coerceToSearchText(item.contentSnippet),
@@ -447,10 +443,11 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
       this.coerceToSearchText(item.categories),
     ]
       .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
+      .join(' ');
 
-    return searchTerms.some((term) => itemText.includes(term));
+    // Word-boundary, stopword-aware match so an "AI" query doesn't pull in
+    // every feed item mentioning "blockchain" or "supply chain".
+    return matchesQuery(itemText, query);
   }
 
   /**
@@ -628,7 +625,7 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
         }
 
         // Filter items by keywords
-        const filteredItems = this.filterItemsByKeywords(allItems, keywords);
+        const filteredItems = this.filterItemsByKeywords(allItems, keywords.join(' '));
 
         if (filteredItems.length > 0) {
           // Transform to SocialMediaPost format
@@ -688,7 +685,7 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
         }
 
         // Filter items by keywords
-        const filteredItems = this.filterItemsByKeywords(allItems, keywords);
+        const filteredItems = this.filterItemsByKeywords(allItems, keywords.join(' '));
 
         if (filteredItems.length > 0) {
           // Transform to SocialMediaPost format
@@ -726,24 +723,12 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
   /**
    * Filter items by keywords
    */
-  private filterItemsByKeywords(items: RSSItem[], keywords: string[]): RSSItem[] {
-    if (!keywords.length) {
+  private filterItemsByKeywords(items: RSSItem[], query: string): RSSItem[] {
+    if (!query.trim()) {
       return items;
     }
 
-    return items.filter((item) => {
-      const itemText = [
-        this.coerceToSearchText(item.title),
-        this.coerceToSearchText(item.contentSnippet),
-        this.coerceToSearchText(item.content),
-        this.coerceToSearchText(item.categories),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-
-      return keywords.some((keyword) => itemText.includes(keyword.toLowerCase()));
-    });
+    return items.filter((item) => this.itemMatchesQuery(item, query));
   }
 
   async validateCredentials(): Promise<boolean> {

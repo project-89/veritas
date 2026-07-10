@@ -129,5 +129,31 @@ describe('FourChanFreeConnector', () => {
       expect(posts).toEqual([]);
       expect(fetchMock).not.toHaveBeenCalled();
     });
+
+    it('excludes off-topic threads that only share a substring with the query', async () => {
+      // "AI" is a substring of "chain"/"blockchain" but not a whole word — the
+      // old includes()-based matcher would have wrongly matched these threads.
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => [
+          {
+            page: 1,
+            threads: [
+              {
+                no: 789,
+                sub: 'Blockchain gains',
+                com: 'The whole chain is available and maintained by the campaign',
+                time: 1_700_000_000,
+              },
+            ],
+          },
+        ],
+      });
+
+      const posts = await connector.searchContent('AI');
+
+      expect(posts).toEqual([]);
+    });
   });
 });

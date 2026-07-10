@@ -249,6 +249,30 @@ describe('TwitterFreeConnector', () => {
     });
   });
 
+  describe('postMatchesKeywords (stream relevance filter)', () => {
+    function matches(text: string, query: string): boolean {
+      return (
+        connector as unknown as {
+          postMatchesKeywords: (post: { text: string }, query: string) => boolean;
+        }
+      ).postMatchesKeywords({ text }, query);
+    }
+
+    it('matches on whole words', () => {
+      expect(matches('A breakthrough in AI research', 'AI')).toBe(true);
+    });
+
+    it('excludes posts that only share a substring with the query', () => {
+      // "AI" is a substring of "blockchain"/"maintained" but never a whole word.
+      expect(matches('Our blockchain is maintained across the whole chain', 'AI')).toBe(false);
+    });
+
+    it('returns false for empty text or query', () => {
+      expect(matches('', 'AI')).toBe(false);
+      expect(matches('some text', '   ')).toBe(false);
+    });
+  });
+
   describe('streamContent', () => {
     it('should return an EventEmitter with close', () => {
       jest.useFakeTimers();

@@ -9,6 +9,7 @@ import {
   SocialMediaPost,
 } from '../interfaces/social-media-connector.interface';
 import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
+import { matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 
 interface ScrapedArticle {
@@ -375,14 +376,15 @@ export class WebScraperConnector
    * Check if an article matches the search query
    */
   private articleMatchesQuery(article: ScrapedArticle, query: string): boolean {
-    const searchTerms = query.toLowerCase().split(' ');
     const articleText = `
-      ${article.title || ''} 
-      ${article.content || ''} 
+      ${article.title || ''}
+      ${article.content || ''}
       ${article.author || ''}
-    `.toLowerCase();
+    `;
 
-    return searchTerms.some((term) => articleText.includes(term));
+    // Word-boundary, stopword-aware match so an "AI" query doesn't match every
+    // article mentioning "blockchain" or "supply chain".
+    return matchesQuery(articleText, query);
   }
 
   /**
@@ -465,7 +467,7 @@ export class WebScraperConnector
         }
 
         // Filter articles by keywords
-        const filteredArticles = this.filterArticlesByKeywords(articles, keywords);
+        const filteredArticles = this.filterArticlesByKeywords(articles, keywords.join(' '));
 
         if (filteredArticles.length > 0) {
           // Transform to SocialMediaPost format
@@ -517,7 +519,7 @@ export class WebScraperConnector
         }
 
         // Filter articles by keywords
-        const filteredArticles = this.filterArticlesByKeywords(articles, keywords);
+        const filteredArticles = this.filterArticlesByKeywords(articles, keywords.join(' '));
 
         if (filteredArticles.length > 0) {
           // Transform to SocialMediaPost format
@@ -557,23 +559,12 @@ export class WebScraperConnector
   /**
    * Filter articles by keywords
    */
-  private filterArticlesByKeywords(
-    articles: ScrapedArticle[],
-    keywords: string[],
-  ): ScrapedArticle[] {
-    if (!keywords.length) {
+  private filterArticlesByKeywords(articles: ScrapedArticle[], query: string): ScrapedArticle[] {
+    if (!query.trim()) {
       return articles;
     }
 
-    return articles.filter((article) => {
-      const articleText = `
-        ${article.title || ''} 
-        ${article.content || ''} 
-        ${article.author || ''}
-      `.toLowerCase();
-
-      return keywords.some((keyword) => articleText.includes(keyword.toLowerCase()));
-    });
+    return articles.filter((article) => this.articleMatchesQuery(article, query));
   }
 
   async validateCredentials(): Promise<boolean> {

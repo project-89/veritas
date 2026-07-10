@@ -136,6 +136,34 @@ describe('RSSConnector', () => {
       expect(posts).toEqual([]);
     });
 
+    it('excludes items that only share a substring with the query', async () => {
+      mockedGetFeedsForQuery.mockReturnValue([
+        {
+          name: 'Mock Feed',
+          url: 'https://example.com/feed.xml',
+          category: 'world_news',
+          tier: 1,
+          language: 'en',
+        },
+      ]);
+
+      // "AI" is a substring of "blockchain"/"maintains"/"chain" but never a
+      // whole word — the old includes()-based matcher would have matched.
+      jest.spyOn(connector as any, 'fetchFeedItems').mockResolvedValue({
+        items: [
+          {
+            title: 'Blockchain startup maintains its supply chain',
+            link: 'https://example.com/posts/ai-substring',
+          },
+        ],
+        failure: null,
+      });
+
+      const posts = await connector.searchContent('AI');
+
+      expect(posts).toEqual([]);
+    });
+
     it('throws when every feed fails or is suppressed and nothing was collected', async () => {
       mockedGetFeedsForQuery.mockReturnValue([
         {

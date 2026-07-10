@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '../schemas';
+import { matchesQuery } from '../utils/query-match.util';
 import { BaseSocialMediaConnector } from './base-social-media.connector';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
@@ -236,7 +237,9 @@ export class TwitterFreeConnector
           limit: 100,
         });
 
-        const filteredPosts = posts.filter((post) => this.postMatchesKeywords(post, keywords));
+        const filteredPosts = posts.filter((post) =>
+          this.postMatchesKeywords(post, keywords.join(' ')),
+        );
 
         for (const post of filteredPosts) {
           emitter.emit('data', post);
@@ -384,9 +387,8 @@ export class TwitterFreeConnector
     return verificationScore + followerScore;
   }
 
-  private postMatchesKeywords(post: SocialMediaPost, keywords: string[]): boolean {
-    if (!post.text || !keywords.length) return false;
-    const text = post.text.toLowerCase();
-    return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
+  private postMatchesKeywords(post: SocialMediaPost, query: string): boolean {
+    if (!post.text || !query.trim()) return false;
+    return matchesQuery(post.text, query);
   }
 }

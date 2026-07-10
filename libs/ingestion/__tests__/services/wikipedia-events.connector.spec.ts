@@ -95,5 +95,23 @@ describe('WikipediaEventsConnector', () => {
       expect(insights).toHaveLength(1);
       expect(insights[0]).toMatchObject({ platform: 'wikipedia' });
     });
+
+    it('excludes events that only share a substring with the query', async () => {
+      // "AI" is a substring of "maintain"/"chain" but not a whole word — the
+      // old includes()-based matcher would have wrongly matched this event.
+      const substringHtml =
+        '<ul>' +
+        '<li>Officials pledge to maintain the supply chain across the region despite disruptions.</li>' +
+        '</ul>';
+      fetchMock.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ parse: { text: { '*': substringHtml } } }),
+      });
+
+      const insights = await connector.searchAndTransform('AI');
+
+      expect(insights).toEqual([]);
+    });
   });
 });

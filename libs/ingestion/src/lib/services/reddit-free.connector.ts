@@ -14,6 +14,7 @@ import {
   normalizeSearchText,
   type SearchMode,
 } from '../utils/query-intent.util';
+import { matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 
@@ -324,7 +325,9 @@ export class RedditFreeConnector
           limit: 100,
         });
 
-        const filteredPosts = posts.filter((post) => this.postMatchesKeywords(post, keywords));
+        const filteredPosts = posts.filter((post) =>
+          this.postMatchesKeywords(post, keywords.join(' ')),
+        );
 
         for (const post of filteredPosts) {
           emitter.emit('data', post);
@@ -362,7 +365,9 @@ export class RedditFreeConnector
           limit: 100,
         });
 
-        const filteredPosts = posts.filter((post) => this.postMatchesKeywords(post, keywords));
+        const filteredPosts = posts.filter((post) =>
+          this.postMatchesKeywords(post, keywords.join(' ')),
+        );
 
         if (filteredPosts.length > 0) {
           const insights = await this.transformService.transformBatch(filteredPosts);
@@ -577,9 +582,8 @@ export class RedditFreeConnector
     return Math.min(Math.max(score, 0), 1);
   }
 
-  private postMatchesKeywords(post: SocialMediaPost, keywords: string[]): boolean {
-    const text = post.text.toLowerCase();
-    return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
+  private postMatchesKeywords(post: SocialMediaPost, query: string): boolean {
+    return matchesQuery(post.text, query);
   }
 
   private postMatchesQuery(post: RedditJsonPost, query: string, searchMode: SearchMode): boolean {

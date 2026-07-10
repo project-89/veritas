@@ -457,6 +457,25 @@ describe('RedditFreeConnector', () => {
     });
   });
 
+  describe('postMatchesKeywords (stream relevance filter)', () => {
+    function matches(text: string, query: string): boolean {
+      return (
+        connector as unknown as {
+          postMatchesKeywords: (post: { text: string }, query: string) => boolean;
+        }
+      ).postMatchesKeywords({ text }, query);
+    }
+
+    it('matches on whole words', () => {
+      expect(matches('A breakthrough in AI research today', 'AI')).toBe(true);
+    });
+
+    it('excludes posts that only share a substring with the query', () => {
+      // "AI" is a substring of "blockchain"/"chain"/"maintain" but never a word.
+      expect(matches('The blockchain will maintain the whole chain of custody', 'AI')).toBe(false);
+    });
+  });
+
   describe('getAuthorDetails', () => {
     it('should return author details from Reddit user API', async () => {
       mockAxiosInstance.get.mockResolvedValue({

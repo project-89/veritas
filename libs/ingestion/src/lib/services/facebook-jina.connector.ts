@@ -5,6 +5,7 @@ import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
+import { matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { JinaReaderService } from './utils/jina-reader.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
@@ -221,7 +222,6 @@ export class FacebookJinaConnector implements DataConnector, OnModuleInit, OnMod
     query: string,
   ): SocialMediaPost[] {
     const posts: SocialMediaPost[] = [];
-    const queryLower = query.toLowerCase();
 
     // Split content into logical blocks (paragraphs or sections)
     const blocks = content
@@ -230,8 +230,9 @@ export class FacebookJinaConnector implements DataConnector, OnModuleInit, OnMod
       .filter((block) => block.length > 20); // Ignore very short blocks
 
     for (const block of blocks) {
-      // Only include blocks that match the query
-      if (queryLower && !block.toLowerCase().includes(queryLower)) {
+      // Only include blocks that match the query — word-boundary, stopword-aware
+      // (replaces the old exact-phrase substring match on the whole query).
+      if (query.trim() && !matchesQuery(block, query)) {
         continue;
       }
 

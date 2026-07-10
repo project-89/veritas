@@ -197,6 +197,23 @@ describe('FacebookJinaConnector', () => {
       expect(posts).toEqual([]);
     });
 
+    it('should exclude blocks that only share a substring with the query', async () => {
+      getConnectorState().pageUrls = ['https://www.facebook.com/testpage'];
+
+      // "AI" is a substring of "blockchain"/"maintained"/"chain" but never a
+      // whole word here — the old substring matcher would have matched.
+      (jinaReader.readUrl as jest.Mock).mockResolvedValue({
+        content:
+          'Our blockchain platform is maintained by the whole chain of contributors and remains available.',
+        title: 'Test',
+        url: 'https://www.facebook.com/testpage',
+      });
+
+      const posts = await connector.searchContent('AI');
+
+      expect(posts).toEqual([]);
+    });
+
     it('should ignore short content blocks (< 20 chars)', async () => {
       // Only set one page URL to make the test predictable
       getConnectorState().pageUrls = ['https://www.facebook.com/testpage'];

@@ -5,6 +5,7 @@ import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
+import { matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 
@@ -271,7 +272,6 @@ export class TelegramFreeConnector implements DataConnector, OnModuleInit, OnMod
     }
 
     const limit = options?.maxResults || options?.limit || 20;
-    const keywords = query.toLowerCase().split(/\s+/).filter(Boolean);
 
     this.logger.debug(
       `Telegram: filtering ${this.channels.length} configured channels for "${query}" — this is channel monitoring, not platform-wide search`,
@@ -305,12 +305,10 @@ export class TelegramFreeConnector implements DataConnector, OnModuleInit, OnMod
       );
     }
 
-    // Filter by keywords
-    if (keywords.length > 0) {
-      allMessages = allMessages.filter((msg) => {
-        const text = msg.text.toLowerCase();
-        return keywords.some((kw) => text.includes(kw));
-      });
+    // Relevance filter — word-boundary, stopword-aware matching so a query
+    // like "AI" doesn't pull in every crypto message containing "chain".
+    if (query.trim().length > 0) {
+      allMessages = allMessages.filter((msg) => matchesQuery(msg.text, query));
     }
 
     // Date filter

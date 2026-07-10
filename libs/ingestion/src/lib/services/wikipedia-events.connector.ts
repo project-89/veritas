@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import type { NarrativeInsight } from '../../types/narrative-insight.interface';
 import type { ConnectorSearchOptions, DataConnector } from '../interfaces/data-connector.interface';
 import type { SourceNode } from '../schemas';
+import { extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
@@ -126,15 +127,11 @@ export class WikipediaEventsConnector implements DataConnector {
 
     const events = this.parseEventsFromHtml(html);
 
-    // Filter by query keywords if provided
-    const keywords = query
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((k) => k.length > 2);
-
+    // Filter by query if it has significant terms — word-boundary, stopword-
+    // aware so an "AI" query doesn't match every "blockchain" headline.
     const filtered =
-      keywords.length > 0
-        ? events.filter((e) => keywords.some((kw) => e.text.toLowerCase().includes(kw)))
+      extractSignificantTerms(query).length > 0
+        ? events.filter((e) => matchesQuery(e.text, query))
         : events;
 
     return filtered.slice(0, limit ?? 50);

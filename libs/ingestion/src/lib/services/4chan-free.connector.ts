@@ -4,6 +4,7 @@ import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
+import { extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 
@@ -152,9 +153,10 @@ export class FourChanFreeConnector implements DataConnector, OnModuleInit, OnMod
 
   async searchContent(query: string, options?: SearchOptions): Promise<SocialMediaPost[]> {
     const limit = options?.maxResults || options?.limit || 25;
-    const keywords = query.toLowerCase().split(/\s+/).filter(Boolean);
 
-    if (keywords.length === 0) return [];
+    // No significant query terms (empty or all stopwords) — nothing to match
+    // against a board-wide catalog, so return nothing rather than everything.
+    if (extractSignificantTerms(query).length === 0) return [];
 
     const allThreads: Array<{ thread: ChanThread; board: string }> = [];
     const failures: string[] = [];
@@ -169,11 +171,13 @@ export class FourChanFreeConnector implements DataConnector, OnModuleInit, OnMod
         for (const page of catalog) {
           if (!Array.isArray(page.threads)) continue;
           for (const thread of page.threads) {
-            const subject = (thread.sub ?? '').toLowerCase();
-            const comment = this.stripHtml(thread.com ?? '').toLowerCase();
+            const subject = thread.sub ?? '';
+            const comment = this.stripHtml(thread.com ?? '');
             const text = `${subject} ${comment}`;
 
-            if (keywords.some((kw) => text.includes(kw))) {
+            // Word-boundary, stopword-aware match so an "AI" query doesn't pull
+            // in every /biz/ thread mentioning "blockchain" or "chain".
+            if (matchesQuery(text, query)) {
               allThreads.push({ thread, board });
             }
           }
