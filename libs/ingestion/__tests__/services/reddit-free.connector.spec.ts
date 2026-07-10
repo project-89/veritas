@@ -106,10 +106,64 @@ describe('RedditFreeConnector', () => {
         expect.objectContaining({
           baseURL: 'https://www.reddit.com',
           headers: expect.objectContaining({
-            'User-Agent': 'Veritas/1.0.0 (API-free connector)',
+            'User-Agent': 'web:veritas.osint:v1.0 (narrative intelligence research tool)',
             Accept: 'application/json',
           }),
         }),
+      );
+    });
+
+    it('uses the oauth.reddit.com base URL when client credentials are configured', () => {
+      jest.clearAllMocks();
+      const oauthConfig: Partial<ConfigService> = {
+        get: jest.fn((key: string) => {
+          if (key === 'REDDIT_CLIENT_ID') return 'id123';
+          if (key === 'REDDIT_CLIENT_SECRET') return 'secret456';
+          return undefined;
+        }),
+      };
+      new RedditFreeConnector(
+        oauthConfig as ConfigService,
+        transformService as TransformOnIngestService,
+      );
+      expect(mockedAxios.create).toHaveBeenCalledWith(
+        expect.objectContaining({ baseURL: 'https://oauth.reddit.com' }),
+      );
+    });
+
+    it('acquires an OAuth token and strips the .json suffix in OAuth mode', async () => {
+      jest.clearAllMocks();
+      const oauthConfig: Partial<ConfigService> = {
+        get: jest.fn((key: string) => {
+          if (key === 'REDDIT_CLIENT_ID') return 'id123';
+          if (key === 'REDDIT_CLIENT_SECRET') return 'secret456';
+          return undefined;
+        }),
+      };
+      mockedAxios.create.mockReturnValue(mockAxiosInstance as any);
+      mockedAxios.post = jest
+        .fn()
+        .mockResolvedValue({ data: { access_token: 'tok', expires_in: 3600 } });
+      mockAxiosInstance.get.mockResolvedValue(mockRedditResponse);
+
+      const oauthConnector = new RedditFreeConnector(
+        oauthConfig as ConfigService,
+        transformService as TransformOnIngestService,
+      );
+      await oauthConnector.searchContent('bitcoin', { limit: 2 });
+
+      // Token fetched from www.reddit.com/api/v1/access_token with basic auth
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        'https://www.reddit.com/api/v1/access_token',
+        expect.stringContaining('grant_type=client_credentials'),
+        expect.objectContaining({ auth: { username: 'id123', password: 'secret456' } }),
+      );
+      // Request path has no .json suffix and carries the bearer token
+      const [calledPath, calledConfig] = mockAxiosInstance.get.mock.calls[0];
+      expect(calledPath).not.toContain('.json');
+      expect(calledPath).toContain('/search?');
+      expect(calledConfig).toEqual(
+        expect.objectContaining({ headers: { Authorization: 'Bearer tok' } }),
       );
     });
 

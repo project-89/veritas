@@ -91,21 +91,81 @@ export class RedditFreeConnector
   private readonly pollingInterval = 60000; // 1 minute
   private readonly logger = new Logger(RedditFreeConnector.name);
 
+  private readonly userAgent: string;
+  // Reddit blocks keyless access to www.reddit.com/*.json from most networks
+  // (403). When app credentials are present we use application-only OAuth,
+  // which is the sanctioned path and is not blocked.
+  private readonly oauthMode: boolean;
+  private readonly clientId?: string;
+  private readonly clientSecret?: string;
+  private accessToken: string | null = null;
+  private tokenExpiresAt = 0;
+
   constructor(
     private configService: ConfigService,
     private transformService: TransformOnIngestService,
   ) {
-    const userAgent =
-      this.configService.get<string>('REDDIT_USER_AGENT') || 'Veritas/1.0.0 (API-free connector)';
+    this.userAgent =
+      this.configService.get<string>('REDDIT_USER_AGENT') ||
+      'web:veritas.osint:v1.0 (narrative intelligence research tool)';
+    this.clientId = this.configService.get<string>('REDDIT_CLIENT_ID') || undefined;
+    this.clientSecret = this.configService.get<string>('REDDIT_CLIENT_SECRET') || undefined;
+    this.oauthMode = Boolean(this.clientId && this.clientSecret);
 
     this.client = axios.create({
-      baseURL: 'https://www.reddit.com',
+      baseURL: this.oauthMode ? 'https://oauth.reddit.com' : 'https://www.reddit.com',
       headers: {
-        'User-Agent': userAgent,
+        'User-Agent': this.userAgent,
         Accept: 'application/json',
       },
       timeout: 15000,
     });
+
+    if (this.oauthMode) {
+      this.logger.log('Reddit connector using application-only OAuth (oauth.reddit.com)');
+    } else {
+      this.logger.warn(
+        'Reddit connector running keyless — reddit.com now blocks unauthenticated JSON access from most networks (HTTP 403). Set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET (free script app at reddit.com/prefs/apps) to enable OAuth.',
+      );
+    }
+  }
+
+  /**
+   * Acquire (or reuse) an application-only OAuth token. Read-only, no user
+   * context — just the app's client credentials. Cached until ~1min before
+   * expiry.
+   */
+  private async ensureToken(): Promise<void> {
+    if (!this.oauthMode) return;
+    if (this.accessToken && Date.now() < this.tokenExpiresAt) return;
+
+    const body = new URLSearchParams({ grant_type: 'client_credentials' });
+    const res = await axios.post<{ access_token: string; expires_in: number }>(
+      'https://www.reddit.com/api/v1/access_token',
+      body.toString(),
+      {
+        auth: { username: this.clientId as string, password: this.clientSecret as string },
+        headers: {
+          'User-Agent': this.userAgent,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        timeout: 15000,
+      },
+    );
+    this.accessToken = res.data.access_token;
+    // Refresh a minute early to avoid mid-flight expiry.
+    this.tokenExpiresAt = Date.now() + Math.max(0, res.data.expires_in - 60) * 1000;
+    this.logger.debug('Reddit OAuth token acquired');
+  }
+
+  /**
+   * The keyless API uses www.reddit.com/<path>.json; the OAuth API uses
+   * oauth.reddit.com/<path> with no .json suffix. Strip it when in OAuth mode,
+   * preserving any query string.
+   */
+  private normalizePath(path: string): string {
+    if (!this.oauthMode) return path;
+    return path.replace(/\.json(\?|$)/, '$1');
   }
 
   async onModuleInit() {
@@ -441,8 +501,14 @@ export class RedditFreeConnector
 
   private async rateLimitedRequest<T>(path: string): Promise<T> {
     try {
+      await this.ensureToken();
+      const requestPath = this.normalizePath(path);
+      const config =
+        this.oauthMode && this.accessToken
+          ? { headers: { Authorization: `Bearer ${this.accessToken}` } }
+          : undefined;
       const response = await SourceRateLimiter.instance.schedule('reddit', () =>
-        this.client.get<T>(path),
+        this.client.get<T>(requestPath, config),
       );
       return response.data;
     } catch (error) {
