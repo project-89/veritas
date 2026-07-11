@@ -185,11 +185,15 @@ export interface SourceCredibilityScore {
 export interface BotScore {
   handle: string;
   platform: string;
-  botProbability: number;
+  /** null = too little data to assess (NOT the same as 0 / clean). */
+  botProbability: number | null;
   structuralScore: number;
   temporalScore: number;
   behavioralScore: number;
   detectedPatterns: string[];
+  postsAnalyzed?: number;
+  dataSufficiency?: 'sufficient' | 'insufficient';
+  confidence?: number;
 }
 
 export interface UserInvestigationResult {

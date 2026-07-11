@@ -66,17 +66,33 @@ function coerceBotScores(value: unknown): BotScore[] {
 
   return value
     .filter((score): score is Record<string, unknown> => score != null && typeof score === 'object')
-    .map((score) => ({
-      handle: asString(score['handle']),
-      platform: asString(score['platform']),
-      botProbability: asNumber(score['botProbability']),
-      structuralScore: asNumber(score['structuralScore']),
-      temporalScore: asNumber(score['temporalScore']),
-      behavioralScore: asNumber(score['behavioralScore']),
-      detectedPatterns: Array.isArray(score['detectedPatterns'])
-        ? score['detectedPatterns'].filter((pattern): pattern is string => typeof pattern === 'string')
-        : [],
-    }));
+    .map((score) => {
+      // Preserve null botProbability (insufficient data) — do not coerce to 0.
+      const rawProb = score['botProbability'];
+      const botProbability = typeof rawProb === 'number' ? rawProb : null;
+      const sufficiency = score['dataSufficiency'];
+      return {
+        handle: asString(score['handle']),
+        platform: asString(score['platform']),
+        botProbability,
+        structuralScore: asNumber(score['structuralScore']),
+        temporalScore: asNumber(score['temporalScore']),
+        behavioralScore: asNumber(score['behavioralScore']),
+        detectedPatterns: Array.isArray(score['detectedPatterns'])
+          ? score['detectedPatterns'].filter(
+              (pattern): pattern is string => typeof pattern === 'string',
+            )
+          : [],
+        postsAnalyzed: asNumber(score['postsAnalyzed']),
+        dataSufficiency:
+          sufficiency === 'sufficient' || sufficiency === 'insufficient'
+            ? sufficiency
+            : botProbability === null
+              ? ('insufficient' as const)
+              : ('sufficient' as const),
+        confidence: asNumber(score['confidence']),
+      };
+    });
 }
 
 function asStructuralPatternType(value: unknown): StructuralPattern['type'] {

@@ -61,6 +61,9 @@ function makeBotScore(
     temporalScore: overrides.temporalScore ?? botProbability * 0.7,
     behavioralScore: overrides.behavioralScore ?? botProbability * 0.6,
     detectedPatterns: overrides.detectedPatterns ?? [],
+    postsAnalyzed: overrides.postsAnalyzed ?? 20,
+    dataSufficiency: overrides.dataSufficiency ?? 'sufficient',
+    confidence: overrides.confidence ?? 0.8,
   };
 }
 
@@ -713,10 +716,7 @@ describe('IntelligenceEngineService', () => {
         makeBotScore('target', 0.1),
       ]);
 
-      const report = serviceWithCredibility.attributeInfluenceOperation(
-        investigation,
-        botResult,
-      );
+      const report = serviceWithCredibility.attributeInfluenceOperation(investigation, botResult);
 
       // Platform credibility should affect confidence values
       expect(report.attributionChain.length).toBeGreaterThan(0);

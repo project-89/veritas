@@ -9,8 +9,12 @@ import { GraphDatabaseService } from './graph-database.service';
 export interface BotScore {
   handle: string;
   platform: string;
-  /** Combined bot probability 0-1 (higher = more likely bot) */
-  botProbability: number;
+  /**
+   * Combined bot probability 0-1 (higher = more likely bot), or `null` when
+   * there was too little data to assess. NULL IS NOT ZERO: a user with a
+   * handful of posts and no graph signal is "unknown", not "clean human".
+   */
+  botProbability: number | null;
   /** Structural anomaly score from graph patterns */
   structuralScore: number;
   /** Temporal anomaly score from posting behavior */
@@ -19,7 +23,20 @@ export interface BotScore {
   behavioralScore: number;
   /** Specific patterns detected */
   detectedPatterns: string[];
+  /** Number of posts the score was computed from. */
+  postsAnalyzed: number;
+  /** Whether there was enough data to produce a meaningful score. */
+  dataSufficiency: 'sufficient' | 'insufficient';
+  /** 0-1 confidence in `botProbability` (scales with post volume / signals). */
+  confidence: number;
 }
+
+/**
+ * Minimum own-post history for the temporal + behavioral cadence/content
+ * signals to carry meaning. Below this, per-user scoring is noise unless the
+ * graph supplies a cross-account structural signal.
+ */
+const MIN_POSTS_FOR_BEHAVIORAL_SCORING = 10;
 
 export interface BotDetectionResult {
   /** Per-user bot scores */
@@ -89,12 +106,18 @@ export class GraphBotDetectionService {
       structuralPatterns = this.detectHeuristicPatterns(users);
     }
 
-    // Step 4: Boost scores for users involved in structural patterns
+    // Step 4: Boost scores for users involved in structural patterns. A user
+    // that was previously insufficient (no own-post signal) becomes assessable
+    // once a structural pattern implicates it.
     for (const pattern of structuralPatterns) {
       for (const score of scores) {
         if (pattern.members.includes(score.handle)) {
           score.structuralScore = Math.min(1, score.structuralScore + pattern.confidence * 0.3);
           score.detectedPatterns.push(`Part of ${pattern.type} pattern: ${pattern.description}`);
+          if (score.dataSufficiency === 'insufficient' && score.structuralScore > 0) {
+            score.dataSufficiency = 'sufficient';
+            score.confidence = Math.max(score.confidence, 0.3);
+          }
         }
       }
     }
@@ -104,20 +127,23 @@ export class GraphBotDetectionService {
       score.botProbability = this.combineProbabilities(score);
     }
 
-    // Sort by bot probability (most suspicious first)
-    scores.sort((a, b) => b.botProbability - a.botProbability);
+    // Sort by bot probability (most suspicious first); abstained (null) users last.
+    scores.sort((a, b) => (b.botProbability ?? -1) - (a.botProbability ?? -1));
 
-    // Summary
-    const highProbCount = scores.filter((s) => s.botProbability > 0.7).length;
-    const medProbCount = scores.filter(
-      (s) => s.botProbability > 0.4 && s.botProbability <= 0.7,
+    // Summary — count only users we could actually assess.
+    const assessed = scores.filter((s) => s.botProbability !== null);
+    const insufficientCount = scores.length - assessed.length;
+    const highProbCount = assessed.filter((s) => (s.botProbability ?? 0) > 0.7).length;
+    const medProbCount = assessed.filter(
+      (s) => (s.botProbability ?? 0) > 0.4 && (s.botProbability ?? 0) <= 0.7,
     ).length;
 
     const summary = [
-      `Analyzed ${users.length} users`,
-      graphAvailable ? 'with graph-enhanced detection' : 'with heuristic-only detection',
+      `Assessed ${assessed.length}/${users.length} users`,
+      graphAvailable ? ' with graph-enhanced detection' : ' with heuristic-only detection',
       `— ${highProbCount} high-probability bot(s)`,
       medProbCount > 0 ? `, ${medProbCount} medium-probability` : '',
+      insufficientCount > 0 ? `, ${insufficientCount} with insufficient data to score` : '',
       structuralPatterns.length > 0
         ? `, ${structuralPatterns.length} structural pattern(s) found`
         : '',
@@ -246,14 +272,25 @@ export class GraphBotDetectionService {
       detectedPatterns.push(...specifics);
     }
 
+    const postsAnalyzed = user.posts.length;
+    const hasStructuralSignal = structuralScore > 0;
+    const enoughPosts = postsAnalyzed >= MIN_POSTS_FOR_BEHAVIORAL_SCORING;
+    // Sufficient if we have enough own-post history OR a cross-account graph
+    // signal. Otherwise we abstain rather than emit a misleading 0.
+    const sufficient = enoughPosts || hasStructuralSignal;
+
     const score: BotScore = {
       handle: user.handle,
       platform: user.platform,
-      botProbability: 0,
+      botProbability: null,
       structuralScore,
       temporalScore,
       behavioralScore,
       detectedPatterns,
+      postsAnalyzed,
+      dataSufficiency: sufficient ? 'sufficient' : 'insufficient',
+      // Confidence scales with post volume; structural-only evidence is low.
+      confidence: sufficient ? (enoughPosts ? Math.min(1, postsAnalyzed / 30) : 0.3) : 0,
     };
 
     score.botProbability = this.combineProbabilities(score);
@@ -687,7 +724,11 @@ export class GraphBotDetectionService {
     return count;
   }
 
-  private combineProbabilities(score: BotScore): number {
+  private combineProbabilities(score: BotScore): number | null {
+    // Abstain when there wasn't enough data — never launder "unknown" into 0.
+    if (score.dataSufficiency === 'insufficient') {
+      return null;
+    }
     // Weighted combination: structural gets more weight when graph is available
     const hasGraph = score.structuralScore > 0;
     if (hasGraph) {

@@ -16,7 +16,8 @@ interface ActorRow {
   handle: string;
   platform: string;
   credibility: number;
-  botProbability: number;
+  /** null = not assessed / insufficient data (not the same as 0). */
+  botProbability: number | null;
   influence: number;
   postCount: number;
   flags: string[];
@@ -47,7 +48,7 @@ export function ActorsMatrix({
       handle: u.user.handle,
       platform: u.user.platform,
       credibility: u.credibility?.overallScore ?? 0.5,
-      botProbability: u.botScore?.botProbability ?? 0,
+      botProbability: u.botScore?.botProbability ?? null,
       influence: u.influenceScore,
       postCount: posts.filter((p) => norm(p.authorHandle ?? '') === norm(u.user.handle)).length,
       flags: u.flags,
@@ -93,7 +94,8 @@ export function ActorsMatrix({
       handle: a.handle,
       platform: a.platform,
       credibility: 0.5,
-      botProbability: 0,
+      // Not investigated → bot probability is unknown, not zero.
+      botProbability: null as number | null,
       influence: 0,
       postCount: a.postCount,
       flags: [] as string[],
@@ -168,7 +170,7 @@ export function ActorsMatrix({
         render: (val: unknown, row: ActorRow) => {
           const v = val as number;
           const color = v > 0.6 ? '#00FF41' : v > 0.3 ? '#f59e0b' : '#e94560';
-          const isDefault = v === 0.5 && row.botProbability === 0;
+          const isDefault = v === 0.5 && row.botProbability === null;
           return (
             <div className="relative group">
               <NervBar value={v} color={color} showLabel height={5} />
@@ -189,7 +191,17 @@ export function ActorsMatrix({
         sortable: true,
         width: '100px',
         render: (val: unknown) => {
-          const v = val as number;
+          const v = val as number | null;
+          if (v === null) {
+            return (
+              <span
+                className="text-[10px] font-mono text-nerv-text-muted/50 italic"
+                title="Insufficient data to assess (not investigated, or too few posts)"
+              >
+                n/a
+              </span>
+            );
+          }
           const color = v < 0.3 ? '#00FF41' : v < 0.7 ? '#f59e0b' : '#e94560';
           return (
             <div className={v > 0.7 ? 'animate-nerv-pulse' : ''}>

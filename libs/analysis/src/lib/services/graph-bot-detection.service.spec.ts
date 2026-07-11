@@ -114,8 +114,13 @@ describe('GraphBotDetectionService', () => {
         },
       ]);
 
-      expect(result.summary).toContain('Analyzed 1 users');
+      // A single-post user cannot be assessed — the score abstains (null) and
+      // the summary reports it as insufficient rather than laundering it into 0.
+      expect(result.summary).toContain('Assessed 0/1 users');
+      expect(result.summary).toContain('insufficient data');
       expect(result.summary).toContain('heuristic-only detection');
+      expect(result.scores[0]!.botProbability).toBeNull();
+      expect(result.scores[0]!.dataSufficiency).toBe('insufficient');
     });
   });
 
@@ -199,7 +204,7 @@ describe('GraphBotDetectionService', () => {
 
       // Should find some structural patterns
       expect(result.structuralPatterns.length).toBeGreaterThanOrEqual(0);
-      expect(result.summary).toContain('Analyzed 5 users');
+      expect(result.summary).toContain('5 users');
     });
 
     it('should detect similar content between users', async () => {

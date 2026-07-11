@@ -739,7 +739,7 @@ export class IntelligenceEngineService {
         evidence.push(`Late adopter — position ${i + 1} in propagation chain`);
       }
 
-      if (botScore && botScore.botProbability >= 0.6) {
+      if (botScore && botScore.botProbability != null && botScore.botProbability >= 0.6) {
         evidence.push(`High bot probability: ${(botScore.botProbability * 100).toFixed(0)}%`);
       }
       if (userResult && userResult.influenceScore >= 0.7) {
@@ -800,7 +800,7 @@ export class IntelligenceEngineService {
       attributionChain.length >= 3 &&
       attributionChain.some((n) => n.role === 'originator') &&
       (attributionChain.some((n) => n.role === 'amplifier') ||
-        botResult.scores.some((s) => s.botProbability >= 0.6));
+        botResult.scores.some((s) => s.botProbability != null && s.botProbability >= 0.6));
 
     const confidence = operationDetected
       ? Math.min(
