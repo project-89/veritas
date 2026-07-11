@@ -57,6 +57,7 @@ import {
   fetchInvestigation,
   fetchInvestigations,
   fetchMentalModel,
+  fetchGenealogy,
   fetchProjectDossier,
   generateMagiProfile,
   generateReport,
@@ -64,6 +65,7 @@ import {
   getAnalysisJobsByScan,
   getIdentityByHandle,
   getInvestigationScans,
+  getInvestigationSnapshots,
   getRecentScans,
   getScanPosts,
   getScanStatus,
@@ -71,6 +73,7 @@ import {
   type InvestigationResult,
   type MagiProfileMode,
   type MentalModel,
+  type NarrativeLineage,
   type ProjectDossier,
   type ProjectDossierOverlap,
   type PropagandaAnalysisResult,
@@ -340,6 +343,8 @@ function InvestigationWorkspace() {
   const [mentalModelSaving, setMentalModelSaving] = useState(false);
   const [scanJob, setScanJob] = useState<ScanJob | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanJob[]>([]);
+  const [genealogyLineages, setGenealogyLineages] = useState<NarrativeLineage[]>([]);
+  const [genealogyLoading, setGenealogyLoading] = useState(false);
   const scanPostsFetchedRef = useRef(false);
   const mergeUniqueByKey = useCallback(<T,>(items: T[], keyFn: (item: T) => string): T[] => {
     const seen = new Set<string>();
@@ -563,6 +568,79 @@ function InvestigationWorkspace() {
     },
     [state.narratives, state.posts, state.investigation, state.claims, state.downstream, dispatch],
   );
+
+  // Build REAL narrative genealogy from persisted snapshots (accumulated via
+  // monitor refreshes) plus the current live narratives as the latest point.
+  // Genuine narrative evolution needs ≥2 snapshots over time; when fewer exist
+  // the panel shows its honest "refresh to create another snapshot" state.
+  const handleBuildGenealogy = useCallback(async () => {
+    const investigationId = investigationRecord?._id ?? investigationRecord?.id ?? invId ?? null;
+    if (!investigationId) {
+      setGenealogyLineages([]);
+      return;
+    }
+    setGenealogyLoading(true);
+    try {
+      const toSnapshotNarratives = (narrs: unknown[]) =>
+        narrs
+          .filter((n): n is Record<string, unknown> => n != null && typeof n === 'object')
+          .map((n) => {
+            const postIndices = n['postIndices'];
+            return {
+              id: String(n['id'] ?? ''),
+              summary: String(n['summary'] ?? ''),
+              centroidEmbedding: Array.isArray(n['centroidEmbedding'])
+                ? (n['centroidEmbedding'] as number[])
+                : [],
+              postCount: Array.isArray(postIndices)
+                ? postIndices.length
+                : Number(n['postCount'] ?? 0),
+              avgSentiment: typeof n['avgSentiment'] === 'number' ? n['avgSentiment'] : 0,
+            };
+          })
+          .filter((n) => n.id !== '');
+
+      const persisted = await getInvestigationSnapshots(investigationId, 50);
+      // Oldest → newest so lineage events read forward in time.
+      const historical = [...persisted]
+        .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+        .map((s) => ({
+          id: s.id ?? s._id,
+          timestamp: s.timestamp,
+          narratives: toSnapshotNarratives(s.narratives),
+        }));
+
+      // Append the current live narratives as the newest snapshot.
+      const snapshots = [...historical];
+      if (state.narratives.length > 0) {
+        snapshots.push({
+          id: 'current',
+          timestamp: new Date().toISOString(),
+          narratives: toSnapshotNarratives(state.narratives as unknown[]),
+        });
+      }
+
+      if (snapshots.length < 2) {
+        // Not enough history for real genealogy — let the panel say so.
+        setGenealogyLineages([]);
+        return;
+      }
+
+      const { lineages } = await fetchGenealogy(snapshots);
+      setGenealogyLineages(lineages);
+    } catch {
+      setGenealogyLineages([]);
+    } finally {
+      setGenealogyLoading(false);
+    }
+  }, [investigationRecord, invId, state.narratives]);
+
+  // Auto-build genealogy when the tab is opened and we have narratives.
+  useEffect(() => {
+    if (state.centerMode === 'genealogy' && state.narratives.length > 0) {
+      handleBuildGenealogy();
+    }
+  }, [state.centerMode, state.narratives.length, handleBuildGenealogy]);
 
   // Load scan history for the current investigation when available.
   useEffect(() => {
@@ -2064,39 +2142,17 @@ function InvestigationWorkspace() {
             onSelectActor={selectActor}
           />
         );
-      case 'genealogy': {
-        // Build single-snapshot lineages from current narratives
-        const singleSnapshotLineages = state.narratives.map((n) => ({
-          currentId: n.id,
-          currentSummary: n.summary ?? 'Untitled',
-          history: [
-            {
-              snapshotId: 'current',
-              snapshotTimestamp: new Date().toISOString(),
-              narrativeId: n.id,
-              summary: n.summary ?? 'Untitled',
-              postCount: n.postIndices?.length ?? 0,
-              avgSentiment: n.avgSentiment ?? 0,
-              similarity: 1,
-            },
-          ],
-          events: [
-            {
-              timestamp: new Date().toISOString(),
-              type: 'emerged' as const,
-              description: `Narrative first detected`,
-            },
-          ],
-          status: 'active' as const,
-        }));
+      case 'genealogy':
+        // Real cross-snapshot lineages from the genealogy engine. When there
+        // aren't ≥2 snapshots yet, lineages is empty and the panel shows its
+        // honest "refresh to create another snapshot" state.
         return (
           <GenealogyPanel
-            lineages={singleSnapshotLineages}
-            onRefresh={handleRefresh}
-            refreshing={pipelineRunning}
+            lineages={genealogyLineages}
+            onRefresh={handleBuildGenealogy}
+            refreshing={genealogyLoading}
           />
         );
-      }
       case 'flow':
         return <PropagationFlow investigation={state.investigation} />;
       case 'evidence':

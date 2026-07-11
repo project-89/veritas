@@ -2,6 +2,20 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GraphDatabaseService } from './graph-database.service';
 
 /**
+ * A weighted directed relationship edge derived from real post content:
+ * `type` is 'reply' | 'mention' | 'co_timing', `weight` is how many times that
+ * interaction occurred. These are the actual edges the graph is built from.
+ */
+export interface SocialGraphEdge {
+  fromHandle: string;
+  fromPlatform: string;
+  toHandle: string;
+  toPlatform: string;
+  type: string;
+  weight: number;
+}
+
+/**
  * Persistent, accumulative social relationship mapping service.
  *
  * Every investigation enriches a shared social graph. When Memgraph is
@@ -30,7 +44,7 @@ export class SocialGraphIntelligenceService {
       posts: Array<{ text: string; timestamp: string }>;
     }>,
     investigationId: string,
-  ): Promise<{ edgesCreated: number; communitiesDetected: number }> {
+  ): Promise<{ edgesCreated: number; communitiesDetected: number; edges: SocialGraphEdge[] }> {
     const interactions: Array<{
       from: { handle: string; platform: string };
       to: { handle: string; platform: string };
@@ -111,7 +125,43 @@ export class SocialGraphIntelligenceService {
       }
     }
 
-    return { edgesCreated, communitiesDetected };
+    // Aggregate raw interactions into weighted directed edges so the client can
+    // render the ACTUAL relationship graph (mentions/replies/co-timing) instead
+    // of re-deriving a linear adoption chain. Capped to keep the payload bounded.
+    const edges = this.aggregateEdges(interactions);
+
+    return { edgesCreated, communitiesDetected, edges };
+  }
+
+  /** Collapse duplicate from→to→type interactions into weighted edges (top 500 by weight). */
+  private aggregateEdges(
+    interactions: Array<{
+      from: { handle: string; platform: string };
+      to: { handle: string; platform: string };
+      type: string;
+      sentiment: number;
+    }>,
+  ): SocialGraphEdge[] {
+    const byKey = new Map<string, SocialGraphEdge>();
+    for (const it of interactions) {
+      const key = `${it.from.handle}|${it.from.platform}→${it.to.handle}|${it.to.platform}|${it.type}`;
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.weight += 1;
+      } else {
+        byKey.set(key, {
+          fromHandle: it.from.handle,
+          fromPlatform: it.from.platform,
+          toHandle: it.to.handle,
+          toPlatform: it.to.platform,
+          type: it.type,
+          weight: 1,
+        });
+      }
+    }
+    return Array.from(byKey.values())
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 500);
   }
 
   /**

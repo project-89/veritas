@@ -251,6 +251,23 @@ export interface InvestigationResult {
     }>;
     graphEnhanced: boolean;
   } | null;
+  /**
+   * Real relationship graph derived from post content — weighted mention/reply/
+   * co-timing edges. Present when social-graph enrichment ran. Distinct from
+   * the adoption-time ordering in `users[].likelySource`.
+   */
+  socialGraph?: {
+    edgesCreated: number;
+    communitiesDetected: number;
+    edges: Array<{
+      fromHandle: string;
+      fromPlatform: string;
+      toHandle: string;
+      toPlatform: string;
+      type: string;
+      weight: number;
+    }>;
+  } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1596,6 +1613,30 @@ export async function getInvestigationScans(
 ): Promise<ScanJob[]> {
   return request<ScanJob[]>(
     `/api/scan/investigation/${encodeURIComponent(investigationId)}?limit=${limit}`,
+  );
+}
+
+/** A persisted investigation snapshot (created on each monitor refresh). */
+export interface InvestigationSnapshot {
+  _id: string;
+  id: string;
+  investigationId: string;
+  timestamp: string;
+  narrativeCount: number;
+  /** Full narrative objects captured at snapshot time (AnalyzedNarrative-shaped). */
+  narratives: unknown[];
+}
+
+/**
+ * List persisted snapshots for an investigation, newest first. Genealogy needs
+ * ≥2 of these (accumulated via monitor refreshes) to trace narrative evolution.
+ */
+export async function getInvestigationSnapshots(
+  investigationId: string,
+  limit = 50,
+): Promise<InvestigationSnapshot[]> {
+  return request<InvestigationSnapshot[]>(
+    `/api/investigations/${encodeURIComponent(investigationId)}/snapshots?limit=${limit}`,
   );
 }
 

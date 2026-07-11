@@ -21,6 +21,8 @@ interface Connection {
   tier: 1 | 2 | 3;
   interactionCount: number;
   weight: number; // 0-1 normalized
+  /** For tier-1 real edges: 'reply' | 'mention' | 'co_timing'. */
+  type?: string;
 }
 
 interface UserNode {
@@ -51,8 +53,8 @@ const PLATFORM_COLORS: Record<string, string> = {
 };
 
 const TIER_STYLES: Record<number, { dotColor: string; textClass: string; label: string }> = {
-  1: { dotColor: '#FF6B2B', textClass: 'text-[12px] font-bold', label: 'Direct' },
-  2: { dotColor: '#0ea5e9', textClass: 'text-[12px]', label: 'Contextual' },
+  1: { dotColor: '#FF6B2B', textClass: 'text-[12px] font-bold', label: 'Interacts' },
+  2: { dotColor: '#0ea5e9', textClass: 'text-[12px]', label: 'Co-cluster' },
   3: { dotColor: '#555570', textClass: 'text-[11px]', label: 'Bridge' },
 };
 
@@ -77,25 +79,17 @@ function deriveGraph(investigation: InvestigationResult): {
     userMap.set(u.user.handle, u);
   }
 
-  // Build adjacency from likelySource (direct connections)
-  const directLinks = new Map<string, Set<string>>();
-  for (const u of users) {
-    if (u.likelySource && userMap.has(u.likelySource)) {
-      let userLinks = directLinks.get(u.user.handle);
-      if (!userLinks) {
-        userLinks = new Set();
-        directLinks.set(u.user.handle, userLinks);
-      }
-      userLinks.add(u.likelySource);
-      // Bidirectional awareness
-      let sourceLinks = directLinks.get(u.likelySource);
-      if (!sourceLinks) {
-        sourceLinks = new Set();
-        directLinks.set(u.likelySource, sourceLinks);
-      }
-      sourceLinks.add(u.user.handle);
-    }
+  // Tier 1 comes from REAL interaction edges (mentions/replies/co-timing
+  // extracted from post content), NOT from likelySource — which is only the
+  // adoption-time ordering and implies interaction it can't support.
+  const realEdges = investigation.socialGraph?.edges ?? [];
+  const edgesByFrom = new Map<string, typeof realEdges>();
+  for (const e of realEdges) {
+    const arr = edgesByFrom.get(e.fromHandle);
+    if (arr) arr.push(e);
+    else edgesByFrom.set(e.fromHandle, [e]);
   }
+  const maxEdgeWeight = Math.max(1, ...realEdges.map((e) => e.weight));
 
   // Build cluster membership
   const clusterMembership = new Map<string, number[]>();
@@ -123,19 +117,18 @@ function deriveGraph(investigation: InvestigationResult): {
     const connections: Connection[] = [];
     const seen = new Set<string>();
 
-    // Tier 1: Direct links (likelySource chain)
-    const direct = directLinks.get(u.user.handle) ?? new Set();
-    for (const targetHandle of direct) {
-      if (seen.has(targetHandle)) continue;
-      seen.add(targetHandle);
-      const target = userMap.get(targetHandle);
-      if (!target) continue;
+    // Tier 1: real interaction edges out of this user (reply/mention/co-timing).
+    // interactionCount is the ACTUAL number of such interactions, not a proxy.
+    for (const e of edgesByFrom.get(u.user.handle) ?? []) {
+      if (seen.has(e.toHandle)) continue;
+      seen.add(e.toHandle);
       connections.push({
-        handle: targetHandle,
-        platform: target.user.platform,
+        handle: e.toHandle,
+        platform: e.toPlatform,
         tier: 1,
-        interactionCount: Math.max(1, Math.round(target.influenceScore * 10)),
-        weight: target.influenceScore / maxInfluence,
+        type: e.type,
+        interactionCount: e.weight,
+        weight: e.weight / maxEdgeWeight,
       });
     }
 
@@ -153,7 +146,9 @@ function deriveGraph(investigation: InvestigationResult): {
           handle: memberHandle,
           platform: member.user.platform,
           tier: 2,
-          interactionCount: Math.max(1, Math.round(cluster.confidence * 5)),
+          // Real co-cluster size (members grouped by coordinated timing), not a
+          // synthetic interaction estimate.
+          interactionCount: cluster.users.length,
           weight: cluster.confidence,
         });
       }
@@ -244,6 +239,13 @@ function ConnectionRow({
       <span className="text-[10px] font-mono text-nerv-text-muted uppercase shrink-0 w-12 text-left">
         {connection.platform.slice(0, 6)}
       </span>
+
+      {/* Edge type (real tier-1 edges only) */}
+      {connection.type && (
+        <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-text-muted/70 shrink-0 w-14 text-left">
+          {connection.type.replace('_', ' ')}
+        </span>
+      )}
 
       {/* Interaction count */}
       <span className="text-[11px] font-mono tabular-nums text-nerv-text-muted shrink-0 w-6 text-right">
@@ -383,6 +385,7 @@ export function SocialGraphPanel({
 
   const { nodes, community } = graphData;
   const totalConnections = nodes.reduce((s, n) => s + n.connections.length, 0);
+  const realEdgeCount = investigation.socialGraph?.edges?.length ?? 0;
 
   return (
     <div className="h-full flex flex-col">
@@ -402,6 +405,13 @@ export function SocialGraphPanel({
             <NervBadge label={`${nodes.length} actors`} variant="muted" size="sm" />
             <NervBadge label={`${totalConnections} connections`} variant="muted" size="sm" />
           </div>
+        </div>
+
+        {/* Honesty note: whether real interaction edges were found */}
+        <div className="mt-1 text-[10px] font-mono text-nerv-text-muted/70 leading-snug">
+          {realEdgeCount > 0
+            ? `${realEdgeCount} real interaction edge${realEdgeCount === 1 ? '' : 's'} (mentions/replies/co-timing). Co-cluster/bridge tiers come from coordinated-timing groups.`
+            : 'No direct interaction edges (mentions/replies) found in captured posts — showing coordinated-timing clusters only, not confirmed interactions.'}
         </div>
 
         {/* Legend */}

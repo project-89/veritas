@@ -40,8 +40,9 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
   const timeRef = useRef(0);
 
   // Parse data into positioned nodes
-  const { nodes, edges, platforms, coordClusters } = useMemo(() => {
-    if (!investigation) return { nodes: [], edges: [], platforms: [], coordClusters: [] };
+  const { nodes, edges, platforms, coordClusters, edgesAreReal } = useMemo(() => {
+    if (!investigation)
+      return { nodes: [], edges: [], platforms: [], coordClusters: [], edgesAreReal: false };
 
     const users = investigation.users ?? [];
     const origin = investigation.originAnalysis;
@@ -71,11 +72,20 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
     }
     if (origin?.firstTimestamp) timestamps.push(new Date(origin.firstTimestamp).getTime());
     if (timestamps.length === 0)
-      return { nodes: [], edges: [], platforms: platformList, coordClusters: [] };
+      return {
+        nodes: [],
+        edges: [],
+        platforms: platformList,
+        coordClusters: [],
+        edgesAreReal: false,
+      };
 
     const minT = Math.min(...timestamps);
     const maxT = Math.max(...timestamps);
     const timeRange = maxT - minT || 1;
+    // When all timestamps are equal/missing there is no real time axis; spread
+    // nodes evenly by index instead of collapsing them all to x=0.
+    const degenerateTime = maxT === minT;
 
     // Build nodes
     const nodeList: Array<{
@@ -91,11 +101,15 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
     }> = [];
 
     const handleIndex = new Map<string, number>();
-    for (const u of users) {
-      const t = new Date(u.adoptionTimestamp ?? u.user.firstMention ?? Date.now()).getTime();
+    users.forEach((u, i) => {
+      // Missing timestamp anchors at the start of the window (minT), never
+      // Date.now() — which would fling the node to the far right and squash
+      // everyone else against x=0.
+      const rawT = u.adoptionTimestamp ?? u.user.firstMention;
+      const t = rawT ? new Date(rawT).getTime() : minT;
       const plat = u.user.platform.toLowerCase();
       const lane = laneMap.get(plat) ?? 0;
-      const xNorm = (t - minT) / timeRange;
+      const xNorm = degenerateTime ? (users.length > 1 ? i / (users.length - 1) : 0.5) : (t - minT) / timeRange;
       const isOrigin = u.user.handle === origin?.firstMover;
       const isBot = u.flags.includes('potential_bot') || (u.botScore?.botProbability ?? 0) > 0.6;
       const baseR = 8 + Math.min(u.influenceScore * 20, 20);
@@ -112,18 +126,32 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
         color: PLATFORM_COLORS[plat] ?? '#8888a0',
         likelySource: u.likelySource,
       });
-    }
+    });
 
-    // Build edges from likelySource
+    // Edges: prefer REAL interaction edges (mentions/replies/co-timing) when
+    // the social graph is available; otherwise fall back to the likelySource
+    // adoption ordering (temporal, not interaction).
+    const realEdges = investigation.socialGraph?.edges ?? [];
     const edgeList: Array<{ from: number; to: number }> = [];
-    for (let i = 0; i < nodeList.length; i++) {
-      const sourceNode = nodeList[i];
-      if (!sourceNode) continue;
-      const src = sourceNode.likelySource;
-      if (src && handleIndex.has(src)) {
-        const sourceIndex = handleIndex.get(src);
-        if (sourceIndex !== undefined) {
-          edgeList.push({ from: sourceIndex, to: i });
+    const edgesAreReal = realEdges.length > 0;
+    if (edgesAreReal) {
+      for (const e of realEdges) {
+        const from = handleIndex.get(e.fromHandle);
+        const to = handleIndex.get(e.toHandle);
+        if (from !== undefined && to !== undefined && from !== to) {
+          edgeList.push({ from, to });
+        }
+      }
+    } else {
+      for (let i = 0; i < nodeList.length; i++) {
+        const sourceNode = nodeList[i];
+        if (!sourceNode) continue;
+        const src = sourceNode.likelySource;
+        if (src && handleIndex.has(src)) {
+          const sourceIndex = handleIndex.get(src);
+          if (sourceIndex !== undefined) {
+            edgeList.push({ from: sourceIndex, to: i });
+          }
         }
       }
     }
@@ -137,7 +165,13 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       confidence: c.confidence,
     }));
 
-    return { nodes: nodeList, edges: edgeList, platforms: platformList, coordClusters: clusters };
+    return {
+      nodes: nodeList,
+      edges: edgeList,
+      platforms: platformList,
+      coordClusters: clusters,
+      edgesAreReal,
+    };
   }, [investigation]);
 
   const draw = useCallback(() => {
@@ -399,6 +433,16 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       <div className="shrink-0 px-3 py-1.5 border-t border-nerv-border bg-nerv-bg flex items-center gap-4 flex-wrap">
         <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
           LEGEND:
+        </span>
+        <span
+          className="text-[10px] font-mono text-nerv-text-muted/70"
+          title={
+            edgesAreReal
+              ? 'Arrows are real interactions (mentions/replies/co-timing) between actors.'
+              : 'Arrows show adoption order (who posted before whom) — temporal sequence, not confirmed interaction. Run investigation for real interaction edges.'
+          }
+        >
+          {edgesAreReal ? 'ARROWS: INTERACTIONS' : 'ARROWS: ADOPTION ORDER'}
         </span>
         <span className="text-[11px] font-mono text-nerv-orange flex items-center gap-1">
           <span className="inline-block w-2 h-2 rounded-full bg-nerv-orange shadow-[0_0_6px_rgba(255,107,43,0.6)]" />
