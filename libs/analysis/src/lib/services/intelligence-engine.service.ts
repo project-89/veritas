@@ -150,12 +150,28 @@ export interface NarrativeLegitimacyReport {
 // Union type
 // ---------------------------------------------------------------------------
 
-export type IntelligenceReport =
+/**
+ * Whether the assessment received the inputs it actually needs. Several
+ * assessments depend on data the caller may not supply (bot scores, geolocated
+ * global events, external signals); without them the engine still returns a
+ * structurally valid report that reads as "nothing detected". This flag lets
+ * the UI say "insufficient input" instead of presenting an empty-input run as
+ * an authoritative all-clear.
+ */
+export interface DataSufficiency {
+  sufficient: boolean;
+  /** Human-readable names of the missing critical inputs, e.g. ['bot scores']. */
+  missingInputs: string[];
+  note?: string;
+}
+
+export type IntelligenceReport = (
   | { type: 'campaign'; report: CoordinatedCampaignReport }
   | { type: 'manipulation'; report: MarketManipulationReport }
   | { type: 'crisis'; report: CrisisWarningReport }
   | { type: 'influence'; report: InfluenceOperationReport }
-  | { type: 'legitimacy'; report: NarrativeLegitimacyReport };
+  | { type: 'legitimacy'; report: NarrativeLegitimacyReport }
+) & { dataSufficiency: DataSufficiency };
 
 // ---------------------------------------------------------------------------
 // Service

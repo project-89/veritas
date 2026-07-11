@@ -1,9 +1,13 @@
 /**
  * Transform narrative analysis data into globe points and arcs.
- * Derives geographic information from:
- * - GDELT signals (have country metadata)
- * - Platform-based country inference
- * - Known country mentions in post text
+ *
+ * IMPORTANT: posts carry no GPS/geolocation. The only honest geographic signal
+ * available is which countries are *referenced in the discourse* — country
+ * names mentioned in post text, plus country metadata on GDELT event signals.
+ * Points therefore represent "this country was referenced by the narrative",
+ * NOT where authors are or where a narrative originated. When no country is
+ * referenced, the globe is empty rather than inventing plausible-looking
+ * geography from platform mix (which it used to do — see git history).
  */
 import type {
   AnalyzedNarrative,
@@ -324,36 +328,9 @@ export function buildGlobeData(params: {
     }
   }
 
-  // If we have no geographic data at all, generate synthetic demo points
-  // from the platforms and narrative data to make the globe useful
-  if (countryMap.size === 0 && narratives.length > 0) {
-    // Use narrative platforms as a rough country proxy
-    const platformCountryDefaults: Record<string, string[]> = {
-      twitter: ['US', 'GB', 'IN'],
-      reddit: ['US', 'CA', 'AU'],
-      youtube: ['US', 'IN', 'BR'],
-      news: ['US', 'GB', 'DE'],
-      web: ['US', 'DE', 'JP'],
-    };
-
-    for (const narrative of narratives) {
-      for (const [platform, count] of Object.entries(narrative.platforms)) {
-        const defaults = platformCountryDefaults[platform.toLowerCase()];
-        if (defaults) {
-          for (const code of defaults) {
-            const bucket = getOrCreateBucket(code);
-            bucket.postCount += Math.ceil(count / defaults.length);
-            bucket.sentimentSum += narrative.avgSentiment;
-            bucket.sentimentCount += 1;
-            bucket.narrativeIds.add(narrative.id);
-            if (!bucket.earliestTimestamp || narrative.firstSeen < bucket.earliestTimestamp) {
-              bucket.earliestTimestamp = narrative.firstSeen;
-            }
-          }
-        }
-      }
-    }
-  }
+  // NOTE: no synthetic fallback. If nothing referenced a country, the globe
+  // stays empty and the panel shows an honest "no geographic references"
+  // state, rather than fabricating dots from platform mix.
 
   // ---------------------------------------------------------------------------
   // Build points
@@ -361,16 +338,6 @@ export function buildGlobeData(params: {
 
   const buckets = Array.from(countryMap.values());
   const maxPostCount = Math.max(1, ...buckets.map((b) => b.postCount));
-
-  // Find the country with the earliest timestamp (origin)
-  let originCode: string | null = null;
-  let originTime: string | null = null;
-  for (const b of buckets) {
-    if (b.earliestTimestamp && (!originTime || b.earliestTimestamp < originTime)) {
-      originTime = b.earliestTimestamp;
-      originCode = b.code;
-    }
-  }
 
   const points: GlobePoint[] = buckets
     .map((bucket) => {
@@ -380,29 +347,31 @@ export function buildGlobeData(params: {
       const avgSentiment =
         bucket.sentimentCount > 0 ? bucket.sentimentSum / bucket.sentimentCount : 0;
 
-      const isOrigin = bucket.code === originCode;
-
       return {
         id: `country-${bucket.code}`,
         lat: coords.lat,
         lng: coords.lng,
         label: coords.name,
         size: Math.max(0.1, bucket.postCount / maxPostCount),
-        color: isOrigin ? '#FF6B2B' : sentimentToColor(avgSentiment),
-        type: isOrigin ? 'origin' : 'narrative',
+        color: sentimentToColor(avgSentiment),
+        type: 'narrative',
         metadata: {
           countryCode: bucket.code,
-          postCount: bucket.postCount,
+          // "references" not "posts" — a country dot means it was named in the
+          // discourse (post text or GDELT signal), not that posts came from it.
+          referenceCount: bucket.postCount,
           avgSentiment,
           narrativeCount: bucket.narrativeIds.size,
-          earliestTimestamp: bucket.earliestTimestamp,
         },
       } as GlobePoint;
     })
     .filter((p): p is GlobePoint => p !== null);
 
   // ---------------------------------------------------------------------------
-  // Build arcs: connect countries that share narratives
+  // Build arcs: UNDIRECTED links between countries co-referenced by the same
+  // narrative. There is no real directional/temporal flow between countries
+  // (the timestamps are narrative first-seen, not per-country adoption), so we
+  // do not imply a source→target direction.
   // ---------------------------------------------------------------------------
 
   const arcs: GlobeArc[] = [];
@@ -425,23 +394,18 @@ export function buildGlobeData(params: {
 
       if (shared.size === 0) continue;
 
-      // Direction: earlier country -> later country
-      const aFirst = (a.earliestTimestamp ?? '') <= (b.earliestTimestamp ?? '');
-      const [source, target] = aFirst ? [a, b] : [b, a];
-      const [sourceCoords, targetCoords] = aFirst ? [coordsA, coordsB] : [coordsB, coordsA];
-
-      const arcKey = `${source?.code}-${target?.code}`;
+      const arcKey = `${a.code}-${b.code}`;
       if (arcSet.has(arcKey)) continue;
       arcSet.add(arcKey);
 
       arcs.push({
-        startLat: sourceCoords.lat,
-        startLng: sourceCoords.lng,
-        endLat: targetCoords.lat,
-        endLng: targetCoords.lng,
-        color: '#FF6B2B',
+        startLat: coordsA.lat,
+        startLng: coordsA.lng,
+        endLat: coordsB.lat,
+        endLng: coordsB.lng,
+        color: '#5B6B8A',
         stroke: Math.min(3, 0.5 + shared.size * 0.8),
-        label: `${shared.size} shared narrative${shared.size > 1 ? 's' : ''}`,
+        label: `Co-referenced by ${shared.size} narrative${shared.size > 1 ? 's' : ''}`,
       });
     }
   }

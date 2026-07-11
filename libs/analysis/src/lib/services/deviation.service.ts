@@ -90,6 +90,12 @@ export interface RawPost {
   authorHandle: string;
   timestamp: string;
   engagement?: { likes: number; shares: number; comments: number };
+  /**
+   * Per-post sentiment, when the client supplied it (score in -1..1). Optional
+   * because some code paths build RawPost without enrichment; consumers must
+   * treat `undefined` as "not measured", never as neutral 0.
+   */
+  sentiment?: { score: number; label?: string };
 }
 
 /** Combined response from the deviations endpoint */

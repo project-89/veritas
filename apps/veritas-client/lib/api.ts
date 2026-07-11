@@ -1153,7 +1153,8 @@ export interface PlatformComparison {
   perPlatform: Array<{
     platform: string;
     postCount: number;
-    avgSentiment: number;
+    /** null when no post on this platform carried a sentiment score */
+    avgSentiment: number | null;
     dominantNarrative: string;
     uniqueNarratives: string[];
     topAuthors: string[];
@@ -1161,7 +1162,7 @@ export interface PlatformComparison {
   crossPlatform: Array<{
     summary: string;
     platforms: string[];
-    sentimentByPlatform: Record<string, number>;
+    sentimentByPlatform: Record<string, number | null>;
   }>;
 }
 
@@ -1992,12 +1993,20 @@ export interface NarrativeLegitimacyReport {
   summary: string;
 }
 
-export type IntelligenceReport =
+/** Whether the assessment received the inputs it needs (see backend). */
+export interface DataSufficiency {
+  sufficient: boolean;
+  missingInputs: string[];
+  note?: string;
+}
+
+export type IntelligenceReport = (
   | { type: 'campaign'; report: CoordinatedCampaignReport }
   | { type: 'manipulation'; report: MarketManipulationReport }
   | { type: 'crisis'; report: CrisisWarningReport }
   | { type: 'influence'; report: InfluenceOperationReport }
-  | { type: 'legitimacy'; report: NarrativeLegitimacyReport };
+  | { type: 'legitimacy'; report: NarrativeLegitimacyReport }
+) & { dataSufficiency?: DataSufficiency };
 
 // ---------------------------------------------------------------------------
 // Intelligence Engine API

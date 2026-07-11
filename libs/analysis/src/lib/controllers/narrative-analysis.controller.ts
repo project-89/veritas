@@ -466,7 +466,18 @@ export class NarrativeAnalysisController {
           botResult,
           investigation,
         );
-        return { type: 'campaign', report };
+        const hasBots = botResult.scores.length > 0;
+        return {
+          type: 'campaign',
+          report,
+          dataSufficiency: {
+            sufficient: hasBots,
+            missingInputs: hasBots ? [] : ['bot scores'],
+            note: hasBots
+              ? undefined
+              : 'Coordinated-campaign detection relies on bot scoring, which was not provided. Run bot detection first — otherwise a "not detected" result only means there was nothing to analyze.',
+          },
+        };
       }
       case 'manipulation': {
         const signals = coerceSignals(body.signals);
@@ -479,12 +490,34 @@ export class NarrativeAnalysisController {
           signals,
           postData,
         );
-        return { type: 'manipulation', report };
+        const hasSignals = signals.length > 0;
+        return {
+          type: 'manipulation',
+          report,
+          dataSufficiency: {
+            sufficient: hasSignals,
+            missingInputs: hasSignals ? [] : ['external market/event signals'],
+            note: hasSignals
+              ? undefined
+              : 'No external signals were supplied (run Effects/downstream analysis first). Manipulation scoring then rests on post text alone.',
+          },
+        };
       }
       case 'crisis': {
         const events = coerceGlobalEvents(body.globalEvents);
         const report = this.intelligenceEngineService.assessCrisisRisk(events, narratives);
-        return { type: 'crisis', report };
+        const hasEvents = events.length > 0;
+        return {
+          type: 'crisis',
+          report,
+          dataSufficiency: {
+            sufficient: hasEvents,
+            missingInputs: hasEvents ? [] : ['geolocated global events'],
+            note: hasEvents
+              ? undefined
+              : 'Crisis assessment needs real-world event data (GDELT/ACLED/GDACS), none of which was provided, so this run analyzed 0 events.',
+          },
+        };
       }
       case 'influence': {
         const botResult = coerceBotDetectionResult(body.botScores);
@@ -493,7 +526,23 @@ export class NarrativeAnalysisController {
           investigation,
           botResult,
         );
-        return { type: 'influence', report };
+        const hasBots = botResult.scores.length > 0;
+        const hasInvestigation = investigation.users.length > 0;
+        const sufficient = hasBots || hasInvestigation;
+        const missing: string[] = [];
+        if (!hasBots) missing.push('bot scores');
+        if (!hasInvestigation) missing.push('actor investigation');
+        return {
+          type: 'influence',
+          report,
+          dataSufficiency: {
+            sufficient,
+            missingInputs: missing,
+            note: sufficient
+              ? undefined
+              : 'Influence attribution needs bot scoring and/or a completed actor investigation; neither was provided.',
+          },
+        };
       }
       case 'legitimacy': {
         const verification = body.claims ?? {
@@ -514,7 +563,18 @@ export class NarrativeAnalysisController {
           verification,
           platforms,
         );
-        return { type: 'legitimacy', report };
+        const hasClaims = verification.results.length > 0;
+        return {
+          type: 'legitimacy',
+          report,
+          dataSufficiency: {
+            sufficient: hasClaims,
+            missingInputs: hasClaims ? [] : ['verified claims'],
+            note: hasClaims
+              ? undefined
+              : 'Legitimacy scoring is strongest with verified claims; none were provided, so this reflects platform mix only.',
+          },
+        };
       }
       default:
         throw new BadRequestException(`Unknown intelligence assessment type: ${type}`);

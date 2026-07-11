@@ -57,7 +57,8 @@ export interface PlatformComparison {
   perPlatform: Array<{
     platform: string;
     postCount: number;
-    avgSentiment: number;
+    /** Mean per-post sentiment, or null when no post on this platform carried a score. */
+    avgSentiment: number | null;
     dominantNarrative: string;
     uniqueNarratives: string[];
     topAuthors: string[];
@@ -66,7 +67,8 @@ export interface PlatformComparison {
   crossPlatform: Array<{
     summary: string;
     platforms: string[];
-    sentimentByPlatform: Record<string, number>;
+    /** Real per-platform mean sentiment for this narrative; null where unmeasured. */
+    sentimentByPlatform: Record<string, number | null>;
   }>;
 }
 
@@ -340,18 +342,20 @@ export class ComparisonService {
       });
     }
 
-    // Cross-platform narratives (appear on 2+ platforms)
+    // Cross-platform narratives (appear on 2+ platforms). Per-platform
+    // sentiment is measured from THIS narrative's own posts on each platform
+    // (via postIndices), not copied from the narrative's overall average.
     const crossPlatform: PlatformComparison['crossPlatform'] = [];
     for (const { narrative, platforms: pSet } of narrativePlatformMap.values()) {
       if (pSet.size >= 2) {
-        const sentimentByPlatform: Record<string, number> = {};
+        const narrativePosts = narrative.postIndices
+          .map((idx) => posts[idx])
+          .filter((p): p is RawPost => p != null);
+
+        const sentimentByPlatform: Record<string, number | null> = {};
         for (const platform of pSet) {
-          // Approximate per-platform sentiment from posts in this narrative
-          void new Set(narrative.postIndices);
-          void (postsByPlatform.get(platform) ?? []).filter(() => true);
-          // Use the narrative's overall sentiment as approximation per platform
-          // A more precise version would cross-reference post indices
-          sentimentByPlatform[platform] = narrative.avgSentiment;
+          const onPlatform = narrativePosts.filter((p) => p.platform.toLowerCase() === platform);
+          sentimentByPlatform[platform] = this.avgPostSentiment(onPlatform);
         }
 
         crossPlatform.push({
@@ -417,11 +421,21 @@ export class ComparisonService {
     return narratives.reduce((s, n) => s + n.avgSentiment * n.postIndices.length, 0) / totalPosts;
   }
 
-  private avgPostSentiment(posts: RawPost[]): number {
-    if (posts.length === 0) return 0;
-    // RawPost from deviation.service doesn't carry sentiment directly,
-    // so return 0 as a fallback. In production the posts would be enriched.
-    return 0;
+  /**
+   * Mean of per-post sentiment over posts that actually carry a score. Returns
+   * null when NONE do, so callers can show "not measured" instead of a
+   * misleading neutral 0.
+   */
+  private avgPostSentiment(posts: RawPost[]): number | null {
+    let sum = 0;
+    let count = 0;
+    for (const p of posts) {
+      if (p.sentiment && Number.isFinite(p.sentiment.score)) {
+        sum += p.sentiment.score;
+        count++;
+      }
+    }
+    return count > 0 ? sum / count : null;
   }
 
   /** Case-insensitive platform key lookup */

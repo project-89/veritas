@@ -108,16 +108,22 @@ export function PlatformComparisonPanel({
             {/* Volume bar */}
             <NervBar value={p.postCount / maxPosts} color="#FF6B2B" />
 
-            {/* Avg sentiment */}
+            {/* Avg sentiment — only shown when actually measured */}
             <div className="space-y-1">
               <span className="text-[11px] font-mono uppercase tracking-wider text-nerv-text-muted">
                 AVG SENTIMENT
               </span>
-              <NervBar
-                value={(p.avgSentiment + 1) / 2}
-                color={sentimentColor(p.avgSentiment)}
-                showLabel
-              />
+              {p.avgSentiment === null ? (
+                <span className="text-[11px] font-mono text-nerv-text-muted/60 italic">
+                  not measured
+                </span>
+              ) : (
+                <NervBar
+                  value={(p.avgSentiment + 1) / 2}
+                  color={sentimentColor(p.avgSentiment)}
+                  showLabel
+                />
+              )}
             </div>
 
             {/* Dominant narrative */}
@@ -191,11 +197,17 @@ export function PlatformComparisonPanel({
                         {pl}
                       </span>
                       <div className="flex-1">
-                        <NervBar
-                          value={(sentiment + 1) / 2}
-                          color={sentimentColor(sentiment)}
-                          height={4}
-                        />
+                        {sentiment === null ? (
+                          <span className="text-[10px] font-mono text-nerv-text-muted/50 italic">
+                            not measured
+                          </span>
+                        ) : (
+                          <NervBar
+                            value={(sentiment + 1) / 2}
+                            color={sentimentColor(sentiment)}
+                            height={4}
+                          />
+                        )}
                       </div>
                     </div>
                   ))}

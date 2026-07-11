@@ -770,6 +770,28 @@ export function IntelligenceReportPanel({
         )}
       </div>
 
+      {/* Honesty banner: this assessment ran without the inputs it needs, so a
+          "not detected" result below only means there was nothing to analyze. */}
+      {report.dataSufficiency && !report.dataSufficiency.sufficient && (
+        <div className="mb-4 border border-nerv-amber/50 bg-nerv-amber/10 rounded-sm p-3 space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-amber">
+              ⚠ Insufficient input
+            </span>
+            {report.dataSufficiency.missingInputs.length > 0 && (
+              <span className="text-[11px] font-mono text-nerv-text-muted">
+                missing: {report.dataSufficiency.missingInputs.join(', ')}
+              </span>
+            )}
+          </div>
+          {report.dataSufficiency.note && (
+            <p className="text-[11px] font-mono text-nerv-text-muted/80 leading-relaxed">
+              {report.dataSufficiency.note}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Report body */}
       {report.type === 'campaign' && <CampaignReportView report={report.report} />}
       {report.type === 'manipulation' && <ManipulationReportView report={report.report} />}

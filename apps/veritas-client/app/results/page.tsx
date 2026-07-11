@@ -550,6 +550,9 @@ function InvestigationWorkspace() {
           posts: state.posts,
           investigation: state.investigation ?? undefined,
           claims: state.claims ?? undefined,
+          // Feed real external signals from a prior Effects/downstream run so
+          // manipulation/crisis assessments have genuine input instead of []).
+          signals: state.downstream?.externalSignals ?? undefined,
         });
         dispatch({ type: 'SET_INTELLIGENCE_REPORT', data: result });
       } catch {
@@ -558,7 +561,7 @@ function InvestigationWorkspace() {
         setIntelligenceLoading(false);
       }
     },
-    [state.narratives, state.posts, state.investigation, state.claims, dispatch],
+    [state.narratives, state.posts, state.investigation, state.claims, state.downstream, dispatch],
   );
 
   // Load scan history for the current investigation when available.
@@ -2023,6 +2026,25 @@ function InvestigationWorkspace() {
               <span className="text-[12px] font-mono text-nerv-text-muted animate-nerv-pulse uppercase tracking-widest">
                 {state.loading ? 'LOADING GLOBE DATA...' : 'AWAITING NARRATIVE DATA FOR GLOBE'}
               </span>
+            </div>
+          );
+        }
+        // Posts carry no GPS — the globe only plots countries *referenced* in
+        // the discourse. When none are, say so instead of an empty sphere.
+        if (memoizedGlobeData.points.length === 0) {
+          return (
+            <div className="flex items-center justify-center h-full px-8">
+              <div className="text-center space-y-2 max-w-md">
+                <span className="block text-[12px] font-mono text-nerv-text-muted uppercase tracking-widest">
+                  No geographic references detected
+                </span>
+                <span className="block text-[11px] font-mono text-nerv-text-muted/70 leading-relaxed">
+                  This discourse doesn&apos;t name specific countries, and no
+                  geolocated event signals are attached. The globe maps countries
+                  mentioned in posts and GDELT signals — it does not infer author
+                  location.
+                </span>
+              </div>
             </div>
           );
         }
