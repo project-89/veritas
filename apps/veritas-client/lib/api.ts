@@ -112,6 +112,10 @@ export interface AnalyzeResult {
   narratives: AnalyzedNarrative[];
   unclustered: number[];
   saturation?: SaturationReport;
+  /** 'gemini' = real semantic vectors; 'hash-fallback'/'mixed' = degraded (not fully semantic). */
+  embeddingSource?: 'gemini' | 'hash-fallback' | 'mixed';
+  /** 'llm' = synthesized summaries; 'first-post'/'mixed' = raw post text. */
+  summarySource?: 'llm' | 'first-post' | 'mixed';
 }
 
 export interface InsightsResponse {

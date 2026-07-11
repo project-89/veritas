@@ -89,6 +89,16 @@ export interface AnalyzeResult {
   unclustered: number[];
   /** Saturation metrics (present when SaturationMetricsService is available) */
   saturation?: SaturationReport;
+  /**
+   * Provenance of the clustering. Consumers must NOT present hash-fallback
+   * clusters as semantic, nor first-post summaries as LLM synthesis.
+   * - embeddingSource: 'gemini' (real semantic vectors), 'hash-fallback' (a
+   *   character-hash bag-of-words substitute used when the embedding API is
+   *   unavailable — NOT semantic), or 'mixed' (some batches fell back).
+   * - summarySource: 'llm', 'first-post' (raw truncated post text), or 'mixed'.
+   */
+  embeddingSource: 'gemini' | 'hash-fallback' | 'mixed';
+  summarySource: 'llm' | 'first-post' | 'mixed';
 }
 
 /**
@@ -107,6 +117,13 @@ export class NarrativeAnalysisService {
   private readonly embeddingRetryBaseMs: number;
   private readonly embeddingMaxRetries: number;
   private readonly chatModel: string = geminiChatModel();
+
+  // Per-run provenance counters (reset at the start of each analyze()). The
+  // analysis queue processes these jobs sequentially per worker.
+  private runEmbedFallbacks = 0;
+  private runEmbedTotal = 0;
+  private runSummaryFallbacks = 0;
+  private runSummaryTotal = 0;
 
   constructor(
     private readonly configService: ConfigService,
@@ -183,10 +200,16 @@ export class NarrativeAnalysisService {
     }>,
   ): Promise<AnalyzeResult> {
     if (posts.length === 0) {
-      return { narratives: [], unclustered: [] };
+      return { narratives: [], unclustered: [], embeddingSource: 'gemini', summarySource: 'llm' };
     }
 
     this.logger.log(`Analyzing ${posts.length} posts...`);
+
+    // Reset per-run provenance counters.
+    this.runEmbedFallbacks = 0;
+    this.runEmbedTotal = 0;
+    this.runSummaryFallbacks = 0;
+    this.runSummaryTotal = 0;
 
     // Step 1: Generate embeddings
     const embeddings = await this.batchEmbed(posts.map((p) => p.text));
@@ -252,9 +275,30 @@ export class NarrativeAnalysisService {
         })
       : undefined;
 
+    this.runEmbedTotal = posts.length;
+    const embeddingSource: AnalyzeResult['embeddingSource'] =
+      this.runEmbedFallbacks === 0
+        ? 'gemini'
+        : this.runEmbedFallbacks >= this.runEmbedTotal
+          ? 'hash-fallback'
+          : 'mixed';
+    const summarySource: AnalyzeResult['summarySource'] =
+      this.runSummaryFallbacks === 0
+        ? 'llm'
+        : this.runSummaryFallbacks >= this.runSummaryTotal
+          ? 'first-post'
+          : 'mixed';
+    if (embeddingSource !== 'gemini') {
+      this.logger.warn(
+        `Narrative clustering used ${embeddingSource} embeddings (${this.runEmbedFallbacks}/${this.runEmbedTotal} fallback) — NOT fully semantic`,
+      );
+    }
+
     return {
       narratives,
       unclustered,
+      embeddingSource,
+      summarySource,
       ...(saturation ? { saturation } : {}),
     };
   }
@@ -462,8 +506,9 @@ export class NarrativeAnalysisService {
     await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  /** Simple hash-based fallback when Gemini is unavailable */
+  /** Simple hash-based fallback when Gemini is unavailable (NOT semantic). */
   private fallbackEmbedding(text: string): number[] {
+    this.runEmbedFallbacks++;
     const dim = 768;
     const vec = new Array(dim).fill(0);
     const words = text.toLowerCase().split(/\s+/).slice(0, 100);
@@ -810,12 +855,14 @@ export class NarrativeAnalysisService {
     narratives: AnalyzedNarrative[],
     posts: Array<{ text: string }>,
   ): Promise<void> {
+    this.runSummaryTotal += narratives.length;
     if (!this.genAI || narratives.length === 0) {
       // Fallback: use most-engaged post text
       for (const n of narratives) {
         const texts = n.postIndices.map((i) => posts[i]?.text ?? '');
         const firstText = texts[0] ?? '';
         n.summary = firstText.slice(0, 120) + (firstText.length > 120 ? '...' : '');
+        this.runSummaryFallbacks++;
       }
       return;
     }
@@ -881,12 +928,13 @@ ${sections.join('\n\n')}`;
       }
     }
 
-    // Fill any missing summaries with fallback
+    // Fill any missing summaries with fallback (LLM failed for these).
     for (const n of narratives) {
       if (!n.summary) {
         const firstIdx = n.postIndices[0] ?? 0;
         const text = posts[firstIdx]?.text ?? '';
         n.summary = text.slice(0, 120) + (text.length > 120 ? '...' : '');
+        this.runSummaryFallbacks++;
       }
     }
   }

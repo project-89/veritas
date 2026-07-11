@@ -345,6 +345,10 @@ function InvestigationWorkspace() {
   const [scanHistory, setScanHistory] = useState<ScanJob[]>([]);
   const [genealogyLineages, setGenealogyLineages] = useState<NarrativeLineage[]>([]);
   const [genealogyLoading, setGenealogyLoading] = useState(false);
+  const [clusteringProvenance, setClusteringProvenance] = useState<{
+    embeddingSource?: 'gemini' | 'hash-fallback' | 'mixed';
+    summarySource?: 'llm' | 'first-post' | 'mixed';
+  } | null>(null);
   const scanPostsFetchedRef = useRef(false);
   const mergeUniqueByKey = useCallback(<T,>(items: T[], keyFn: (item: T) => string): T[] => {
     const seen = new Set<string>();
@@ -909,6 +913,10 @@ function InvestigationWorkspace() {
         dispatch({ type: 'SET_PIPELINE', stage: 'analyze', status: 'running' });
         const analyzeResult = await analyzeNarratives(posts);
         narratives = analyzeResult.narratives;
+        setClusteringProvenance({
+          embeddingSource: analyzeResult.embeddingSource,
+          summarySource: analyzeResult.summarySource,
+        });
         dispatch({
           type: 'SET_NARRATIVES',
           narratives: analyzeResult.narratives,
@@ -2226,6 +2234,22 @@ function InvestigationWorkspace() {
 
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 44px)' }}>
+      {/* Degraded-analysis banner: clustering fell back to non-semantic vectors
+          or raw-text summaries (e.g. embedding API unavailable). Never present
+          fallback clusters as genuine semantic narratives. */}
+      {clusteringProvenance &&
+        (clusteringProvenance.embeddingSource === 'hash-fallback' ||
+          clusteringProvenance.embeddingSource === 'mixed' ||
+          clusteringProvenance.summarySource === 'first-post') && (
+          <div className="shrink-0 px-4 py-1 bg-nerv-amber/10 border-b border-nerv-amber/40 text-[10px] font-mono text-nerv-amber/90">
+            ⚠ DEGRADED ANALYSIS —{' '}
+            {clusteringProvenance.embeddingSource !== 'gemini' &&
+              'clusters formed from non-semantic fallback vectors (embedding API unavailable); '}
+            {clusteringProvenance.summarySource === 'first-post' &&
+              'summaries are raw post text, not LLM synthesis; '}
+            treat groupings as approximate.
+          </div>
+        )}
       {/* Top bar: compact header + grouped tabs */}
       <div className="shrink-0 border-b border-nerv-border bg-nerv-bg">
         {/* Row 1: query + status badges + refresh — single compact line */}

@@ -39,6 +39,8 @@ describe('NarrativeAnalysisController', () => {
       },
     ],
     unclustered: [3],
+    embeddingSource: 'gemini',
+    summarySource: 'llm',
   };
 
   beforeEach(async () => {
