@@ -38,28 +38,33 @@ export function ActorsMatrix({
   onSelectActor,
 }: ActorsMatrixProps) {
   const actors: ActorRow[] = useMemo(() => {
+    // Handles are keyed case-insensitively throughout so the same person from
+    // the investigation, narrative authors, and raw posts collapses to ONE row
+    // (the backend lowercases handles; the client used to compare raw-case).
+    const norm = (s: string) => s.trim().toLowerCase();
+
     const investigationActors = (investigation?.users ?? []).map((u: UserInvestigationResult) => ({
       handle: u.user.handle,
       platform: u.user.platform,
       credibility: u.credibility?.overallScore ?? 0.5,
       botProbability: u.botScore?.botProbability ?? 0,
       influence: u.influenceScore,
-      postCount: posts.filter((p) => p.authorHandle === u.user.handle).length,
+      postCount: posts.filter((p) => norm(p.authorHandle ?? '') === norm(u.user.handle)).length,
       flags: u.flags,
     }));
 
-    // Derive from narrative authors
+    // Derive from narrative authors, keyed by normalized handle/name.
     const authorMap = new Map<string, { handle: string; platform: string; postCount: number }>();
     for (const narrative of narratives) {
       for (const author of narrative.authors) {
-        const key = author.handle || author.name;
+        const key = norm(author.handle || author.name);
+        if (!key) continue;
         const existing = authorMap.get(key);
         if (existing) {
           existing.postCount += author.postCount;
         } else {
-          // Find platform from posts
           const matchingPost = posts.find(
-            (p) => p.authorHandle === author.handle || p.authorName === author.name,
+            (p) => norm(p.authorHandle ?? '') === key || norm(p.authorName ?? '') === key,
           );
           authorMap.set(key, {
             handle: author.handle || author.name,
@@ -72,14 +77,15 @@ export function ActorsMatrix({
 
     // Also collect unique authors directly from posts (covers authors not in narrative.authors)
     for (const post of posts) {
-      const key = post.authorHandle || post.authorName || '';
+      const display = post.authorHandle || post.authorName || '';
+      const key = norm(display);
       if (!key) continue;
       const existing = authorMap.get(key);
       if (existing) continue;
       authorMap.set(key, {
-        handle: key,
+        handle: display,
         platform: post.platform ?? 'unknown',
-        postCount: posts.filter((p) => (p.authorHandle || p.authorName) === key).length,
+        postCount: posts.filter((p) => norm(p.authorHandle || p.authorName || '') === key).length,
       });
     }
 
@@ -90,21 +96,27 @@ export function ActorsMatrix({
       botProbability: 0,
       influence: 0,
       postCount: a.postCount,
-      flags: [],
+      flags: [] as string[],
     }));
 
     if (investigationActors.length > 0) {
       const merged = new Map<string, ActorRow>();
       for (const actor of discoveredActors) {
-        merged.set(`${actor.handle}:${actor.platform}`, actor);
+        merged.set(norm(actor.handle), actor);
       }
       for (const actor of investigationActors) {
-        const key = `${actor.handle}:${actor.platform}`;
+        const key = norm(actor.handle);
+        const prev = merged.get(key);
         merged.set(key, {
-          ...(merged.get(key) ?? actor),
+          ...(prev ?? actor),
           ...actor,
-          postCount: actor.postCount || merged.get(key)?.postCount || 0,
-          flags: actor.flags.length > 0 ? actor.flags : (merged.get(key)?.flags ?? []),
+          // Prefer a known platform over a discovered 'unknown'.
+          platform:
+            actor.platform && actor.platform !== 'unknown'
+              ? actor.platform
+              : (prev?.platform ?? actor.platform),
+          postCount: actor.postCount || prev?.postCount || 0,
+          flags: actor.flags.length > 0 ? actor.flags : (prev?.flags ?? []),
         });
       }
       return Array.from(merged.values());

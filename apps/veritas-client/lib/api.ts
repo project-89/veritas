@@ -27,7 +27,9 @@ export interface RawPost {
    * placeholder zeros. Absent on older cached posts. See the backend
    * engagement-provenance map.
    */
-  engagementProvenance?: Partial<Record<'likes' | 'shares' | 'comments' | 'reach' | 'views', MetricProvenance>>;
+  engagementProvenance?: Partial<
+    Record<'likes' | 'shares' | 'comments' | 'reach' | 'views', MetricProvenance>
+  >;
 }
 
 export type MetricProvenance = 'real' | 'inferred' | 'unavailable';
@@ -294,10 +296,7 @@ const API_KEY = process.env['NEXT_PUBLIC_VERITAS_API_KEY'];
 // waiting forever; callers can override via options.signal or the timeoutMs arg.
 const DEFAULT_TIMEOUT_MS = 60_000;
 
-async function request<T>(
-  url: string,
-  options?: RequestInit & { timeoutMs?: number },
-): Promise<T> {
+async function request<T>(url: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, signal: callerSignal, ...init } = options ?? {};
 
   // Abort on timeout, but still honor a caller-supplied signal if present.
@@ -325,7 +324,11 @@ async function request<T>(
 
     return res.json() as Promise<T>;
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError' && timeoutController.signal.aborted) {
+    if (
+      err instanceof DOMException &&
+      err.name === 'AbortError' &&
+      timeoutController.signal.aborted
+    ) {
       throw new ApiError(`API request timed out after ${timeoutMs}ms`, 408);
     }
     throw err;

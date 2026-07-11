@@ -299,6 +299,14 @@ export function EvidenceChainPanel({
             {totalLeads > 0 && (
               <NervBadge label={`${totalLeads} leads`} variant="amber" size="sm" />
             )}
+            {/* Honesty flag — mirror the CLAIMS panel so heuristic/skipped
+                verification isn't presented as authoritative fact-checking. */}
+            {claims.analysisMode === 'heuristic' && (
+              <NervBadge label="⚠ heuristic" variant="amber" size="sm" />
+            )}
+            {(claims.analysisMode === 'skipped' || claims.analysisMode === 'unavailable') && (
+              <NervBadge label="⚠ not verified" variant="amber" size="sm" />
+            )}
           </div>
         </div>
         {claims.summary && (
@@ -306,7 +314,13 @@ export function EvidenceChainPanel({
             {claims.summary}
           </p>
         )}
-        {propaganda && (
+        {propaganda && propaganda.analysisMode === 'unavailable' && (
+          <p className="text-[10px] font-mono text-nerv-amber/80 mt-1">
+            ⚠ Propaganda analysis unavailable — manipulation level not assessed (not a &quot;low
+            manipulation&quot; finding).
+          </p>
+        )}
+        {propaganda && propaganda.analysisMode !== 'unavailable' && (
           <div className="flex items-center gap-2 mt-1">
             <span className="text-[10px] font-mono uppercase text-nerv-text-muted">
               Manipulation:

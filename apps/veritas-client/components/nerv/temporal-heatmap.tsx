@@ -80,17 +80,18 @@ export function TemporalHeatmap({
     let maxTime: number;
 
     if (absMatch) {
-      minTime = new Date(`${absMatch[1]}T00:00:00Z`).getTime();
-      maxTime = new Date(`${absMatch[2]}T23:59:59Z`).getTime();
+      // Parse as LOCAL midnight (no trailing Z) so bucket edges line up with the
+      // local-time axis labels below — otherwise cells land one bucket off from
+      // where their label reads by the viewer's UTC offset.
+      minTime = new Date(`${absMatch[1]}T00:00:00`).getTime();
+      maxTime = new Date(`${absMatch[2]}T23:59:59`).getTime();
     } else if (relMatch) {
       const [, valueText, unit] = relMatch;
       const value = Number.parseInt(valueText, 10);
       const durationMs =
         unit === 'd' ? value * 86400000 : unit === 'h' ? value * 3600000 : value * 60000;
       const latestTimestamp = allTimestamps[allTimestamps.length - 1] ?? Date.now();
-      const endTime = scanCreatedAt
-        ? new Date(scanCreatedAt).getTime()
-        : latestTimestamp;
+      const endTime = scanCreatedAt ? new Date(scanCreatedAt).getTime() : latestTimestamp;
       minTime = endTime - durationMs;
       maxTime = endTime;
     } else {
@@ -350,9 +351,10 @@ export function TemporalHeatmap({
     ctx.textBaseline = 'top';
     ctx.fillText('TEMPORAL HEATMAP', LABEL_WIDTH, 4);
 
-    // Legend
+    // Legend: NEG (red) on the left → POS (green) on the right, matching the
+    // left-to-right swatch order below.
     ctx.textAlign = 'right';
-    ctx.fillText('NEG', dimensions.width - RIGHT_MARGIN, 4);
+    ctx.fillText('NEG', dimensions.width - RIGHT_MARGIN - 54, 4);
     ctx.fillStyle = sentimentToColor(-0.8);
     ctx.fillRect(dimensions.width - RIGHT_MARGIN - 50, 3, 12, 10);
     ctx.fillStyle = sentimentToColor(0);
@@ -361,7 +363,7 @@ export function TemporalHeatmap({
     ctx.fillRect(dimensions.width - RIGHT_MARGIN - 22, 3, 12, 10);
     ctx.fillStyle = '#555570';
     ctx.textAlign = 'left';
-    ctx.fillText('POS', dimensions.width - RIGHT_MARGIN - 8, 4);
+    ctx.fillText('POS', dimensions.width - RIGHT_MARGIN - 6, 4);
   }, [narratives, grid, buckets, bucketLabels, dimensions, selectedNarrativeId, maxCount]);
 
   // Mouse handlers

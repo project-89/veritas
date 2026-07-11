@@ -61,9 +61,18 @@ export function ClaimsMatrix({
   const rows: ClaimRow[] = useMemo(() => {
     if (!propaganda?.claims) return [];
 
+    // Index verifications by normalized claim text so a difference in casing or
+    // surrounding whitespace between extraction and verification doesn't silently
+    // drop every row to "unverified".
+    const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    const verificationByClaim = new Map<string, VerificationResult>();
+    for (const r of claims?.results ?? []) {
+      verificationByClaim.set(normalize(r.claim), r);
+    }
+
     return propaganda.claims.map((c: ExtractedClaim, i: number) => {
-      const verification: VerificationResult | undefined = claims?.results?.find(
-        (r) => r.claim === c.claim,
+      const verification: VerificationResult | undefined = verificationByClaim.get(
+        normalize(c.claim),
       );
       return {
         index: i,

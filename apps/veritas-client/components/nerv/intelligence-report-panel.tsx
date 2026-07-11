@@ -497,7 +497,9 @@ function InfluenceReportView({ report }: { report: InfluenceOperationReport }) {
                   <span className="text-[11px] font-mono text-nerv-text-secondary">
                     @{node.handle}
                   </span>
-                  <span className="text-[10px] font-mono text-nerv-text-muted">{node.platform}</span>
+                  <span className="text-[10px] font-mono text-nerv-text-muted">
+                    {node.platform}
+                  </span>
                   <span className="text-[10px] font-mono tabular-nums text-nerv-text-muted">
                     {(node.confidence * 100).toFixed(0)}%
                   </span>

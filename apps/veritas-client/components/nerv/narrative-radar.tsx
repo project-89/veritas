@@ -113,12 +113,32 @@ function buildMetrics(
   const velocity = maxVelocity > 0 ? Math.min(narrative.velocity.postsPerHour / maxVelocity, 1) : 0;
   const reach = maxPosts > 0 ? Math.min(narrative.postIndices.length / maxPosts, 1) : 0;
   const sentimentMag = Math.min(Math.abs(narrative.avgSentiment), 1);
+  // Distinguish "deviation is zero" from "deviation was never computed".
+  const deviationComputed = deviationMap.has(narrative.id);
   const deviation = deviationMap.get(narrative.id) ?? 0;
   const platformCount = Object.keys(narrative.platforms).length;
   const platformDiv = maxPlatforms > 0 ? platformCount / maxPlatforms : 0;
   const uniqueAuthors = narrative.authors.length;
   const totalPosts = narrative.postIndices.length || 1;
-  const authorDiv = Math.min(uniqueAuthors / totalPosts, 1);
+  // Author Breadth via Simpson diversity (1 - HHI over per-author post shares):
+  // the probability two random posts come from different authors. Unlike
+  // uniqueAuthors/totalPosts, this drops sharply when one account dominates,
+  // instead of saturating near 1 whenever most authors post once.
+  const authorCounts = narrative.authors.map((a) => a.postCount);
+  const sumAuthorPosts = authorCounts.reduce((s, c) => s + c, 0);
+  let authorDiv: number;
+  if (uniqueAuthors === 0) {
+    authorDiv = 0;
+  } else if (sumAuthorPosts <= 0) {
+    // No per-author counts available — fall back to the crude ratio.
+    authorDiv = Math.min(uniqueAuthors / totalPosts, 1);
+  } else {
+    const hhi = authorCounts.reduce((s, c) => {
+      const share = c / sumAuthorPosts;
+      return s + share * share;
+    }, 0);
+    authorDiv = 1 - hhi;
+  }
 
   return [
     {
@@ -157,13 +177,15 @@ function buildMetrics(
       description: AXES[3].description,
       whatHighMeans: AXES[3].whatHighMeans,
       value: deviation,
-      scoreLabel: `${Math.round(deviation * 100)} / 100`,
-      rawLabel:
-        deviation > 0
+      scoreLabel: deviationComputed ? `${Math.round(deviation * 100)} / 100` : '— / 100',
+      rawLabel: !deviationComputed
+        ? 'Not computed — run deviation analysis'
+        : deviation > 0
           ? `${(deviation * 100).toFixed(0)}% of max observed deviation`
           : 'No significant deviation detected',
-      emphasisLabel:
-        deviation > 0.66
+      emphasisLabel: !deviationComputed
+        ? 'NOT COMPUTED'
+        : deviation > 0.66
           ? 'HIGHLY DISTINCT'
           : deviation > 0.33
             ? 'MODERATELY DISTINCT'

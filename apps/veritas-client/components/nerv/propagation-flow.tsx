@@ -109,7 +109,11 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       const t = rawT ? new Date(rawT).getTime() : minT;
       const plat = u.user.platform.toLowerCase();
       const lane = laneMap.get(plat) ?? 0;
-      const xNorm = degenerateTime ? (users.length > 1 ? i / (users.length - 1) : 0.5) : (t - minT) / timeRange;
+      const xNorm = degenerateTime
+        ? users.length > 1
+          ? i / (users.length - 1)
+          : 0.5
+        : (t - minT) / timeRange;
       const isOrigin = u.user.handle === origin?.firstMover;
       const isBot = u.flags.includes('potential_bot') || (u.botScore?.botProbability ?? 0) > 0.6;
       const baseR = 8 + Math.min(u.influenceScore * 20, 20);
@@ -232,13 +236,7 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       if (cluster.userIndices.length < 2) continue;
       const clusterNodes = cluster.userIndices
         .map((i) => nodes[i])
-        .filter(
-          (
-            node,
-          ): node is NonNullable<
-            (typeof nodes)[number]
-          > => node !== undefined,
-        );
+        .filter((node): node is NonNullable<(typeof nodes)[number]> => node !== undefined);
       let minX = Infinity,
         maxX = -Infinity,
         minY = Infinity,

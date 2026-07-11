@@ -1,5 +1,6 @@
 'use client';
 
+import nlp from 'compromise';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -32,17 +33,17 @@ import { ScanProgress } from '../../components/nerv/scan-progress';
 import { SocialGraphPanel } from '../../components/nerv/social-graph-panel';
 import { TemporalHeatmap } from '../../components/nerv/temporal-heatmap';
 import {
-  type AnalyzeResult,
   type AnalyzedNarrative,
+  type AnalyzeResult,
   addInvestigationEvidenceSeed,
   analyzeEntities,
   analyzeNarratives,
   analyzePropaganda,
   buildMentalModel,
   buildProjectDossier,
+  type ClaimVerificationBatchResult,
   cancelAnalysisJob,
   cancelScan,
-  type ClaimVerificationBatchResult,
   compareNarratives,
   comparePlatforms,
   createOrGetInvestigation,
@@ -54,10 +55,10 @@ import {
   fetchAlerts,
   fetchDeviations,
   fetchDownstreamEffects,
+  fetchGenealogy,
   fetchInvestigation,
   fetchInvestigations,
   fetchMentalModel,
-  fetchGenealogy,
   fetchProjectDossier,
   generateMagiProfile,
   generateReport,
@@ -257,8 +258,7 @@ function InvestigationWorkspace() {
   const rawQuery = searchParams.get('q');
   // Guard against a literal "undefined"/"null" reaching the URL from a stray
   // stringified value upstream.
-  const query =
-    rawQuery && rawQuery !== 'undefined' && rawQuery !== 'null' ? rawQuery : '';
+  const query = rawQuery && rawQuery !== 'undefined' && rawQuery !== 'null' ? rawQuery : '';
   const invId = normalizeRouteId(searchParams.get('inv'));
   const requestedScanId = normalizeRouteId(searchParams.get('scan'));
   const freshSearch = searchParams.get('fresh') === '1';
@@ -1004,7 +1004,25 @@ function InvestigationWorkspace() {
         // Themes are promoted into topic entities so the topic tab has real content.
         const insights: EntityAnalysisInsight[] = posts
           .map((p) => {
+            // Real named-entity recognition on the post TEXT (compromise, pure-JS)
+            // — people, organizations, and places actually mentioned in the
+            // discourse. Previously this was empty, so "entities" was only
+            // authors + themes; now the Organizations/Other tabs carry real data.
             const entityList: Array<{ name: string; type: string; relevance: number }> = [];
+            const addNamed = (names: string[], type: string, relevance: number) => {
+              for (const raw of names) {
+                const clean = raw.trim().replace(/\s+/g, ' ');
+                if (clean.length > 1 && clean.length <= 60) {
+                  entityList.push({ name: clean, type, relevance });
+                }
+              }
+            };
+            if (typeof p.text === 'string' && p.text.length > 0) {
+              const doc = nlp(p.text.slice(0, 2000));
+              addNamed(doc.organizations().out('array'), 'org', 0.85);
+              addNamed(doc.people().out('array'), 'person', 0.8);
+              addNamed(doc.places().out('array'), 'entity', 0.75);
+            }
             const authorEntity =
               typeof p.authorHandle === 'string' && p.authorHandle.trim().length > 0
                 ? {
@@ -2117,10 +2135,9 @@ function InvestigationWorkspace() {
                   No geographic references detected
                 </span>
                 <span className="block text-[11px] font-mono text-nerv-text-muted/70 leading-relaxed">
-                  This discourse doesn&apos;t name specific countries, and no
-                  geolocated event signals are attached. The globe maps countries
-                  mentioned in posts and GDELT signals — it does not infer author
-                  location.
+                  This discourse doesn&apos;t name specific countries, and no geolocated event
+                  signals are attached. The globe maps countries mentioned in posts and GDELT
+                  signals — it does not infer author location.
                 </span>
               </div>
             </div>
