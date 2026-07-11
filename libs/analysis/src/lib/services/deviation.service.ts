@@ -321,8 +321,11 @@ export class DeviationService {
           metrics: {
             strength: clamp(engagement / 1000, 0.1, 1),
             relevance: clamp(1 - deviation.deviationMagnitude, 0, 1),
+            // Deterministic: a node's consensus alignment is 1 - its own
+            // deviation from the consensus centroid (the consensus node itself
+            // floors high). Never Math.random() — this is a displayed metric.
             consensus: isConsensus
-              ? 0.8 + Math.random() * 0.2
+              ? clamp(1 - deviation.deviationMagnitude, 0.8, 1)
               : clamp(1 - deviation.deviationMagnitude, 0, 1),
           },
           connections: [],

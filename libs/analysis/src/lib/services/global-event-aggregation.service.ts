@@ -297,9 +297,13 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
               category = 'environmental';
             }
 
-            // Add some jitter to position so events don't stack exactly
-            const jitterLat = (Math.random() - 0.5) * 8;
-            const jitterLng = (Math.random() - 0.5) * 12;
+            // Deterministic de-overlap jitter derived from the event id, so a
+            // given event renders at a STABLE position (region-anchored) rather
+            // than jumping around the map on every reload.
+            let h = 0;
+            for (let ci = 0; ci < id.length; ci++) h = (h * 31 + id.charCodeAt(ci)) | 0;
+            const jitterLat = ((h % 1000) / 1000 - 0.5) * 8;
+            const jitterLng = (((h >> 10) % 1000) / 1000 - 0.5) * 12;
 
             events.push({
               id,

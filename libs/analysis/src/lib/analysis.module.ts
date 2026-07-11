@@ -14,6 +14,7 @@ import {
   CAUSAL_REASONING_SERVICE,
   DownstreamEffectsService,
 } from './services/downstream-effects.service';
+import { MongoEmbeddingCacheStore } from './services/embedding-cache.store';
 import { EntityAnalysisService } from './services/entity-analysis.service';
 import { NarrativeGenealogyService } from './services/genealogy.service';
 import { GlobalEventAggregationService } from './services/global-event-aggregation.service';
@@ -21,7 +22,10 @@ import { GraphBotDetectionService } from './services/graph-bot-detection.service
 import { GraphDatabaseService } from './services/graph-database.service';
 import { IntelligenceEngineService } from './services/intelligence-engine.service';
 import { MonitorService } from './services/monitor.service';
-import { NarrativeAnalysisService } from './services/narrative-analysis.service';
+import {
+  EMBEDDING_CACHE_STORE,
+  NarrativeAnalysisService,
+} from './services/narrative-analysis.service';
 import { PlatformCredibilityService } from './services/platform-credibility.service';
 import { PropagandaAnalysisService } from './services/propaganda.service';
 import { ReportService } from './services/report.service';
@@ -34,6 +38,13 @@ import { SourceCredibilityService } from './services/source-credibility.service'
   providers: [
     AnalysisService,
     NarrativeAnalysisService,
+    // Wire the previously-dead embedding cache so runs stop re-embedding every
+    // post at full Gemini cost.
+    MongoEmbeddingCacheStore,
+    {
+      provide: EMBEDDING_CACHE_STORE,
+      useExisting: MongoEmbeddingCacheStore,
+    },
     DeviationService,
     MonitorService,
     DeepInvestigationService,
