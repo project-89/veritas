@@ -5,9 +5,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { EventEmitter } from 'events';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
-import {
-  SocialMediaPost,
-} from '../interfaces/social-media-connector.interface';
+import { SocialMediaPost } from '../interfaces/social-media-connector.interface';
 import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
 import { matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
@@ -88,26 +86,14 @@ export class WebScraperConnector
       }
     }
 
-    // Add some default configs if none were loaded
+    // No default configs. The previous default pointed at example.com — a
+    // non-functional placeholder that only produced fetch errors. Curated news
+    // is already covered by the RSS connector's 144-feed catalog; this
+    // connector stays inert until real NEWS_SCRAPER_CONFIGS are provided.
     if (this.scrapeConfigs.size === 0) {
-      const defaultConfigs: ScrapeConfig[] = [
-        {
-          name: 'Example News Site',
-          url: 'https://example.com/news',
-          articleSelector: 'article',
-          titleSelector: 'h1, h2',
-          contentSelector: '.article-content, .content',
-          authorSelector: '.author',
-          dateSelector: '.date, time',
-          urlSelector: 'a',
-          baseUrl: 'https://example.com',
-        },
-      ];
-
-      for (const config of defaultConfigs) {
-        this.scrapeConfigs.set(config.name, config);
-      }
-      this.logger.log(`Added ${defaultConfigs.length} default scraping configurations`);
+      this.logger.log(
+        'Web scraper idle — set NEWS_SCRAPER_CONFIGS to enable custom site scraping (RSS connector already covers curated news).',
+      );
     }
   }
 

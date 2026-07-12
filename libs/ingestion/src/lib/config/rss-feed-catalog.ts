@@ -1176,6 +1176,61 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       region: 'us',
     },
   ],
+
+  // ---------------------------------------------------------------------------
+  // FACT-CHECK / DEBUNKING — IFCN-aligned fact-checkers. High value for
+  // narrative provenance: surfaces existing debunks of a circulating claim.
+  // ---------------------------------------------------------------------------
+  fact_check: [
+    {
+      name: 'Snopes',
+      url: 'https://www.snopes.com/feed/',
+      category: 'fact_check',
+      tier: 1,
+      language: 'en',
+      region: 'global',
+    },
+    {
+      name: 'PolitiFact',
+      url: 'https://www.politifact.com/rss/all/',
+      category: 'fact_check',
+      tier: 1,
+      language: 'en',
+      region: 'us',
+    },
+    {
+      name: 'FactCheck.org',
+      url: 'https://www.factcheck.org/feed/',
+      category: 'fact_check',
+      tier: 1,
+      language: 'en',
+      region: 'us',
+    },
+    {
+      name: 'Full Fact',
+      url: 'https://fullfact.org/feed/all/',
+      category: 'fact_check',
+      tier: 1,
+      language: 'en',
+      region: 'uk',
+    },
+    {
+      name: 'Lead Stories',
+      url: 'https://leadstories.com/atom.xml',
+      category: 'fact_check',
+      tier: 2,
+      language: 'en',
+      region: 'global',
+    },
+    {
+      name: 'EUvsDisinfo',
+      url: 'https://euvsdisinfo.eu/feed/',
+      category: 'fact_check',
+      tier: 1,
+      language: 'en',
+      region: 'europe',
+    },
+  ],
 };
 
 // ---------------------------------------------------------------------------

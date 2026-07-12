@@ -43,18 +43,19 @@ interface TelegramChannelInfo {
  * Curated list of OSINT / crypto / geopolitical Telegram channels.
  * Used as the default channel set when TELEGRAM_CHANNELS is not configured.
  */
+// NOTE: this is a minimal ILLUSTRATIVE default. Telegram is channel-monitoring,
+// not platform-wide search, so it is only as good as the channels configured.
+// For real use, set TELEGRAM_CHANNELS to a curated, verified list relevant to
+// the investigation. The previous default contained corrupted placeholder
+// entries ('defaboratory', 'inaboratory', 'ryaboratory') that were not real
+// channels — removed rather than shipped as fake curation.
 const CURATED_CHANNELS = [
   // Crypto
   'whale_alert_io',
-  'cryptonews',
-  'defaboratory',
-  // Geopolitical OSINT
-  'inaboratory',
-  'ryaboratory',
+  'cointelegraph',
   // News
   'bbcnews',
   'reuters',
-  'breakingnews',
 ];
 
 /**
