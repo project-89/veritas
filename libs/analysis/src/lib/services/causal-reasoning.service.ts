@@ -1,7 +1,7 @@
 /**
  * Agentic Causal Reasoning Service
  *
- * Uses Gemini function calling (gemini-3.1-pro-preview) to run a multi-turn
+ * Uses Gemini function calling (gemini-3.1-flash-lite) to run a multi-turn
  * investigative loop that evaluates causal relationships between narratives
  * and real-world signals.
  *

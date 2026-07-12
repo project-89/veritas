@@ -105,8 +105,9 @@ export class ContentClassificationService {
     if (geminiKey) {
       try {
         const genAI = new GoogleGenerativeAI(geminiKey);
-        this.geminiModel = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' });
-        this.logger.log('Gemini sentiment analysis enabled (gemini-3.1-flash-lite-preview)');
+        const model = process.env['GEMINI_CHAT_MODEL'] ?? 'gemini-3.1-flash-lite';
+        this.geminiModel = genAI.getGenerativeModel({ model });
+        this.logger.log(`Gemini sentiment analysis enabled (${model})`);
       } catch (err) {
         this.logger.warn(`Failed to initialize Gemini: ${err}`);
       }

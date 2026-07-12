@@ -30,7 +30,7 @@ const JSON_SCHEMA = `{
 export class MentalModelService {
   private readonly logger = new Logger(MentalModelService.name);
   private readonly genAI: GoogleGenerativeAI | null = null;
-  private readonly chatModel = 'gemini-2.0-flash';
+  private readonly chatModel = process.env['GEMINI_CHAT_MODEL'] ?? 'gemini-3.1-flash-lite';
 
   constructor(private readonly configService: ConfigService) {
     const geminiKey =

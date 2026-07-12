@@ -8,12 +8,15 @@
  * markdown-fence-stripping failure mode.
  */
 
+// Gemini 3.1 Flash (Lite is the generateContent-capable 3.1 Flash text model;
+// gemini-3-pro-preview / "3.0 pro" is deprecated and 404s). Env-overridable so a
+// future pro/upgrade is one deployment change.
 export function geminiChatModel(): string {
-  return process.env['GEMINI_CHAT_MODEL'] ?? 'gemini-2.0-flash';
+  return process.env['GEMINI_CHAT_MODEL'] ?? 'gemini-3.1-flash-lite';
 }
 
 export function geminiReasoningModel(): string {
-  return process.env['GEMINI_REASONING_MODEL'] ?? 'gemini-3.1-pro-preview';
+  return process.env['GEMINI_REASONING_MODEL'] ?? 'gemini-3.1-flash-lite';
 }
 
 /** For every LLM call whose output is parsed as JSON. */

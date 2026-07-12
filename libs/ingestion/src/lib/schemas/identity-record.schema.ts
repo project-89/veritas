@@ -180,7 +180,7 @@ class PsychologicalProfileEmbed {
   @Prop({ type: Date, required: true })
   generatedAt!: Date;
 
-  @Prop({ type: String, default: 'gemini-3.1-pro-preview' })
+  @Prop({ type: String, default: 'gemini-3.1-flash-lite' })
   modelUsed!: string;
 
   @Prop({ type: Number, default: 0 })
