@@ -611,11 +611,18 @@ export class RedditFreeConnector
     if (haystack.includes(normalizedQuery)) return true;
 
     const terms = extractSignificantQueryTerms(query);
+    const matchedTerms = terms.filter((term) => this.haystackIncludesTerm(haystack, term));
+
     if (terms.length <= 3 && searchMode !== 'claim') {
-      return true;
+      // Short topic query: require the significant terms to actually appear
+      // (word-boundary) rather than blindly trusting the platform search — the
+      // long-query path below floors at 3 matches, which a 1-2 term query can
+      // never meet, so it needs its own proportionate threshold.
+      // 1-2 terms: all must match; 3 terms: at least 2.
+      const required = terms.length <= 2 ? terms.length : 2;
+      return matchedTerms.length >= required;
     }
 
-    const matchedTerms = terms.filter((term) => this.haystackIncludesTerm(haystack, term));
     if (searchMode === 'claim') {
       const plan = buildClaimQueryPlan(query);
       const matchedActors = plan.actorTerms.filter((term) =>

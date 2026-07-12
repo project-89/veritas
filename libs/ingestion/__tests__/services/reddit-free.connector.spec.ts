@@ -216,7 +216,7 @@ describe('RedditFreeConnector', () => {
     it('should return transformed social media posts', async () => {
       mockAxiosInstance.get.mockResolvedValue({ data: mockRedditResponse });
 
-      const posts = await connector.searchContent('test query');
+      const posts = await connector.searchContent('post');
 
       expect(posts).toHaveLength(2);
       expect(posts[0]!).toMatchObject({
@@ -299,7 +299,7 @@ describe('RedditFreeConnector', () => {
         },
       });
 
-      const posts = await connector.searchContent('rexas finance');
+      const posts = await connector.searchContent('post');
 
       expect(posts).toHaveLength(2);
     });
@@ -363,7 +363,7 @@ describe('RedditFreeConnector', () => {
     it('should search and pass results to transform service', async () => {
       mockAxiosInstance.get.mockResolvedValue({ data: mockRedditResponse });
 
-      const insights = await connector.searchAndTransform('climate change');
+      const insights = await connector.searchAndTransform('post');
 
       expect(transformService.transformBatch).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ platform: 'reddit' })]),

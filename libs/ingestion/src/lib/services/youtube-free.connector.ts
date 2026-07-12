@@ -12,7 +12,7 @@ import {
   normalizeSearchMode,
   type SearchMode,
 } from '../utils/query-intent.util';
-import { buildSearchQuery } from '../utils/query-match.util';
+import { buildSearchQuery, extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 import { SubprocessUtil } from './utils/subprocess.util';
@@ -350,7 +350,10 @@ export class YouTubeFreeConnector implements DataConnector, OnModuleInit, OnModu
         }
       }
 
-      return posts;
+      // Relevance safety-net: require the query terms to appear in the video's
+      // title/transcript text, so YouTube search noise doesn't enter the corpus.
+      if (extractSignificantTerms(query).length === 0) return posts;
+      return posts.filter((p) => matchesQuery(p.text, query));
     } catch (error) {
       this.logger.error('Error searching YouTube with yt-dlp:', error);
       throw error;

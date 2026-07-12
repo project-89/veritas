@@ -5,7 +5,7 @@ import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
-import { buildSearchQuery } from '../utils/query-match.util';
+import { buildSearchQuery, extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 
@@ -368,7 +368,10 @@ export class FarcasterFreeConnector implements DataConnector, OnModuleInit, OnMo
         });
       }
 
-      return casts.slice(0, limit).map((c) => this.transformNeynarCast(c));
+      const transformed = casts.slice(0, limit).map((c) => this.transformNeynarCast(c));
+      // Relevance safety-net over platform search results.
+      if (extractSignificantTerms(query).length === 0) return transformed;
+      return transformed.filter((c) => matchesQuery(c.text, query));
     } catch (error) {
       this.logger.error('Error searching Farcaster via Neynar:', error);
       const message = error instanceof Error ? error.message : String(error);

@@ -120,12 +120,12 @@ describe('YouTubeFreeConnector', () => {
 
   describe('searchContent (via searchAndTransform)', () => {
     it('should search with yt-dlp and transform results', async () => {
-      const insights = await connector.searchAndTransform('test query');
+      const insights = await connector.searchAndTransform('test');
 
       expect(subprocessUtil.execJsonLines).toHaveBeenCalledWith(
         'yt-dlp',
         expect.arrayContaining([
-          'ytsearch25:test query',
+          'ytsearch25:test',
           '--dump-json',
           '--no-download',
           '--flat-playlist',
@@ -226,7 +226,7 @@ describe('YouTubeFreeConnector', () => {
         },
       ]);
 
-      await connector.searchAndTransform('test');
+      await connector.searchAndTransform('title');
 
       const posts = (transformService.transformBatch as jest.Mock).mock.calls[0][0];
       expect(posts[0].authorId).toBe('');

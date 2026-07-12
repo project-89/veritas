@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '../schemas';
-import { buildSearchQuery, matchesQuery } from '../utils/query-match.util';
+import { buildSearchQuery, extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { BaseSocialMediaConnector } from './base-social-media.connector';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
@@ -228,7 +228,12 @@ export class TwitterFreeConnector
         filtered = filtered.filter((t) => t.timeParsed && t.timeParsed.getTime() <= end);
       }
 
-      return filtered.map((tweet) => this.transformTweetToSocialMediaPost(tweet));
+      const transformed = filtered.map((tweet) => this.transformTweetToSocialMediaPost(tweet));
+      // Relevance safety-net for TOPIC queries (skip for bare handle lookups,
+      // whose tweets legitimately may not contain the handle as a word).
+      // Reuses isHandleQuery computed above.
+      if (isHandleQuery || extractSignificantTerms(query).length === 0) return transformed;
+      return transformed.filter((p) => matchesQuery(p.text, query));
     } catch (error: unknown) {
       this.logger.error(
         'Error searching Twitter:',

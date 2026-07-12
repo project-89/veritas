@@ -4,7 +4,7 @@ import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
-import { buildSearchQuery } from '../utils/query-match.util';
+import { buildSearchQuery, extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 
@@ -248,7 +248,12 @@ export class BlueskyFreeConnector implements DataConnector, OnModuleInit, OnModu
         });
       }
 
-      return posts.slice(0, limit).map((p) => this.transformToSocialMediaPost(p));
+      const transformed = posts.slice(0, limit).map((p) => this.transformToSocialMediaPost(p));
+      // Relevance safety-net: Bluesky search can return loosely-related posts;
+      // require the query's significant terms to actually appear (word-boundary,
+      // stopword-aware). Skipped when the query has no significant terms.
+      if (extractSignificantTerms(query).length === 0) return transformed;
+      return transformed.filter((p) => matchesQuery(p.text, query));
     } catch (error) {
       const status = getErrorStatus(error);
       if (status === 400) {
