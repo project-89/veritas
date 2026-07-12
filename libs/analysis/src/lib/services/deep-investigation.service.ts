@@ -437,7 +437,8 @@ Respond ONLY with a JSON object:
       .filter((u) => u.adoptionTimestamp)
       .sort(
         (a, b) =>
-          new Date(a.adoptionTimestamp ?? 0).getTime() - new Date(b.adoptionTimestamp ?? 0).getTime(),
+          new Date(a.adoptionTimestamp ?? 0).getTime() -
+          new Date(b.adoptionTimestamp ?? 0).getTime(),
       );
 
     if (withAdoption.length === 0) {
@@ -493,11 +494,46 @@ Respond ONLY with a JSON object:
       .filter((u) => u.adoptionTimestamp)
       .sort(
         (a, b) =>
-          new Date(a.adoptionTimestamp ?? 0).getTime() - new Date(b.adoptionTimestamp ?? 0).getTime(),
+          new Date(a.adoptionTimestamp ?? 0).getTime() -
+          new Date(b.adoptionTimestamp ?? 0).getTime(),
       );
 
-    // Sliding window: users who adopted within 30 minutes of each other
+    // Sliding window: users who adopted within 30 minutes of each other.
     const WINDOW_MS = 30 * 60 * 1000;
+    const n = withTimestamps.length;
+
+    // BASE-RATE CORRECTION: a burst of N adopters in 30 minutes is only
+    // suspicious if it's well ABOVE what uniform posting would produce. If a
+    // topic has 100 adopters over an hour, every 30-min window naturally holds
+    // ~50 — that's not coordination. Compute the expected per-window count and
+    // require a window to exceed it by a clear factor before flagging.
+    let clusterThreshold = 3;
+    let expectedPerWindow = 0;
+    if (n >= 3) {
+      const firstTs = new Date(withTimestamps[0]?.adoptionTimestamp ?? 0).getTime();
+      const lastTs = new Date(withTimestamps[n - 1]?.adoptionTimestamp ?? 0).getTime();
+      const observedSpanMs = Math.max(lastTs - firstTs, 1);
+      // Compare against ORGANIC spread, not the adopters' own span — otherwise a
+      // tight burst is measured against itself and always looks "expected".
+      // Organic adoption of a narrative spreads over hours; use 6h as the floor
+      // reference. When real adoption spans longer than that, use the observed
+      // span so high-volume trending topics (many adopters over hours) don't
+      // flag every sub-window as coordination.
+      const ORGANIC_REFERENCE_MS = 6 * 60 * 60 * 1000;
+      const referenceSpanMs = Math.max(observedSpanMs, ORGANIC_REFERENCE_MS);
+      expectedPerWindow = n * (WINDOW_MS / referenceSpanMs);
+      // Need at least 3 users AND >= 2.5x the organic-adoption expectation.
+      clusterThreshold = Math.max(3, Math.ceil(expectedPerWindow * 2.5));
+    }
+
+    // temporal-only evidence is weak — cap confidence well below certainty.
+    const TEMPORAL_CONF_CAP = 0.6;
+    const windowConfidence = (count: number): number => {
+      if (expectedPerWindow <= 0) return 0.3;
+      const ratio = count / expectedPerWindow; // how many times above base rate
+      return Math.min(TEMPORAL_CONF_CAP, 0.2 + (ratio - 2.5) * 0.15);
+    };
+
     let windowStart = 0;
     for (let i = 1; i < withTimestamps.length; i++) {
       const current = withTimestamps[i];
@@ -508,12 +544,12 @@ Respond ONLY with a JSON object:
         new Date(start.adoptionTimestamp ?? 0).getTime();
 
       if (gap > WINDOW_MS) {
-        // Check if window had enough users for a cluster
-        if (i - windowStart >= 3) {
+        const count = i - windowStart;
+        if (count >= clusterThreshold) {
           clusters.push({
             users: withTimestamps.slice(windowStart, i).map((u) => u.user.handle),
-            pattern: `${i - windowStart} users adopted the narrative within ${Math.round(gap / 60000)} minutes`,
-            confidence: Math.min(0.9, (i - windowStart) / 10),
+            pattern: `Possible coordination (temporal only): ${count} users adopted within ${Math.round(gap / 60000)} min — ${(count / Math.max(expectedPerWindow, 0.1)).toFixed(1)}x the expected rate`,
+            confidence: windowConfidence(count),
           });
         }
         windowStart = i;
@@ -521,21 +557,23 @@ Respond ONLY with a JSON object:
     }
 
     // Check remaining window
-    if (withTimestamps.length - windowStart >= 3) {
+    const tailCount = withTimestamps.length - windowStart;
+    if (tailCount >= clusterThreshold) {
       clusters.push({
         users: withTimestamps.slice(windowStart).map((u) => u.user.handle),
-        pattern: `${withTimestamps.length - windowStart} users adopted the narrative in rapid succession`,
-        confidence: Math.min(0.9, (withTimestamps.length - windowStart) / 10),
+        pattern: `Possible coordination (temporal only): ${tailCount} users adopted in rapid succession — ${(tailCount / Math.max(expectedPerWindow, 0.1)).toFixed(1)}x the expected rate`,
+        confidence: windowConfidence(tailCount),
       });
     }
 
-    // Check for users with shared flags
+    // Users with shared bot/suspicion flags — content/behavior signal, stronger
+    // than pure timing. Require >= 3 to avoid flagging coincidental pairs.
     const flaggedUsers = users.filter((u) => u.flags.length > 0);
-    if (flaggedUsers.length >= 2) {
+    if (flaggedUsers.length >= 3) {
       clusters.push({
         users: flaggedUsers.map((u) => u.user.handle),
-        pattern: `${flaggedUsers.length} users show suspicious posting patterns`,
-        confidence: 0.5,
+        pattern: `${flaggedUsers.length} users share suspicious posting-pattern flags`,
+        confidence: Math.min(0.6, 0.3 + flaggedUsers.length * 0.05),
       });
     }
 

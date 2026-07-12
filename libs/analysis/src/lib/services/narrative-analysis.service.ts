@@ -805,6 +805,10 @@ export class NarrativeAnalysisService {
   }
 
   private calculateVelocity(sorted: EmbeddedPost[]): AnalyzedNarrative['velocity'] {
+    // Trend/acceleration are pure noise below this many posts — a 2-post
+    // cluster over 3 minutes must not report "20 posts/hr, surging".
+    const MIN_POSTS_FOR_TREND = 5;
+
     if (sorted.length < 2) {
       return { postsPerHour: 0, acceleration: 0, trend: 'steady' };
     }
@@ -816,8 +820,18 @@ export class NarrativeAnalysisService {
     }
     const firstTs = first.timestamp.getTime();
     const lastTs = last.timestamp.getTime();
-    const hours = Math.max((lastTs - firstTs) / (1000 * 60 * 60), 0.1);
+
+    // For small clusters, floor the span at 1 hour so a handful of posts in a
+    // few minutes doesn't manufacture a huge per-hour rate. Larger clusters use
+    // the real (6-minute floored) span.
+    const spanFloorHours = sorted.length < MIN_POSTS_FOR_TREND ? 1 : 0.1;
+    const hours = Math.max((lastTs - firstTs) / (1000 * 60 * 60), spanFloorHours);
     const postsPerHour = sorted.length / hours;
+
+    // Below the sample-size floor, report volume but never a directional trend.
+    if (sorted.length < MIN_POSTS_FOR_TREND) {
+      return { postsPerHour, acceleration: 0, trend: 'steady' };
+    }
 
     // Acceleration: compare first-half rate to second-half rate
     const mid = Math.floor(sorted.length / 2);

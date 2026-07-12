@@ -285,10 +285,27 @@ export class PropagandaAnalysisService {
 
     // Stratified, deterministic sample of posts per narrative, each tagged
     // with a stable reference the model must cite in its evidence.
-    const sampledByNarrative = narratives.map((n) => ({
-      narrative: n,
-      sampled: this.sampleNarrativePosts(n, posts),
-    }));
+    // Minimum-text floor: drop only genuinely trivial narratives (a stray word
+    // or two). Kept intentionally LOW — propaganda techniques (name-calling,
+    // loaded language, fear appeals) routinely appear in short punchy posts, so
+    // a high floor would suppress exactly what we want to catch.
+    const MIN_TEXT_CHARS = 40;
+    const sampledByNarrative = narratives
+      .map((n) => ({
+        narrative: n,
+        sampled: this.sampleNarrativePosts(n, posts),
+      }))
+      .filter(
+        ({ sampled }) =>
+          sampled.reduce((sum, s) => sum + s.normalizedText.length, 0) >= MIN_TEXT_CHARS,
+      );
+
+    if (sampledByNarrative.length === 0) {
+      return this.emptyResult(
+        'skipped',
+        'Insufficient text to assess — narratives had too few characters for reliable propaganda-technique detection.',
+      );
+    }
 
     // Global dedup: the same post may back multiple narratives, but it needs
     // exactly one tag for grounding.
