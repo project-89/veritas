@@ -266,12 +266,21 @@ export class NarrativeAnalysisService {
 
     const unclustered = noise.map((p) => p.index);
 
+    // Cross-source duplication signal: how many posts are near-duplicates of
+    // each other REGARDLESS of platform (same URL, or same normalized text).
+    // We do NOT drop them — repetition across accounts/platforms is itself the
+    // amplification signal — but we measure it to feed the deduplication rate.
+    const contentKeys = new Set(posts.map((p) => this.contentDedupKey(p.text)));
+    const deduplicatedCount = contentKeys.size;
+
     // Step 6: Compute saturation metrics if service is available
     const saturation = this.saturationMetrics
       ? this.saturationMetrics.computeSaturation({
           narratives,
           totalPosts: posts.length,
           unclusteredCount: unclustered.length,
+          rawPostCount: posts.length,
+          deduplicatedCount,
         })
       : undefined;
 
@@ -504,6 +513,24 @@ export class NarrativeAnalysisService {
 
   private async sleep(ms: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Platform-agnostic content key for cross-source duplication detection.
+   * Normalizes text (lowercase, strip URLs/@mentions/#tags/punctuation, collapse
+   * whitespace) and keys on the first 150 chars, so the same message reposted
+   * across accounts/platforms maps to one key. Used only to MEASURE duplication,
+   * never to drop posts.
+   */
+  private contentDedupKey(text: string): string {
+    return (text ?? '')
+      .toLowerCase()
+      .replace(/https?:\/\/\S+/g, ' ')
+      .replace(/[@#]\w+/g, ' ')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 150);
   }
 
   /** Simple hash-based fallback when Gemini is unavailable (NOT semantic). */
