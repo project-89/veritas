@@ -576,7 +576,7 @@ CRITICAL PRINCIPLES:
 
 CLAIM: "${claim.claim}"
 CLAIM TYPE: ${claim.type}
-SOURCES WHO MADE THIS CLAIM: ${claim.sources.join(', ') || 'Unknown'}
+SOURCES WHO MADE THIS CLAIM: ${(claim.sources ?? []).join(', ') || 'Unknown'}
 
 EVIDENCE FOUND (the ONLY material you may cite):
 ${evidenceText || 'No relevant evidence found from searched sources.'}
