@@ -14,6 +14,7 @@ import {
   FACEBOOK_CONNECTOR,
   FARCASTER_CONNECTOR,
   FOURCHAN_CONNECTOR,
+  GDELT_CONNECTOR,
   REDDIT_CONNECTOR,
   TELEGRAM_CONNECTOR,
   TRUTHSOCIAL_CONNECTOR,
@@ -60,6 +61,7 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
     private readonly wikipediaConnector: DataConnector,
     @Optional() @Inject(BLUESKY_CONNECTOR) private readonly blueskyConnector: DataConnector,
     @Optional() @Inject(FOURCHAN_CONNECTOR) private readonly fourchanConnector: DataConnector,
+    @Optional() @Inject(GDELT_CONNECTOR) private readonly gdeltConnector: DataConnector,
     @Optional() private readonly rssFeedConnector: RSSConnector,
     @Optional() private readonly webScraperConnector: WebScraperConnector,
     private readonly databaseService: DatabaseService,
@@ -113,6 +115,7 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
       this.wikipediaConnector,
       this.blueskyConnector,
       this.fourchanConnector,
+      this.gdeltConnector,
       this.rssFeedConnector,
       this.webScraperConnector,
     ].filter((connector) => connector !== undefined);

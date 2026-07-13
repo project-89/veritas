@@ -6,9 +6,9 @@ import { SocialMediaPost } from '../../types/social-media.types';
 import { ConnectorSearchOptions } from '../interfaces/data-connector.interface';
 import { ConnectorFetchCacheRepository } from '../repositories/connector-fetch-cache.repository';
 import { ScanJobRepository } from '../repositories/scan-job.repository';
-import { getEngagementProvenance } from '../utils/engagement-provenance';
 import { IngestionService } from '../services/ingestion.service';
 import { ScanEventsService, ScanStatusEvent } from '../services/scan-events.service';
+import { getEngagementProvenance } from '../utils/engagement-provenance';
 import { buildPostDedupKey } from '../utils/post-dedup.util';
 
 export interface ScanJobData {
@@ -259,8 +259,13 @@ export class ScanProcessor extends WorkerHost {
       // Save results to MongoDB
       await this.scanJobRepository.addConnectorResults(scanId, connector, serializedPosts);
 
-      // Populate the cross-scan cache (best-effort)
-      await this.fetchCache?.save(connector, cacheKey, serializedPosts);
+      // Populate the cross-scan cache (best-effort). Do NOT cache empty
+      // results: an empty set is often a transient failure (rate-limit,
+      // network) returned as [] rather than a genuine "no matches", and caching
+      // it would poison the next 30 min of scans. Re-fetching an empty is cheap.
+      if (serializedPosts.length > 0) {
+        await this.fetchCache?.save(connector, cacheKey, serializedPosts);
+      }
 
       const duration = Date.now() - startTime;
 

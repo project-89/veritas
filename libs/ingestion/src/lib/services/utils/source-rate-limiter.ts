@@ -51,6 +51,7 @@ const PLATFORM_DEFAULTS: Record<string, PlatformRateConfig> = {
   truthsocial: { minIntervalMs: 2000, maxConcurrent: 1 },
   wikipedia: { minIntervalMs: 300, maxConcurrent: 2 },
   web: { minIntervalMs: 1000, maxConcurrent: 2 },
+  gdelt: { minIntervalMs: 5500, maxConcurrent: 1 }, // GDELT DOC API: max 1 req / 5s
 };
 
 const ENV_OVERRIDE_VAR = 'SOURCE_RATE_LIMITS';

@@ -17,6 +17,7 @@ import {
   FACEBOOK_CONNECTOR,
   FARCASTER_CONNECTOR,
   FOURCHAN_CONNECTOR,
+  GDELT_CONNECTOR,
   REDDIT_CONNECTOR,
   TELEGRAM_CONNECTOR,
   TRUTHSOCIAL_CONNECTOR,
@@ -27,6 +28,7 @@ import {
 import { ScanProcessor } from './queue/scan.processor';
 import { AlertRepository } from './repositories/alert.repository';
 import { AnalysisJobRepository } from './repositories/analysis-job.repository';
+import { ConnectorFetchCacheRepository } from './repositories/connector-fetch-cache.repository';
 import { EmbeddingCacheRepository } from './repositories/embedding-cache.repository';
 import { GlobalEventRepository } from './repositories/global-event.repository';
 import { IdentityRecordRepository } from './repositories/identity-record.repository';
@@ -38,7 +40,6 @@ import {
   NarrativeRepository,
 } from './repositories/narrative-insight.repository';
 import { ProjectDossierRepository } from './repositories/project-dossier.repository';
-import { ConnectorFetchCacheRepository } from './repositories/connector-fetch-cache.repository';
 import { RssCacheRepository } from './repositories/rss-cache.repository';
 import { ScanJobRepository } from './repositories/scan-job.repository';
 import { SignalCacheRepository } from './repositories/signal-cache.repository';
@@ -46,6 +47,7 @@ import { FourChanFreeConnector } from './services/4chan-free.connector';
 import { BlueskyFreeConnector } from './services/bluesky-free.connector';
 import { FacebookJinaConnector } from './services/facebook-jina.connector';
 import { FarcasterFreeConnector } from './services/farcaster-free.connector';
+import { GdeltConnector } from './services/gdelt.connector';
 import { IngestionService } from './services/ingestion.service';
 import { InvestigationEvidenceService } from './services/investigation-evidence.service';
 import { MentalModelService } from './services/mental-model.service';
@@ -283,6 +285,10 @@ export class IngestionModule {
 
     if ((connectorConfig as Record<string, unknown>)['fourchan'] !== false) {
       providers.push({ provide: FOURCHAN_CONNECTOR, useClass: FourChanFreeConnector });
+    }
+
+    if ((connectorConfig as Record<string, unknown>)['gdelt'] !== false) {
+      providers.push({ provide: GDELT_CONNECTOR, useClass: GdeltConnector });
     }
 
     // RSS and WebScraper are already API-free
