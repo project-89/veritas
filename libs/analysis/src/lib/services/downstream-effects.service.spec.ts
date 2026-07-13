@@ -54,6 +54,19 @@ function createService(): DownstreamEffectsService {
 describe('DownstreamEffectsService', () => {
   let service: DownstreamEffectsService;
 
+  // createService() mocks ConfigService to return no key, but the service falls
+  // back to process.env['GEMINI_API_KEY']. Clear it so the fallback-mode tests
+  // are genuinely key-less and never make a real (slow, non-deterministic) LLM
+  // call. Restored afterwards.
+  let savedGeminiKey: string | undefined;
+  beforeAll(() => {
+    savedGeminiKey = process.env['GEMINI_API_KEY'];
+    delete process.env['GEMINI_API_KEY'];
+  });
+  afterAll(() => {
+    if (savedGeminiKey !== undefined) process.env['GEMINI_API_KEY'] = savedGeminiKey;
+  });
+
   beforeEach(() => {
     service = createService();
   });

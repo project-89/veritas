@@ -251,7 +251,7 @@ export class DownstreamEffectsService {
     // 3. Fetch initial signals from all adapters
     const externalSignals = await this.fetchAllSignals(keywords, startDate, endDate);
 
-    // 4. Try agentic causal reasoning first (gemini-3.1-flash-lite)
+    // 4. Try agentic causal reasoning first (gemini-3.1-pro-preview)
     if (this.causalReasoning) {
       try {
         const agentResult = await this.causalReasoning.analyze({
