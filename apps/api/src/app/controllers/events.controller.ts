@@ -7,7 +7,7 @@ import {
   Query,
   Sse,
 } from '@nestjs/common';
-import { GlobalEvent, GlobalEventAggregationService } from '@veritas/analysis';
+import { dedupeGlobalEvents, GlobalEvent, GlobalEventAggregationService } from '@veritas/analysis';
 import { GlobalEventRepository } from '@veritas/ingestion';
 import { filter, interval, map, merge, Observable } from 'rxjs';
 
@@ -82,13 +82,18 @@ export class EventsController {
     @Query('severity') severity?: string,
     @Query('since') since?: string,
   ): Promise<GlobalEvent[]> {
-    return this.eventRepo.getRecentEvents({
-      limit: Number(limit) || 200,
+    const requested = Number(limit) || 200;
+    // Over-fetch, then collapse cross-source duplicates of the same real-world
+    // event (multiple feeds mint distinct ids for one happening), so the caller
+    // still gets up to `requested` DISTINCT events instead of a wall of dupes.
+    const events = await this.eventRepo.getRecentEvents({
+      limit: Math.min(requested * 4, 1000),
       category: category || undefined,
       region: region || undefined,
       severity: severity || undefined,
       since: since || undefined,
     });
+    return dedupeGlobalEvents(events).slice(0, requested);
   }
 
   /**

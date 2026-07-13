@@ -10,6 +10,7 @@ import { ModuleRef } from '@nestjs/core';
 import { Observable, Subject } from 'rxjs';
 import type { EventCategory, EventSeverity, GeoLocation, GlobalEvent } from '../types/global-event';
 import { REGION_CENTROIDS, resolveCountryCode } from '../utils/geocoding';
+import { contentTokens, locationAnchor, overlapCoefficient } from './utils/dedupe-global-events';
 import { AcledAdapter } from './signal-adapters/acled.adapter';
 import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
 import { GdacsAdapter } from './signal-adapters/gdacs.adapter';
@@ -47,6 +48,9 @@ const RELIEFWEB_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes
 const RSS_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const DEFAULT_EVENT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const CONTENT_DEDUP_WINDOW_MS = 12 * 60 * 60 * 1000; // 12h: same happening reported across sources
+const CONTENT_DEDUP_OVERLAP = 0.5; // content-token overlap to treat as the same event
+const MAX_CONTENT_SIGNATURES = 5000; // memory bound on the signature store
 
 // ---------------------------------------------------------------------------
 // Service
@@ -85,6 +89,16 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
 
   // Deduplication: eventId → timestamp (ms)
   private readonly seen = new Map<string, number>();
+
+  // Content-level dedup: signatures of recently accepted events, so the SAME
+  // real-world happening arriving from a different source (a distinct id) is
+  // suppressed instead of stacking up in the feed.
+  private readonly recentSignatures: Array<{
+    tokens: Set<string>;
+    anchor: string;
+    category: EventCategory;
+    time: number;
+  }> = [];
 
   // RxJS event stream
   private readonly subject = new Subject<GlobalEvent>();
@@ -446,6 +460,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
       const normalizedEvent = this.sanitizeEvent(event);
 
       if (this.isDuplicate(normalizedEvent.id)) continue;
+      if (this.isContentDuplicate(normalizedEvent)) continue;
 
       this.seen.set(normalizedEvent.id, Date.now());
       this.subject.next(normalizedEvent);
@@ -469,6 +484,28 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     return this.seen.has(eventId);
   }
 
+  /**
+   * True when this event describes the same happening (same category, location
+   * anchor, similar title, close in time) as one already accepted in the window
+   * — even though it carries a different source id.
+   */
+  private isContentDuplicate(event: GlobalEvent): boolean {
+    const tokens = contentTokens(event.title, event.location?.label);
+    if (tokens.size === 0) return false; // can't judge — keep it
+    const anchor = locationAnchor(event.location);
+    const time = new Date(event.timestamp).getTime();
+
+    for (const sig of this.recentSignatures) {
+      if (sig.category !== event.category) continue;
+      if (sig.anchor !== anchor) continue;
+      if (Number.isFinite(time) && Math.abs(sig.time - time) > CONTENT_DEDUP_WINDOW_MS) continue;
+      if (overlapCoefficient(tokens, sig.tokens) >= CONTENT_DEDUP_OVERLAP) return true;
+    }
+
+    this.recentSignatures.push({ tokens, anchor, category: event.category, time });
+    return false;
+  }
+
   /** Remove entries older than the dedup window. */
   private pruneDedup(): void {
     const cutoff = Date.now() - DEDUP_WINDOW_MS;
@@ -476,6 +513,12 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
       if (ts < cutoff) {
         this.seen.delete(id);
       }
+    }
+    // Bound the signature store. Correctness is enforced by the per-event time
+    // check in isContentDuplicate (events far apart in time never match), so
+    // this only caps memory — drop the oldest-inserted signatures past the cap.
+    if (this.recentSignatures.length > MAX_CONTENT_SIGNATURES) {
+      this.recentSignatures.splice(0, this.recentSignatures.length - MAX_CONTENT_SIGNATURES);
     }
   }
 

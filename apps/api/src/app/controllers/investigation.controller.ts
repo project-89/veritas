@@ -355,7 +355,9 @@ export class InvestigationController {
       if (cred) {
         userResult.flags.push(...cred.flags.filter((f) => !userResult.flags.includes(f)));
       }
-      if (bot && bot.botProbability > 0.5) {
+      // botProbability is null when detection abstained (insufficient data) —
+      // only flag on a real score above threshold.
+      if (bot && bot.botProbability !== null && bot.botProbability > 0.5) {
         userResult.flags.push(`Bot probability: ${Math.round(bot.botProbability * 100)}%`);
         userResult.flags.push(...bot.detectedPatterns.filter((p) => !userResult.flags.includes(p)));
       }
