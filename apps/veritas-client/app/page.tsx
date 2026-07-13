@@ -108,10 +108,10 @@ export default function CommandHome() {
   );
 
   return (
-    <div className="min-h-screen bg-nerv-bg-deep text-nerv-text px-4 py-5 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1400px]">
+    <div className="min-h-[calc(100vh-49px)] lg:h-[calc(100vh-49px)] lg:overflow-hidden bg-nerv-bg-deep text-nerv-text px-4 py-4 sm:px-6 lg:px-8 flex flex-col">
+      <div className="mx-auto max-w-[1400px] w-full flex flex-col lg:flex-1 lg:min-h-0">
         {/* Command bar */}
-        <header className="mb-6">
+        <header className="mb-4 shrink-0">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-[13px] font-mono text-nerv-orange tracking-widest">{'//'}</span>
             <h1 className="text-[15px] font-mono font-semibold tracking-[0.2em] text-nerv-text">
@@ -160,7 +160,7 @@ export default function CommandHome() {
         </header>
 
         {/* Stat strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 shrink-0">
           <NervPanel className="p-3" corners={false}>
             <NervMetric label="INVESTIGATIONS" value={loading ? '—' : investigations.length} />
           </NervPanel>
@@ -187,14 +187,17 @@ export default function CommandHome() {
           </NervPanel>
         </div>
 
+        {/* Content region — fills the remaining viewport; sections scroll
+            internally instead of pushing the page past the fold. */}
+        <div className="flex flex-col gap-4 lg:flex-1 lg:min-h-0">
         {/* Main grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:flex-[3] lg:min-h-0">
           {/* Active + recent operations */}
           <NervPanel
             title="OPERATIONS"
             subtitle="active & recent investigations"
             accent="orange"
-            className="lg:col-span-2 p-3"
+            className="lg:col-span-2 p-3 lg:min-h-0"
             headerRight={
               <Link
                 href="/monitor"
@@ -213,7 +216,7 @@ export default function CommandHome() {
                 No investigations yet — search above to start one.
               </p>
             ) : (
-              <ul className="divide-y divide-nerv-border/60">
+              <ul className="divide-y divide-nerv-border/60 overflow-y-auto pr-1 max-h-[42vh] lg:max-h-none lg:h-full">
                 {recentInvestigations.map((inv) => {
                   const id = inv._id ?? inv.id ?? '';
                   const activeScan = activeScans.find((s) => s.investigationId === id);
@@ -249,7 +252,7 @@ export default function CommandHome() {
             subtitle={unreadCount ? `${unreadCount} unread` : 'all clear'}
             accent={unreadCount ? 'red' : 'green'}
             status={unreadCount ? 'warning' : 'online'}
-            className="p-3"
+            className="p-3 lg:min-h-0"
             headerRight={
               <Link
                 href="/monitor"
@@ -268,7 +271,7 @@ export default function CommandHome() {
                 No unread alerts.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-2 overflow-y-auto pr-1 max-h-[42vh] lg:max-h-none lg:h-full">
                 {unreadAlerts.map((a) => (
                   <li key={a._id}>
                     <Link
@@ -301,7 +304,7 @@ export default function CommandHome() {
           title="GLOBAL FEED"
           subtitle="recent world events"
           accent="blue"
-          className="mt-4 p-3"
+          className="p-3 lg:flex-[2] lg:min-h-0"
           headerRight={
             <Link
               href="/worldmap"
@@ -318,8 +321,8 @@ export default function CommandHome() {
               No recent global events.
             </p>
           ) : (
-            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5">
-              {events.slice(0, 12).map((e) => (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1.5 content-start overflow-y-auto pr-1 max-h-[32vh] lg:max-h-none lg:h-full">
+              {events.slice(0, 30).map((e) => (
                 <li key={e.id} className="flex items-baseline gap-2 min-w-0">
                   <span
                     className={[
@@ -339,6 +342,7 @@ export default function CommandHome() {
             </ul>
           )}
         </NervPanel>
+        </div>
       </div>
     </div>
   );
