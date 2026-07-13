@@ -23,6 +23,7 @@ import { EvidenceChainPanel } from '../../components/nerv/evidence-chain-panel';
 import { GenealogyPanel } from '../../components/nerv/genealogy-panel';
 import { IntelligenceReportPanel } from '../../components/nerv/intelligence-report-panel';
 import { NarrativeComparisonPanel } from '../../components/nerv/narrative-comparison-panel';
+import { NarrativeEmergence } from '../../components/nerv/narrative-emergence';
 import { NarrativeList } from '../../components/nerv/narrative-list';
 import { NarrativeRadar } from '../../components/nerv/narrative-radar';
 import { PlatformComparisonPanel } from '../../components/nerv/platform-comparison-panel';
@@ -99,6 +100,7 @@ import {
   useInvestigation,
 } from '../../lib/investigation-context';
 import { useScanProgress } from '../../lib/use-scan-progress';
+import { useResultsQueryParams } from '../../hooks/use-results-query-params';
 
 const NarrativeGlobeLazy = dynamic(
   () =>
@@ -117,6 +119,7 @@ const CENTER_MODE_GROUPS: {
   {
     label: 'Analysis',
     modes: [
+      { key: 'emergence', label: 'EMERGENCE', shortcut: 'N' },
       { key: 'temporal', label: 'TEMPORAL', shortcut: '1' },
       { key: 'radar', label: 'RADAR', shortcut: '2' },
       { key: 'entities', label: 'ENTITIES', shortcut: '3' },
@@ -251,79 +254,21 @@ function InvestigationWorkspace() {
     unclusteredCount?: number;
     saturation?: SaturationReport;
   }
-  const normalizeRouteId = (value: string | null): string | null => {
-    if (!value) return null;
-    const trimmed = value.trim();
-    if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return null;
-    return trimmed;
-  };
-  const rawQuery = searchParams.get('q');
-  // Guard against a literal "undefined"/"null" reaching the URL from a stray
-  // stringified value upstream.
-  const query = rawQuery && rawQuery !== 'undefined' && rawQuery !== 'null' ? rawQuery : '';
-  const invId = normalizeRouteId(searchParams.get('inv'));
-  const requestedScanId = normalizeRouteId(searchParams.get('scan'));
-  const freshSearch = searchParams.get('fresh') === '1';
-  const urlModeParam = searchParams.get('mode');
-  const urlSearchMode: 'topic' | 'claim' | 'person' =
-    urlModeParam === 'claim' ? 'claim' : urlModeParam === 'person' ? 'person' : 'topic';
-  const urlPlatforms = searchParams.get('platforms')?.split(',').filter(Boolean) ?? undefined;
-  const urlTimeRange = searchParams.get('timeRange') ?? '7d';
-  const parsedUrlLimit = Number.parseInt(searchParams.get('limit') ?? '', 10);
-  const urlLimit =
-    Number.isFinite(parsedUrlLimit) && parsedUrlLimit > 0 ? parsedUrlLimit : undefined;
-  const urlUsernames = useMemo(
-    () =>
-      searchParams
-        .get('usernames')
-        ?.split(',')
-        .map((s) => s.trim().replace(/^@/, ''))
-        .filter(Boolean) ?? [],
-    [searchParams],
-  );
-  const urlHashtags = useMemo(
-    () =>
-      searchParams
-        .get('hashtags')
-        ?.split(',')
-        .map((s) => s.trim())
-        .filter(Boolean) ?? [],
-    [searchParams],
-  );
-  const urlWallets = useMemo(
-    () =>
-      searchParams
-        .get('wallets')
-        ?.split(',')
-        .map((s) => s.trim())
-        .filter(Boolean) ?? [],
-    [searchParams],
-  );
-  const urlSubreddits = useMemo(
-    () =>
-      searchParams
-        .get('subreddits')
-        ?.split(',')
-        .map((s) => s.trim().replace(/^r\//, ''))
-        .filter(Boolean) ?? [],
-    [searchParams],
-  );
-
-  // Build enhanced query: base query + hashtags + wallet terms + subreddit scoping
-  const enhancedQuery = useMemo(() => {
-    const parts = [query];
-    for (const tag of urlHashtags) {
-      const t = tag.startsWith('#') ? tag : `#${tag}`;
-      if (!query.includes(t)) parts.push(t);
-    }
-    for (const wallet of urlWallets) {
-      if (!query.includes(wallet)) parts.push(wallet);
-    }
-    for (const sub of urlSubreddits) {
-      if (!query.includes(`subreddit:${sub}`)) parts.push(`subreddit:${sub}`);
-    }
-    return parts.join(' ');
-  }, [query, urlHashtags, urlSubreddits, urlWallets]);
+  const {
+    query,
+    invId,
+    requestedScanId,
+    freshSearch,
+    urlSearchMode,
+    urlPlatforms,
+    urlTimeRange,
+    urlLimit,
+    urlUsernames,
+    urlHashtags,
+    urlWallets,
+    urlSubreddits,
+    enhancedQuery,
+  } = useResultsQueryParams(searchParams);
   const { state, dispatch, selectNarrative, selectActor, selectClaim, setCenterMode } =
     useInvestigation();
   const pipelineRan = useRef(false);
@@ -2117,6 +2062,17 @@ function InvestigationWorkspace() {
   // ---- Center panel content ----
   const renderCenterPanel = () => {
     switch (state.centerMode) {
+      case 'emergence':
+        return (
+          <NarrativeEmergence
+            narratives={state.narratives}
+            posts={state.posts}
+            timeRange={scanJob?.settings?.timeRange ?? urlTimeRange}
+            scanCreatedAt={scanJob?.createdAt ?? null}
+            selectedNarrativeId={state.selectedNarrativeId}
+            onSelectNarrative={selectNarrative}
+          />
+        );
       case 'temporal':
         return (
           <TemporalHeatmap

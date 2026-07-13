@@ -42,6 +42,7 @@ export type PipelineStage =
 export type StageStatus = 'idle' | 'running' | 'done' | 'error';
 
 export type CenterMode =
+  | 'emergence'
   | 'temporal'
   | 'actors'
   | 'claims'
