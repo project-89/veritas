@@ -64,7 +64,10 @@ function getErrorStatus(error: unknown): number | null {
   return typeof candidate.status === 'number' ? candidate.status : null;
 }
 
-const BSKY_PUBLIC_API = 'https://public.api.bsky.app/xrpc';
+// public.api.bsky.app now 403s on searchPosts; api.bsky.app serves the same
+// unauthenticated AppView endpoints (searchPosts/getProfile/getAuthorFeed) and
+// returns real data. Env-overridable in case the host changes again.
+const BSKY_PUBLIC_API = process.env['BSKY_APPVIEW_API'] ?? 'https://api.bsky.app/xrpc';
 
 /**
  * API-free Bluesky connector using the AT Protocol public API.

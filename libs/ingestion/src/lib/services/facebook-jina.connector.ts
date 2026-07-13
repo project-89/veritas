@@ -52,6 +52,18 @@ export class FacebookJinaConnector implements DataConnector, OnModuleInit, OnMod
     await this.disconnect();
   }
 
+  /**
+   * This connector monitors specific Facebook pages (there is no public search
+   * API); without FACEBOOK_PAGE_URLS it cannot fetch anything and would fail
+   * every scan. Report it missing so the registration gate auto-disables the
+   * connector rather than surfacing a per-scan error.
+   */
+  getMissingCredentials(): string[] {
+    const configured =
+      this.configService.get<string>('FACEBOOK_PAGE_URLS') || process.env['FACEBOOK_PAGE_URLS'];
+    return configured && configured.trim().length > 0 ? [] : ['FACEBOOK_PAGE_URLS'];
+  }
+
   async connect(): Promise<void> {
     const pageUrlsConfig = this.configService.get<string>('FACEBOOK_PAGE_URLS');
 
