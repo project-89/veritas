@@ -2525,7 +2525,14 @@ function InvestigationWorkspace() {
         {/* CENTER: Visualization + Mode Selector */}
         <div className="flex-1 flex flex-col overflow-hidden bg-nerv-bg-deep min-w-0">
           {/* Visualization area */}
-          <div className="flex-1 overflow-auto min-h-0">{renderCenterPanel()}</div>
+          <div className="flex-1 overflow-auto min-h-0">
+            {/* Per-panel boundary keyed by mode: a single broken visualization
+                degrades to a recoverable message instead of taking down the
+                whole workspace, and switching modes clears a prior error. */}
+            <NervErrorBoundary key={state.centerMode} label={`${state.centerMode} panel`}>
+              {renderCenterPanel()}
+            </NervErrorBoundary>
+          </div>
         </div>
 
         {/* RIGHT resize handle */}
