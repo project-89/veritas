@@ -15,6 +15,7 @@ import {
   type IdentityRecordLookup,
   SocialGraphEvidenceAdapter,
 } from './evidence-adapters/social-graph.evidence-adapter';
+import { WaybackEvidenceAdapter } from './evidence-adapters/wayback.evidence-adapter';
 import { PlatformCredibilityService } from './platform-credibility.service';
 import type { AnalysisMode, ExtractedClaim } from './propaganda.service';
 import {
@@ -252,6 +253,7 @@ export class ClaimVerificationService {
       new DexScreenerEvidenceAdapter(),
       new GitHubEvidenceAdapter(),
       new SecEdgarEvidenceAdapter(),
+      new WaybackEvidenceAdapter(),
     ];
 
     if (identityRepo) {
