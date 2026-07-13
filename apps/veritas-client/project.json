@@ -6,11 +6,12 @@
   "tags": [],
   "targets": {
     "build": {
-      "executor": "@nx/next:build",
-      "outputs": ["{options.outputPath}"],
-      "defaultConfiguration": "production",
+      "//": "Uses `next build --webpack` for the same reason as `serve`: Next 16 defaults to Turbopack, which refuses the private-plugins symlink (points outside the repo root) and the ESM plugin packages, failing to resolve @veritas/plugin-magi. NODE_ENV=production is forced because nx auto-loads the root .env (which pins NODE_ENV=development for dev); without this the production prerender of /_global-error fails with a non-standard NODE_ENV. Output stays in apps/veritas-client/.next (run with `next start`).",
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/.next"],
       "options": {
-        "outputPath": "dist/apps/veritas-client"
+        "command": "NODE_ENV=production npx next build --webpack",
+        "cwd": "apps/veritas-client"
       }
     },
     "serve": {
