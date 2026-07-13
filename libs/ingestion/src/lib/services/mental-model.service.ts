@@ -12,6 +12,31 @@ type SourceExcerpt = {
   excerpt: string;
 };
 
+/** First complete balanced JSON object in a string (tolerates trailing text). */
+function extractFirstJsonObject(text: string): string | null {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+    } else if (ch === '"') {
+      inString = true;
+    } else if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
 const JSON_SCHEMA = `{
   "domain": "short domain label",
   "theses": ["core thesis"],
@@ -30,7 +55,7 @@ const JSON_SCHEMA = `{
 export class MentalModelService {
   private readonly logger = new Logger(MentalModelService.name);
   private readonly genAI: GoogleGenerativeAI | null = null;
-  private readonly chatModel = process.env['GEMINI_CHAT_MODEL'] ?? 'gemini-3.1-flash-lite';
+  private readonly chatModel = process.env['GEMINI_CHAT_MODEL'] ?? 'gemini-3.5-flash';
 
   constructor(private readonly configService: ConfigService) {
     const geminiKey =
@@ -156,12 +181,14 @@ Rules:
       const model = this.genAI.getGenerativeModel({ model: this.chatModel });
       const result = await model.generateContent(prompt);
       const text = result.response.text();
-      const match = text.match(/\{[\s\S]*\}/);
-      if (!match) {
+      // Balanced-brace extraction — thinking models (gemini-3.x) may append
+      // reasoning after the JSON, which a greedy regex + JSON.parse chokes on.
+      const jsonStr = extractFirstJsonObject(text);
+      if (!jsonStr) {
         return null;
       }
 
-      const parsed = JSON.parse(match[0]) as Record<string, unknown>;
+      const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
       return {
         domain: this.asString(parsed['domain']) || this.inferDomain(investigation, evidenceDossier),
         theses: this.asStringArray(parsed['theses']).slice(0, 6),

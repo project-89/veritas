@@ -3,7 +3,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { BotScore } from './graph-bot-detection.service';
 import type { SourceCredibilityScore } from './source-credibility.service';
-import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
+import {
+  DETERMINISTIC_JSON_CONFIG,
+  extractFirstJsonObject,
+  geminiChatModel,
+} from './utils/llm-config';
 import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 // ---------------------------------------------------------------------------
@@ -405,9 +409,9 @@ Respond ONLY with a JSON object:
         contextKey: `investigation:${topic}`,
         generate: () => model.generateContent(prompt).then((r) => r.response.text()),
       });
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const jsonMatch = extractFirstJsonObject(text);
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]) as Partial<UserProfile>;
+        const parsed = JSON.parse(jsonMatch) as Partial<UserProfile>;
         return {
           summary: parsed.summary ?? fallback.summary,
           topics: parsed.topics ?? [],
@@ -649,9 +653,9 @@ Respond ONLY with JSON:
         contextKey: `investigation:${topic}`,
         generate: () => model.generateContent(prompt).then((r) => r.response.text()),
       });
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const jsonMatch = extractFirstJsonObject(text);
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]) as DeepInvestigationResult['cuiBono'];
+        const parsed = JSON.parse(jsonMatch) as DeepInvestigationResult['cuiBono'];
         return {
           beneficiaries: parsed.beneficiaries ?? [],
           agendas: parsed.agendas ?? [],

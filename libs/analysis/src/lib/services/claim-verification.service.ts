@@ -17,7 +17,11 @@ import {
 } from './evidence-adapters/social-graph.evidence-adapter';
 import { PlatformCredibilityService } from './platform-credibility.service';
 import type { AnalysisMode, ExtractedClaim } from './propaganda.service';
-import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
+import {
+  DETERMINISTIC_JSON_CONFIG,
+  extractFirstJsonObject,
+  geminiChatModel,
+} from './utils/llm-config';
 import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 // ---------------------------------------------------------------------------
@@ -340,10 +344,7 @@ export class ClaimVerificationService {
   // Single claim verification
   // ---------------------------------------------------------------------------
 
-  async verifySingleClaim(
-    claim: ExtractedClaim,
-    contextKey?: string,
-  ): Promise<VerificationResult> {
+  async verifySingleClaim(claim: ExtractedClaim, contextKey?: string): Promise<VerificationResult> {
     const sourcesChecked: string[] = [];
 
     // Search for evidence from multiple free sources
@@ -650,14 +651,17 @@ Rules:
     sourcesChecked: string[],
     sentSnippets: string[],
   ): VerificationResult {
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    // Extract the first balanced JSON object. A greedy /\{[\s\S]*\}/ breaks on
+    // "thinking" models (e.g. gemini-3.x) that append reasoning or a second
+    // block after the JSON — JSON.parse then fails on trailing content.
+    const jsonStr = extractFirstJsonObject(responseText);
+    if (!jsonStr) {
       this.logger.warn('Could not extract JSON from LLM verification response');
       return this.unverifiedResult(claimText, sourcesChecked);
     }
 
     try {
-      const raw = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+      const raw = JSON.parse(jsonStr) as Record<string, unknown>;
       return this.validateLlmResult(claimText, raw, sourcesChecked, sentSnippets);
     } catch (err) {
       this.logger.warn(`Failed to parse LLM verification JSON: ${err}`);

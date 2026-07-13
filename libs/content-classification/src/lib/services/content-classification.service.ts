@@ -105,7 +105,7 @@ export class ContentClassificationService {
     if (geminiKey) {
       try {
         const genAI = new GoogleGenerativeAI(geminiKey);
-        const model = process.env['GEMINI_CHAT_MODEL'] ?? 'gemini-3.1-flash-lite';
+        const model = process.env['GEMINI_CHAT_MODEL'] ?? 'gemini-3.5-flash';
         this.geminiModel = genAI.getGenerativeModel({ model });
         this.logger.log(`Gemini sentiment analysis enabled (${model})`);
       } catch (err) {

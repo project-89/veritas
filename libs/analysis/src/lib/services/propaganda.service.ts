@@ -3,7 +3,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { RawPost } from './deviation.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
-import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
+import {
+  DETERMINISTIC_JSON_CONFIG,
+  extractFirstJsonObject,
+  geminiChatModel,
+} from './utils/llm-config';
 import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 // ---------------------------------------------------------------------------
@@ -523,15 +527,16 @@ Rules for the JSON:
   // ---------------------------------------------------------------------------
 
   private parseResponse(text: string, sampledPosts: SampledPost[]): PropagandaAnalysisResult {
-    // Try to extract JSON from response (may have markdown fences)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    // Balanced-brace extraction — resilient to thinking models that append
+    // reasoning/trailing content after the JSON.
+    const jsonStr = extractFirstJsonObject(text);
+    if (!jsonStr) {
       this.logger.warn('Could not extract JSON from LLM response');
       return this.emptyResult('unavailable', 'LLM returned an unparseable response.');
     }
 
     try {
-      const raw = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+      const raw = JSON.parse(jsonStr) as Record<string, unknown>;
       return this.validateAndNormalize(raw, sampledPosts);
     } catch (err) {
       this.logger.warn(`Failed to parse propaganda analysis JSON: ${err}`);
