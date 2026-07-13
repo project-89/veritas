@@ -1,0 +1,33 @@
+{
+  "name": "veritas-mcp",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/veritas-mcp/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "NODE_PATH=\"$PWD/node_modules\" node -r @swc-node/register -r tsconfig-paths/register apps/veritas-mcp/src/main.ts",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "build": {
+      "executor": "@nx/webpack:webpack",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "target": "node",
+        "compiler": "tsc",
+        "outputPath": "dist/apps/veritas-mcp",
+        "main": "apps/veritas-mcp/src/main.ts",
+        "tsConfig": "apps/veritas-mcp/tsconfig.app.json",
+        "generatePackageJson": true
+      },
+      "configurations": {
+        "development": {},
+        "production": {}
+      }
+    }
+  }
+}

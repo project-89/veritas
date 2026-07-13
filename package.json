@@ -105,6 +105,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@haruhunab1320/twitter-scraper": "file:../../twitter-scraper",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.1.19",
     "@nestjs/config": "^4.0.4",
