@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NarrativeAnalysisController } from '../../src/lib/controllers/narrative-analysis.controller';
 import { ClaimVerificationService } from '../../src/lib/services/claim-verification.service';
 import { ComparisonService } from '../../src/lib/services/comparison.service';
+import { CoverageProbeService } from '../../src/lib/services/coverage-probe.service';
 import { DeviationService } from '../../src/lib/services/deviation.service';
 import { DownstreamEffectsService } from '../../src/lib/services/downstream-effects.service';
 import { EntityAnalysisService } from '../../src/lib/services/entity-analysis.service';
@@ -169,6 +170,17 @@ describe('NarrativeAnalysisController', () => {
               evidenceBalance: { supporting: 0, contradicting: 0, neutral: 0 },
               investigativeLeads: [],
               summary: '',
+            }),
+          },
+        },
+        {
+          provide: CoverageProbeService,
+          useValue: {
+            probe: jest.fn().mockResolvedValue({
+              probed: false,
+              source: 'gdelt-timelinevol',
+              timeline: [],
+              totalVolume: 0,
             }),
           },
         },

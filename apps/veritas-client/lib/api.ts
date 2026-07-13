@@ -1176,6 +1176,31 @@ export interface TimePeriodComparison {
   volumeChange: number;
 }
 
+// ---------------------------------------------------------------------------
+// Coverage probe — "when was this topic actually active?" (adaptive window)
+// ---------------------------------------------------------------------------
+
+export interface CoverageReport {
+  probed: boolean;
+  reason?: string;
+  source: 'gdelt-timelinevol';
+  timeline: Array<{ date: string; value: number }>;
+  peak?: { date: string; value: number };
+  suggestedWindow?: { start: string; end: string; label: string };
+  totalVolume: number;
+}
+
+/**
+ * Ask when a topic was actually active over time. Used when a scan's window is
+ * sparse — the report's suggestedWindow drives the "expand to that period" offer.
+ */
+export async function probeCoverage(query: string, timespan?: string): Promise<CoverageReport> {
+  return request<CoverageReport>('/api/narratives/coverage-probe', {
+    method: 'POST',
+    body: JSON.stringify({ query, timespan }),
+  });
+}
+
 export interface PlatformComparison {
   platforms: string[];
   perPlatform: Array<{

@@ -42,6 +42,7 @@ import {
   buildMentalModel,
   buildProjectDossier,
   type ClaimVerificationBatchResult,
+  type CoverageReport,
   cancelAnalysisJob,
   cancelScan,
   compareNarratives,
@@ -78,6 +79,7 @@ import {
   type ProjectDossier,
   type ProjectDossierOverlap,
   type PropagandaAnalysisResult,
+  probeCoverage,
   type RawPost,
   retryScanConnector,
   runIntelligenceAssessment,
@@ -349,6 +351,8 @@ function InvestigationWorkspace() {
     embeddingSource?: 'gemini' | 'hash-fallback' | 'mixed';
     summarySource?: 'llm' | 'first-post' | 'mixed';
   } | null>(null);
+  const [coverageReport, setCoverageReport] = useState<CoverageReport | null>(null);
+  const probedQueryRef = useRef<string | null>(null);
   const scanPostsFetchedRef = useRef(false);
   const mergeUniqueByKey = useCallback(<T,>(items: T[], keyFn: (item: T) => string): T[] => {
     const seen = new Set<string>();
@@ -645,6 +649,38 @@ function InvestigationWorkspace() {
       handleBuildGenealogy();
     }
   }, [state.centerMode, state.narratives.length, handleBuildGenealogy]);
+
+  // Adaptive window: when a completed scan's window is SPARSE, probe when the
+  // topic was actually active and offer to expand. Probe once per query.
+  useEffect(() => {
+    const sparse = state.posts.length > 0 && state.posts.length < 8;
+    const analyzeDone = state.pipeline.analyze === 'done';
+    if (!query || !analyzeDone || !sparse) return;
+    if (probedQueryRef.current === query) return;
+    probedQueryRef.current = query;
+    probeCoverage(query)
+      .then(setCoverageReport)
+      .catch(() => setCoverageReport(null));
+  }, [query, state.posts.length, state.pipeline.analyze]);
+
+  // Launch a fresh scan over the coverage-suggested (historical) window.
+  const handleExpandWindow = useCallback(
+    async (start: string, end: string) => {
+      const range = `${start.slice(0, 10)}_${end.slice(0, 10)}`;
+      const params = new URLSearchParams({ q: query, mode: 'topic', timeRange: range, fresh: '1' });
+      try {
+        const inv = await createOrGetInvestigation(query, {
+          timeRange: range,
+          searchMode: 'topic',
+        });
+        const id = inv._id ?? inv.id;
+        router.push(id ? `/investigate/${id}?${params}` : `/results?${params}`);
+      } catch {
+        router.push(`/results?${params}`);
+      }
+    },
+    [query, router],
+  );
 
   // Load scan history for the current investigation when available.
   useEffect(() => {
@@ -2250,6 +2286,30 @@ function InvestigationWorkspace() {
             treat groupings as approximate.
           </div>
         )}
+      {/* Adaptive-window prompt: the selected window is sparse but the topic was
+          active elsewhere. Offer to expand rather than silently show nothing. */}
+      {coverageReport?.probed && coverageReport.suggestedWindow && state.posts.length < 8 && (
+        <div className="shrink-0 px-4 py-1.5 bg-nerv-blue/10 border-b border-nerv-blue/40 text-[11px] font-mono text-nerv-text-secondary flex items-center gap-3 flex-wrap">
+          <span className="text-nerv-blue uppercase tracking-wider">↔ Sparse window</span>
+          <span>
+            Little activity in your window, but this topic peaked{' '}
+            <span className="text-nerv-text">{coverageReport.suggestedWindow.label}</span>
+            {coverageReport.peak ? ` (${coverageReport.peak.value} articles)` : ''}.
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              handleExpandWindow(
+                coverageReport.suggestedWindow!.start,
+                coverageReport.suggestedWindow!.end,
+              )
+            }
+            className="px-2 py-0.5 border border-nerv-blue/60 text-nerv-blue hover:bg-nerv-blue/15 rounded-sm uppercase tracking-wider"
+          >
+            Scan that period
+          </button>
+        </div>
+      )}
       {/* Top bar: compact header + grouped tabs */}
       <div className="shrink-0 border-b border-nerv-border bg-nerv-bg">
         {/* Row 1: query + status badges + refresh — single compact line */}

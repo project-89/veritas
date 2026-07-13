@@ -7,6 +7,7 @@ import { AnalysisService } from './services/analysis.service';
 import { CausalReasoningService } from './services/causal-reasoning.service';
 import { ClaimVerificationService } from './services/claim-verification.service';
 import { ComparisonService } from './services/comparison.service';
+import { CoverageProbeService } from './services/coverage-probe.service';
 import { CrossPlatformIdentityService } from './services/cross-platform-identity.service';
 import { DeepInvestigationService } from './services/deep-investigation.service';
 import { DeviationService } from './services/deviation.service';
@@ -52,6 +53,7 @@ import { SourceCredibilityService } from './services/source-credibility.service'
     ReportService,
     PropagandaAnalysisService,
     ComparisonService,
+    CoverageProbeService,
     EntityAnalysisService,
     NarrativeGenealogyService,
     DownstreamEffectsService,
@@ -86,6 +88,7 @@ import { SourceCredibilityService } from './services/source-credibility.service'
     ReportService,
     PropagandaAnalysisService,
     ComparisonService,
+    CoverageProbeService,
     EntityAnalysisService,
     NarrativeGenealogyService,
     DownstreamEffectsService,

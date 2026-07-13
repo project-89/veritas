@@ -7,6 +7,7 @@ import type {
   TimePeriodComparison,
 } from '../services/comparison.service';
 import { ComparisonService } from '../services/comparison.service';
+import { CoverageProbeService, type CoverageReport } from '../services/coverage-probe.service';
 import type {
   DeepInvestigationResult,
   UserInvestigationResult,
@@ -269,7 +270,29 @@ export class NarrativeAnalysisController {
     private readonly downstreamEffectsService: DownstreamEffectsService,
     private readonly claimVerificationService: ClaimVerificationService,
     private readonly intelligenceEngineService: IntelligenceEngineService,
+    private readonly coverageProbeService: CoverageProbeService,
   ) {}
+
+  /**
+   * Probe when a topic was actually active over time (GDELT volume histogram).
+   * Powers the adaptive-window UX: when a scan's window is sparse, the client
+   * calls this to learn where the story lives and offer to expand the window.
+   */
+  @Post('coverage-probe')
+  async coverageProbe(@Body() body: { query: string; timespan?: string }): Promise<CoverageReport> {
+    const query = (body.query ?? '').trim();
+    if (!query) {
+      return {
+        probed: false,
+        reason: 'empty query',
+        source: 'gdelt-timelinevol',
+        timeline: [],
+        totalVolume: 0,
+      };
+    }
+    this.logger.log(`Coverage probe: "${query}"`);
+    return this.coverageProbeService.probe(query, body.timespan);
+  }
 
   /**
    * Analyze an array of posts: embed, cluster, summarize, score velocity.
