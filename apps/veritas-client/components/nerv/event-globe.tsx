@@ -206,12 +206,15 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
       // Controls
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
+      // Higher damping factor = the camera settles faster after a zoom/drag, so
+      // the projected label anchors catch up quickly instead of drifting for a
+      // second or two while a very low factor eases in.
+      controls.dampingFactor = 0.14;
       controls.enablePan = false;
       controls.minDistance = 150;
       controls.maxDistance = 600;
       controls.rotateSpeed = 0.5;
-      controls.zoomSpeed = 0.8;
+      controls.zoomSpeed = 1.1;
       const markInteraction = () => {
         lastInteractionAtRef.current = performance.now();
       };
