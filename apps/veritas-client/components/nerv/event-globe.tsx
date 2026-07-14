@@ -7,6 +7,8 @@ import { EVENT_COLORS } from '../../lib/global-event.types';
 export interface EventGlobeProps {
   events: GlobalEvent[];
   onEventClick?: (event: GlobalEvent) => void;
+  /** When set (a fresh object), the globe rotates to bring this point to front. */
+  focusLocation?: { lat: number; lng: number } | null;
 }
 
 const SEVERITY_SIZE: Record<string, number> = { critical: 1.5, high: 1.0, medium: 0.7, low: 0.4 };
@@ -60,7 +62,7 @@ interface GlobePointData {
   title: string;
 }
 
-export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
+export function EventGlobe({ events, onEventClick, focusLocation }: EventGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
@@ -716,6 +718,22 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
     if (!globe || !loaded) return;
     globe.pointsData(pointsRef.current);
   }, [loaded]);
+
+  // Fly-to: rotate the globe to bring a searched location to the front, then
+  // hand control back to auto-rotate after a pause.
+  useEffect(() => {
+    if (!focusLocation || !loaded) return;
+    autoRotate.current = false;
+    targetRotationX.current = focusLocation.lat * (Math.PI / 180);
+    targetRotationY.current = -focusLocation.lng * (Math.PI / 180);
+    if (resumeAutoRotateTimeoutRef.current !== null) {
+      window.clearTimeout(resumeAutoRotateTimeoutRef.current);
+    }
+    resumeAutoRotateTimeoutRef.current = window.setTimeout(() => {
+      autoRotate.current = true;
+      resumeAutoRotateTimeoutRef.current = null;
+    }, 12000);
+  }, [focusLocation, loaded]);
 
   return (
     <div className="relative w-full h-full min-h-[400px]">
