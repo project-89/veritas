@@ -20,7 +20,8 @@ const LABEL_SPACING = 8;
 const SIDE_WIDTH = 340;
 const SIDE_MARGIN = 10;
 const LABEL_TOP_MARGIN = 52;
-const MAX_LABELS = 14;
+const LABEL_MIN = 8; // labels shown when fully zoomed out (clusters carry the rest)
+const LABEL_ZOOM_SPAN = 16; // additional labels earned as you zoom all the way in
 const LABEL_ANCHOR_ALTITUDE = 0.007;
 // A label only shows while its location is on the hemisphere facing the
 // viewer: it appears once the pin is well onto the near face and leaves before
@@ -443,6 +444,12 @@ export function EventGlobe({ events, onEventClick, focusLocation }: EventGlobePr
                 (LABEL_HEIGHT + LABEL_SPACING),
             ),
           );
+          // Adaptive label density: show more labels the closer you zoom in
+          // (fewer events in view, more room, and clusters carry the rest), fewer
+          // when zoomed out where the density badges do the summarising.
+          const camDist = camera.position.length();
+          const zoomT = Math.max(0, Math.min(1, (600 - camDist) / (600 - 150)));
+          const maxLabels = Math.min(maxSlots * 2, Math.round(LABEL_MIN + zoomT * LABEL_ZOOM_SPAN));
 
           // 1) Project every point; collect those currently in view (front-facing
           //    + on-screen), with hysteresis so pins near the horizon don't strobe.
@@ -586,12 +593,12 @@ export function EventGlobe({ events, onEventClick, focusLocation }: EventGlobePr
           }
 
           // 4) Admit newly-visible events into free slots, most severe first.
-          if (activeLabelsRef.current.size < MAX_LABELS) {
+          if (activeLabelsRef.current.size < maxLabels) {
             const candidates = [...inView.entries()]
               .filter(([eventId]) => !activeLabelsRef.current.has(eventId))
               .sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]));
             for (const [eventId, seen] of candidates) {
-              if (activeLabelsRef.current.size >= MAX_LABELS) break;
+              if (activeLabelsRef.current.size >= maxLabels) break;
               const preferred: LabelSide = seen.sx < centerX ? 'left' : 'right';
               const claimed = claimSlot(preferred, maxSlots);
               if (!claimed) continue;
