@@ -10,7 +10,6 @@ import {
   DeepInvestigationService,
   DownstreamEffectsService,
   GLOBAL_EVENT_REPOSITORY,
-  GLOBAL_EVENT_RSS_FEEDS,
   GraphBotDetectionService,
   PropagandaAnalysisService,
   SIGNAL_CACHE_STORE,
@@ -107,7 +106,10 @@ import { SchedulerService } from './services/scheduler.service';
     IngestionModule.forRoot({
       repositoryType: 'mongodb',
     }),
-    AnalysisModule,
+    // Pass the RSS feed catalog into AnalysisModule's own scope so the
+    // aggregation service actually receives it (a plain AppModule provider is
+    // invisible to the child module and silently defaults to []).
+    AnalysisModule.forRoot({ rssFeeds: getAllFeeds() }),
     ContentClassificationModule.forRoot(),
   ],
   providers: [
@@ -128,7 +130,6 @@ import { SchedulerService } from './services/scheduler.service';
     // Bridge ingestion repositories to analysis tokens
     { provide: SIGNAL_CACHE_STORE, useExisting: SignalCacheRepository },
     { provide: GLOBAL_EVENT_REPOSITORY, useExisting: GlobalEventRepository },
-    { provide: GLOBAL_EVENT_RSS_FEEDS, useValue: getAllFeeds() },
     // Bridge analysis services to ingestion's AnalysisProcessor tokens
     { provide: PROPAGANDA_SERVICE, useExisting: PropagandaAnalysisService },
     { provide: CLAIM_VERIFICATION_SERVICE, useExisting: ClaimVerificationService },

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { type DynamicModule, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AnalysisController } from './analysis.controller';
 import { NarrativeAnalysisController } from './controllers/narrative-analysis.controller';
@@ -18,7 +18,11 @@ import {
 import { MongoEmbeddingCacheStore } from './services/embedding-cache.store';
 import { EntityAnalysisService } from './services/entity-analysis.service';
 import { NarrativeGenealogyService } from './services/genealogy.service';
-import { GlobalEventAggregationService } from './services/global-event-aggregation.service';
+import {
+  GLOBAL_EVENT_RSS_FEEDS,
+  GlobalEventAggregationService,
+  type RssFeedEntry,
+} from './services/global-event-aggregation.service';
 import { GraphBotDetectionService } from './services/graph-bot-detection.service';
 import { GraphDatabaseService } from './services/graph-database.service';
 import { IntelligenceEngineService } from './services/intelligence-engine.service';
@@ -104,4 +108,19 @@ import { SourceCredibilityService } from './services/source-credibility.service'
     IntelligenceEngineService,
   ],
 })
-export class AnalysisModule {}
+export class AnalysisModule {
+  /**
+   * Supplies the world-map RSS feed catalog to the aggregation service. The
+   * catalog lives in @veritas/ingestion, which already depends on
+   * @veritas/analysis — importing it here would be circular, so the app (which
+   * imports both) passes it in. Without this the service's @Optional() feed
+   * injection silently defaults to [] and no RSS events are ever produced.
+   */
+  static forRoot(options: { rssFeeds?: RssFeedEntry[] } = {}): DynamicModule {
+    return {
+      module: AnalysisModule,
+      providers: [{ provide: GLOBAL_EVENT_RSS_FEEDS, useValue: options.rssFeeds ?? [] }],
+      exports: [GLOBAL_EVENT_RSS_FEEDS],
+    };
+  }
+}
