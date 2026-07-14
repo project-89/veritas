@@ -24,6 +24,7 @@ import {
   renameInvestigation,
   type Snapshot,
 } from '../../lib/api';
+import { ResizeHandle } from '../../components/nerv/resize-handle';
 import { hasPluginCapability, usePluginManifest } from '../../lib/plugins';
 
 // ---------------------------------------------------------------------------
@@ -63,6 +64,8 @@ export default function MonitorPage() {
   const [menuOpenInvId, setMenuOpenInvId] = useState<string | null>(null);
   const [preview, setPreview] = useState<InvestigationPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(260);
+  const [rightWidth, setRightWidth] = useState(320);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [alertFilter, setAlertFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
@@ -246,7 +249,10 @@ export default function MonitorPage() {
       {/* Main 3-column layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Investigation list */}
-        <div className="w-[260px] shrink-0 border-r border-nerv-border overflow-y-auto">
+        <div
+          className="shrink-0 border-r border-nerv-border overflow-y-auto"
+          style={{ width: leftWidth }}
+        >
           <div className="p-2">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
@@ -327,8 +333,13 @@ export default function MonitorPage() {
           </div>
         </div>
 
+        <ResizeHandle
+          ariaLabel="Resize investigation list"
+          onDrag={(dx) => setLeftWidth((w) => Math.max(200, Math.min(480, w + dx)))}
+        />
+
         {/* Center: Overview / Investigation Preview */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 min-w-0">
           {!selectedInvId ? (
             /* Aggregate overview */
             <div className="space-y-4">
@@ -530,7 +541,15 @@ export default function MonitorPage() {
         </div>
 
         {/* Right: Alert feed */}
-        <div className="w-[320px] shrink-0 border-l border-nerv-border overflow-y-auto">
+        <ResizeHandle
+          ariaLabel="Resize detail panel"
+          onDrag={(dx) => setRightWidth((w) => Math.max(240, Math.min(560, w - dx)))}
+        />
+
+        <div
+          className="shrink-0 border-l border-nerv-border overflow-y-auto"
+          style={{ width: rightWidth }}
+        >
           <div className="p-2">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted">
