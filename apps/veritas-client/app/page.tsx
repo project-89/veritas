@@ -108,7 +108,7 @@ export default function CommandHome() {
   );
 
   return (
-    <div className="min-h-[calc(100vh-49px)] lg:h-[calc(100vh-49px)] lg:overflow-hidden bg-nerv-bg-deep text-nerv-text px-4 py-4 sm:px-6 lg:px-8 flex flex-col">
+    <div className="min-h-[calc(100vh-49px)] lg:h-[calc(100vh-49px)] lg:overflow-hidden bg-nerv-bg-deep text-nerv-text px-4 pt-4 pb-8 sm:px-6 lg:px-8 flex flex-col">
       <div className="mx-auto max-w-[1400px] w-full flex flex-col lg:flex-1 lg:min-h-0">
         {/* Command bar */}
         <header className="mb-4 shrink-0">
