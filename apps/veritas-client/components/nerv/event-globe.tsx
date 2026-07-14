@@ -20,14 +20,15 @@ const SIDE_MARGIN = 10;
 const LABEL_TOP_MARGIN = 52;
 const MAX_LABELS = 14;
 const LABEL_ANCHOR_ALTITUDE = 0.007;
-// A label appears once its pin is comfortably front-facing, and only leaves
-// once the pin is clearly rotating away — the gap is hysteresis so a pin
-// hovering near the horizon doesn't strobe.
-const LABEL_ENTER_DOT = 0.08;
-const LABEL_EXIT_DOT = -0.04;
+// A label only shows while its location is on the hemisphere facing the
+// viewer: it appears once the pin is well onto the near face and leaves before
+// it reaches the limb. Both thresholds stay positive (front-facing only); the
+// gap between them is hysteresis so a pin near the edge doesn't strobe.
+const LABEL_ENTER_DOT = 0.26;
+const LABEL_EXIT_DOT = 0.12;
 const LABEL_OFFSCREEN_MARGIN = 40;
 const LABEL_FADE_MS = 520; // fade in / fade out duration (kept in sync with CSS)
-const LEADER_CURVE_MAX = 130; // max horizontal pull on the leader-line control points
+const LEADER_STUB_MIN = 16; // min horizontal run off the label / into the pin
 
 type LabelOverlayNode = {
   wrapper: HTMLDivElement;
@@ -493,19 +494,23 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
             node.inner.style.borderLeft = isLeft ? 'none' : `2px solid ${label.color}`;
             node.inner.style.borderRight = isLeft ? `2px solid ${label.color}` : 'none';
 
-            // Leader curve leaves the label horizontally and eases into the pin.
+            // 3-segment leader with angled symmetry: a horizontal stub off the
+            // label, a diagonal, then a horizontal stub into the pin. Equal
+            // stubs on both ends make it exactly 45° when there's room and keep
+            // it symmetric otherwise.
             const labelConnectX = isLeft ? slotX + SIDE_WIDTH : slotX;
             const labelMidY = slotY + LABEL_HEIGHT / 2;
-            const dir = label.sx >= labelConnectX ? 1 : -1;
-            const reach = Math.min(
-              LEADER_CURVE_MAX,
-              Math.abs(label.sx - labelConnectX) * 0.45,
-            );
-            const c1x = labelConnectX + dir * reach;
-            const c2x = label.sx - dir * reach;
+            const dirX = label.sx >= labelConnectX ? 1 : -1;
+            const adx = Math.abs(label.sx - labelConnectX);
+            const ady = Math.abs(label.sy - labelMidY);
+            let stub = (adx - ady) / 2;
+            if (stub < LEADER_STUB_MIN) stub = LEADER_STUB_MIN;
+            stub = Math.min(stub, adx / 2);
+            const kneeAX = labelConnectX + dirX * stub;
+            const kneeBX = label.sx - dirX * stub;
             node.path.setAttribute(
               'd',
-              `M${labelConnectX},${labelMidY} C${c1x},${labelMidY} ${c2x},${label.sy} ${label.sx},${label.sy}`,
+              `M${labelConnectX},${labelMidY} L${kneeAX},${labelMidY} L${kneeBX},${label.sy} L${label.sx},${label.sy}`,
             );
             node.path.setAttribute('stroke', label.color);
             node.dot.setAttribute('cx', `${label.sx}`);
