@@ -90,6 +90,12 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
     if (!Number.isFinite(ev.location?.lat) || !Number.isFinite(ev.location?.lng)) {
       return [];
     }
+    // The globe only plots events whose location actually means something. Skip
+    // global-scope events (e.g. crypto markets) that carry a placeholder
+    // "Global" location at (20, 0) — they'd just pile up in one meaningless spot.
+    if (ev.location.region === 'global' || ev.location.label === 'Global') {
+      return [];
+    }
 
     return [
       {
