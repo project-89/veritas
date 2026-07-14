@@ -395,6 +395,10 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
             string,
             { sx: number; sy: number; color: string; title: string; size: number }
           >();
+          // Project against a freshly-inverted camera matrix so zoom (dolly) and
+          // resize are reflected the same frame they happen — otherwise the pins
+          // can lag the globe when the camera distance changes.
+          camera.updateMatrixWorld();
           const globeCenter = new THREE.Vector3();
           globe.getWorldPosition(globeCenter);
           for (const pt of pointsRef.current) {
