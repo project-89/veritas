@@ -3,11 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { fetchUnreadAlertCount } from '../../lib/api';
 import { getTopNavItemsFromPlugins, usePluginManifest } from '../../lib/plugins';
 import { prefetchRecentEvents } from '../../lib/use-event-stream';
-import { NervBadge } from './nerv-badge';
 import { NervStatus } from './nerv-status';
+import { NotificationBell } from './notification-bell';
 
 const DEFAULT_NAV_LINKS: ReadonlyArray<{ href: string; label: string }> = [
   { href: '/', label: 'Command' },
@@ -57,7 +56,6 @@ function useTheme() {
 
 export function NervNav() {
   const pathname = usePathname();
-  const [unreadCount, setUnreadCount] = useState(0);
   const { theme, toggle: toggleTheme } = useTheme();
   const { plugins } = usePluginManifest();
 
@@ -67,23 +65,6 @@ export function NervNav() {
       label: item.label,
     })) || DEFAULT_NAV_LINKS;
   const resolvedNavLinks = navLinks.length > 0 ? navLinks : DEFAULT_NAV_LINKS;
-
-  useEffect(() => {
-    let mounted = true;
-    const poll = () => {
-      fetchUnreadAlertCount()
-        .then((count) => {
-          if (mounted) setUnreadCount(count);
-        })
-        .catch(() => undefined);
-    };
-    poll();
-    const interval = setInterval(poll, 60_000);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,24 +144,15 @@ export function NervNav() {
                     ].join(' ')}
                   >
                     {link.label}
-                    {link.href === '/monitor' && unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1">
-                        <NervBadge
-                          label={unreadCount > 99 ? '99+' : String(unreadCount)}
-                          variant="red"
-                          size="sm"
-                          pulse
-                        />
-                      </span>
-                    )}
                   </Link>
                 );
               })
             : null}
         </div>
 
-        {/* Right: Theme toggle + System status + time */}
+        {/* Right: Alerts + Theme toggle + System status + time */}
         <div className="flex items-center gap-3 shrink-0">
+          <NotificationBell />
           <button
             type="button"
             onClick={toggleTheme}

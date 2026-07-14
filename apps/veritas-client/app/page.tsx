@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NervBadge, NervMetric, NervPanel } from '../components/nerv';
 import {
-  type Alert,
   createOrGetInvestigation,
-  fetchAlerts,
   fetchInvestigations,
   fetchUnreadAlertCount,
   getRecentScans,
@@ -48,7 +46,6 @@ const SEVERITY_VARIANT: Record<string, 'red' | 'amber' | 'blue' | 'muted'> = {
 export default function CommandHome() {
   const router = useRouter();
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [recentScans, setRecentScans] = useState<ScanJob[]>([]);
   const [events, setEvents] = useState<GlobalEvent[]>([]);
@@ -60,14 +57,12 @@ export default function CommandHome() {
     let cancelled = false;
     Promise.all([
       fetchInvestigations().catch(() => [] as Investigation[]),
-      fetchAlerts().catch(() => [] as Alert[]),
       fetchUnreadAlertCount().catch(() => 0),
       getRecentScans(8).catch(() => [] as ScanJob[]),
       prefetchRecentEvents().catch(() => [] as GlobalEvent[]),
-    ]).then(([invs, alts, count, scans, evts]) => {
+    ]).then(([invs, count, scans, evts]) => {
       if (cancelled) return;
       setInvestigations(invs);
-      setAlerts(alts);
       setUnreadCount(count as number);
       setRecentScans(scans);
       setEvents(evts);
@@ -98,7 +93,6 @@ export default function CommandHome() {
     () => recentScans.filter((s) => s.status === 'running' || s.status === 'pending'),
     [recentScans],
   );
-  const unreadAlerts = useMemo(() => alerts.filter((a) => !a.read).slice(0, 6), [alerts]);
   const recentInvestigations = useMemo(
     () =>
       [...investigations]
@@ -190,14 +184,12 @@ export default function CommandHome() {
         {/* Content region — fills the remaining viewport; sections scroll
             internally instead of pushing the page past the fold. */}
         <div className="flex flex-col gap-4 lg:flex-1 lg:min-h-0">
-        {/* Main grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:flex-[3] lg:min-h-0">
-          {/* Active + recent operations */}
-          <NervPanel
-            title="OPERATIONS"
-            subtitle="active & recent investigations"
-            accent="orange"
-            className="lg:col-span-2 p-3 lg:min-h-0"
+        {/* Active + recent operations (full width; alerts moved to the top-bar bell) */}
+        <NervPanel
+          title="OPERATIONS"
+          subtitle="active & recent investigations"
+          accent="orange"
+          className="p-3 lg:flex-[3] lg:min-h-0"
             headerRight={
               <Link
                 href="/monitor"
@@ -244,60 +236,7 @@ export default function CommandHome() {
                 })}
               </ul>
             )}
-          </NervPanel>
-
-          {/* Alerts */}
-          <NervPanel
-            title="ALERTS"
-            subtitle={unreadCount ? `${unreadCount} unread` : 'all clear'}
-            accent={unreadCount ? 'red' : 'green'}
-            status={unreadCount ? 'warning' : 'online'}
-            className="p-3 lg:min-h-0"
-            headerRight={
-              <Link
-                href="/monitor"
-                className="text-[11px] font-mono text-nerv-blue hover:text-nerv-orange"
-              >
-                all ▸
-              </Link>
-            }
-          >
-            {loading ? (
-              <p className="text-[12px] font-mono text-nerv-text-muted py-6 text-center">
-                loading…
-              </p>
-            ) : unreadAlerts.length === 0 ? (
-              <p className="text-[12px] font-mono text-nerv-text-muted py-6 text-center">
-                No unread alerts.
-              </p>
-            ) : (
-              <ul className="space-y-2 overflow-y-auto pr-1 max-h-[42vh] lg:max-h-none lg:h-full">
-                {unreadAlerts.map((a) => (
-                  <li key={a._id}>
-                    <Link
-                      href={`/investigate/${a.investigationId}`}
-                      className="block border-l-2 border-nerv-border pl-2 py-1 hover:border-nerv-orange hover:bg-nerv-bg-elevated/60 transition-colors"
-                    >
-                      <span className="flex items-center gap-2">
-                        <NervBadge
-                          label={a.severity.toUpperCase()}
-                          variant={SEVERITY_VARIANT[a.severity] ?? 'muted'}
-                          size="sm"
-                        />
-                        <span className="text-[11px] font-mono text-nerv-text-muted">
-                          {timeAgo(a.createdAt)}
-                        </span>
-                      </span>
-                      <span className="block mt-0.5 text-[12px] font-mono text-nerv-text leading-snug">
-                        {a.title}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </NervPanel>
-        </div>
+        </NervPanel>
 
         {/* Global feed */}
         <NervPanel
