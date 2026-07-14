@@ -10,7 +10,7 @@ import { ModuleRef } from '@nestjs/core';
 import { Observable, Subject } from 'rxjs';
 import type { EventCategory, EventSeverity, GeoLocation, GlobalEvent } from '../types/global-event';
 import { REGION_CENTROIDS, resolveCountryCode } from '../utils/geocoding';
-import { contentTokens, locationAnchor, overlapCoefficient } from './utils/dedupe-global-events';
+import { contentTokens, overlapCoefficient, sameLocation } from './utils/dedupe-global-events';
 import { AcledAdapter } from './signal-adapters/acled.adapter';
 import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
 import { GdacsAdapter } from './signal-adapters/gdacs.adapter';
@@ -46,6 +46,7 @@ const COINGECKO_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const GDACS_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const RELIEFWEB_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes
 const RSS_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+const RSS_MAX_AGE_MS = 24 * 60 * 60 * 1000; // keep feed items from the last 24h
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const DEFAULT_EVENT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const CONTENT_DEDUP_WINDOW_MS = 12 * 60 * 60 * 1000; // 12h: same happening reported across sources
@@ -95,7 +96,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   // suppressed instead of stacking up in the feed.
   private readonly recentSignatures: Array<{
     tokens: Set<string>;
-    anchor: string;
+    location: GeoLocation;
     category: EventCategory;
     time: number;
   }> = [];
@@ -276,12 +277,15 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
           if (result.status !== 'fulfilled') continue;
           const { feed, items } = result.value;
 
-          // Only items from last 2 hours
-          const cutoff = now.getTime() - 2 * 60 * 60 * 1000;
+          // Keep items from the last 24h. A 2h window dropped almost everything
+          // — many feeds (e.g. NPR politics) had zero items that fresh at poll
+          // time, which starved the political and media categories even though
+          // the feeds themselves were fine.
+          const cutoff = now.getTime() - RSS_MAX_AGE_MS;
 
           for (const item of items.slice(0, 5)) {
-            // Max 5 per feed
-            const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : 0;
+            // Max 5 per feed. Undated items are assumed recent, not dropped.
+            const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : now.getTime();
             if (pubDate < cutoff) continue;
 
             const title = item.title ?? 'Untitled';
@@ -492,17 +496,16 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   private isContentDuplicate(event: GlobalEvent): boolean {
     const tokens = contentTokens(event.title, event.location?.label);
     if (tokens.size === 0) return false; // can't judge — keep it
-    const anchor = locationAnchor(event.location);
     const time = new Date(event.timestamp).getTime();
 
     for (const sig of this.recentSignatures) {
       if (sig.category !== event.category) continue;
-      if (sig.anchor !== anchor) continue;
+      if (!sameLocation(sig.location, event.location)) continue;
       if (Number.isFinite(time) && Math.abs(sig.time - time) > CONTENT_DEDUP_WINDOW_MS) continue;
       if (overlapCoefficient(tokens, sig.tokens) >= CONTENT_DEDUP_OVERLAP) return true;
     }
 
-    this.recentSignatures.push({ tokens, anchor, category: event.category, time });
+    this.recentSignatures.push({ tokens, location: event.location, category: event.category, time });
     return false;
   }
 

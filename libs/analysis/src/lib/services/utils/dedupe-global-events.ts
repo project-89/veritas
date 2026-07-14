@@ -47,14 +47,39 @@ export function significantTitleTokens(title: string): Set<string> {
   );
 }
 
-export function locationAnchor(location: GeoLocation | undefined | null): string {
-  if (!location) return 'global';
-  if (location.countryCode) return `cc:${location.countryCode.toLowerCase()}`;
-  if (location.region) return `rg:${location.region.toLowerCase()}`;
-  if (Number.isFinite(location.lat) && Number.isFinite(location.lng)) {
-    return `ll:${Math.round(location.lat)},${Math.round(location.lng)}`;
+// Cross-source coordinate slop: two reports of one event rarely share exact
+// coordinates (USGS epicentre vs a newswire's region centroid), so anchor on
+// proximity rather than an exact grid cell that a few degrees would split.
+const LOCATION_MERGE_DEGREES = 3; // ~330km at the equator
+
+/** Shortest absolute longitude distance in degrees (0..180), handling wrap. */
+function lngDistance(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+/**
+ * Whether two events point at the same place: matching country codes when both
+ * are known, otherwise geographic proximity (or a shared region label as a last
+ * resort). Deliberately lenient enough to bridge cross-source coordinate slop,
+ * strict enough not to merge different countries.
+ */
+export function sameLocation(
+  a: GeoLocation | undefined | null,
+  b: GeoLocation | undefined | null,
+): boolean {
+  if (!a || !b) return false;
+  const ac = a.countryCode?.toLowerCase();
+  const bc = b.countryCode?.toLowerCase();
+  if (ac && bc) return ac === bc;
+  if ([a.lat, a.lng, b.lat, b.lng].every((n) => Number.isFinite(n))) {
+    return (
+      Math.abs(a.lat - b.lat) <= LOCATION_MERGE_DEGREES &&
+      lngDistance(a.lng, b.lng) <= LOCATION_MERGE_DEGREES
+    );
   }
-  return 'global';
+  if (a.region && b.region) return a.region.toLowerCase() === b.region.toLowerCase();
+  return false;
 }
 
 /** Significant title tokens with the location name removed — the anchor already
@@ -88,7 +113,7 @@ export interface DedupeOptions {
 
 interface KeptSignature {
   tokens: Set<string>;
-  anchor: string;
+  location: GeoLocation;
   category: GlobalEvent['category'];
   time: number;
 }
@@ -105,7 +130,6 @@ export function dedupeGlobalEvents(
 
   for (const event of events) {
     const tokens = contentTokens(event.title, event.location?.label);
-    const anchor = locationAnchor(event.location);
     const time = new Date(event.timestamp).getTime();
 
     // With no significant tokens we can't judge similarity — keep it rather than
@@ -114,7 +138,7 @@ export function dedupeGlobalEvents(
     if (tokens.size > 0) {
       for (const sig of kept) {
         if (sig.category !== event.category) continue;
-        if (sig.anchor !== anchor) continue;
+        if (!sameLocation(sig.location, event.location)) continue;
         if (Number.isFinite(time) && Number.isFinite(sig.time) && Math.abs(sig.time - time) > windowMs) {
           continue;
         }
@@ -126,7 +150,7 @@ export function dedupeGlobalEvents(
     }
 
     if (isDuplicate) continue;
-    kept.push({ tokens, anchor, category: event.category, time });
+    kept.push({ tokens, location: event.location, category: event.category, time });
     result.push(event);
   }
 

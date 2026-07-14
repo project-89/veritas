@@ -1,5 +1,5 @@
 import type { GlobalEvent } from '../../types/global-event';
-import { dedupeGlobalEvents, locationAnchor, significantTitleTokens } from './dedupe-global-events';
+import { dedupeGlobalEvents, sameLocation, significantTitleTokens } from './dedupe-global-events';
 
 function makeEvent(overrides: Partial<GlobalEvent>): GlobalEvent {
   return {
@@ -27,11 +27,43 @@ describe('significantTitleTokens', () => {
   });
 });
 
-describe('locationAnchor', () => {
-  it('prefers country code, then region, then a lat/lng cell', () => {
-    expect(locationAnchor({ lat: 1, lng: 2, label: 'x', countryCode: 'NC' })).toBe('cc:nc');
-    expect(locationAnchor({ lat: 1, lng: 2, label: 'x', region: 'Pacific' })).toBe('rg:pacific');
-    expect(locationAnchor({ lat: 1.4, lng: 2.6, label: 'x' })).toBe('ll:1,3');
+describe('sameLocation', () => {
+  it('matches on country code when both are known', () => {
+    expect(
+      sameLocation(
+        { lat: 1, lng: 2, label: 'x', countryCode: 'NC' },
+        { lat: 40, lng: 90, label: 'y', countryCode: 'NC' },
+      ),
+    ).toBe(true);
+    expect(
+      sameLocation(
+        { lat: 1, lng: 2, label: 'x', countryCode: 'NC' },
+        { lat: 1, lng: 2, label: 'y', countryCode: 'JP' },
+      ),
+    ).toBe(false);
+  });
+
+  it('falls back to geographic proximity when a country code is missing', () => {
+    // ~1.7° apart — same happening from two sources with slightly different coords.
+    expect(
+      sameLocation(
+        { lat: -56.3, lng: -27.5, label: 'South Sandwich Islands' },
+        { lat: -57.0, lng: -26.0, label: 'South Sandwich Islands Region' },
+      ),
+    ).toBe(true);
+    // Far apart → distinct.
+    expect(
+      sameLocation(
+        { lat: -56.3, lng: -27.5, label: 'a' },
+        { lat: 35, lng: 139, label: 'b' },
+      ),
+    ).toBe(false);
+  });
+
+  it('treats the antimeridian as continuous', () => {
+    expect(
+      sameLocation({ lat: 0, lng: 179, label: 'a' }, { lat: 0, lng: -179, label: 'b' }),
+    ).toBe(true);
   });
 });
 
@@ -45,6 +77,24 @@ describe('dedupeGlobalEvents', () => {
     const result = dedupeGlobalEvents(events);
     expect(result).toHaveLength(1);
     expect(result[0]?.id).toBe('usgs-1'); // first wins
+  });
+
+  it('collapses the same quake reported with slightly different coords and no country code', () => {
+    const events = [
+      makeEvent({
+        id: 'usgs-ss',
+        title: 'M4.9 Earthquake — South Sandwich Islands region',
+        location: { lat: -56.3, lng: -27.5, label: 'South Sandwich Islands region' },
+      }),
+      makeEvent({
+        id: 'news-ss',
+        title: 'Earthquake in South Sandwich Islands Region',
+        location: { lat: -57.0, lng: -26.2, label: 'South Sandwich Islands Region' },
+      }),
+    ];
+    const result = dedupeGlobalEvents(events);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe('usgs-ss');
   });
 
   it('keeps genuinely distinct events at the same location', () => {
