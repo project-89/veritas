@@ -100,6 +100,8 @@ import {
   useInvestigation,
 } from '../../lib/investigation-context';
 import { useScanProgress } from '../../lib/use-scan-progress';
+import { useCenterModeShortcuts } from '../../hooks/use-center-mode-shortcuts';
+import { usePanelLayout } from '../../hooks/use-panel-layout';
 import { useResultsQueryParams } from '../../hooks/use-results-query-params';
 
 const NarrativeGlobeLazy = dynamic(
@@ -276,8 +278,7 @@ function InvestigationWorkspace() {
     pipelineRan.current = false;
   }
   const [radarSelectedIds, setRadarSelectedIds] = useState<string[]>([]);
-  const [leftWidth, setLeftWidth] = useState(280);
-  const [rightWidth, setRightWidth] = useState(380);
+  const { leftWidth, rightWidth, onDragLeft, onDragRight } = usePanelLayout();
   const [investigationRecord, setInvestigationRecord] = useState<Investigation | null>(null);
   const [projectDossier, setProjectDossier] = useState<ProjectDossier | null>(null);
   const [projectDossierOverlaps, setProjectDossierOverlaps] = useState<ProjectDossierOverlap[]>([]);
@@ -1454,21 +1455,7 @@ function InvestigationWorkspace() {
   }, [state.investigationId, dispatch]);
 
   // ---- Keyboard shortcuts for center modes ----
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-      const key = e.key.toUpperCase();
-      const mode = SHORTCUT_MAP.get(key);
-      if (mode) {
-        setCenterMode(mode);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [setCenterMode]);
+  useCenterModeShortcuts(SHORTCUT_MAP, setCenterMode);
 
   // ---- Action handlers ----
   /**
@@ -2488,36 +2475,38 @@ function InvestigationWorkspace() {
               <NervBadge label={String(state.narratives.length)} variant="orange" size="sm" />
             )}
           </div>
-          {state.narratives.length > 0 ? (
-            <NarrativeList
-              narratives={state.narratives}
-              selectedId={state.selectedNarrativeId}
-              onSelect={handleNarrativeSelect}
-              unclusteredCount={state.unclusteredCount}
-              selectedNarrativeIds={state.selectedNarrativeIds}
-              analysisJobs={state.analysisJobs}
-              investigatedNarrativeIds={state.investigatedNarrativeIds}
-              onToggleSelection={(id) =>
-                dispatch({ type: 'TOGGLE_NARRATIVE_SELECTION', narrativeId: id })
-              }
-              onAnalyzeSelected={handleAnalyzeSelected}
-              onClearSelection={() => dispatch({ type: 'CLEAR_NARRATIVE_SELECTION' })}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <span className="text-[12px] font-mono text-nerv-text-muted animate-nerv-pulse">
-                {state.pipeline.search === 'running'
-                  ? 'SEARCHING...'
-                  : state.pipeline.analyze === 'running'
-                    ? 'ANALYZING...'
-                    : 'AWAITING DATA'}
-              </span>
-            </div>
-          )}
+          <NervErrorBoundary label="narratives panel">
+            {state.narratives.length > 0 ? (
+              <NarrativeList
+                narratives={state.narratives}
+                selectedId={state.selectedNarrativeId}
+                onSelect={handleNarrativeSelect}
+                unclusteredCount={state.unclusteredCount}
+                selectedNarrativeIds={state.selectedNarrativeIds}
+                analysisJobs={state.analysisJobs}
+                investigatedNarrativeIds={state.investigatedNarrativeIds}
+                onToggleSelection={(id) =>
+                  dispatch({ type: 'TOGGLE_NARRATIVE_SELECTION', narrativeId: id })
+                }
+                onAnalyzeSelected={handleAnalyzeSelected}
+                onClearSelection={() => dispatch({ type: 'CLEAR_NARRATIVE_SELECTION' })}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <span className="text-[12px] font-mono text-nerv-text-muted animate-nerv-pulse">
+                  {state.pipeline.search === 'running'
+                    ? 'SEARCHING...'
+                    : state.pipeline.analyze === 'running'
+                      ? 'ANALYZING...'
+                      : 'AWAITING DATA'}
+                </span>
+              </div>
+            )}
+          </NervErrorBoundary>
         </div>
 
         {/* LEFT resize handle */}
-        <DragHandle onDrag={(dx) => setLeftWidth((w) => Math.max(200, Math.min(500, w + dx)))} />
+        <DragHandle onDrag={onDragLeft} />
 
         {/* CENTER: Visualization + Mode Selector */}
         <div className="flex-1 flex flex-col overflow-hidden bg-nerv-bg-deep min-w-0">
@@ -2533,10 +2522,14 @@ function InvestigationWorkspace() {
         </div>
 
         {/* RIGHT resize handle */}
-        <DragHandle onDrag={(dx) => setRightWidth((w) => Math.max(280, Math.min(600, w - dx)))} />
+        <DragHandle onDrag={onDragRight} />
 
         {/* RIGHT: Detail Panel */}
         <div className="overflow-auto bg-nerv-bg shrink-0" style={{ width: rightWidth }}>
+          <NervErrorBoundary
+            label="detail panel"
+            key={`${state.selectedNarrativeId ?? ''}:${state.selectedActorHandle ?? ''}:${state.selectedClaimIndex ?? ''}`}
+          >
           <DetailPanel
             selectedNarrativeId={state.selectedNarrativeId}
             selectedActorHandle={state.selectedActorHandle}
@@ -2571,6 +2564,7 @@ function InvestigationWorkspace() {
             onGenerateReport={handleGenerateReport}
             onRunIntelligence={(type) => handleIntelligence(type)}
           />
+          </NervErrorBoundary>
         </div>
       </div>
 
