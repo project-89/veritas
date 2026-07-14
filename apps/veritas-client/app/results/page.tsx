@@ -264,9 +264,6 @@ function InvestigationWorkspace() {
     urlTimeRange,
     urlLimit,
     urlUsernames,
-    urlHashtags,
-    urlWallets,
-    urlSubreddits,
     enhancedQuery,
   } = useResultsQueryParams(searchParams);
   const { state, dispatch, selectNarrative, selectActor, selectClaim, setCenterMode } =
