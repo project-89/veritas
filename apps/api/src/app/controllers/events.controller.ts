@@ -11,6 +11,9 @@ import { dedupeGlobalEvents, GlobalEvent, GlobalEventAggregationService } from '
 import { GlobalEventRepository } from '@veritas/ingestion';
 import { filter, interval, map, merge, Observable } from 'rxjs';
 
+/** Feed dedup spans the retention window so repeated reports days apart collapse. */
+const FEED_DEDUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 @Controller('events')
 export class EventsController {
   constructor(
@@ -93,7 +96,11 @@ export class EventsController {
       severity: severity || undefined,
       since: since || undefined,
     });
-    return dedupeGlobalEvents(events).slice(0, requested);
+    // Collapse across the whole retention window the feed spans (~7d), not just
+    // the 12h ingestion window: the same place having the same kind of event
+    // (repeated GDACS/USGS earthquake reports, etc.) should appear once in the
+    // feed, even when the reports land days apart.
+    return dedupeGlobalEvents(events, { windowMs: FEED_DEDUP_WINDOW_MS }).slice(0, requested);
   }
 
   /**

@@ -113,6 +113,28 @@ describe('dedupeGlobalEvents', () => {
     expect(dedupeGlobalEvents(events)).toHaveLength(2);
   });
 
+  it('collapses same-location repeats within a wide window (feed read-path)', () => {
+    // GDACS country-level report + USGS specific report of the same quake, but
+    // landing ~2 days apart — the feed dedup window must span that.
+    const events = [
+      makeEvent({
+        id: 'gdacs',
+        title: 'Earthquake in Philippines',
+        location: { lat: 5.18, lng: 125.68, label: 'Philippines' },
+        timestamp: '2026-07-14T08:00:00.000Z',
+      }),
+      makeEvent({
+        id: 'usgs',
+        title: 'M5.2 Earthquake — 56 km SSW of Sarangani, Philippines',
+        location: { lat: 4.94, lng: 125.24, label: '56 km SSW of Sarangani, Philippines' },
+        timestamp: '2026-07-12T08:00:00.000Z',
+      }),
+    ];
+    // Default 12h window keeps them; a 7-day feed window collapses them.
+    expect(dedupeGlobalEvents(events)).toHaveLength(2);
+    expect(dedupeGlobalEvents(events, { windowMs: 7 * 24 * 60 * 60 * 1000 })).toHaveLength(1);
+  });
+
   it('does not merge similar titles in different countries', () => {
     const events = [
       makeEvent({ id: 'a', title: 'Earthquake reported', location: { lat: -21, lng: 165, label: 'NC', countryCode: 'NC' } }),
