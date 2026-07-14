@@ -29,6 +29,8 @@ const LABEL_EXIT_DOT = 0.12;
 const LABEL_OFFSCREEN_MARGIN = 40;
 const LABEL_FADE_MS = 520; // fade in / fade out duration (kept in sync with CSS)
 const LEADER_STUB_MIN = 16; // min horizontal run off the label / into the pin
+const CLUSTER_PX = 48; // events within this screen distance merge into one density badge
+const CLUSTER_MIN = 2; // show a count badge once a cluster holds at least this many events
 
 type LabelOverlayNode = {
   wrapper: HTMLDivElement;
@@ -85,6 +87,10 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   const activeLabelsRef = useRef<Map<string, ActiveLabel>>(new Map());
   const leftSlotsRef = useRef<(string | null)[]>([]);
   const rightSlotsRef = useRef<(string | null)[]>([]);
+  // Pooled SVG nodes for density-cluster count badges (reused frame to frame).
+  const badgeNodesRef = useRef<
+    Array<{ g: SVGGElement; circle: SVGCircleElement; text: SVGTextElement }>
+  >([]);
   const pointsRef = useRef<GlobePointData[]>([]);
   pointsRef.current = events.flatMap((ev) => {
     if (!Number.isFinite(ev.location?.lat) || !Number.isFinite(ev.location?.lng)) {
@@ -346,6 +352,50 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         node.dot.style.opacity = on ? '0.85' : '0';
       };
 
+      const SVG_NS = 'http://www.w3.org/2000/svg';
+      const getBadgeNode = (index: number) => {
+        const existing = badgeNodesRef.current[index];
+        if (existing || !svgRef.current) return existing;
+        const g = document.createElementNS(SVG_NS, 'g');
+        g.style.cursor = 'pointer';
+        g.style.pointerEvents = 'auto';
+        const circle = document.createElementNS(SVG_NS, 'circle');
+        circle.setAttribute('stroke', '#0a0a0f');
+        circle.setAttribute('stroke-width', '1.5');
+        const text = document.createElementNS(SVG_NS, 'text');
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'central');
+        text.setAttribute('font-family', 'monospace');
+        text.setAttribute('font-size', '10');
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('fill', '#0a0a0f');
+        text.style.pointerEvents = 'none';
+        g.appendChild(circle);
+        g.appendChild(text);
+        // Click a dense cluster to rotate it front-and-centre so it can be
+        // zoomed into and read individually.
+        g.addEventListener('click', () => {
+          const repId = g.dataset.rep;
+          if (!repId) return;
+          const ev = eventsRef.current.find((e) => e.id === repId);
+          if (!ev) return;
+          autoRotate.current = false;
+          targetRotationX.current = ev.location.lat * (Math.PI / 180);
+          targetRotationY.current = -ev.location.lng * (Math.PI / 180);
+          if (resumeAutoRotateTimeoutRef.current !== null) {
+            window.clearTimeout(resumeAutoRotateTimeoutRef.current);
+          }
+          resumeAutoRotateTimeoutRef.current = window.setTimeout(() => {
+            autoRotate.current = true;
+            resumeAutoRotateTimeoutRef.current = null;
+          }, 10000);
+        });
+        svgRef.current.appendChild(g);
+        const created = { g, circle, text };
+        badgeNodesRef.current[index] = created;
+        return created;
+      };
+
       const animate = () => {
         frameRef.current = requestAnimationFrame(animate);
 
@@ -430,6 +480,78 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
                 size: pt.size,
               });
             }
+          }
+
+          // 1b) Density clustering: greedily group in-view pins by screen
+          //     distance and draw a count badge wherever events pile up. This is
+          //     zoom-aware for free — screen distances shrink as you zoom in, so
+          //     clusters split apart. Click a badge to swing it to the front.
+          const clusters: Array<{
+            cx: number;
+            cy: number;
+            sumX: number;
+            sumY: number;
+            count: number;
+            color: string;
+            sev: number;
+            rep: string;
+          }> = [];
+          for (const [id, v] of inView) {
+            let target: (typeof clusters)[number] | null = null;
+            for (const c of clusters) {
+              const dx = c.cx - v.sx;
+              const dy = c.cy - v.sy;
+              if (dx * dx + dy * dy <= CLUSTER_PX * CLUSTER_PX) {
+                target = c;
+                break;
+              }
+            }
+            if (target) {
+              target.count += 1;
+              target.sumX += v.sx;
+              target.sumY += v.sy;
+              target.cx = target.sumX / target.count;
+              target.cy = target.sumY / target.count;
+              if (v.size > target.sev) {
+                target.sev = v.size;
+                target.color = v.color;
+                target.rep = id;
+              }
+            } else {
+              clusters.push({
+                cx: v.sx,
+                cy: v.sy,
+                sumX: v.sx,
+                sumY: v.sy,
+                count: 1,
+                color: v.color,
+                sev: v.size,
+                rep: id,
+              });
+            }
+          }
+          const badges = clusters.filter((c) => c.count >= CLUSTER_MIN);
+          const badgeSlots = Math.max(badges.length, badgeNodesRef.current.length);
+          for (let i = 0; i < badgeSlots; i += 1) {
+            const c = badges[i];
+            if (!c) {
+              const idle = badgeNodesRef.current[i];
+              if (idle) idle.g.style.display = 'none';
+              continue;
+            }
+            const node = getBadgeNode(i);
+            if (!node) continue;
+            const r = Math.min(20, 11 + Math.log2(c.count) * 2.5);
+            node.circle.setAttribute('cx', `${c.cx}`);
+            node.circle.setAttribute('cy', `${c.cy}`);
+            node.circle.setAttribute('r', `${r}`);
+            node.circle.setAttribute('fill', c.color);
+            node.circle.setAttribute('fill-opacity', '0.88');
+            node.text.setAttribute('x', `${c.cx}`);
+            node.text.setAttribute('y', `${c.cy}`);
+            node.text.textContent = c.count > 99 ? '99+' : String(c.count);
+            node.g.dataset.rep = c.rep;
+            node.g.style.display = 'block';
           }
 
           // 2) Update active labels: follow their pin, revive if the pin came
@@ -566,6 +688,10 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         for (const eventId of Object.keys(overlayNodesRef.current)) {
           removeOverlayNode(eventId);
         }
+        for (const badge of badgeNodesRef.current) {
+          badge.g.remove();
+        }
+        badgeNodesRef.current = [];
       };
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initialize globe');
