@@ -19,25 +19,33 @@ const SIDE_WIDTH = 340;
 const SIDE_MARGIN = 10;
 const LABEL_TOP_MARGIN = 52;
 const MAX_LABELS = 14;
-const LABEL_UPDATE_MS = 120;
 const LABEL_ANCHOR_ALTITUDE = 0.007;
-const LABEL_SIDE_HYSTERESIS = 48;
-const LABEL_SIDE_SWITCH_HYSTERESIS = 96;
-const LABEL_SIDE_MEMORY_UPDATES = 12;
-const LABEL_VISIBLE_ENTER_DOT = 0.05;
-const LABEL_VISIBLE_EXIT_DOT = -0.02;
-const LABEL_OFFSCREEN_MARGIN = 24;
-const LABEL_INTERACTION_SETTLE_MS = 220;
-const LABEL_UPDATE_MS_MOVING = 180;
+// A label appears once its pin is comfortably front-facing, and only leaves
+// once the pin is clearly rotating away — the gap is hysteresis so a pin
+// hovering near the horizon doesn't strobe.
+const LABEL_ENTER_DOT = 0.08;
+const LABEL_EXIT_DOT = -0.04;
+const LABEL_OFFSCREEN_MARGIN = 40;
+const LABEL_FADE_MS = 520; // fade in / fade out duration (kept in sync with CSS)
+const LEADER_CURVE_MAX = 130; // max horizontal pull on the leader-line control points
 
-type LabelSideState = { side: 'left' | 'right'; missingUpdates: number };
-type LabelVisibilityState = { visible: boolean; missingUpdates: number };
 type LabelOverlayNode = {
   wrapper: HTMLDivElement;
   inner: HTMLDivElement;
   text: HTMLDivElement;
   path: SVGPathElement;
   dot: SVGCircleElement;
+};
+
+type LabelSide = 'left' | 'right';
+type ActiveLabel = {
+  side: LabelSide;
+  slot: number;
+  phase: 'in' | 'out';
+  sx: number;
+  sy: number;
+  color: string;
+  outSince: number;
 };
 
 interface GlobePointData {
@@ -69,10 +77,13 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
   eventsRef.current = events;
   const onClickRef = useRef(onEventClick);
   onClickRef.current = onEventClick;
-  const displayedLabelIdsRef = useRef<string[]>([]);
-  const labelSideRef = useRef<Record<string, LabelSideState | 'left' | 'right'>>({});
-  const labelVisibilityRef = useRef<Record<string, LabelVisibilityState>>({});
   const overlayNodesRef = useRef<Record<string, LabelOverlayNode>>({});
+  // Sticky placement: each label owns a fixed side + vertical slot from the
+  // moment it appears until it fades out, so labels never reorder or jump sides
+  // while the globe turns. Slot arrays are indexed by slot; value = eventId.
+  const activeLabelsRef = useRef<Map<string, ActiveLabel>>(new Map());
+  const leftSlotsRef = useRef<(string | null)[]>([]);
+  const rightSlotsRef = useRef<(string | null)[]>([]);
   const pointsRef = useRef<GlobePointData[]>([]);
   pointsRef.current = events.flatMap((ev) => {
     if (!Number.isFinite(ev.location?.lat) || !Number.isFinite(ev.location?.lng)) {
@@ -212,8 +223,6 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
       controls.addEventListener('end', markInteraction);
 
       // --- RENDER LOOP ---
-      let lastLabelRenderAt = 0;
-      let lastLabelSignature = '';
       const getOverlayNode = (eventId: string) => {
         const existing = overlayNodesRef.current[eventId];
         if (existing || !svgRef.current || !labelsRef.current) return existing;
@@ -223,6 +232,8 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         wrapper.style.position = 'absolute';
         wrapper.style.pointerEvents = 'auto';
         wrapper.style.cursor = 'pointer';
+        wrapper.style.opacity = '0';
+        wrapper.style.transition = `opacity ${LABEL_FADE_MS}ms ease-out`;
 
         const inner = document.createElement('div');
         inner.style.display = 'flex';
@@ -250,12 +261,14 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
 
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke-width', '0.8');
-        path.setAttribute('opacity', '0.45');
+        path.setAttribute('stroke-width', '1');
+        path.style.opacity = '0';
+        path.style.transition = `opacity ${LABEL_FADE_MS}ms ease-out`;
 
         const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         dot.setAttribute('r', '3');
-        dot.setAttribute('opacity', '0.7');
+        dot.style.opacity = '0';
+        dot.style.transition = `opacity ${LABEL_FADE_MS}ms ease-out`;
 
         wrapper.addEventListener('click', () => {
           const ev = eventsRef.current.find((e) => e.id === eventId);
@@ -291,6 +304,38 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         delete overlayNodesRef.current[eventId];
       };
 
+      const slotsFor = (side: LabelSide) =>
+        side === 'left' ? leftSlotsRef.current : rightSlotsRef.current;
+
+      const firstFreeSlot = (side: LabelSide, maxSlots: number): number => {
+        const slots = slotsFor(side);
+        for (let i = 0; i < maxSlots; i += 1) {
+          if (!slots[i]) return i;
+        }
+        return -1;
+      };
+
+      // Prefer the side the pin is on; fall back to the other side if full.
+      const claimSlot = (
+        preferred: LabelSide,
+        maxSlots: number,
+      ): { side: LabelSide; slot: number } | null => {
+        let slot = firstFreeSlot(preferred, maxSlots);
+        if (slot >= 0) return { side: preferred, slot };
+        const other: LabelSide = preferred === 'left' ? 'right' : 'left';
+        slot = firstFreeSlot(other, maxSlots);
+        if (slot >= 0) return { side: other, slot };
+        return null;
+      };
+
+      const setNodeOpacity = (eventId: string, on: boolean) => {
+        const node = overlayNodesRef.current[eventId];
+        if (!node) return;
+        node.wrapper.style.opacity = on ? '1' : '0';
+        node.path.style.opacity = on ? '0.5' : '0';
+        node.dot.style.opacity = on ? '0.85' : '0';
+      };
+
       const animate = () => {
         frameRef.current = requestAnimationFrame(animate);
 
@@ -323,252 +368,149 @@ export function EventGlobe({ events, onEventClick }: EventGlobeProps) {
         controls.update();
         renderer.render(scene, camera);
 
-        // --- SCREEN-SPACE LABEL UPDATE ---
+        // --- SCREEN-SPACE LABELS: sticky slot, fade in / stable / fade out ---
         if (svgRef.current && labelsRef.current) {
           const now = performance.now();
-          const interactionActive =
-            mouseDown.current || now - lastInteractionAtRef.current < LABEL_INTERACTION_SETTLE_MS;
-          const labelUpdateMs = interactionActive ? LABEL_UPDATE_MS_MOVING : LABEL_UPDATE_MS;
-          if (now - lastLabelRenderAt < labelUpdateMs) return;
-          lastLabelRenderAt = now;
-
           const cw = container.clientWidth;
           const ch = container.clientHeight;
-          // Project each point to screen space + front-facing check
-          type ScreenLabel = {
-            sx: number;
-            sy: number;
-            color: string;
-            title: string;
-            eventId: string;
-            size: number;
-          };
-          const screenLabels: ScreenLabel[] = [];
-
-          for (const pt of pointsRef.current) {
-            const local = globe.getCoords(pt.lat, pt.lng, LABEL_ANCHOR_ALTITUDE);
-            const v = new THREE.Vector3(local.x, local.y, local.z);
-            // Transform to world space through globe's matrix
-            globe.localToWorld(v);
-
-            // Front-facing check
-            const toCamera = camera.position.clone().sub(v).normalize();
-            const globeCenter = new THREE.Vector3();
-            globe.getWorldPosition(globeCenter);
-            const normal = v.clone().sub(globeCenter).normalize();
-            const facingDot = toCamera.dot(normal);
-            const previousVisibility = labelVisibilityRef.current[pt.eventId];
-            const wasVisible = previousVisibility?.visible ?? false;
-            const requiredDot = wasVisible ? LABEL_VISIBLE_EXIT_DOT : LABEL_VISIBLE_ENTER_DOT;
-
-            // Project to screen
-            const projected = v.clone().project(camera);
-            const projectedInDepth = projected.z >= -1 && projected.z <= 1;
-
-            const sx = Math.round(((projected.x * 0.5 + 0.5) * cw) / 2) * 2;
-            const sy = Math.round(((-projected.y * 0.5 + 0.5) * ch) / 2) * 2;
-            const withinBounds = wasVisible
-              ? sx >= -LABEL_OFFSCREEN_MARGIN &&
-                sx <= cw + LABEL_OFFSCREEN_MARGIN &&
-                sy >= -LABEL_OFFSCREEN_MARGIN &&
-                sy <= ch + LABEL_OFFSCREEN_MARGIN
-              : sx >= 0 && sx <= cw && sy >= 0 && sy <= ch;
-            const isVisible = facingDot > requiredDot && projectedInDepth && withinBounds;
-
-            if (!isVisible) {
-              labelVisibilityRef.current[pt.eventId] = {
-                visible: false,
-                missingUpdates: (previousVisibility?.missingUpdates ?? 0) + 1,
-              };
-              continue;
-            }
-
-            labelVisibilityRef.current[pt.eventId] = { visible: true, missingUpdates: 0 };
-
-            screenLabels.push({
-              sx,
-              sy,
-              color: pt.color,
-              title: pt.title,
-              eventId: pt.eventId,
-              size: pt.size,
-            });
-          }
-
-          for (const [eventId, visibility] of Object.entries(labelVisibilityRef.current)) {
-            if (
-              !screenLabels.some((label) => label.eventId === eventId) &&
-              visibility.missingUpdates > LABEL_SIDE_MEMORY_UPDATES
-            ) {
-              delete labelVisibilityRef.current[eventId];
-            }
-          }
-
-          const rankedLabels = screenLabels.sort(
-            (a, b) => b.size - a.size || a.eventId.localeCompare(b.eventId),
-          );
-          const visibleById = new Map(rankedLabels.map((label) => [label.eventId, label]));
-
-          let nextLabels: ScreenLabel[];
-          if (interactionActive) {
-            const frozenLabels = displayedLabelIdsRef.current
-              .map((eventId) => visibleById.get(eventId))
-              .filter((label): label is ScreenLabel => Boolean(label));
-            nextLabels = frozenLabels.length > 0 ? frozenLabels : rankedLabels.slice(0, MAX_LABELS);
-          } else {
-            const persistentLabels = displayedLabelIdsRef.current
-              .map((eventId) => visibleById.get(eventId))
-              .filter((label): label is ScreenLabel => Boolean(label));
-            nextLabels = [...persistentLabels];
-
-            for (const label of rankedLabels) {
-              if (nextLabels.length >= MAX_LABELS) break;
-              if (
-                visibleById.has(label.eventId) &&
-                !nextLabels.some((existing) => existing.eventId === label.eventId)
-              ) {
-                nextLabels.push(label);
-              }
-            }
-
-            displayedLabelIdsRef.current = nextLabels.map((label) => label.eventId);
-          }
-
-          if (interactionActive && displayedLabelIdsRef.current.length === 0) {
-            displayedLabelIdsRef.current = nextLabels.map((label) => label.eventId);
-          }
-
           const centerX = cw / 2;
-          const maxLabelsPerSide = Math.max(
+          const maxSlots = Math.max(
             1,
             Math.floor(
               (ch - LABEL_TOP_MARGIN - SIDE_MARGIN + LABEL_SPACING) /
                 (LABEL_HEIGHT + LABEL_SPACING),
             ),
           );
-          const assignedSideById = new Map<string, 'left' | 'right'>();
 
-          for (const label of nextLabels) {
-            const previousState = labelSideRef.current[label.eventId];
-            const previousSide =
-              typeof previousState === 'string' ? previousState : previousState?.side;
-            const side =
-              interactionActive && previousSide
-                ? previousSide
-                : previousSide
-                  ? previousSide === 'left'
-                    ? label.sx > centerX + LABEL_SIDE_SWITCH_HYSTERESIS
-                      ? 'right'
-                      : 'left'
-                    : label.sx < centerX - LABEL_SIDE_SWITCH_HYSTERESIS
-                      ? 'left'
-                      : 'right'
-                  : label.sx <= centerX - LABEL_SIDE_HYSTERESIS
-                    ? 'left'
-                    : label.sx >= centerX + LABEL_SIDE_HYSTERESIS
-                      ? 'right'
-                      : label.sx < centerX
-                        ? 'left'
-                        : 'right';
-
-            assignedSideById.set(label.eventId, side);
-            labelSideRef.current[label.eventId] = { side, missingUpdates: 0 };
+          // 1) Project every point; collect those currently in view (front-facing
+          //    + on-screen), with hysteresis so pins near the horizon don't strobe.
+          const inView = new Map<
+            string,
+            { sx: number; sy: number; color: string; title: string; size: number }
+          >();
+          const globeCenter = new THREE.Vector3();
+          globe.getWorldPosition(globeCenter);
+          for (const pt of pointsRef.current) {
+            const local = globe.getCoords(pt.lat, pt.lng, LABEL_ANCHOR_ALTITUDE);
+            const v = new THREE.Vector3(local.x, local.y, local.z);
+            globe.localToWorld(v);
+            const toCamera = camera.position.clone().sub(v).normalize();
+            const normal = v.clone().sub(globeCenter).normalize();
+            const facingDot = toCamera.dot(normal);
+            const existing = activeLabelsRef.current.get(pt.eventId);
+            const wasShowing = Boolean(existing && existing.phase === 'in');
+            const requiredDot = wasShowing ? LABEL_EXIT_DOT : LABEL_ENTER_DOT;
+            const projected = v.clone().project(camera);
+            const inDepth = projected.z >= -1 && projected.z <= 1;
+            const sx = (projected.x * 0.5 + 0.5) * cw;
+            const sy = (-projected.y * 0.5 + 0.5) * ch;
+            const margin = wasShowing ? LABEL_OFFSCREEN_MARGIN : 0;
+            const inBounds =
+              sx >= -margin && sx <= cw + margin && sy >= -margin && sy <= ch + margin;
+            if (facingDot > requiredDot && inDepth && inBounds) {
+              inView.set(pt.eventId, {
+                sx,
+                sy,
+                color: pt.color,
+                title: pt.title,
+                size: pt.size,
+              });
+            }
           }
 
-          if (!interactionActive) {
-            for (const [eventId, state] of Object.entries(labelSideRef.current)) {
-              if (!assignedSideById.has(eventId)) {
-                if (typeof state === 'string') {
-                  delete labelSideRef.current[eventId];
-                  continue;
-                }
+          // 2) Update active labels: follow their pin, revive if the pin came
+          //    back, or start fading out if the pin left the view.
+          for (const [eventId, label] of activeLabelsRef.current) {
+            const seen = inView.get(eventId);
+            if (seen) {
+              label.sx = seen.sx;
+              label.sy = seen.sy;
+              label.color = seen.color;
+              if (label.phase === 'out') {
+                label.phase = 'in';
+                setNodeOpacity(eventId, true);
+              }
+            } else if (label.phase === 'in') {
+              label.phase = 'out';
+              label.outSince = now;
+              setNodeOpacity(eventId, false);
+            }
+          }
 
-                state.missingUpdates += 1;
-                if (state.missingUpdates > LABEL_SIDE_MEMORY_UPDATES) {
-                  delete labelSideRef.current[eventId];
-                }
+          // 3) Retire labels that have finished fading out (frees their slot).
+          for (const [eventId, label] of [...activeLabelsRef.current]) {
+            if (label.phase === 'out' && now - label.outSince > LABEL_FADE_MS) {
+              const slots = slotsFor(label.side);
+              if (slots[label.slot] === eventId) slots[label.slot] = null;
+              activeLabelsRef.current.delete(eventId);
+              removeOverlayNode(eventId);
+            }
+          }
+
+          // 4) Admit newly-visible events into free slots, most severe first.
+          if (activeLabelsRef.current.size < MAX_LABELS) {
+            const candidates = [...inView.entries()]
+              .filter(([eventId]) => !activeLabelsRef.current.has(eventId))
+              .sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]));
+            for (const [eventId, seen] of candidates) {
+              if (activeLabelsRef.current.size >= MAX_LABELS) break;
+              const preferred: LabelSide = seen.sx < centerX ? 'left' : 'right';
+              const claimed = claimSlot(preferred, maxSlots);
+              if (!claimed) continue;
+              slotsFor(claimed.side)[claimed.slot] = eventId;
+              activeLabelsRef.current.set(eventId, {
+                side: claimed.side,
+                slot: claimed.slot,
+                phase: 'in',
+                sx: seen.sx,
+                sy: seen.sy,
+                color: seen.color,
+                outSince: 0,
+              });
+              const node = getOverlayNode(eventId);
+              if (node) {
+                node.text.textContent = seen.title;
+                // Defer the opacity flip one frame so the CSS transition runs.
+                requestAnimationFrame(() => setNodeOpacity(eventId, true));
               }
             }
           }
 
-          // Split into left and right based on screen X
-          const leftLabels = nextLabels
-            .filter((l) => assignedSideById.get(l.eventId) === 'left')
-            .sort((a, b) => a.sy - b.sy)
-            .slice(0, maxLabelsPerSide);
-          const rightLabels = nextLabels
-            .filter((l) => assignedSideById.get(l.eventId) === 'right')
-            .sort((a, b) => a.sy - b.sy)
-            .slice(0, maxLabelsPerSide);
-
-          // Stack labels vertically on each side (no overlap)
-          const stackLabels = (labels: ScreenLabel[], startX: number) => {
-            let nextY = LABEL_TOP_MARGIN;
-            return labels.map((l, index) => {
-              const labelY = nextY;
-              nextY = labelY + LABEL_HEIGHT + LABEL_SPACING;
-              return { ...l, labelX: startX, labelY, routeIndex: index };
-            });
-          };
-
-          const leftStacked = stackLabels(leftLabels, SIDE_MARGIN);
-          const rightStacked = stackLabels(rightLabels, cw - SIDE_WIDTH - SIDE_MARGIN);
-
-          const allStacked = [...leftStacked, ...rightStacked];
-          const overlaySignature = allStacked
-            .map((l) => {
-              const isLeft = l.labelX < cw / 2;
-              return `${l.eventId}:${l.sx},${l.sy},${l.labelX},${l.labelY},${isLeft ? 'L' : 'R'}:${l.title}`;
-            })
-            .join('|');
-          if (overlaySignature === lastLabelSignature) return;
-          lastLabelSignature = overlaySignature;
-          const activeNodeIds = new Set(allStacked.map((l) => l.eventId));
-
-          for (const l of allStacked) {
-            const isLeft = l.labelX < cw / 2;
-            const labelConnectX = isLeft ? l.labelX + SIDE_WIDTH : l.labelX;
-            const labelMidY = l.labelY + LABEL_HEIGHT / 2;
-            const towardLabel = labelConnectX >= l.sx ? 1 : -1;
-            const diagonalSpread = 56 + Math.min(72, l.routeIndex * 12);
-            const diagonalStartRaw = labelConnectX - towardLabel * diagonalSpread;
-            const diagonalStartMin = Math.min(l.sx, labelConnectX) + 12;
-            const diagonalStartMax = Math.max(l.sx, labelConnectX) - 24;
-            const diagonalStartX = Math.max(
-              diagonalStartMin,
-              Math.min(diagonalStartMax, diagonalStartRaw),
-            );
-            const horizontalEntryX = labelConnectX - towardLabel * 18;
-            const node = getOverlayNode(l.eventId);
+          // 5) Position each label at its fixed slot and draw the leader curve to
+          //    its pin. The label box never moves; only the curve tracks the pin.
+          for (const [eventId, label] of activeLabelsRef.current) {
+            const node = overlayNodesRef.current[eventId];
             if (!node) continue;
+            const isLeft = label.side === 'left';
+            const slotX = isLeft ? SIDE_MARGIN : cw - SIDE_WIDTH - SIDE_MARGIN;
+            const slotY = LABEL_TOP_MARGIN + label.slot * (LABEL_HEIGHT + LABEL_SPACING);
 
-            node.wrapper.style.display = 'block';
-            node.wrapper.style.left = `${l.labelX}px`;
-            node.wrapper.style.top = `${l.labelY}px`;
+            node.wrapper.style.left = `${slotX}px`;
+            node.wrapper.style.top = `${slotY}px`;
             node.wrapper.style.width = `${SIDE_WIDTH}px`;
             node.wrapper.style.height = `${LABEL_HEIGHT}px`;
+            node.inner.style.color = label.color;
+            node.inner.style.borderLeft = isLeft ? 'none' : `2px solid ${label.color}`;
+            node.inner.style.borderRight = isLeft ? `2px solid ${label.color}` : 'none';
 
-            node.inner.style.color = l.color;
-            node.inner.style.borderLeft = isLeft ? 'none' : `2px solid ${l.color}`;
-            node.inner.style.borderRight = isLeft ? `2px solid ${l.color}` : 'none';
-            if (node.text.textContent !== l.title) {
-              node.text.textContent = l.title;
-            }
-
+            // Leader curve leaves the label horizontally and eases into the pin.
+            const labelConnectX = isLeft ? slotX + SIDE_WIDTH : slotX;
+            const labelMidY = slotY + LABEL_HEIGHT / 2;
+            const dir = label.sx >= labelConnectX ? 1 : -1;
+            const reach = Math.min(
+              LEADER_CURVE_MAX,
+              Math.abs(label.sx - labelConnectX) * 0.45,
+            );
+            const c1x = labelConnectX + dir * reach;
+            const c2x = label.sx - dir * reach;
             node.path.setAttribute(
               'd',
-              `M${l.sx},${l.sy} L${diagonalStartX},${l.sy} L${horizontalEntryX},${labelMidY} L${labelConnectX},${labelMidY}`,
+              `M${labelConnectX},${labelMidY} C${c1x},${labelMidY} ${c2x},${label.sy} ${label.sx},${label.sy}`,
             );
-            node.path.setAttribute('stroke', l.color);
-            node.dot.setAttribute('cx', `${l.sx}`);
-            node.dot.setAttribute('cy', `${l.sy}`);
-            node.dot.setAttribute('fill', l.color);
-          }
-
-          for (const eventId of Object.keys(overlayNodesRef.current)) {
-            if (!activeNodeIds.has(eventId)) {
-              removeOverlayNode(eventId);
-            }
+            node.path.setAttribute('stroke', label.color);
+            node.dot.setAttribute('cx', `${label.sx}`);
+            node.dot.setAttribute('cy', `${label.sy}`);
+            node.dot.setAttribute('fill', label.color);
           }
         }
       };
