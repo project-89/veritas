@@ -144,6 +144,45 @@ export function resolveCountryCode(
   return null;
 }
 
+// Country names indexed for headline scanning: longest name first (so
+// "South Korea" wins over "Korea"), skipping very short/ambiguous names.
+const COUNTRY_NAME_INDEX: ReadonlyArray<{
+  pattern: RegExp;
+  lat: number;
+  lng: number;
+  label: string;
+  code: string;
+}> = Object.entries(COUNTRY_COORDS)
+  .map(([code, entry]) => ({ code, ...entry }))
+  .filter((entry) => entry.name.length >= 4)
+  .sort((a, b) => b.name.length - a.name.length)
+  .map((entry) => ({
+    pattern: new RegExp(`\\b${entry.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'),
+    lat: entry.lat,
+    lng: entry.lng,
+    label: entry.name,
+    code: entry.code,
+  }));
+
+/**
+ * Best-effort geocoding from free text: scan for a known country name and
+ * return its coordinates. Used to place news headlines that carry no explicit
+ * location (e.g. world-news RSS) onto the map instead of a "global" placeholder.
+ * Conservative by design — matches whole country names, longest first, and
+ * returns null rather than guessing.
+ */
+export function geocodeFromText(
+  text: string,
+): { lat: number; lng: number; label: string; code: string } | null {
+  if (!text) return null;
+  for (const entry of COUNTRY_NAME_INDEX) {
+    if (entry.pattern.test(text)) {
+      return { lat: entry.lat, lng: entry.lng, label: entry.label, code: entry.code };
+    }
+  }
+  return null;
+}
+
 /**
  * Resolve a region string to centroid coordinates and label.
  * Normalizes input by lowercasing and replacing spaces/hyphens with underscores.

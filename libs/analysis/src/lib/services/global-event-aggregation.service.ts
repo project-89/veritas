@@ -9,7 +9,7 @@ import {
 import { ModuleRef } from '@nestjs/core';
 import { Observable, Subject } from 'rxjs';
 import type { EventCategory, EventSeverity, GeoLocation, GlobalEvent } from '../types/global-event';
-import { REGION_CENTROIDS, resolveCountryCode } from '../utils/geocoding';
+import { geocodeFromText, REGION_CENTROIDS, resolveCountryCode } from '../utils/geocoding';
 import { contentTokens, overlapCoefficient, sameLocation } from './utils/dedupe-global-events';
 import { AcledAdapter } from './signal-adapters/acled.adapter';
 import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
@@ -291,10 +291,14 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
             const title = item.title ?? 'Untitled';
             const id = `rss-${feed.name}-${title.slice(0, 50).replace(/\W/g, '-').toLowerCase()}`;
 
-            // Resolve location from feed region
-            const region = feed.region ?? 'global';
-            const centroid = REGION_CENTROIDS[region] ??
-              REGION_CENTROIDS['global'] ?? { lat: 20, lng: 0 };
+            // Prefer a country named in the headline, so world-news lands on the
+            // map instead of the "global" placeholder; else the feed's region.
+            const geo = geocodeFromText(title);
+            const region = geo ? 'geocoded' : (feed.region ?? 'global');
+            const centroid = geo
+              ? { lat: geo.lat, lng: geo.lng }
+              : (REGION_CENTROIDS[feed.region ?? 'global'] ??
+                REGION_CENTROIDS['global'] ?? { lat: 20, lng: 0 });
 
             // Classify category from feed category
             let category: EventCategory = 'media';
@@ -339,8 +343,9 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
               location: {
                 lat: centroid.lat + jitterLat,
                 lng: centroid.lng + jitterLng,
-                label: feed.region ?? 'Global',
+                label: geo ? geo.label : (feed.region ?? 'Global'),
                 region,
+                ...(geo ? { countryCode: geo.code } : {}),
               },
               magnitude: feed.tier === 1 ? 0.5 : 0.3,
               metadata: {
