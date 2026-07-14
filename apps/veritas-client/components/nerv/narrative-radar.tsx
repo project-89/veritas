@@ -330,14 +330,12 @@ export function NarrativeRadar({
     <div className="h-full flex flex-col px-5 py-4">
       <div className="grid h-full min-h-0 gap-5 xl:grid-cols-[minmax(460px,560px)_minmax(0,1fr)]">
         <div className="flex flex-col items-center justify-center rounded border border-nerv-border bg-nerv-bg-alt/20 p-3">
-          <div className="mb-3 w-full max-w-[520px]">
+          <div className="mb-3 flex w-full max-w-[520px] items-baseline justify-between gap-3">
             <div className="text-[13px] font-mono uppercase tracking-[0.22em] text-nerv-text-muted">
               Narrative Radar
             </div>
-            <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
-              Each spoke measures one narrative trait relative to the narratives currently loaded in
-              this investigation. Center means weak relative presence. The outer ring means
-              strongest relative presence in this result set.
+            <div className="text-[11px] font-mono text-nerv-text-muted/70">
+              center = weakest · edge = strongest, relative to loaded narratives
             </div>
           </div>
 
@@ -447,130 +445,72 @@ export function NarrativeRadar({
 
         <div className="min-h-0 rounded border border-nerv-border bg-nerv-bg-alt/20 p-4 overflow-y-auto">
           <div className="grid gap-4">
-            <section className="rounded border border-nerv-border/70 bg-nerv-bg/60 p-4">
-              <div className="text-[14px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted">
-                How To Read This
-              </div>
-              <div className="mt-3 grid gap-3 lg:grid-cols-3">
-                <div className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3">
-                  <div className="text-[15px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
-                    Spokes
-                  </div>
-                  <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
-                    Each spoke represents one dimension of narrative behavior: pace, reach,
-                    emotional intensity, outlier behavior, platform spread, and author breadth.
-                  </div>
-                </div>
-                <div className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3">
-                  <div className="text-[15px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
-                    Distance From Center
-                  </div>
-                  <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
-                    Farther from center means stronger relative expression of that trait inside the
-                    current narrative set. This is comparative, not absolute.
-                  </div>
-                </div>
-                <div className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3">
-                  <div className="text-[15px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
-                    Overlays
-                  </div>
-                  <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
-                    When multiple polygons overlap, the right-side breakdown explains the raw values
-                    so you can see what each shape is actually communicating.
-                  </div>
-                </div>
-              </div>
-            </section>
-
             {radarData.map((item) => (
               <section
                 key={item.id}
-                className="rounded border border-nerv-border/80 bg-nerv-bg/70 p-4"
+                className="rounded border border-nerv-border/80 bg-nerv-bg/70 p-3"
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-center gap-2">
                   <span
-                    className="mt-1 inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                    className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: item.color }}
                   />
-                  <div className="min-w-0">
-                    <div className="text-[14px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted">
-                      Selected Narrative
-                    </div>
-                    <div className="mt-1 text-[17px] leading-relaxed text-nerv-text-primary">
-                      {item.summary}
-                    </div>
+                  <div className="min-w-0 text-[14px] leading-snug text-nerv-text-primary line-clamp-2">
+                    {item.summary}
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3">
-                  {item.metrics.map((metric) => (
-                    <div
-                      key={metric.key}
-                      className="rounded border border-nerv-border/70 bg-nerv-bg-alt/30 px-4 py-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="text-[15px] font-mono uppercase tracking-[0.14em] text-nerv-text-secondary">
-                          {metric.detailLabel}
+                <div className="mt-3 grid gap-1">
+                  {item.metrics.map((metric) => {
+                    const notComputed = metric.scoreLabel.startsWith('—');
+                    const pct = Math.round(metric.value * 100);
+                    return (
+                      // Hover for the description — the bar + raw value carry the
+                      // meaning, so the explanation stays out of the way until asked for.
+                      <div
+                        key={metric.key}
+                        title={`${metric.description}\n\nHigh values: ${metric.whatHighMeans}`}
+                        className="cursor-help rounded px-2 py-1.5 hover:bg-nerv-bg-alt/40"
+                      >
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-[12px] font-mono uppercase tracking-[0.1em] text-nerv-text-secondary">
+                            {metric.detailLabel}
+                          </span>
+                          <span className="shrink-0 text-[10px] font-mono uppercase tracking-wider text-nerv-orange/80">
+                            {metric.emphasisLabel}
+                          </span>
                         </div>
-                        <div className="rounded border border-nerv-orange/40 bg-nerv-orange/8 px-2.5 py-1 text-[14px] font-mono text-nerv-orange tabular-nums">
-                          Relative Score {metric.scoreLabel}
+                        <div className="mt-1 flex items-center gap-2">
+                          <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-nerv-bg-alt/60">
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-full"
+                              style={{ width: `${pct}%`, backgroundColor: item.color }}
+                            />
+                          </div>
+                          <span className="w-6 shrink-0 text-right text-[11px] font-mono tabular-nums text-nerv-text-muted">
+                            {notComputed ? '—' : pct}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-mono text-nerv-text-muted">
+                          {metric.rawLabel}
                         </div>
                       </div>
-                      <div className="mt-3 text-[16px] leading-snug text-nerv-text-primary">
-                        {metric.rawLabel}
-                      </div>
-                      <div className="mt-2 text-[14px] font-mono uppercase tracking-[0.12em] text-nerv-orange/90">
-                        {metric.emphasisLabel}
-                      </div>
-                      <div className="mt-3 text-[14px] leading-relaxed text-nerv-text-secondary">
-                        {metric.description}
-                      </div>
-                      <div className="mt-2 text-[15px] leading-relaxed text-nerv-text-primary/85">
-                        High values: {metric.whatHighMeans}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             ))}
 
-            <section className="rounded border border-nerv-border/70 bg-nerv-bg/60 p-4">
-              <div className="text-[14px] font-mono uppercase tracking-[0.18em] text-nerv-text-muted">
-                Axis Guide
-              </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                {AXES.map((axis) => (
-                  <div
-                    key={axis.key}
-                    className="rounded border border-nerv-border/60 bg-nerv-bg-alt/20 p-3"
-                  >
-                    <div className="text-[15px] font-mono uppercase tracking-[0.12em] text-nerv-text-primary">
-                      {axis.detailLabel}
-                    </div>
-                    <div className="mt-1 text-[14px] leading-relaxed text-nerv-text-secondary">
-                      {axis.description}
-                    </div>
-                    <div className="mt-2 text-[15px] leading-relaxed text-nerv-text-primary/85">
-                      High values: {axis.whatHighMeans}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <div className="flex flex-wrap items-center gap-4">
-              {radarData.length < 3 && (
-                <span className="text-[13px] font-mono text-nerv-text-muted italic">
-                  Shift-click narratives to compare up to 3 overlays.
-                </span>
-              )}
+            <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-nerv-text-muted">
+              <span className="italic">hover a metric for what it means</span>
+              {radarData.length < 3 && <span>· shift-click to overlay up to 3</span>}
               {onCompare && radarData.length >= 2 && (
                 <button
                   type="button"
                   onClick={() => onCompare(radarData.map((d) => d.id))}
-                  className="px-3 py-1.5 text-[12px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
+                  className="ml-auto rounded-sm border border-nerv-orange px-3 py-1.5 text-[12px] font-mono uppercase tracking-wider text-nerv-orange transition-colors hover:bg-nerv-orange/10"
                 >
-                  Compare Selected Narratives
+                  Compare Selected
                 </button>
               )}
             </div>
