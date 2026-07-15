@@ -484,15 +484,21 @@ export class InvestigationController {
     investigation: Investigation,
     projectDossier?: ProjectDossier | null,
   ): InvestigationWithDossier {
+    // `investigation` may be a hydrated Mongoose document. Spreading one copies
+    // internal props ($__/_doc) while dropping the real fields (which live on
+    // the document, not as own-enumerable keys), so the client sees no _id or
+    // query. Normalize to a plain object first.
+    const maybeDoc = investigation as unknown as { toObject?: () => Investigation };
+    const plain = typeof maybeDoc.toObject === 'function' ? maybeDoc.toObject() : investigation;
     return {
-      ...investigation,
+      ...plain,
       linkedProjectDossierId:
-        investigation.linkedProjectDossierId ??
+        plain.linkedProjectDossierId ??
         projectDossier?._id?.toString() ??
         projectDossier?.id ??
         null,
       evidenceDossier: this.investigationEvidenceService.buildDossier(
-        investigation.evidenceSeeds ?? [],
+        plain.evidenceSeeds ?? [],
       ),
     };
   }
