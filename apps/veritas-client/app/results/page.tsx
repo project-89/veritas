@@ -2491,14 +2491,37 @@ function InvestigationWorkspace() {
                 onAnalyzeSelected={handleAnalyzeSelected}
                 onClearSelection={() => dispatch({ type: 'CLEAR_NARRATIVE_SELECTION' })}
               />
+            ) : state.pipeline.search === 'running' || state.pipeline.analyze === 'running' ? (
+              <div className="flex-1 flex items-center justify-center">
+                <span className="text-[12px] font-mono text-nerv-text-muted animate-nerv-pulse">
+                  {state.pipeline.search === 'running' ? 'SEARCHING...' : 'ANALYZING...'}
+                </span>
+              </div>
+            ) : scanJob?.status === 'completed' ? (
+              // Scan finished but produced too little to cluster into narratives —
+              // say so plainly instead of an ambiguous "awaiting data" spinner.
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 px-4 text-center">
+                <span className="text-[12px] font-mono uppercase tracking-wider text-nerv-text-muted">
+                  {state.posts.length > 0
+                    ? `${state.posts.length} post${state.posts.length === 1 ? '' : 's'} · too few to form narratives`
+                    : 'Scan collected no posts'}
+                </span>
+                <span className="text-[10px] font-mono text-nerv-text-muted/70 leading-relaxed max-w-[220px]">
+                  Keyless sources returned little for this query. Try a broader query or a wider time
+                  window.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRefresh}
+                  className="mt-1 px-3 py-1.5 text-[11px] font-mono uppercase tracking-wider border border-nerv-orange text-nerv-orange hover:bg-nerv-orange/10 rounded-sm transition-colors"
+                >
+                  Re-run scan
+                </button>
+              </div>
             ) : (
               <div className="flex-1 flex items-center justify-center">
                 <span className="text-[12px] font-mono text-nerv-text-muted animate-nerv-pulse">
-                  {state.pipeline.search === 'running'
-                    ? 'SEARCHING...'
-                    : state.pipeline.analyze === 'running'
-                      ? 'ANALYZING...'
-                      : 'AWAITING DATA'}
+                  AWAITING DATA
                 </span>
               </div>
             )}
