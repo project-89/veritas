@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NervBadge, NervMetric, NervPanel } from '../components/nerv';
+import { HexTacticalMap } from '../components/nerv/hex-tactical-map';
 import {
   createOrGetInvestigation,
   fetchInvestigations,
@@ -52,6 +53,17 @@ export default function CommandHome() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [launching, setLaunching] = useState(false);
+  const [view, setView] = useState<'command' | 'tactical'>('command');
+
+  // Remember the last-used home view (Command dashboard vs Tactical hex map).
+  useEffect(() => {
+    const v = localStorage.getItem('veritas-home-view');
+    if (v === 'tactical' || v === 'command') setView(v);
+  }, []);
+  const selectView = useCallback((v: 'command' | 'tactical') => {
+    setView(v);
+    localStorage.setItem('veritas-home-view', v);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,8 +124,25 @@ export default function CommandHome() {
               VERITAS
             </h1>
             <span className="text-[13px] font-mono text-nerv-text-muted tracking-[0.2em]">
-              COMMAND
+              {view === 'tactical' ? 'TACTICAL' : 'COMMAND'}
             </span>
+            {/* View toggle — Command dashboard vs holographic hex map */}
+            <div className="ml-auto flex items-center rounded-sm border border-nerv-border overflow-hidden">
+              {(['command', 'tactical'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => selectView(v)}
+                  className={`px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider transition-colors ${
+                    view === v
+                      ? 'bg-nerv-orange/15 text-nerv-orange'
+                      : 'text-nerv-text-muted hover:text-nerv-text'
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="relative">
@@ -181,8 +210,13 @@ export default function CommandHome() {
           </NervPanel>
         </div>
 
-        {/* Content region — fills the remaining viewport; sections scroll
-            internally instead of pushing the page past the fold. */}
+        {view === 'tactical' ? (
+          <div className="flex min-h-[420px] lg:flex-1 lg:min-h-0">
+            <HexTacticalMap events={events} onSelectEvent={() => router.push('/worldmap')} />
+          </div>
+        ) : (
+        // Content region — fills the remaining viewport; sections scroll
+        // internally instead of pushing the page past the fold.
         <div className="flex flex-col gap-4 lg:flex-1 lg:min-h-0">
         {/* Active + recent operations (full width; alerts moved to the top-bar bell) */}
         <NervPanel
@@ -282,6 +316,7 @@ export default function CommandHome() {
           )}
         </NervPanel>
         </div>
+        )}
       </div>
     </div>
   );
