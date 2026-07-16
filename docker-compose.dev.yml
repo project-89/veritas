@@ -5,9 +5,10 @@ version: '3.8'
 # This file adds Memgraph and Redis on top.
 
 services:
-  # Memgraph Graph Database
+  # Memgraph Graph Database — MAGE image adds the built-in graph algorithms
+  # (pagerank, betweenness, community detection) the social-graph analysis uses.
   memgraph:
-    image: memgraph/memgraph:latest
+    image: memgraph/memgraph-mage:latest
     ports:
       - "7687:7687"
       - "7444:7444"
