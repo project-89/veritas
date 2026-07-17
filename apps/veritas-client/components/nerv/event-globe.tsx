@@ -31,6 +31,9 @@ const LABEL_ENTER_DOT = 0.26;
 const LABEL_EXIT_DOT = 0.12;
 const LABEL_OFFSCREEN_MARGIN = 40;
 const LABEL_FADE_MS = 520; // fade in / fade out duration (kept in sync with CSS)
+// While the globe is actively being dragged, the docked label boxes + leader
+// lines whip around; hide them during interaction and settle them back after.
+const LABEL_INTERACTION_SETTLE_MS = 280;
 const LEADER_STUB_MIN = 16; // min horizontal run off the label / into the pin
 const CLUSTER_PX = 48; // events within this screen distance merge into one density badge
 const CLUSTER_MIN = 2; // show a count badge once a cluster holds at least this many events
@@ -90,6 +93,7 @@ export function EventGlobe({ events, onEventClick, focusLocation }: EventGlobePr
   const activeLabelsRef = useRef<Map<string, ActiveLabel>>(new Map());
   const leftSlotsRef = useRef<(string | null)[]>([]);
   const rightSlotsRef = useRef<(string | null)[]>([]);
+  const interactingRef = useRef(false);
   // Pooled SVG nodes for density-cluster count badges (reused frame to frame).
   const badgeNodesRef = useRef<
     Array<{ g: SVGGElement; circle: SVGCircleElement; text: SVGTextElement }>
@@ -282,7 +286,7 @@ export function EventGlobe({ events, onEventClick, focusLocation }: EventGlobePr
         path.setAttribute('fill', 'none');
         path.setAttribute('stroke-width', '1');
         path.style.opacity = '0';
-        path.style.transition = `opacity ${LABEL_FADE_MS}ms ease-out`;
+        path.style.transition = `opacity ${LABEL_INTERACTION_SETTLE_MS}ms ease-out`;
 
         const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         dot.setAttribute('r', '3');
@@ -434,6 +438,20 @@ export function EventGlobe({ events, onEventClick, focusLocation }: EventGlobePr
         // --- SCREEN-SPACE LABELS: sticky slot, fade in / stable / fade out ---
         if (svgRef.current && labelsRef.current) {
           const now = performance.now();
+
+          // While actively spinning/dragging, hide the docked label boxes + their
+          // leader lines (which otherwise whip around); the pin dots keep tracking
+          // so you can still see where things are, and labels settle back on stop.
+          const interacting =
+            mouseDown.current || now - lastInteractionAtRef.current < LABEL_INTERACTION_SETTLE_MS;
+          if (interacting !== interactingRef.current) {
+            interactingRef.current = interacting;
+            labelsRef.current.style.opacity = interacting ? '0' : '1';
+            for (const [eventId, label] of activeLabelsRef.current) {
+              const node = overlayNodesRef.current[eventId];
+              if (node) node.path.style.opacity = interacting ? '0' : label.phase === 'in' ? '0.5' : '0';
+            }
+          }
           const cw = container.clientWidth;
           const ch = container.clientHeight;
           const centerX = cw / 2;
@@ -770,7 +788,7 @@ export function EventGlobe({ events, onEventClick, focusLocation }: EventGlobePr
         <div
           ref={labelsRef}
           className="absolute inset-0 pointer-events-none"
-          style={{ zIndex: 6 }}
+          style={{ zIndex: 6, transition: 'opacity 0.2s ease' }}
         />
       </div>
       {/* Scanline overlay */}
