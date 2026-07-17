@@ -116,6 +116,7 @@ interface KeptSignature {
   location: GeoLocation;
   category: GlobalEvent['category'];
   time: number;
+  source: string;
 }
 
 export function dedupeGlobalEvents(
@@ -137,6 +138,10 @@ export function dedupeGlobalEvents(
     let isDuplicate = false;
     if (tokens.size > 0) {
       for (const sig of kept) {
+        // Only collapse across DIFFERENT sources (cross-source reports of one
+        // event). Distinct events from the same structured source — e.g. many
+        // separate NASA EONET wildfires with generic titles — must NOT merge.
+        if (sig.source === event.source) continue;
         if (sig.category !== event.category) continue;
         if (!sameLocation(sig.location, event.location)) continue;
         if (Number.isFinite(time) && Number.isFinite(sig.time) && Math.abs(sig.time - time) > windowMs) {
@@ -150,7 +155,7 @@ export function dedupeGlobalEvents(
     }
 
     if (isDuplicate) continue;
-    kept.push({ tokens, location: event.location, category: event.category, time });
+    kept.push({ tokens, location: event.location, category: event.category, time, source: event.source });
     result.push(event);
   }
 

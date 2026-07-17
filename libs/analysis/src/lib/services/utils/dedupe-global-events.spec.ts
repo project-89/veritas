@@ -83,11 +83,13 @@ describe('dedupeGlobalEvents', () => {
     const events = [
       makeEvent({
         id: 'usgs-ss',
+        source: 'USGS',
         title: 'M4.9 Earthquake — South Sandwich Islands region',
         location: { lat: -56.3, lng: -27.5, label: 'South Sandwich Islands region' },
       }),
       makeEvent({
         id: 'news-ss',
+        source: 'GDACS',
         title: 'Earthquake in South Sandwich Islands Region',
         location: { lat: -57.0, lng: -26.2, label: 'South Sandwich Islands Region' },
       }),
@@ -95,6 +97,16 @@ describe('dedupeGlobalEvents', () => {
     const result = dedupeGlobalEvents(events);
     expect(result).toHaveLength(1);
     expect(result[0]?.id).toBe('usgs-ss');
+  });
+
+  it('keeps distinct same-source events with generic titles (e.g. EONET wildfires)', () => {
+    // Two separate wildfires from the same source near each other must NOT merge
+    // just because they share the word "wildfire" — only cross-source dupes do.
+    const events = [
+      makeEvent({ id: 'eonet-1', source: 'NASA EONET', title: 'Wildfire', location: { lat: 37, lng: -120, label: 'Wildfire' } }),
+      makeEvent({ id: 'eonet-2', source: 'NASA EONET', title: 'Wildfire', location: { lat: 38, lng: -121, label: 'Wildfire' } }),
+    ];
+    expect(dedupeGlobalEvents(events)).toHaveLength(2);
   });
 
   it('keeps genuinely distinct events at the same location', () => {
@@ -119,12 +131,14 @@ describe('dedupeGlobalEvents', () => {
     const events = [
       makeEvent({
         id: 'gdacs',
+        source: 'GDACS',
         title: 'Earthquake in Philippines',
         location: { lat: 5.18, lng: 125.68, label: 'Philippines' },
         timestamp: '2026-07-14T08:00:00.000Z',
       }),
       makeEvent({
         id: 'usgs',
+        source: 'USGS',
         title: 'M5.2 Earthquake — 56 km SSW of Sarangani, Philippines',
         location: { lat: 4.94, lng: 125.24, label: '56 km SSW of Sarangani, Philippines' },
         timestamp: '2026-07-12T08:00:00.000Z',

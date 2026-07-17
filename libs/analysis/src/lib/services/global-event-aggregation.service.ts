@@ -13,9 +13,10 @@ import { geocodeFromText, REGION_CENTROIDS, resolveCountryCode } from '../utils/
 import { contentTokens, overlapCoefficient, sameLocation } from './utils/dedupe-global-events';
 import { AcledAdapter } from './signal-adapters/acled.adapter';
 import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
+import { EonetAdapter } from './signal-adapters/eonet.adapter';
 import { GdacsAdapter } from './signal-adapters/gdacs.adapter';
 import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
-import { ReliefWebAdapter } from './signal-adapters/reliefweb.adapter';
+import { NwsAdapter } from './signal-adapters/nws.adapter';
 import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
 import { UsgsAdapter } from './signal-adapters/usgs.adapter';
 /** Injection token for the global event repository (avoids cross-module dependency). */
@@ -44,7 +45,8 @@ const GDELT_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes (GDELT rate-limits aggre
 const ACLED_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 const COINGECKO_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const GDACS_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
-const RELIEFWEB_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes
+const EONET_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes (open events change slowly)
+const NWS_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const RSS_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const RSS_MAX_AGE_MS = 24 * 60 * 60 * 1000; // keep feed items from the last 24h
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
@@ -77,7 +79,8 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   private readonly acled = new AcledAdapter();
   private readonly coingecko = new CoinGeckoAdapter();
   private readonly gdacs = new GdacsAdapter();
-  private readonly reliefweb = new ReliefWebAdapter();
+  private readonly eonet = new EonetAdapter();
+  private readonly nws = new NwsAdapter();
 
   // Polling handles
   private usgsInterval: ReturnType<typeof setInterval> | null = null;
@@ -85,7 +88,8 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   private acledInterval: ReturnType<typeof setInterval> | null = null;
   private coingeckoInterval: ReturnType<typeof setInterval> | null = null;
   private gdacsInterval: ReturnType<typeof setInterval> | null = null;
-  private reliefwebInterval: ReturnType<typeof setInterval> | null = null;
+  private eonetInterval: ReturnType<typeof setInterval> | null = null;
+  private nwsInterval: ReturnType<typeof setInterval> | null = null;
   private rssInterval: ReturnType<typeof setInterval> | null = null;
 
   // Deduplication: eventId → timestamp (ms)
@@ -99,6 +103,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     location: GeoLocation;
     category: EventCategory;
     time: number;
+    source: string;
   }> = [];
 
   // RxJS event stream
@@ -137,7 +142,8 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     this.scheduleInitialPoll(() => void this.pollRss(), 20_000);
     this.scheduleInitialPoll(() => void this.pollGdelt(), 60_000);
     this.scheduleInitialPoll(() => void this.pollGdacs(), 75_000);
-    this.scheduleInitialPoll(() => void this.pollReliefweb(), 80_000);
+    this.scheduleInitialPoll(() => void this.pollEonet(), 30_000);
+    this.scheduleInitialPoll(() => void this.pollNws(), 45_000);
 
     // ACLED polling — disabled by default (requires API key setup)
     const acledEnabled = process.env['ACLED_ENABLED'] === 'true';
@@ -158,8 +164,10 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     this.coingeckoInterval.unref?.();
     this.gdacsInterval = setInterval(() => void this.pollGdacs(), GDACS_INTERVAL_MS);
     this.gdacsInterval.unref?.();
-    this.reliefwebInterval = setInterval(() => void this.pollReliefweb(), RELIEFWEB_INTERVAL_MS);
-    this.reliefwebInterval.unref?.();
+    this.eonetInterval = setInterval(() => void this.pollEonet(), EONET_INTERVAL_MS);
+    this.eonetInterval.unref?.();
+    this.nwsInterval = setInterval(() => void this.pollNws(), NWS_INTERVAL_MS);
+    this.nwsInterval.unref?.();
     this.rssInterval = setInterval(() => void this.pollRss(), RSS_INTERVAL_MS);
     this.rssInterval.unref?.();
   }
@@ -175,7 +183,8 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     if (this.gdeltInterval) clearInterval(this.gdeltInterval);
     if (this.acledInterval) clearInterval(this.acledInterval);
     if (this.gdacsInterval) clearInterval(this.gdacsInterval);
-    if (this.reliefwebInterval) clearInterval(this.reliefwebInterval);
+    if (this.eonetInterval) clearInterval(this.eonetInterval);
+    if (this.nwsInterval) clearInterval(this.nwsInterval);
     this.subject.complete();
     this.logger.log('Global event aggregation stopped');
   }
@@ -438,23 +447,29 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     }
   }
 
-  private async pollReliefweb(): Promise<void> {
+  private async pollEonet(): Promise<void> {
     try {
-      const now = new Date();
-      const signals = await this.reliefweb.fetchSignals({
-        keywords: [],
-        startDate: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
-        endDate: now.toISOString(),
-      });
-
+      const signals = await this.eonet.fetchSignals();
       const events = signals
-        .map((s) => this.normalizeReliefweb(s))
+        .map((s) => this.normalizeEonet(s))
         .filter((e): e is GlobalEvent => e !== null);
-
       await this.processEvents(events);
-      this.logger.debug(`ReliefWeb poll: ${events.length} events`);
+      this.logger.debug(`EONET poll: ${events.length} events`);
     } catch (err) {
-      this.logger.error(`ReliefWeb poll error: ${err}`);
+      this.logger.error(`EONET poll error: ${err}`);
+    }
+  }
+
+  private async pollNws(): Promise<void> {
+    try {
+      const signals = await this.nws.fetchSignals();
+      const events = signals
+        .map((s) => this.normalizeNws(s))
+        .filter((e): e is GlobalEvent => e !== null);
+      await this.processEvents(events);
+      this.logger.debug(`NWS poll: ${events.length} events`);
+    } catch (err) {
+      this.logger.error(`NWS poll error: ${err}`);
     }
   }
 
@@ -504,13 +519,22 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     const time = new Date(event.timestamp).getTime();
 
     for (const sig of this.recentSignatures) {
+      // Only cross-source reports of the same event are duplicates; distinct
+      // events from one structured source (e.g. many EONET wildfires) are not.
+      if (sig.source === event.source) continue;
       if (sig.category !== event.category) continue;
       if (!sameLocation(sig.location, event.location)) continue;
       if (Number.isFinite(time) && Math.abs(sig.time - time) > CONTENT_DEDUP_WINDOW_MS) continue;
       if (overlapCoefficient(tokens, sig.tokens) >= CONTENT_DEDUP_OVERLAP) return true;
     }
 
-    this.recentSignatures.push({ tokens, location: event.location, category: event.category, time });
+    this.recentSignatures.push({
+      tokens,
+      location: event.location,
+      category: event.category,
+      time,
+      source: event.source,
+    });
     return false;
   }
 
@@ -739,33 +763,28 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   }
 
   // ---------------------------------------------------------------------------
-  // Normalization — ReliefWeb
+  // Normalization — NASA EONET
   // ---------------------------------------------------------------------------
 
-  private normalizeReliefweb(signal: ExternalSignal): GlobalEvent | null {
-    const country = (signal.metadata['country'] as string) || '';
-    const resolved = resolveCountryCode(country);
+  private normalizeEonet(signal: ExternalSignal): GlobalEvent | null {
+    const coords = signal.metadata['coordinates'] as
+      | { latitude?: number; longitude?: number }
+      | undefined;
+    if (!Number.isFinite(coords?.latitude) || !Number.isFinite(coords?.longitude)) return null;
 
-    const location: GeoLocation = resolved
-      ? {
-          lat: resolved.lat,
-          lng: resolved.lng,
-          label: resolved.label,
-          countryCode: country,
-        }
-      : {
-          lat: 0,
-          lng: 0,
-          label: country || 'Unknown',
-        };
+    const location: GeoLocation = {
+      lat: coords?.latitude ?? 0,
+      lng: coords?.longitude ?? 0,
+      label: (signal.metadata['eonetCategory'] as string) || 'Natural Event',
+    };
 
     return {
       id: signal.id,
-      source: 'ReliefWeb',
-      category: 'political' as EventCategory,
-      severity: this.reliefwebSeverity(signal.magnitude),
+      source: 'NASA EONET',
+      category: 'environmental' as EventCategory,
+      severity: this.magnitudeSeverity(signal.magnitude),
       title: signal.title,
-      description: this.getEventDescription(signal.description, signal.title, 'ReliefWeb'),
+      description: this.getEventDescription(signal.description, signal.title, 'NASA EONET'),
       timestamp: signal.timestamp,
       location,
       magnitude: signal.magnitude,
@@ -774,10 +793,43 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     };
   }
 
-  private reliefwebSeverity(magnitude: number): EventSeverity {
-    if (magnitude >= 0.9) return 'critical';
+  // ---------------------------------------------------------------------------
+  // Normalization — NOAA/NWS
+  // ---------------------------------------------------------------------------
+
+  private normalizeNws(signal: ExternalSignal): GlobalEvent | null {
+    const coords = signal.metadata['coordinates'] as
+      | { latitude?: number; longitude?: number }
+      | undefined;
+    if (!Number.isFinite(coords?.latitude) || !Number.isFinite(coords?.longitude)) return null;
+
+    const sev = (signal.metadata['nwsSeverity'] as string) ?? 'Unknown';
+    const location: GeoLocation = {
+      lat: coords?.latitude ?? 0,
+      lng: coords?.longitude ?? 0,
+      label: (signal.metadata['areaDesc'] as string)?.split(';')[0]?.trim() || 'United States',
+      countryCode: 'US',
+    };
+
+    return {
+      id: signal.id,
+      source: 'NOAA/NWS',
+      category: 'environmental' as EventCategory,
+      severity: sev === 'Extreme' ? 'critical' : sev === 'Severe' ? 'high' : 'medium',
+      title: signal.title,
+      description: this.getEventDescription(signal.description, signal.title, 'NOAA/NWS'),
+      timestamp: signal.timestamp,
+      location,
+      magnitude: signal.magnitude,
+      metadata: signal.metadata,
+      expiresAt: new Date(Date.now() + DEFAULT_EVENT_TTL_MS).toISOString(),
+    };
+  }
+
+  private magnitudeSeverity(magnitude: number): EventSeverity {
+    if (magnitude >= 0.85) return 'critical';
     if (magnitude >= 0.7) return 'high';
-    if (magnitude >= 0.5) return 'medium';
+    if (magnitude >= 0.45) return 'medium';
     return 'low';
   }
 }

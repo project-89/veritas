@@ -11,7 +11,7 @@ import { FredAdapter } from './signal-adapters/fred.adapter';
 import { GdacsAdapter } from './signal-adapters/gdacs.adapter';
 import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
 import { LlmHypothesisAdapter } from './signal-adapters/llm-hypothesis.adapter';
-import { ReliefWebAdapter } from './signal-adapters/reliefweb.adapter';
+import { EonetAdapter } from './signal-adapters/eonet.adapter';
 import type { ExternalSignal, SignalAdapter } from './signal-adapters/signal-adapter.interface';
 import { UsgsAdapter } from './signal-adapters/usgs.adapter';
 import { WorldBankAdapter } from './signal-adapters/worldbank.adapter';
@@ -208,7 +208,7 @@ export class DownstreamEffectsService {
     this.adapters.push(new AcledAdapter());
     this.adapters.push(new UsgsAdapter());
     this.adapters.push(new GdacsAdapter());
-    this.adapters.push(new ReliefWebAdapter());
+    this.adapters.push(new EonetAdapter());
 
     // The LLM-hypothesis adapter INVENTS plausible signals rather than
     // fetching real ones. Feeding synthetic signals into causal reasoning
