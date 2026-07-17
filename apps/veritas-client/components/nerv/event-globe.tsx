@@ -30,7 +30,8 @@ const LABEL_ANCHOR_ALTITUDE = 0.007;
 const LABEL_ENTER_DOT = 0.26;
 const LABEL_EXIT_DOT = 0.12;
 const LABEL_OFFSCREEN_MARGIN = 40;
-const LABEL_FADE_MS = 520; // fade in / fade out duration (kept in sync with CSS)
+const LABEL_FADE_MS = 300; // label box fade in / out duration
+const LABEL_DOT_FADE_MS = 130; // pin dots snap fast so back-facing ones don't linger/show through
 // While the globe is actively being dragged, the docked label boxes + leader
 // lines whip around; hide them during interaction and settle them back after.
 const LABEL_INTERACTION_SETTLE_MS = 280;
@@ -291,7 +292,7 @@ export function EventGlobe({ events, onEventClick, focusLocation }: EventGlobePr
         const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         dot.setAttribute('r', '3');
         dot.style.opacity = '0';
-        dot.style.transition = `opacity ${LABEL_FADE_MS}ms ease-out`;
+        dot.style.transition = `opacity ${LABEL_DOT_FADE_MS}ms ease-out`;
 
         wrapper.addEventListener('click', () => {
           const ev = eventsRef.current.find((e) => e.id === eventId);
