@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
+
 export interface NervTickerItem {
   id: string;
   severity: string;
@@ -18,12 +20,33 @@ const severityDotColor: Record<string, string> = {
   critical: 'bg-nerv-red animate-nerv-pulse-fast',
 };
 
+// Constant scroll speed. The keyframe travels -50% of the (duplicated) strip,
+// so a fixed duration makes speed scale with item count — a long feed would
+// fly by unreadably. Instead, derive the duration from the measured width.
+const PX_PER_SECOND = 55;
+const MIN_DURATION_S = 30;
+
 export function NervTicker({ items, onItemClick }: NervTickerProps) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [durationS, setDurationS] = useState(60);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    // One full loop = half the strip (items are rendered twice).
+    const onePassPx = el.scrollWidth / 2;
+    setDurationS(Math.max(MIN_DURATION_S, Math.round(onePassPx / PX_PER_SECOND)));
+  }, [items]);
+
   if (items.length === 0) return null;
 
   return (
     <div className="w-full overflow-hidden bg-nerv-bg border-t border-nerv-border h-8 flex items-center">
-      <div className="flex items-center animate-nerv-ticker whitespace-nowrap">
+      <div
+        ref={trackRef}
+        className="flex items-center animate-nerv-ticker whitespace-nowrap"
+        style={{ animationDuration: `${durationS}s` }}
+      >
         {([0, 1] as const).flatMap((pass) =>
           items.map((item) => (
             <button
