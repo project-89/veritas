@@ -1,3 +1,15 @@
+/**
+ * Editorial ownership/control of a feed. This is PROVENANCE, not a quality
+ * score: the platform's job is seeing who says what, so official state
+ * mouthpieces are valuable primary sources for narrative attribution — as
+ * long as they are never presented as independent reporting.
+ *
+ * - independent:        privately owned, editorially independent
+ * - public-broadcaster: state-funded but editorially independent (BBC, DW)
+ * - state-media:        state-controlled messaging (Xinhua, RT, Sputnik)
+ */
+export type FeedOwnership = 'independent' | 'public-broadcaster' | 'state-media';
+
 export interface RssFeedEntry {
   name: string;
   url: string;
@@ -5,6 +17,8 @@ export interface RssFeedEntry {
   tier: 1 | 2 | 3;
   language: string;
   region?: string;
+  /** Defaults to 'independent' when omitted. */
+  ownership?: FeedOwnership;
 }
 
 export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
@@ -19,6 +33,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'global',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'Al Jazeera',
@@ -27,6 +42,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'global',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'France 24 - World',
@@ -35,6 +51,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'global',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'Guardian - World',
@@ -51,6 +68,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'global',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'NPR News',
@@ -59,6 +77,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'us',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'CBS News',
@@ -129,6 +148,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'us',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'PBS NewsHour',
@@ -137,6 +157,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'us',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'Politico',
@@ -231,6 +252,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'europe',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'BBC - Europe',
@@ -239,6 +261,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'europe',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'Guardian - Europe',
@@ -295,6 +318,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 2,
       language: 'en',
       region: 'europe',
+      ownership: 'public-broadcaster',
     },
   ],
 
@@ -309,6 +333,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'middle_east',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'BBC - Middle East',
@@ -317,6 +342,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'middle_east',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'Al-Monitor',
@@ -403,6 +429,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'asia',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'Channel News Asia',
@@ -411,6 +438,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'singapore',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'Japan Times',
@@ -443,6 +471,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 2,
       language: 'en',
       region: 'australia',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'NHK World',
@@ -451,6 +480,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 2,
       language: 'en',
       region: 'japan',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'Rappler',
@@ -473,6 +503,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'africa',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'AllAfrica',
@@ -497,6 +528,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 2,
       language: 'en',
       region: 'africa',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'The Africa Report',
@@ -535,6 +567,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'latin_america',
+      ownership: 'public-broadcaster',
     },
     {
       name: 'InSight Crime',
@@ -1229,6 +1262,154 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'europe',
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // OFFICIAL STATE MEDIA
+  //
+  // Primary sources for what governments tell the world (these are the
+  // English-language, outward-facing arms). The value is comparative: when
+  // Xinhua, RT, and Reuters describe the same event differently, THAT GAP is
+  // the narrative signal. Every entry is tagged ownership: 'state-media' and
+  // must surface with that provenance everywhere downstream.
+  //
+  // All URLs verified live 2026-07-18. Global Times had no working RSS;
+  // Xinhua's english RSS is abandoned (last items 2018) and China Daily's
+  // items carry no dates (would read as perpetually fresh) — China News
+  // Service (ecns.cn, the second official state wire) is dated and current.
+  // Reuters/AFP have no public RSS (wire services); their stories reach us
+  // via GDELT and the wire copy carried by BBC/DW/France 24.
+  // ---------------------------------------------------------------------------
+  state_media: [
+    {
+      name: 'China News Service',
+      url: 'https://www.ecns.cn/rss/rss.xml',
+      category: 'state_media',
+      tier: 1,
+      language: 'en',
+      region: 'china',
+      ownership: 'state-media',
+    },
+    {
+      name: 'CGTN - World',
+      url: 'https://www.cgtn.com/subscribe/rss/section/world.xml',
+      category: 'state_media',
+      tier: 1,
+      language: 'en',
+      region: 'china',
+      ownership: 'state-media',
+    },
+    {
+      name: 'CGTN - China',
+      url: 'https://www.cgtn.com/subscribe/rss/section/china.xml',
+      category: 'state_media',
+      tier: 2,
+      language: 'en',
+      region: 'china',
+      ownership: 'state-media',
+    },
+    {
+      name: 'RT News',
+      url: 'https://www.rt.com/rss/news/',
+      category: 'state_media',
+      tier: 1,
+      language: 'en',
+      region: 'russia',
+      ownership: 'state-media',
+    },
+    {
+      name: 'Sputnik',
+      url: 'https://sputnikglobe.com/export/rss2/archive/index.xml',
+      category: 'state_media',
+      tier: 1,
+      language: 'en',
+      region: 'russia',
+      ownership: 'state-media',
+    },
+    {
+      name: 'TASS',
+      url: 'https://tass.com/rss/v2.xml',
+      category: 'state_media',
+      tier: 1,
+      language: 'en',
+      region: 'russia',
+      ownership: 'state-media',
+    },
+    {
+      name: 'Press TV',
+      url: 'https://www.presstv.ir/rss.xml',
+      category: 'state_media',
+      tier: 1,
+      language: 'en',
+      region: 'iran',
+      ownership: 'state-media',
+    },
+    {
+      name: 'teleSUR English',
+      url: 'https://www.telesurenglish.net/feed',
+      category: 'state_media',
+      tier: 1,
+      language: 'en',
+      region: 'venezuela',
+      ownership: 'state-media',
+    },
+    {
+      name: 'Anadolu Agency',
+      url: 'https://www.aa.com.tr/en/rss/default?cat=guncel',
+      category: 'state_media',
+      tier: 1,
+      language: 'en',
+      region: 'turkey',
+      ownership: 'state-media',
+    },
+  ],
+
+  // ---------------------------------------------------------------------------
+  // GLOBAL SOUTH / REGIONAL BALANCE
+  // Independent outlets filling regions the catalog under-covered.
+  // All URLs verified live 2026-07-18.
+  // ---------------------------------------------------------------------------
+  regional_balance: [
+    {
+      name: 'The Hindu - World',
+      url: 'https://www.thehindu.com/news/international/feeder/default.rss',
+      category: 'regional_balance',
+      tier: 1,
+      language: 'en',
+      region: 'india',
+    },
+    {
+      name: 'AllAfrica',
+      url: 'https://allafrica.com/tools/headlines/rdf/latest/headlines.rdf',
+      category: 'regional_balance',
+      tier: 1,
+      language: 'en',
+      region: 'africa',
+    },
+    {
+      name: 'MercoPress',
+      url: 'https://en.mercopress.com/rss/',
+      category: 'regional_balance',
+      tier: 1,
+      language: 'en',
+      region: 'latin_america',
+    },
+    {
+      name: 'Arab News',
+      url: 'https://www.arabnews.com/rss.xml',
+      category: 'regional_balance',
+      tier: 1,
+      language: 'en',
+      region: 'saudi_arabia',
+    },
+    {
+      name: 'Korea Herald',
+      url: 'https://www.koreaherald.com/rss/newsAll',
+      category: 'regional_balance',
+      tier: 1,
+      language: 'en',
+      region: 'south_korea',
     },
   ],
 };

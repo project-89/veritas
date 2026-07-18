@@ -30,6 +30,8 @@ export interface RssFeedEntry {
   tier: 1 | 2 | 3;
   language: string;
   region?: string;
+  /** Editorial control: independent | public-broadcaster | state-media. */
+  ownership?: 'independent' | 'public-broadcaster' | 'state-media';
 }
 
 interface EventRepository {
@@ -361,6 +363,10 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
                 feedName: feed.name,
                 feedCategory: feed.category,
                 feedTier: feed.tier,
+                // Provenance: state-media vs public-broadcaster vs independent.
+                // Never dropped — comparing what state outlets say against
+                // everyone else IS the narrative signal.
+                feedOwnership: feed.ownership ?? 'independent',
                 link: item.link,
               },
               expiresAt: new Date(Date.now() + DEFAULT_EVENT_TTL_MS).toISOString(),

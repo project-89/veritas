@@ -28,6 +28,27 @@ export const REGION_CENTROIDS: Record<string, { lat: number; lng: number }> = {
   east_africa: { lat: 0.0, lng: 35.0 },
   southern_africa: { lat: -25.0, lng: 25.0 },
   north_africa: { lat: 28.0, lng: 10.0 },
+  // Country-level keys used as feed home regions in the RSS catalog — without
+  // them, feeds whose headlines don't geocode fall back to the mid-Atlantic
+  // "global" centroid instead of their actual home region.
+  russia: { lat: 61.5, lng: 105.0 },
+  china: { lat: 35.0, lng: 105.0 },
+  iran: { lat: 32.4, lng: 53.7 },
+  turkey: { lat: 39.0, lng: 35.2 },
+  venezuela: { lat: 6.4, lng: -66.6 },
+  india: { lat: 20.6, lng: 79.0 },
+  saudi_arabia: { lat: 24.0, lng: 45.0 },
+  south_korea: { lat: 35.9, lng: 127.8 },
+  japan: { lat: 36.2, lng: 138.3 },
+  singapore: { lat: 1.35, lng: 103.8 },
+  kenya: { lat: -0.02, lng: 37.9 },
+  israel: { lat: 31.0, lng: 34.9 },
+  philippines: { lat: 12.9, lng: 121.8 },
+  brazil: { lat: -14.2, lng: -51.9 },
+  argentina: { lat: -38.4, lng: -63.6 },
+  australia: { lat: -25.3, lng: 133.8 },
+  france: { lat: 46.2, lng: 2.2 },
+  balkans: { lat: 43.0, lng: 20.5 },
 };
 
 export const COUNTRY_COORDS: Record<string, { lat: number; lng: number; name: string }> = {
