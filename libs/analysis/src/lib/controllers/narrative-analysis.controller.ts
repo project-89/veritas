@@ -18,6 +18,8 @@ import type { DownstreamEffectsResult, MyceliumData } from '../services/downstre
 import { DownstreamEffectsService } from '../services/downstream-effects.service';
 import type { EntityAnalysisResponse, InsightInput } from '../services/entity-analysis.service';
 import { EntityAnalysisService } from '../services/entity-analysis.service';
+import type { ExamplePost, FailureExampleResult } from '../services/failure-example.service';
+import { FailureExampleService } from '../services/failure-example.service';
 import type { GenealogyResponse, NarrativeSnapshot } from '../services/genealogy.service';
 import { NarrativeGenealogyService } from '../services/genealogy.service';
 import type {
@@ -271,6 +273,7 @@ export class NarrativeAnalysisController {
     private readonly claimVerificationService: ClaimVerificationService,
     private readonly intelligenceEngineService: IntelligenceEngineService,
     private readonly coverageProbeService: CoverageProbeService,
+    private readonly failureExampleService: FailureExampleService,
   ) {}
 
   /**
@@ -342,6 +345,24 @@ export class NarrativeAnalysisController {
       investigation: body.investigation,
       format: body.format ?? 'markdown',
     });
+  }
+
+  /**
+   * Extract concrete, evidence-grounded failure examples about a subject
+   * (typically an AI model) from scanned posts. Each example cites a verbatim
+   * excerpt from its source post, verified server-side.
+   */
+  @Post('failure-examples')
+  async extractFailureExamples(
+    @Body() body: { subject: string; posts: ExamplePost[] },
+  ): Promise<FailureExampleResult> {
+    const subject = (body.subject ?? '').trim();
+    if (!subject) {
+      throw new BadRequestException('subject is required');
+    }
+    const posts = body.posts ?? [];
+    this.logger.log(`Failure-example extraction for "${subject}" over ${posts.length} posts`);
+    return this.failureExampleService.extract(subject, posts);
   }
 
   /**

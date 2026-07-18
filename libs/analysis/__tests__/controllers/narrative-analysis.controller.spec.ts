@@ -3,6 +3,7 @@ import { NarrativeAnalysisController } from '../../src/lib/controllers/narrative
 import { ClaimVerificationService } from '../../src/lib/services/claim-verification.service';
 import { ComparisonService } from '../../src/lib/services/comparison.service';
 import { CoverageProbeService } from '../../src/lib/services/coverage-probe.service';
+import { FailureExampleService } from '../../src/lib/services/failure-example.service';
 import { DeviationService } from '../../src/lib/services/deviation.service';
 import { DownstreamEffectsService } from '../../src/lib/services/downstream-effects.service';
 import { EntityAnalysisService } from '../../src/lib/services/entity-analysis.service';
@@ -181,6 +182,21 @@ describe('NarrativeAnalysisController', () => {
               source: 'gdelt-timelinevol',
               timeline: [],
               totalVolume: 0,
+            }),
+          },
+        },
+        {
+          provide: FailureExampleService,
+          useValue: {
+            extract: jest.fn().mockResolvedValue({
+              status: 'skipped',
+              subject: '',
+              examples: [],
+              vagueComplaintCount: 0,
+              ungroundedDropped: 0,
+              postsScanned: 0,
+              modelUsed: null,
+              promptVersion: 1,
             }),
           },
         },

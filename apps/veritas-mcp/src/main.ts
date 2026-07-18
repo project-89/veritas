@@ -10,6 +10,7 @@
  *   veritas_get_scan / _posts -> read what a scan collected
  *   veritas_analyze_narratives -> cluster + summarize (surfaces provenance flags)
  *   veritas_verify_claim -> grounded fact-check
+ *   veritas_extract_failure_examples -> evidence-grounded failure corpus from a scan
  *   veritas_coverage_probe -> when was a topic active (adaptive-window signal)
  *   veritas_recent_scans -> list recent scans/investigations
  *
@@ -293,6 +294,40 @@ server.registerTool(
       reasoning: r?.['reasoning'],
       sourcesChecked: r?.['sourcesChecked'],
     });
+  },
+);
+
+server.registerTool(
+  'veritas_extract_failure_examples',
+  {
+    description:
+      'Extract concrete, documented failure examples about a subject (typically an AI ' +
+      "model, e.g. 'Google Gemini') from a completed scan's posts. Each example cites a " +
+      'verbatim excerpt from its source post, verified server-side — vague complaints are ' +
+      'counted separately, never turned into examples. Returns provenance (platform, ' +
+      'author, url, engagement) per example.',
+    inputSchema: { scanId: z.string(), subject: z.string() },
+  },
+  async ({ scanId, subject }) => {
+    budgetCheck();
+    const data = await api<{ posts?: Array<Record<string, unknown>> }>(`/scan/${scanId}/posts`);
+    const payload = (data.posts ?? []).map((p) => ({
+      id: p['id'] ?? p['postId'] ?? '',
+      text: p['text'],
+      platform: p['platform'],
+      authorName: p['authorName'],
+      authorHandle: p['authorHandle'],
+      timestamp: p['timestamp'],
+      engagement: p['engagement'],
+      url: p['url'],
+    }));
+    if (payload.length === 0) return ok({ examples: [], note: 'no posts to extract from' });
+    return ok(
+      await api('/narratives/failure-examples', {
+        method: 'POST',
+        body: { subject, posts: payload },
+      }),
+    );
   },
 );
 
