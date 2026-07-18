@@ -4,19 +4,24 @@ import type { ExternalSignal, SignalAdapter } from './signal-adapter.interface';
 const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
 
 // EONET category → coarse magnitude (0..1) since EONET rarely carries a scalar.
+// Capped BELOW the 0.7 high-severity threshold: an EONET entry means "NASA is
+// tracking this natural event", not "this is an emergency" — it carries no
+// impact/intensity data, so a routine prescribed burn would otherwise rank the
+// same as a disaster. Sources with real impact scalars and alert levels
+// (GDACS, USGS) own the high/critical range.
 const CATEGORY_MAGNITUDE: Record<string, number> = {
-  volcanoes: 0.85,
-  severeStorms: 0.8,
-  earthquakes: 0.75,
-  wildfires: 0.7,
-  floods: 0.7,
-  landslides: 0.6,
-  tempExtremes: 0.55,
-  drought: 0.5,
-  manmade: 0.5,
-  seaLakeIce: 0.45,
-  snow: 0.4,
-  dustHaze: 0.4,
+  volcanoes: 0.65,
+  severeStorms: 0.65,
+  earthquakes: 0.6,
+  wildfires: 0.55,
+  floods: 0.55,
+  landslides: 0.5,
+  tempExtremes: 0.5,
+  drought: 0.45,
+  manmade: 0.45,
+  seaLakeIce: 0.4,
+  snow: 0.35,
+  dustHaze: 0.35,
   waterColor: 0.3,
 };
 

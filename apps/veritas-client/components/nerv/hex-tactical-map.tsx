@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { EventCategory, EventSeverity, GlobalEvent } from '../../lib/global-event.types';
+import {
+  EVENT_COLORS,
+  type EventCategory,
+  type EventSeverity,
+  type GlobalEvent,
+} from '../../lib/global-event.types';
 
 // Same low-res country geometry the globe uses; rasterized once into the hex
 // grid via point-in-polygon so continents read as an amber hex-mesh silhouette.
@@ -58,6 +63,13 @@ function pointInRing(lng: number, lat: number, ring: Ring): boolean {
 }
 interface Feature {
   geometry?: { type?: string; coordinates?: unknown };
+  properties?: { NAME?: string; ISO_A3?: string };
+}
+
+/** Antarctica renders as a huge smeared tile band on an equirectangular grid
+ *  and hosts no events — leave it off the tactical picture. */
+function isAntarctica(f: Feature): boolean {
+  return f.properties?.ISO_A3 === 'ATA' || f.properties?.NAME === 'Antarctica';
 }
 function isLand(lng: number, lat: number, features: Feature[]): boolean {
   for (const f of features) {
@@ -99,7 +111,9 @@ export function HexTacticalMap({ events, onSelectEvent }: HexTacticalMapProps) {
     (async () => {
       try {
         const geo = await (await fetch(COUNTRIES_URL)).json();
-        const features: Feature[] = geo.features ?? [];
+        const features: Feature[] = ((geo.features ?? []) as Feature[]).filter(
+          (f) => !isAntarctica(f),
+        );
         const set = new Set<string>();
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
@@ -200,7 +214,24 @@ export function HexTacticalMap({ events, onSelectEvent }: HexTacticalMapProps) {
     [hot],
   );
 
-  const criticalCount = hot.filter((c) => c.topSeverity >= 2).length;
+  // Count EVENTS at high/critical (the banner says "events" — zones would
+  // undercount a cell holding several severe events).
+  const severeEventCount = useMemo(
+    () =>
+      hot.reduce(
+        (n, cell) => n + cell.events.filter((e) => (SEV_RANK[e.severity] ?? 0) >= 2).length,
+        0,
+      ),
+    [hot],
+  );
+
+  const legendCategories = useMemo(() => {
+    const present = new Set<EventCategory>();
+    for (const cell of hot) {
+      if (cell.dominant) present.add(cell.dominant);
+    }
+    return [...present];
+  }, [hot]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-sm border border-nerv-orange/30 bg-[#0a0603]">
@@ -276,10 +307,11 @@ export function HexTacticalMap({ events, onSelectEvent }: HexTacticalMapProps) {
           </g>
         )}
 
-        {/* event hotspots */}
+        {/* event hotspots — colored by dominant category (same palette as the globe) */}
         {hot.map((cell) => {
           const t = cell.count / maxCount;
           const isSel = cell.key === selectedKey;
+          const color = cell.dominant ? EVENT_COLORS[cell.dominant] : AMBER_HOT;
           return (
             <g
               key={cell.key}
@@ -288,9 +320,9 @@ export function HexTacticalMap({ events, onSelectEvent }: HexTacticalMapProps) {
             >
               <polygon
                 points={hexPoints(cell.cx, cell.cy, 0.92)}
-                fill={AMBER_HOT}
-                fillOpacity={0.55 + 0.4 * t}
-                stroke={AMBER_HOT}
+                fill={color}
+                fillOpacity={0.4 + 0.4 * t}
+                stroke={color}
                 strokeWidth={isSel ? 1.6 : 0.8}
                 filter="url(#amberGlow)"
               >
@@ -346,15 +378,30 @@ export function HexTacticalMap({ events, onSelectEvent }: HexTacticalMapProps) {
 
       {/* HUD: warning banner (data-driven) */}
       <div className="pointer-events-none absolute left-3 top-3 z-10">
-        {criticalCount > 0 ? (
+        {severeEventCount > 0 ? (
           <div className="border border-nerv-orange/60 bg-nerv-orange/10 px-2 py-1">
             <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-nerv-orange">
-              ⚠ {criticalCount} high-severity event{criticalCount === 1 ? '' : 's'} detected
+              ⚠ {severeEventCount} high-severity event{severeEventCount === 1 ? '' : 's'} detected
             </div>
           </div>
         ) : (
           <div className="text-[11px] font-mono uppercase tracking-[0.12em] text-nerv-orange/70">
             ◇ Monitoring — {hot.length} active zone{hot.length === 1 ? '' : 's'}
+          </div>
+        )}
+        {legendCategories.length > 0 && (
+          <div className="mt-1.5 flex items-center gap-2.5">
+            {legendCategories.map((cat) => (
+              <span key={cat} className="flex items-center gap-1">
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: EVENT_COLORS[cat] }}
+                />
+                <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-orange/60">
+                  {cat}
+                </span>
+              </span>
+            ))}
           </div>
         )}
       </div>
@@ -400,8 +447,17 @@ export function HexTacticalMap({ events, onSelectEvent }: HexTacticalMapProps) {
                   onClick={() => onSelectEvent?.(e)}
                   className="block w-full px-3 py-2 text-left transition-colors hover:bg-nerv-orange/10"
                 >
-                  <span className="block truncate text-[11px] font-mono text-nerv-orange/60">
-                    {e.location.label}
+                  <span className="flex items-center gap-1.5 text-[11px] font-mono text-nerv-orange/60">
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: EVENT_COLORS[e.category] }}
+                    />
+                    <span className="truncate">{e.location.label}</span>
+                    {(e.severity === 'high' || e.severity === 'critical') && (
+                      <span className="shrink-0 uppercase text-[9px] tracking-wider text-nerv-red">
+                        {e.severity}
+                      </span>
+                    )}
                   </span>
                   <span className="mt-0.5 block text-[12px] font-mono text-[#ffe9cf] leading-snug line-clamp-2">
                     {e.title}
