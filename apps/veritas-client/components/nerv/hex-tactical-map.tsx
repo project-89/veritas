@@ -195,11 +195,14 @@ export function HexTacticalMap({ events, onSelectEvent }: HexTacticalMapProps) {
 
   const selected = cells.find((c) => c.key === selectedKey && c.count > 0) ?? null;
 
-  // The single most-severe / hottest cell gets a radar sweep, like the epicenter.
+  // The radar sweep marks a genuine epicenter: the worst cell holding a
+  // high/critical event. With no severe events it stays hidden — otherwise the
+  // count tiebreaker would just point at source-density bias (US-heavy EONET/
+  // NWS/RSS coverage), which is attention theater, not signal.
   const epicenter = useMemo(() => {
-    return [...hot].sort(
-      (a, b) => b.topSeverity - a.topSeverity || b.count - a.count,
-    )[0] ?? null;
+    return hot
+      .filter((c) => c.topSeverity >= 2)
+      .sort((a, b) => b.topSeverity - a.topSeverity || b.count - a.count)[0] ?? null;
   }, [hot]);
   const epiEvent = epicenter?.events
     .slice()
