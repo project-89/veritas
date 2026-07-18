@@ -20,6 +20,14 @@ export interface SocialMediaEngagementMetrics extends BaseEngagementMetrics {
   viralityScore?: number;
 }
 
+/** A media attachment on a post (image/video URL as served by the platform). */
+export interface PostMedia {
+  type: 'image' | 'video';
+  url: string;
+  /** Platform-provided alt text / description, when available. */
+  alt?: string;
+}
+
 /**
  * Standard social media post format used by transform-on-ingest components
  */
@@ -32,6 +40,8 @@ export interface SocialMediaPost {
   authorName?: string;
   authorHandle?: string;
   url?: string;
+  /** Media attached to the post, when the platform exposes it keylessly. */
+  media?: PostMedia[];
   engagementMetrics: SocialMediaEngagementMetrics & {
     likes: number;
     shares: number;

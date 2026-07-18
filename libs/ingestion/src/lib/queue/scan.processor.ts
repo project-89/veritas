@@ -239,6 +239,7 @@ export class ScanProcessor extends WorkerHost {
           authorName: post.authorName ?? 'Unknown',
           authorHandle: post.authorHandle ?? 'unknown',
           url: post.url ?? '',
+          media: post.media ?? [],
           timestamp: serializePostTimestamp(post.timestamp),
           sentiment: insight?.sentiment ?? { score: 0, label: 'neutral', confidence: 0 },
           themes: insight?.themes ?? [],

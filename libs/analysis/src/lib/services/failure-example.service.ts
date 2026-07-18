@@ -18,9 +18,17 @@ export const FAILURE_EXAMPLE_PROMPT_VERSION = 1;
  * only posts describing WHAT was asked and HOW the model failed qualify.
  */
 
+/** A media attachment carried through from ingestion (image/video URL). */
+export interface ExamplePostMedia {
+  type: string;
+  url: string;
+  alt?: string;
+}
+
 /** A RawPost plus the provenance fields the corpus needs. */
 export interface ExamplePost extends RawPost {
   url?: string;
+  media?: ExamplePostMedia[];
 }
 
 export type FailureModality =
@@ -53,6 +61,8 @@ export interface FailureExample {
   url: string | null;
   timestamp: string;
   engagement: { likes: number; shares: number; comments: number };
+  /** Media attached to the source post (e.g. the image the model struggled with). */
+  media: ExamplePostMedia[];
 }
 
 export interface FailureExampleResult {
@@ -159,6 +169,7 @@ export function groundFailureExample(
       shares: post.engagement?.shares ?? 0,
       comments: post.engagement?.comments ?? 0,
     },
+    media: post.media ?? [],
   };
 }
 

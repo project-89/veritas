@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
-import { SocialMediaPost } from '../../types/social-media.types';
+import { PostMedia, SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
@@ -25,6 +25,22 @@ interface ChanThread {
   time: number;
   replies?: number;
   images?: number;
+  /** OP attachment: renamed-file timestamp id + extension (e.g. ".jpg", ".webm"). */
+  tim?: number;
+  ext?: string;
+}
+
+const CHAN_VIDEO_EXTS = new Set(['.webm', '.mp4']);
+
+/** OP attachment as PostMedia (files are served from i.4cdn.org). */
+function extractChanMedia(thread: ChanThread, board: string): PostMedia[] {
+  if (!thread.tim || !thread.ext) return [];
+  return [
+    {
+      type: CHAN_VIDEO_EXTS.has(thread.ext) ? 'video' : 'image',
+      url: `https://i.4cdn.org/${board}/${thread.tim}${thread.ext}`,
+    },
+  ];
 }
 
 interface CatalogPage {
@@ -228,6 +244,7 @@ export class FourChanFreeConnector implements DataConnector, OnModuleInit, OnMod
       authorHandle: 'Anonymous',
       url: `https://boards.4chan.org/${board}/thread/${thread.no}`,
       timestamp: new Date(thread.time * 1000),
+      media: extractChanMedia(thread, board),
       engagementMetrics: {
         likes: 0,
         shares: thread.images ?? 0,

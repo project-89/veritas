@@ -208,6 +208,7 @@ server.registerTool(
       text: p['text'],
       timestamp: p['timestamp'],
       url: p['url'],
+      media: p['media'],
     }));
     return ok({ count: posts.length, posts });
   },
@@ -320,6 +321,7 @@ server.registerTool(
       timestamp: p['timestamp'],
       engagement: p['engagement'],
       url: p['url'],
+      media: p['media'],
     }));
     if (payload.length === 0) return ok({ examples: [], note: 'no posts to extract from' });
     return ok(

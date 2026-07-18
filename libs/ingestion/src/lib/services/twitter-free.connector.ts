@@ -2,12 +2,25 @@ import { Profile, Scraper, SearchMode, Tweet } from '@haruhunab1320/twitter-scra
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
-import { SocialMediaPost } from '../../types/social-media.types';
+import { PostMedia, SocialMediaPost } from '../../types/social-media.types';
 import { SourceNode } from '../schemas';
 import { buildSearchQuery, extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { BaseSocialMediaConnector } from './base-social-media.connector';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
+
+/** Photo/video attachments from a scraped tweet as normalized PostMedia. */
+function extractTweetMedia(tweet: Tweet): PostMedia[] {
+  const media: PostMedia[] = [];
+  for (const photo of tweet.photos ?? []) {
+    if (photo.url) media.push({ type: 'image', url: photo.url, alt: photo.alt_text });
+  }
+  for (const video of tweet.videos ?? []) {
+    const url = video.url ?? video.preview;
+    if (url) media.push({ type: 'video', url });
+  }
+  return media;
+}
 
 /**
  * API-free Twitter/X connector using @haruhunab1320/twitter-scraper.
@@ -309,6 +322,7 @@ export class TwitterFreeConnector
             text: tweet.text,
             timestamp: tweet.timeParsed ?? new Date(),
             url: tweet.id ? `https://x.com/${cleanUsername}/status/${tweet.id}` : undefined,
+            media: extractTweetMedia(tweet),
             engagementMetrics: {
               likes: tweet.likes ?? 0,
               shares: tweet.retweets ?? 0,
@@ -380,6 +394,7 @@ export class TwitterFreeConnector
       authorHandle: tweet.username || '',
       url: tweet.permanentUrl || `https://twitter.com/${tweet.username}/status/${tweet.id}`,
       timestamp: tweet.timeParsed || new Date(),
+      media: extractTweetMedia(tweet),
       engagementMetrics: {
         likes: tweet.likes || 0,
         shares: tweet.retweets || 0,

@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
-import { SocialMediaPost } from '../../types/social-media.types';
+import { PostMedia, SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { buildSearchQuery, extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
@@ -30,6 +30,13 @@ interface BlueskyPost {
     text: string;
     createdAt: string;
   };
+  /** Hydrated embed view (app.bsky.embed.images#view etc.) from the AppView. */
+  embed?: {
+    $type?: string;
+    images?: Array<{ thumb?: string; fullsize?: string; alt?: string }>;
+    playlist?: string;
+    thumbnail?: string;
+  };
   likeCount?: number;
   repostCount?: number;
   replyCount?: number;
@@ -56,6 +63,24 @@ interface BlueskyFeedResponse {
     post: BlueskyPost;
   }>;
   cursor?: string;
+}
+
+/** Image/video attachments from a hydrated AppView embed as PostMedia. */
+function extractBlueskyMedia(post: BlueskyPost): PostMedia[] {
+  const embed = post.embed;
+  if (!embed) return [];
+  const media: PostMedia[] = [];
+  for (const image of embed.images ?? []) {
+    const url = image.fullsize ?? image.thumb;
+    if (url) media.push({ type: 'image', url, alt: image.alt || undefined });
+  }
+  // app.bsky.embed.video#view exposes an HLS playlist + poster thumbnail.
+  if (embed.playlist) {
+    media.push({ type: 'video', url: embed.playlist });
+  } else if (embed.thumbnail) {
+    media.push({ type: 'image', url: embed.thumbnail });
+  }
+  return media;
 }
 
 function getErrorStatus(error: unknown): number | null {
@@ -284,6 +309,7 @@ export class BlueskyFreeConnector implements DataConnector, OnModuleInit, OnModu
       authorHandle: author.handle || 'unknown',
       url: `https://bsky.app/profile/${author.handle}/post/${rkey}`,
       timestamp: new Date(post.record?.createdAt ?? Date.now()),
+      media: extractBlueskyMedia(post),
       engagementMetrics: {
         likes: post.likeCount ?? 0,
         shares: post.repostCount ?? 0,

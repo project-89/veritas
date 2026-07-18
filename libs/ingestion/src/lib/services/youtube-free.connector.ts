@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
 import { readFile, unlink } from 'fs/promises';
 import { NarrativeInsight } from '../../types/narrative-insight.interface';
-import { SocialMediaPost } from '../../types/social-media.types';
+import { PostMedia, SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import {
@@ -73,6 +73,16 @@ interface YtDlpVideoInfo {
   duration: number;
   categories?: string[];
   tags?: string[];
+}
+
+/** The video itself plus its poster frame — yt-dlp flat extraction doesn't
+ *  return thumbnail URLs, but i.ytimg.com serves them deterministically by id. */
+function buildYoutubeMedia(video: YtDlpVideoInfo): PostMedia[] {
+  if (!video.id) return [];
+  return [
+    { type: 'video', url: video.webpage_url || `https://www.youtube.com/watch?v=${video.id}` },
+    { type: 'image', url: `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg` },
+  ];
 }
 
 interface YtDlpChannelInfo {
@@ -455,6 +465,7 @@ export class YouTubeFreeConnector implements DataConnector, OnModuleInit, OnModu
       authorHandle: handle,
       url: video.webpage_url || `https://www.youtube.com/watch?v=${video.id}`,
       timestamp: this.parseYtDlpDate(video.upload_date),
+      media: buildYoutubeMedia(video),
       engagementMetrics: {
         likes: video.like_count || 0,
         shares: 0,
