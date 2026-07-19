@@ -16,7 +16,13 @@ export * from './services/evidence-adapters/evidence-adapter.interface';
 export * from './services/genealogy.service';
 export * from './services/global-event-aggregation.service';
 export * from './services/utils/cluster-global-events';
-export { geminiChatModel, geminiReasoningModel } from './services/utils/llm-config';
+export {
+  DETERMINISTIC_JSON_CONFIG,
+  extractFirstJsonObject,
+  geminiChatModel,
+  geminiReasoningModel,
+} from './services/utils/llm-config';
+export { LlmBudgetExceededError, LlmGateway } from './services/utils/llm-gateway';
 export * from './services/utils/dedupe-global-events';
 export * from './services/graph-bot-detection.service';
 export * from './services/graph-database.service';

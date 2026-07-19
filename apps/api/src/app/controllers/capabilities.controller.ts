@@ -4,7 +4,7 @@ import {
   geminiReasoningModel,
   GLOBAL_EVENT_SIGNAL_SOURCES,
 } from '@veritas/analysis';
-import { getAllFeeds, IngestionService } from '@veritas/ingestion';
+import { getAllFeeds, IngestionService, WebSearchService } from '@veritas/ingestion';
 
 /**
  * Runtime capability report — what THIS deployment can actually do.
@@ -17,7 +17,10 @@ import { getAllFeeds, IngestionService } from '@veritas/ingestion';
  */
 @Controller('capabilities')
 export class CapabilitiesController {
-  constructor(private readonly ingestionService: IngestionService) {}
+  constructor(
+    private readonly ingestionService: IngestionService,
+    private readonly webSearch: WebSearchService,
+  ) {}
 
   @Get()
   getCapabilities() {
@@ -53,6 +56,7 @@ export class CapabilitiesController {
           deepInvestigation: llmAvailable,
         },
       },
+      webSearch: { providers: this.webSearch.providers },
       searchModes: ['topic', 'claim', 'person'],
       timeRangeFormats: ['<n>h', '<n>d', '<n>m', 'YYYY-MM-DD_YYYY-MM-DD'],
     };

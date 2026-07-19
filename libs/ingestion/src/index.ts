@@ -69,6 +69,7 @@ export { BlueskyFreeConnector } from './lib/services/bluesky-free.connector';
 export { FacebookJinaConnector } from './lib/services/facebook-jina.connector';
 // Services
 export * from './lib/services/ingestion.service';
+export * from './lib/services/web-search.service';
 // API-free connectors
 export { RedditFreeConnector } from './lib/services/reddit-free.connector';
 // Scan progress events (SSE bus)

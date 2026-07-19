@@ -32,6 +32,7 @@ import {
   SOURCE_CREDIBILITY_SERVICE,
 } from '@veritas/ingestion';
 import { CapabilitiesController } from './controllers/capabilities.controller';
+import { WebSearchController } from './controllers/web-search.controller';
 import { EventsController } from './controllers/events.controller';
 import { HealthController } from './controllers/health.controller';
 import { InvestigationController } from './controllers/investigation.controller';
@@ -150,6 +151,7 @@ import { SchedulerService } from './services/scheduler.service';
     MonitorController,
     EventsController,
     CapabilitiesController,
+    WebSearchController,
     PluginsController,
     ...GENERATED_PLUGIN_CONTROLLERS,
   ],

@@ -69,6 +69,15 @@ export interface Repository<T> {
   count(filter?: FilterQuery<T>): Promise<number>;
 
   /**
+   * Run a database-side aggregation pipeline. Optional: only backends with
+   * native aggregation (MongoDB) implement it. Callers must feature-check.
+   * Exists so high-volume computations (per-zone activity baselines over a
+   * week of events) run IN the database instead of fetching thousands of
+   * documents to count them in application memory.
+   */
+  aggregate?<R>(pipeline: Record<string, unknown>[]): Promise<R[]>;
+
+  /**
    * Create a new entity
    * @param data The entity data
    * @returns The created entity

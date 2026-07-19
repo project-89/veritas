@@ -240,6 +240,84 @@ export class GlobalEventRepository implements OnModuleInit {
   // ---------------------------------------------------------------------------
 
   /**
+   * Per-zone activity counts computed IN the database: events binned into
+   * `cellDeg`° lat/lng cells, split into last-24h vs prior counts, with the
+   * distinct recent sources per cell. Powers surge detection — fetching a
+   * week of raw events to count them in memory stopped working once volume
+   * meant the newest-N cap couldn't span the baseline window.
+   *
+   * Applies the same placement-honesty rules as the maps: no global anchors,
+   * and RSS events only when the headline geocoded (a feed-home fallback
+   * would register the OUTLET's publish volume as zone activity).
+   */
+  async aggregateZoneActivity(options: {
+    cellDeg: number;
+    sinceMs: number;
+    recentMs: number;
+  }): Promise<
+    Array<{
+      row: number;
+      col: number;
+      recent: number;
+      prior: number;
+      recentSources: string[];
+      oldest: Date;
+    }>
+  > {
+    this.ensureInitialized();
+    if (!this.repo.aggregate) return [];
+    const now = Date.now();
+    const since = new Date(now - options.sinceMs);
+    const recentCutoff = new Date(now - options.recentMs);
+
+    interface ZoneRow {
+      _id: { row: number; col: number };
+      recent: number;
+      prior: number;
+      recentSources: string[];
+      oldest: Date;
+    }
+    const rows = await this.repo.aggregate<ZoneRow>([
+      {
+        $match: {
+          timestamp: { $gte: since },
+          'location.region': { $ne: 'global' },
+          'location.label': { $ne: 'Global' },
+          $or: [{ source: { $not: /^RSS:/ } }, { 'location.region': 'geocoded' }],
+        },
+      },
+      {
+        $addFields: {
+          row: {
+            $floor: { $divide: [{ $subtract: [90, '$location.lat'] }, options.cellDeg] },
+          },
+          col: {
+            $floor: { $divide: [{ $add: ['$location.lng', 180] }, options.cellDeg] },
+          },
+          isRecent: { $gte: ['$timestamp', recentCutoff] },
+        },
+      },
+      {
+        $group: {
+          _id: { row: '$row', col: '$col' },
+          recent: { $sum: { $cond: ['$isRecent', 1, 0] } },
+          prior: { $sum: { $cond: ['$isRecent', 0, 1] } },
+          recentSources: { $addToSet: { $cond: ['$isRecent', '$source', '$$REMOVE'] } },
+          oldest: { $min: '$timestamp' },
+        },
+      },
+    ]);
+    return rows.map((r) => ({
+      row: r._id.row,
+      col: r._id.col,
+      recent: r.recent,
+      prior: r.prior,
+      recentSources: r.recentSources ?? [],
+      oldest: r.oldest,
+    }));
+  }
+
+  /**
    * Upsert a GlobalEvent by its unique event id.
    * If a document with the same eventId exists it is updated; otherwise created.
    */

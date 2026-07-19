@@ -49,6 +49,7 @@ import { FacebookJinaConnector } from './services/facebook-jina.connector';
 import { FarcasterFreeConnector } from './services/farcaster-free.connector';
 import { GdeltConnector } from './services/gdelt.connector';
 import { IngestionService } from './services/ingestion.service';
+import { WebSearchService } from './services/web-search.service';
 import { InvestigationEvidenceService } from './services/investigation-evidence.service';
 import { MentalModelService } from './services/mental-model.service';
 import { OnChainCorrelationService } from './services/onchain-correlation.service';
@@ -230,7 +231,7 @@ export class IngestionModule {
     }
 
     // Shared utilities needed by free connectors
-    providers.push(SubprocessUtil, JinaReaderService);
+    providers.push(SubprocessUtil, JinaReaderService, WebSearchService);
 
     // Configure connectors - default to 'free' (API-free) if not specified.
     // WebScraper stays disabled by default because it is only useful when
@@ -313,6 +314,7 @@ export class IngestionModule {
 
     const exports = [
       IngestionService,
+      WebSearchService,
       NarrativeRepository,
       TransformOnIngestService,
       InvestigationRepository,

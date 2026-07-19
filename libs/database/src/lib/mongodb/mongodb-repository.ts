@@ -120,6 +120,19 @@ export class MongoDBRepository<T> implements Repository<T> {
   }
 
   /**
+   * Run an aggregation pipeline database-side (see Repository.aggregate).
+   */
+  async aggregate<R>(pipeline: Record<string, unknown>[]): Promise<R[]> {
+    try {
+      return await this.model.aggregate<R>(pipeline as unknown as Parameters<typeof this.model.aggregate>[0]).exec();
+    } catch (error: unknown) {
+      const err = error as Error;
+      this.logger.error(`Error running aggregation: ${err.message}`, err.stack);
+      throw error;
+    }
+  }
+
+  /**
    * Create a new entity
    */
   async create(data: Partial<T>): Promise<T> {

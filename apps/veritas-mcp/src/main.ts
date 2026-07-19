@@ -334,6 +334,39 @@ server.registerTool(
 );
 
 server.registerTool(
+  'veritas_web_search',
+  {
+    description:
+      'General web + news search (keyless: DuckDuckGo + Google News RSS; Brave when ' +
+      'configured). Results are provenance-tagged per provider. Use to ground a vague ' +
+      'topic before spending a full multi-connector scan on it.',
+    inputSchema: { query: z.string(), limit: z.number().optional() },
+  },
+  async ({ query, limit }) => {
+    budgetCheck();
+    return ok(
+      await api(`/web/search?q=${encodeURIComponent(query)}&limit=${limit ?? 8}`),
+    );
+  },
+);
+
+server.registerTool(
+  'veritas_refine_query',
+  {
+    description:
+      'Turn a vague topic into sharper scan queries: web-searches the topic, then LLM ' +
+      'extracts what it currently refers to, 3-5 refined query angles, and the central ' +
+      "entities. analysisMode 'unavailable' means no LLM — raw web results only, " +
+      'nothing fabricated. Feed refinedQueries into veritas_scan.',
+    inputSchema: { query: z.string() },
+  },
+  async ({ query }) => {
+    budgetCheck();
+    return ok(await api(`/web/refine?q=${encodeURIComponent(query)}`));
+  },
+);
+
+server.registerTool(
   'veritas_coverage_probe',
   {
     description:

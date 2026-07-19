@@ -85,6 +85,10 @@ export class GlobalEventSchema {
 
 export const GlobalEventModel = SchemaFactory.createForClass(GlobalEventSchema);
 
+// Plain timestamp index: the primary unfiltered read path (getRecentEvents
+// with no category/severity/region filter) sorts by recency alone — without
+// this, that sort walks the collection.
+GlobalEventModel.index({ timestamp: -1 });
 GlobalEventModel.index({ category: 1, timestamp: -1 });
 GlobalEventModel.index({ severity: 1, timestamp: -1 });
 GlobalEventModel.index({ 'location.region': 1, timestamp: -1 });
