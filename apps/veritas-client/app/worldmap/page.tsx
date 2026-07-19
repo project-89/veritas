@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EventDetailFlyout } from '../../components/nerv/event-detail-flyout';
 import type { EventFilters } from '../../components/nerv/event-filter-panel';
 import { EventFilterPanel } from '../../components/nerv/event-filter-panel';
@@ -55,6 +55,17 @@ export default function WorldMapPage() {
   });
   const [search, setSearch] = useState('');
   const [focus, setFocus] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Fly-to handoff from the tactical map (?lat=&lng=). Read from
+  // window.location instead of useSearchParams to avoid a Suspense boundary.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const lat = Number(params.get('lat'));
+    const lng = Number(params.get('lng'));
+    if (Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
+      setFocus({ lat, lng });
+    }
+  }, []);
 
   // Apply filters client-side
   const filteredEvents = useMemo(() => {

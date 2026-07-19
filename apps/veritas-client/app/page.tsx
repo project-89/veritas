@@ -6,7 +6,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NervBadge, NervMetric, NervPanel } from '../components/nerv';
 import { HexTacticalMap } from '../components/nerv/hex-tactical-map';
 import {
+  type ContestedZone,
   createOrGetInvestigation,
+  fetchContestedZones,
   fetchInvestigations,
   fetchUnreadAlertCount,
   getRecentScans,
@@ -54,6 +56,7 @@ export default function CommandHome() {
   const [query, setQuery] = useState('');
   const [launching, setLaunching] = useState(false);
   const [view, setView] = useState<'command' | 'tactical'>('command');
+  const [contested, setContested] = useState<ContestedZone[]>([]);
 
   // Remember the last-used home view (Command dashboard vs Tactical hex map).
   useEffect(() => {
@@ -72,12 +75,14 @@ export default function CommandHome() {
       fetchUnreadAlertCount().catch(() => 0),
       getRecentScans(8).catch(() => [] as ScanJob[]),
       prefetchRecentEvents().catch(() => [] as GlobalEvent[]),
-    ]).then(([invs, count, scans, evts]) => {
+      fetchContestedZones().catch(() => [] as ContestedZone[]),
+    ]).then(([invs, count, scans, evts, zones]) => {
       if (cancelled) return;
       setInvestigations(invs);
       setUnreadCount(count as number);
       setRecentScans(scans);
       setEvents(evts);
+      setContested(zones);
       setLoading(false);
     });
     return () => {
@@ -212,7 +217,15 @@ export default function CommandHome() {
 
         {view === 'tactical' ? (
           <div className="flex min-h-[420px] lg:flex-1 lg:min-h-0">
-            <HexTacticalMap events={events} onSelectEvent={() => router.push('/worldmap')} />
+            <HexTacticalMap
+              events={events}
+              contested={contested}
+              onSelectEvent={(e) =>
+                router.push(
+                  `/worldmap?lat=${e.location.lat.toFixed(3)}&lng=${e.location.lng.toFixed(3)}`,
+                )
+              }
+            />
           </div>
         ) : (
         // Content region — fills the remaining viewport; sections scroll

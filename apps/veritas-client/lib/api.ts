@@ -1004,6 +1004,37 @@ export async function fetchUnreadAlertCount(): Promise<number> {
   return result.count;
 }
 
+/** A story covered from 2+ perspective classes, reduced to what the tactical
+ *  map needs to mark the zone as narratively contested. */
+export interface ContestedZone {
+  lat: number;
+  lng: number;
+  title: string;
+  perspectiveCount: number;
+}
+
+/**
+ * Locations of multi-perspective stories from the divergence endpoint —
+ * zones where state and independent framings of the same event split.
+ */
+export async function fetchContestedZones(): Promise<ContestedZone[]> {
+  const stories = await request<
+    Array<{
+      title: string;
+      location: { lat: number; lng: number };
+      perspectives: string[];
+    }>
+  >('/api/events/divergence?limit=20&windowHours=48');
+  return stories
+    .filter((s) => Number.isFinite(s.location?.lat) && Number.isFinite(s.location?.lng))
+    .map((s) => ({
+      lat: s.location.lat,
+      lng: s.location.lng,
+      title: s.title,
+      perspectiveCount: s.perspectives.length,
+    }));
+}
+
 /**
  * Mark a single alert as read.
  */

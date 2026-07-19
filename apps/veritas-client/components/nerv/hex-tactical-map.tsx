@@ -97,12 +97,25 @@ interface HexCell {
   count: number;
 }
 
+export interface HexContestedZone {
+  lat: number;
+  lng: number;
+  title: string;
+  perspectiveCount: number;
+}
+
 export interface HexTacticalMapProps {
   events: GlobalEvent[];
+  /** Multi-perspective stories — zones where framings of one event diverge. */
+  contested?: HexContestedZone[];
   onSelectEvent?: (event: GlobalEvent) => void;
 }
 
-export function HexTacticalMap({ events, onSelectEvent }: HexTacticalMapProps) {
+// Contested-narrative marker: pale blue-white so it reads as a distinct layer
+// over both the amber terrain and the category-colored hotspots.
+const CONTESTED = '#c9d8ff';
+
+export function HexTacticalMap({ events, contested, onSelectEvent }: HexTacticalMapProps) {
   const [landSet, setLandSet] = useState<Set<string> | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
@@ -236,6 +249,21 @@ export function HexTacticalMap({ events, onSelectEvent }: HexTacticalMapProps) {
     return [...present];
   }, [hot]);
 
+  // Contested-narrative zones, binned to hex cells (one marker per cell).
+  const contestedCells = useMemo(() => {
+    const byCell = new Map<string, { cx: number; cy: number; titles: string[] }>();
+    for (const zone of contested ?? []) {
+      if (!Number.isFinite(zone.lat) || !Number.isFinite(zone.lng)) continue;
+      const row = clamp(Math.floor((90 - zone.lat) / ROW_DEG), 0, ROWS - 1);
+      const col = clamp(Math.floor((zone.lng + 180) / COL_DEG), 0, COLS - 1);
+      const key = `${row},${col}`;
+      const existing = byCell.get(key);
+      if (existing) existing.titles.push(zone.title);
+      else byCell.set(key, { ...cellPx(row, col), titles: [zone.title] });
+    }
+    return [...byCell.values()];
+  }, [contested]);
+
   return (
     <div className="relative h-full w-full overflow-hidden rounded-sm border border-nerv-orange/30 bg-[#0a0603]">
       {/* corner brackets — screen bezel */}
@@ -338,6 +366,38 @@ export function HexTacticalMap({ events, onSelectEvent }: HexTacticalMapProps) {
           );
         })}
 
+        {/* contested-narrative markers: rotated-square outline over the zone */}
+        {contestedCells.map((c) => (
+          <g key={`contested-${c.cx}-${c.cy}`} pointerEvents="none" opacity={0.9}>
+            <rect
+              x={-R * 0.95}
+              y={-R * 0.95}
+              width={R * 1.9}
+              height={R * 1.9}
+              transform={`translate(${c.cx} ${c.cy}) rotate(45)`}
+              fill="none"
+              stroke={CONTESTED}
+              strokeWidth={0.9}
+            >
+              <title>
+                Contested narrative: {c.titles[0]}
+                {c.titles.length > 1 ? ` (+${c.titles.length - 1} more)` : ''}
+              </title>
+            </rect>
+            <rect
+              x={-R * 1.25}
+              y={-R * 1.25}
+              width={R * 2.5}
+              height={R * 2.5}
+              transform={`translate(${c.cx} ${c.cy}) rotate(45)`}
+              fill="none"
+              stroke={CONTESTED}
+              strokeOpacity={0.35}
+              strokeWidth={0.5}
+            />
+          </g>
+        ))}
+
         {/* zone labels for the top events */}
         {labelled.map((cell) => {
           const ev = cell.events[0];
@@ -405,6 +465,17 @@ export function HexTacticalMap({ events, onSelectEvent }: HexTacticalMapProps) {
                 </span>
               </span>
             ))}
+            {contestedCells.length > 0 && (
+              <span className="flex items-center gap-1">
+                <span
+                  className="h-1.5 w-1.5 rotate-45 border"
+                  style={{ borderColor: CONTESTED }}
+                />
+                <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-orange/60">
+                  contested narrative
+                </span>
+              </span>
+            )}
           </div>
         )}
       </div>

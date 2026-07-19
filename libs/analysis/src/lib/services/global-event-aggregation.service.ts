@@ -60,6 +60,19 @@ const CONTENT_DEDUP_WINDOW_MS = 12 * 60 * 60 * 1000; // 12h: same happening repo
 const CONTENT_DEDUP_OVERLAP = 0.5; // content-token overlap to treat as the same event
 const MAX_CONTENT_SIGNATURES = 5000; // memory bound on the signature store
 
+/** Place name for an EONET event: "Wildfire Bear, Denali, Alaska" → "Denali,
+ *  Alaska"; nameless titles fall back to a headline geocode, then coordinates. */
+function eonetPlaceLabel(title: string, lat: number, lng: number): string {
+  const commaIdx = title.indexOf(', ');
+  if (commaIdx !== -1) {
+    const place = title.slice(commaIdx + 2).trim();
+    if (place.length >= 3) return place;
+  }
+  const geo = geocodeFromText(title);
+  if (geo) return geo.label;
+  return `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? 'N' : 'S'} ${Math.abs(lng).toFixed(1)}°${lng >= 0 ? 'E' : 'W'}`;
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -813,10 +826,16 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
       | undefined;
     if (!Number.isFinite(coords?.latitude) || !Number.isFinite(coords?.longitude)) return null;
 
+    const lat = coords?.latitude ?? 0;
+    const lng = coords?.longitude ?? 0;
     const location: GeoLocation = {
-      lat: coords?.latitude ?? 0,
-      lng: coords?.longitude ?? 0,
-      label: (signal.metadata['eonetCategory'] as string) || 'Natural Event',
+      lat,
+      lng,
+      // A location label must name a PLACE — the category ("Wildfires") ends up
+      // printed as a zone name on the tactical map otherwise. EONET titles are
+      // usually "Wildfire Bear, Denali, Alaska": the place is what follows the
+      // first comma. Fall back to a headline geocode, then raw coordinates.
+      label: eonetPlaceLabel(signal.title, lat, lng),
     };
 
     return {
