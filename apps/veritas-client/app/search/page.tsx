@@ -10,30 +10,37 @@ import { createOrGetInvestigation, fetchInvestigations } from '../../lib/api';
 // Constants
 // ---------------------------------------------------------------------------
 
+// Mirrors the connectors ACTUALLY registered by the ingestion service \u2014 a
+// platform users can tick but that silently returns nothing is worse than a
+// shorter list. `disabled` marks registered connectors awaiting credentials.
 const PLATFORM_GROUPS = [
   {
     label: 'Social',
     platforms: [
-      { id: 'twitter', label: 'Twitter / X', icon: '\u{1D54F}' },
-      { id: 'reddit', label: 'Reddit', icon: 'R' },
-      { id: 'farcaster', label: 'Farcaster', icon: 'FC' },
-      { id: 'truthsocial', label: 'Truth Social', icon: 'TS' },
+      { id: 'twitter', label: 'Twitter / X' },
+      { id: 'bluesky', label: 'Bluesky' },
+      { id: 'farcaster', label: 'Farcaster' },
+      { id: '4chan', label: '4chan' },
+      { id: 'reddit', label: 'Reddit', disabled: true, disabledReason: 'needs API credentials' },
     ],
   },
   {
-    label: 'Media',
+    label: 'Media & Reference',
     platforms: [
-      { id: 'youtube', label: 'YouTube', icon: '\u25B6' },
-      { id: 'rss', label: 'News Feeds (177)', icon: '\u{1F4F0}' },
-      { id: 'telegram', label: 'Telegram OSINT', icon: '\u2708' },
+      { id: 'youtube', label: 'YouTube' },
+      { id: 'rss', label: 'News + State Media Feeds' },
+      { id: 'gdelt', label: 'GDELT News Index' },
+      { id: 'telegram', label: 'Telegram OSINT' },
+      { id: 'wikipedia', label: 'Wikipedia' },
     ],
   },
 ];
 
-const ALL_PLATFORMS = PLATFORM_GROUPS.flatMap((g) => g.platforms);
+const ALL_PLATFORMS = PLATFORM_GROUPS.flatMap((g) => g.platforms).filter((p) => !p.disabled);
 
 const TIME_RANGES = [
   { value: '24h', label: '24h' },
+  { value: '3d', label: '3d' },
   { value: '7d', label: '7d' },
   { value: '30d', label: '30d' },
   { value: '90d', label: '90d' },
@@ -51,12 +58,15 @@ const DEPTH_PRESETS = [
   },
 ] as const;
 
+// Honest tips only — the pipeline has no AND/OR/NOT/quote operators. Terms
+// are matched implicitly: significant words extracted, stopwords dropped,
+// posts must contain most of the remaining terms.
 const TIPS = [
-  'Use quotes for exact phrases',
-  '@handle to include specific accounts',
-  'Combine topics with AND / OR',
-  'Prefix with NOT to exclude terms',
-  'Try broad topics first, then narrow',
+  '2–4 specific terms beat long sentences — filler words are dropped',
+  'Posts must match most of your significant terms (all, if only 1–2)',
+  'Person mode + @handle pulls account timelines across platforms',
+  'A wallet/contract in Advanced triggers on-chain evidence lookup',
+  'Sparse results? The workspace suggests a better time window',
 ];
 
 // ---------------------------------------------------------------------------
@@ -82,7 +92,7 @@ export default function SearchPage() {
   const [query, setQuery] = useState('');
   const [platforms, setPlatforms] = useState<string[]>([
     'twitter',
-    'reddit',
+    'bluesky',
     'youtube',
     'rss',
     'farcaster',
@@ -415,7 +425,7 @@ export default function SearchPage() {
                     placeholder="@handle1, @handle2"
                     className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
                   />
-                  <span className="text-[7px] font-mono text-nerv-text-muted">
+                  <span className="text-[10px] font-mono text-nerv-text-muted">
                     Fetch timelines for these users
                   </span>
                 </div>
@@ -434,7 +444,7 @@ export default function SearchPage() {
                     placeholder="#tag1, #tag2"
                     className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
                   />
-                  <span className="text-[7px] font-mono text-nerv-text-muted">
+                  <span className="text-[10px] font-mono text-nerv-text-muted">
                     Add to search terms
                   </span>
                 </div>
@@ -453,7 +463,7 @@ export default function SearchPage() {
                     placeholder="0x1234... or contract address"
                     className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
                   />
-                  <span className="text-[7px] font-mono text-nerv-text-muted">
+                  <span className="text-[10px] font-mono text-nerv-text-muted">
                     Triggers on-chain evidence lookup
                   </span>
                 </div>
@@ -472,8 +482,8 @@ export default function SearchPage() {
                     placeholder="r/cryptocurrency, r/bitcoin"
                     className="w-full px-2 py-1.5 text-xs font-mono bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted/50 focus:outline-none focus:border-nerv-blue/50 transition-all"
                   />
-                  <span className="text-[7px] font-mono text-nerv-text-muted">
-                    Scope Reddit search to specific subs
+                  <span className="text-[10px] font-mono text-nerv-text-muted">
+                    Scope Reddit search (offline until Reddit credentials are added)
                   </span>
                 </div>
               </div>
@@ -495,19 +505,30 @@ export default function SearchPage() {
                       <div className="space-y-1">
                         {group.platforms.map((p) => {
                           const checked = platforms.includes(p.id);
+                          const disabled = 'disabled' in p && p.disabled === true;
                           return (
                             <button
                               key={p.id}
                               type="button"
-                              className="flex items-center gap-2 cursor-pointer group"
-                              onClick={() => togglePlatform(p.id)}
+                              disabled={disabled}
+                              title={
+                                disabled && 'disabledReason' in p
+                                  ? `Unavailable \u2014 ${p.disabledReason}`
+                                  : undefined
+                              }
+                              className={[
+                                'flex items-center gap-2 group',
+                                disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer',
+                              ].join(' ')}
+                              onClick={disabled ? undefined : () => togglePlatform(p.id)}
                             >
                               <span
                                 className={[
                                   'w-3.5 h-3.5 border flex items-center justify-center text-[10px] font-mono transition-all',
                                   checked
                                     ? 'border-nerv-green bg-nerv-green/15 text-nerv-green'
-                                    : 'border-nerv-border text-transparent hover:border-nerv-text-muted',
+                                    : 'border-nerv-border text-transparent',
+                                  !disabled && !checked ? 'hover:border-nerv-text-muted' : '',
                                 ].join(' ')}
                               >
                                 {checked ? '\u2713' : ''}
@@ -519,6 +540,11 @@ export default function SearchPage() {
                                 ].join(' ')}
                               >
                                 {p.label}
+                                {disabled && (
+                                  <span className="ml-1.5 text-[9px] uppercase tracking-wider text-nerv-text-muted/70">
+                                    offline
+                                  </span>
+                                )}
                               </span>
                             </button>
                           );
