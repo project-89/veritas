@@ -3,40 +3,71 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NervBadge, NervPanel } from '../../components/nerv';
-import type { Investigation } from '../../lib/api';
-import { createOrGetInvestigation, fetchInvestigations } from '../../lib/api';
+import type { ConnectorCapability, Investigation } from '../../lib/api';
+import { createOrGetInvestigation, fetchCapabilities, fetchInvestigations } from '../../lib/api';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-// Mirrors the connectors ACTUALLY registered by the ingestion service \u2014 a
-// platform users can tick but that silently returns nothing is worse than a
-// shorter list. `disabled` marks registered connectors awaiting credentials.
-const PLATFORM_GROUPS = [
-  {
-    label: 'Social',
-    platforms: [
-      { id: 'twitter', label: 'Twitter / X' },
-      { id: 'bluesky', label: 'Bluesky' },
-      { id: 'farcaster', label: 'Farcaster' },
-      { id: '4chan', label: '4chan' },
-      { id: 'reddit', label: 'Reddit', disabled: true, disabledReason: 'needs API credentials' },
-    ],
-  },
-  {
-    label: 'Media & Reference',
-    platforms: [
-      { id: 'youtube', label: 'YouTube' },
-      { id: 'rss', label: 'News + State Media Feeds' },
-      { id: 'gdelt', label: 'GDELT News Index' },
-      { id: 'telegram', label: 'Telegram OSINT' },
-      { id: 'wikipedia', label: 'Wikipedia' },
-    ],
-  },
+// The platform picker is built from GET /capabilities at runtime \u2014 the server
+// reports which connectors are actually registered and why any are down, so
+// this list can never drift from reality (it once offered a disabled Reddit,
+// hid four live connectors, and listed an unregistered Truth Social). The map
+// below is PRESENTATION only: labels + grouping for known platform ids.
+// Unknown ids reported by the server auto-surface with a default label.
+const PLATFORM_META: Record<string, { label: string; group: string }> = {
+  twitter: { label: 'Twitter / X', group: 'Social' },
+  bluesky: { label: 'Bluesky', group: 'Social' },
+  farcaster: { label: 'Farcaster', group: 'Social' },
+  '4chan': { label: '4chan', group: 'Social' },
+  reddit: { label: 'Reddit', group: 'Social' },
+  truthsocial: { label: 'Truth Social', group: 'Social' },
+  facebook: { label: 'Facebook', group: 'Social' },
+  youtube: { label: 'YouTube', group: 'Media & Reference' },
+  rss: { label: 'News + State Media Feeds', group: 'Media & Reference' },
+  gdelt: { label: 'GDELT News Index', group: 'Media & Reference' },
+  telegram: { label: 'Telegram OSINT', group: 'Media & Reference' },
+  wikipedia: { label: 'Wikipedia', group: 'Media & Reference' },
+  web: { label: 'Web Scraper', group: 'Media & Reference' },
+};
+
+const GROUP_ORDER = ['Social', 'Media & Reference', 'Other'];
+
+interface PlatformOption {
+  id: string;
+  label: string;
+  group: string;
+  disabled: boolean;
+  disabledReason?: string;
+}
+
+/** Fallback shown only if /capabilities is unreachable \u2014 matches the last
+ *  known deployment state rather than aspiration. */
+const FALLBACK_PLATFORMS: PlatformOption[] = [
+  { id: 'twitter', label: 'Twitter / X', group: 'Social', disabled: false },
+  { id: 'bluesky', label: 'Bluesky', group: 'Social', disabled: false },
+  { id: 'farcaster', label: 'Farcaster', group: 'Social', disabled: false },
+  { id: '4chan', label: '4chan', group: 'Social', disabled: false },
+  { id: 'youtube', label: 'YouTube', group: 'Media & Reference', disabled: false },
+  { id: 'rss', label: 'News + State Media Feeds', group: 'Media & Reference', disabled: false },
+  { id: 'gdelt', label: 'GDELT News Index', group: 'Media & Reference', disabled: false },
+  { id: 'telegram', label: 'Telegram OSINT', group: 'Media & Reference', disabled: false },
+  { id: 'wikipedia', label: 'Wikipedia', group: 'Media & Reference', disabled: false },
 ];
 
-const ALL_PLATFORMS = PLATFORM_GROUPS.flatMap((g) => g.platforms).filter((p) => !p.disabled);
+function toPlatformOptions(connectors: ConnectorCapability[]): PlatformOption[] {
+  return connectors.map((c) => {
+    const meta = PLATFORM_META[c.platform];
+    return {
+      id: c.platform,
+      label: meta?.label ?? c.platform.charAt(0).toUpperCase() + c.platform.slice(1),
+      group: meta?.group ?? 'Other',
+      disabled: c.status !== 'live',
+      disabledReason: c.detail,
+    };
+  });
+}
 
 const TIME_RANGES = [
   { value: '24h', label: '24h' },
@@ -110,11 +141,37 @@ export default function SearchPage() {
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
   const [loadingInv, setLoadingInv] = useState(true);
   const [selectedInvestigationId, setSelectedInvestigationId] = useState<string>('');
+  const [platformOptions, setPlatformOptions] = useState<PlatformOption[]>(FALLBACK_PLATFORMS);
 
   // Auto-focus input
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Build the platform picker from the server's runtime capability report.
+  useEffect(() => {
+    let cancelled = false;
+    fetchCapabilities()
+      .then((caps) => {
+        if (cancelled) return;
+        const options = toPlatformOptions(caps.connectors);
+        setPlatformOptions(options);
+        // Never leave a dead platform selected — its scans return nothing.
+        const usable = new Set(options.filter((o) => !o.disabled).map((o) => o.id));
+        setPlatforms((prev) => prev.filter((id) => usable.has(id)));
+      })
+      .catch(() => {
+        // Fallback list already in place.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const platformGroups = GROUP_ORDER.map((group) => ({
+    label: group,
+    platforms: platformOptions.filter((p) => p.group === group),
+  })).filter((g) => g.platforms.length > 0);
 
   // Load recent investigations
   useEffect(() => {
@@ -497,7 +554,7 @@ export default function SearchPage() {
                   Data Sources
                 </div>
                 <div className="space-y-3">
-                  {PLATFORM_GROUPS.map((group) => (
+                  {platformGroups.map((group) => (
                     <div key={group.label}>
                       <div className="text-[10px] uppercase tracking-widest text-nerv-text-muted mb-1">
                         {group.label}
@@ -505,22 +562,21 @@ export default function SearchPage() {
                       <div className="space-y-1">
                         {group.platforms.map((p) => {
                           const checked = platforms.includes(p.id);
-                          const disabled = 'disabled' in p && p.disabled === true;
                           return (
                             <button
                               key={p.id}
                               type="button"
-                              disabled={disabled}
+                              disabled={p.disabled}
                               title={
-                                disabled && 'disabledReason' in p
-                                  ? `Unavailable \u2014 ${p.disabledReason}`
+                                p.disabled
+                                  ? `Unavailable \u2014 ${p.disabledReason ?? 'connector offline'}`
                                   : undefined
                               }
                               className={[
                                 'flex items-center gap-2 group',
-                                disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer',
+                                p.disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer',
                               ].join(' ')}
-                              onClick={disabled ? undefined : () => togglePlatform(p.id)}
+                              onClick={p.disabled ? undefined : () => togglePlatform(p.id)}
                             >
                               <span
                                 className={[
@@ -528,7 +584,7 @@ export default function SearchPage() {
                                   checked
                                     ? 'border-nerv-green bg-nerv-green/15 text-nerv-green'
                                     : 'border-nerv-border text-transparent',
-                                  !disabled && !checked ? 'hover:border-nerv-text-muted' : '',
+                                  !p.disabled && !checked ? 'hover:border-nerv-text-muted' : '',
                                 ].join(' ')}
                               >
                                 {checked ? '\u2713' : ''}
@@ -540,7 +596,7 @@ export default function SearchPage() {
                                 ].join(' ')}
                               >
                                 {p.label}
-                                {disabled && (
+                                {p.disabled && (
                                   <span className="ml-1.5 text-[9px] uppercase tracking-wider text-nerv-text-muted/70">
                                     offline
                                   </span>
@@ -555,7 +611,9 @@ export default function SearchPage() {
                   <div className="flex gap-2 pt-1">
                     <button
                       type="button"
-                      onClick={() => setPlatforms(ALL_PLATFORMS.map((p) => p.id))}
+                      onClick={() =>
+                        setPlatforms(platformOptions.filter((p) => !p.disabled).map((p) => p.id))
+                      }
                       className="text-[10px] font-mono uppercase text-nerv-green hover:underline"
                     >
                       All

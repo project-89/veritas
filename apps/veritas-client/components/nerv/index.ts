@@ -42,3 +42,4 @@ export type { SaturationIndicatorProps } from './saturation-indicator';
 export { SaturationIndicator } from './saturation-indicator';
 export type { SocialGraphPanelProps } from './social-graph-panel';
 export { SocialGraphPanel } from './social-graph-panel';
+export { CapabilitiesPanel } from './capabilities-panel';

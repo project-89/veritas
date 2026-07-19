@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
+import { CapabilitiesPanel,
   NervAlert,
   NervBadge,
   NervMetric,
@@ -362,6 +362,8 @@ export default function MonitorPage() {
                   <NervMetric label="Unread Alerts" value={String(unreadCount)} />
                 </div>
               </NervPanel>
+
+              <CapabilitiesPanel />
 
               <NervPanel title="Active Investigations" accent="blue" corners>
                 <div className="divide-y divide-nerv-border">

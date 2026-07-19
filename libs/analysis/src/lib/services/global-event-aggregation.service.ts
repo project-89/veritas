@@ -60,6 +60,24 @@ const CONTENT_DEDUP_WINDOW_MS = 12 * 60 * 60 * 1000; // 12h: same happening repo
 const CONTENT_DEDUP_OVERLAP = 0.5; // content-token overlap to treat as the same event
 const MAX_CONTENT_SIGNATURES = 5000; // memory bound on the signature store
 
+/** The global-event signal sources this service polls, with their cadences.
+ *  Served by /capabilities — defined HERE, next to the interval constants,
+ *  so the reported list cannot drift from what actually runs. */
+export const GLOBAL_EVENT_SIGNAL_SOURCES: ReadonlyArray<{
+  name: string;
+  kind: 'geophysical' | 'disaster' | 'weather' | 'conflict' | 'news' | 'market' | 'feeds';
+  intervalMinutes: number;
+}> = [
+  { name: 'USGS Earthquakes', kind: 'geophysical', intervalMinutes: USGS_INTERVAL_MS / 60_000 },
+  { name: 'GDACS Disasters', kind: 'disaster', intervalMinutes: GDACS_INTERVAL_MS / 60_000 },
+  { name: 'NASA EONET', kind: 'disaster', intervalMinutes: EONET_INTERVAL_MS / 60_000 },
+  { name: 'NOAA/NWS Alerts', kind: 'weather', intervalMinutes: NWS_INTERVAL_MS / 60_000 },
+  { name: 'ACLED Conflict', kind: 'conflict', intervalMinutes: ACLED_INTERVAL_MS / 60_000 },
+  { name: 'GDELT News', kind: 'news', intervalMinutes: GDELT_INTERVAL_MS / 60_000 },
+  { name: 'CoinGecko Markets', kind: 'market', intervalMinutes: COINGECKO_INTERVAL_MS / 60_000 },
+  { name: 'RSS Tier-1 Feeds', kind: 'feeds', intervalMinutes: RSS_INTERVAL_MS / 60_000 },
+];
+
 /** Minimal HTML entity decode for feed titles ("BTS&apos; halftime show"). */
 function decodeEntities(text: string): string {
   return text

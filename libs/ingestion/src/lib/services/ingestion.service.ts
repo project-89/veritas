@@ -35,6 +35,13 @@ type RawDataConnector = DataConnector & {
   ) => Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }>;
 };
 
+/** One connector's runtime status, as determined at registration. */
+export interface ConnectorCapability {
+  platform: string;
+  status: 'live' | 'failed' | 'disabled';
+  detail?: string;
+}
+
 /**
  * Service that manages ingestion connections and data flow
  * Provides a unified interface for accessing all data connectors
@@ -43,6 +50,7 @@ type RawDataConnector = DataConnector & {
 export class IngestionService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IngestionService.name);
   private connectors: Map<string, DataConnector> = new Map();
+  private connectorCapability: ConnectorCapability[] = [];
   private contentRepository!: Repository<ContentNode>;
   private sourceRepository!: Repository<SourceNode>;
 
@@ -149,7 +157,10 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
 
     // Startup capability table — one authoritative log of what this
     // deployment can actually reach, so degraded sources are visible up
-    // front instead of surfacing as mystery-empty scan results.
+    // front instead of surfacing as mystery-empty scan results. Kept on the
+    // instance so /capabilities can serve it — the UI builds its platform
+    // picker from THIS, never from a hardcoded list that can drift.
+    this.connectorCapability = results;
     const live = results.filter((r) => r.status === 'live').map((r) => r.platform);
     const disabled = results.filter((r) => r.status === 'disabled');
     const failed = results.filter((r) => r.status === 'failed');
@@ -169,6 +180,12 @@ export class IngestionService implements OnModuleInit, OnModuleDestroy {
     for (const connector of this.connectors.values()) {
       await connector.disconnect();
     }
+  }
+
+  /** Runtime connector statuses — the single source of truth for what this
+   *  deployment can search. UIs must build from this, not hardcoded lists. */
+  getConnectorCapability(): ConnectorCapability[] {
+    return [...this.connectorCapability];
   }
 
   /**

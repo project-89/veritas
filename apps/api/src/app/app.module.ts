@@ -31,6 +31,7 @@ import {
   SignalCacheRepository,
   SOURCE_CREDIBILITY_SERVICE,
 } from '@veritas/ingestion';
+import { CapabilitiesController } from './controllers/capabilities.controller';
 import { EventsController } from './controllers/events.controller';
 import { HealthController } from './controllers/health.controller';
 import { InvestigationController } from './controllers/investigation.controller';
@@ -148,6 +149,7 @@ import { SchedulerService } from './services/scheduler.service';
     InvestigationController,
     MonitorController,
     EventsController,
+    CapabilitiesController,
     PluginsController,
     ...GENERATED_PLUGIN_CONTROLLERS,
   ],

@@ -1062,6 +1062,40 @@ export async function fetchSurgeZones(): Promise<SurgeZone[]> {
   return request<SurgeZone[]>('/api/events/surge');
 }
 
+// ---------------------------------------------------------------------------
+// Runtime capabilities — what THIS deployment can actually do. UIs build
+// pickers and status displays from this, never from hardcoded lists.
+// ---------------------------------------------------------------------------
+
+export interface ConnectorCapability {
+  platform: string;
+  status: 'live' | 'failed' | 'disabled';
+  detail?: string;
+}
+
+export interface SystemCapabilities {
+  connectors: ConnectorCapability[];
+  feeds: {
+    total: number;
+    tier1: number;
+    stateMedia: number;
+    publicBroadcaster: number;
+    domesticAudience: number;
+    languages: string[];
+  };
+  signals: Array<{ name: string; kind: string; intervalMinutes: number }>;
+  analysis: {
+    llm: { available: boolean; chatModel: string | null; reasoningModel: string | null };
+    features: Record<string, string | boolean>;
+  };
+  searchModes: string[];
+  timeRangeFormats: string[];
+}
+
+export async function fetchCapabilities(): Promise<SystemCapabilities> {
+  return request<SystemCapabilities>('/api/capabilities');
+}
+
 /**
  * Mark a single alert as read.
  */
