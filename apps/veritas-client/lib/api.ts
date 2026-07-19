@@ -1007,6 +1007,8 @@ export async function fetchUnreadAlertCount(): Promise<number> {
 /** A story covered from 2+ perspective classes, reduced to what the tactical
  *  map needs to mark the zone as narratively contested. */
 export interface ContestedZone {
+  /** StoryCluster id — used to anchor into the /perspectives page. */
+  id: string;
   lat: number;
   lng: number;
   title: string;
@@ -1020,6 +1022,7 @@ export interface ContestedZone {
 export async function fetchContestedZones(): Promise<ContestedZone[]> {
   const stories = await request<
     Array<{
+      id: string;
       title: string;
       location: { lat: number; lng: number };
       perspectives: string[];
@@ -1028,11 +1031,27 @@ export async function fetchContestedZones(): Promise<ContestedZone[]> {
   return stories
     .filter((s) => Number.isFinite(s.location?.lat) && Number.isFinite(s.location?.lng))
     .map((s) => ({
+      id: s.id,
       lat: s.location.lat,
       lng: s.location.lng,
       title: s.title,
       perspectiveCount: s.perspectives.length,
     }));
+}
+
+/** A zone whose last-24h activity is anomalously high vs its own baseline. */
+export interface SurgeZone {
+  lat: number;
+  lng: number;
+  recent24h: number;
+  baselinePerDay: number;
+  factor: number;
+}
+
+/** Zones surging vs their own prior-week baseline (empty until the event
+ *  store has enough history to make "anomalous" an honest claim). */
+export async function fetchSurgeZones(): Promise<SurgeZone[]> {
+  return request<SurgeZone[]>('/api/events/surge');
 }
 
 /**

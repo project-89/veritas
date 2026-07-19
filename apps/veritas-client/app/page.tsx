@@ -10,10 +10,12 @@ import {
   createOrGetInvestigation,
   fetchContestedZones,
   fetchInvestigations,
+  fetchSurgeZones,
   fetchUnreadAlertCount,
   getRecentScans,
   type Investigation,
   type ScanJob,
+  type SurgeZone,
 } from '../lib/api';
 import type { GlobalEvent } from '../lib/global-event.types';
 import { prefetchRecentEvents } from '../lib/use-event-stream';
@@ -57,6 +59,7 @@ export default function CommandHome() {
   const [launching, setLaunching] = useState(false);
   const [view, setView] = useState<'command' | 'tactical'>('command');
   const [contested, setContested] = useState<ContestedZone[]>([]);
+  const [surge, setSurge] = useState<SurgeZone[]>([]);
 
   // Remember the last-used home view (Command dashboard vs Tactical hex map).
   useEffect(() => {
@@ -76,13 +79,15 @@ export default function CommandHome() {
       getRecentScans(8).catch(() => [] as ScanJob[]),
       prefetchRecentEvents().catch(() => [] as GlobalEvent[]),
       fetchContestedZones().catch(() => [] as ContestedZone[]),
-    ]).then(([invs, count, scans, evts, zones]) => {
+      fetchSurgeZones().catch(() => [] as SurgeZone[]),
+    ]).then(([invs, count, scans, evts, zones, surges]) => {
       if (cancelled) return;
       setInvestigations(invs);
       setUnreadCount(count as number);
       setRecentScans(scans);
       setEvents(evts);
       setContested(zones);
+      setSurge(surges);
       setLoading(false);
     });
     return () => {
@@ -220,6 +225,8 @@ export default function CommandHome() {
             <HexTacticalMap
               events={events}
               contested={contested}
+              surge={surge}
+              onSelectContested={(id) => router.push(`/perspectives#${id}`)}
               onSelectEvent={(e) =>
                 router.push(
                   `/worldmap?lat=${e.location.lat.toFixed(3)}&lng=${e.location.lng.toFixed(3)}`,

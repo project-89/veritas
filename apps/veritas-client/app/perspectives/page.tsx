@@ -69,7 +69,7 @@ function perspectiveOf(e: GlobalEvent): PerspectiveClass {
   return 'independent';
 }
 
-function StoryCard({ story }: { story: StoryCluster }) {
+function StoryCard({ story, highlighted }: { story: StoryCluster; highlighted?: boolean }) {
   const byPerspective = new Map<PerspectiveClass, GlobalEvent[]>();
   for (const e of story.events) {
     const p = perspectiveOf(e);
@@ -79,7 +79,15 @@ function StoryCard({ story }: { story: StoryCluster }) {
   }
 
   return (
-    <div className="border border-nerv-border rounded-sm bg-nerv-bg-panel">
+    <div
+      id={story.id}
+      className={[
+        'border rounded-sm bg-nerv-bg-panel scroll-mt-16',
+        highlighted
+          ? 'border-nerv-orange/60 shadow-[0_0_18px_rgba(255,133,61,0.15)]'
+          : 'border-nerv-border',
+      ].join(' ')}
+    >
       <div className="flex items-baseline justify-between gap-3 border-b border-nerv-border px-3 py-2">
         <div className="min-w-0">
           <h3 className="text-[13px] font-mono font-bold text-nerv-text leading-snug">
@@ -158,6 +166,19 @@ export default function PerspectivesPage() {
   const [stories, setStories] = useState<StoryCluster[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [anchorId, setAnchorId] = useState<string | null>(null);
+
+  // Deep-link from a tactical-map contested marker (/perspectives#story-...).
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (hash) setAnchorId(decodeURIComponent(hash));
+  }, []);
+
+  useEffect(() => {
+    if (!anchorId || loading) return;
+    const el = document.getElementById(anchorId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [anchorId, loading]);
 
   const load = useCallback(async () => {
     try {
@@ -208,7 +229,7 @@ export default function PerspectivesPage() {
         ) : (
           <div className="space-y-3">
             {stories.map((story) => (
-              <StoryCard key={story.id} story={story} />
+              <StoryCard key={story.id} story={story} highlighted={story.id === anchorId} />
             ))}
           </div>
         )}
