@@ -170,7 +170,10 @@ export default function SearchPage() {
 
   const platformGroups = GROUP_ORDER.map((group) => ({
     label: group,
-    platforms: platformOptions.filter((p) => p.group === group),
+    platforms: platformOptions
+      .filter((p) => p.group === group)
+      // Live connectors first; offline ones sink with their reason.
+      .sort((a, b) => Number(a.disabled) - Number(b.disabled)),
   })).filter((g) => g.platforms.length > 0);
 
   // Load recent investigations
@@ -270,9 +273,10 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] flex flex-col items-center justify-start px-4 pt-[8vh] overflow-y-auto">
+    <div className="min-h-[calc(100vh-49px)] overflow-y-auto px-6 py-6">
+      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_360px]">
       {/* ── SCAN PANEL ── */}
-      <div className="w-full max-w-3xl">
+      <div className="w-full">
         <NervPanel title="Initiate Scan" accent="orange" status="online">
           <div className="p-4 space-y-4">
             <div className="space-y-3 border border-nerv-border/50 rounded-sm p-3 bg-nerv-bg-panel/30">
@@ -750,10 +754,10 @@ export default function SearchPage() {
         </NervPanel>
       </div>
 
-      {/* ── BOTTOM ROW: Recent + Tips ── */}
-      <div className="w-full max-w-3xl mt-4 grid grid-cols-5 gap-4 pb-8">
+      {/* ── RIGHT RAIL: Recent + Tips ── */}
+      <div className="flex w-full flex-col gap-4 pb-8">
         {/* Recent Investigations */}
-        <div className="col-span-3">
+        <div>
           <NervPanel title="Recent Investigations" accent="blue" corners>
             <div className="divide-y divide-nerv-border">
               {loadingInv ? (
@@ -803,7 +807,7 @@ export default function SearchPage() {
         </div>
 
         {/* Quick Tips */}
-        <div className="col-span-2">
+        <div>
           <NervPanel title="Quick Tips" accent="green" corners>
             <div className="px-3 py-2 space-y-2">
               {TIPS.map((tip) => (
@@ -817,6 +821,7 @@ export default function SearchPage() {
             </div>
           </NervPanel>
         </div>
+      </div>
       </div>
     </div>
   );
