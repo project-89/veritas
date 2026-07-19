@@ -1,6 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { GlobalEvent } from '@veritas/analysis';
 import { DatabaseService, Repository } from '@veritas/database';
+import {
+  type GlobalEventArchiveDoc,
+  GlobalEventArchiveModel,
+  type GlobalEventHistoryDoc,
+  GlobalEventHistoryModel,
+} from '../schemas/global-event-history.schema';
 import { GlobalEventModel } from '../schemas/global-event.schema';
 
 // ---------------------------------------------------------------------------
@@ -184,6 +190,37 @@ function compareDocQuality(a: GlobalEventDoc, b: GlobalEventDoc): number {
   return a.timestamp.getTime() - b.timestamp.getTime();
 }
 
+/**
+ * Field-level changes between the stored version of an event and its
+ * re-ingested version. Only substantive changes count: retitles, severity
+ * moves, and location moves beyond coordinate noise. Powers the append-only
+ * history — a source revising its framing after publication is signal.
+ */
+export function diffEventChanges(
+  prev: { title: string; severity: string; location: { lat: number; lng: number; label: string } },
+  next: { title: string; severity: string; location: { lat: number; lng: number; label: string } },
+): Array<{ field: string; previous: string; next: string }> {
+  const changes: Array<{ field: string; previous: string; next: string }> = [];
+  if (normalizeTitle(prev.title) !== normalizeTitle(next.title)) {
+    changes.push({ field: 'title', previous: prev.title, next: next.title });
+  }
+  if (prev.severity !== next.severity) {
+    changes.push({ field: 'severity', previous: prev.severity, next: next.severity });
+  }
+  const labelChanged = (prev.location.label ?? '') !== (next.location.label ?? '');
+  const moved =
+    Math.abs((prev.location.lat ?? 0) - (next.location.lat ?? 0)) > 0.5 ||
+    Math.abs((prev.location.lng ?? 0) - (next.location.lng ?? 0)) > 0.5;
+  if (labelChanged || moved) {
+    changes.push({
+      field: 'location',
+      previous: `${prev.location.label} (${prev.location.lat?.toFixed?.(2)}, ${prev.location.lng?.toFixed?.(2)})`,
+      next: `${next.location.label} (${next.location.lat?.toFixed?.(2)}, ${next.location.lng?.toFixed?.(2)})`,
+    });
+  }
+  return changes;
+}
+
 // ---------------------------------------------------------------------------
 // Query options
 // ---------------------------------------------------------------------------
@@ -204,6 +241,8 @@ export interface GlobalEventQueryOptions {
 export class GlobalEventRepository implements OnModuleInit {
   private readonly logger = new Logger(GlobalEventRepository.name);
   private repo!: Repository<GlobalEventDoc>;
+  private historyRepo?: Repository<GlobalEventHistoryDoc>;
+  private archiveRepo?: Repository<GlobalEventArchiveDoc>;
   private initialized = false;
 
   constructor(private readonly databaseService: DatabaseService) {}
@@ -221,6 +260,16 @@ export class GlobalEventRepository implements OnModuleInit {
       }
 
       this.repo = this.databaseService.getRepository<GlobalEventDoc>('GlobalEvent');
+      try {
+        this.databaseService.registerModel('GlobalEventHistory', GlobalEventHistoryModel);
+        this.databaseService.registerModel('GlobalEventArchive', GlobalEventArchiveModel);
+      } catch {
+        this.logger.warn('GlobalEvent history/archive models already registered');
+      }
+      this.historyRepo =
+        this.databaseService.getRepository<GlobalEventHistoryDoc>('GlobalEventHistory');
+      this.archiveRepo =
+        this.databaseService.getRepository<GlobalEventArchiveDoc>('GlobalEventArchive');
       this.initialized = true;
       this.logger.log('GlobalEvent repository initialized');
     } catch (error: unknown) {
@@ -333,8 +382,63 @@ export class GlobalEventRepository implements OnModuleInit {
           existing._id?.toString() ??
           ((existing as unknown as Record<string, unknown>)['id'] as string);
         await this.repo.updateById(id, doc);
+        // Append-only edit history: the live doc is about to be overwritten,
+        // so record what changed BEFORE the old version is gone. Best-effort —
+        // history must never break ingestion.
+        //
+        // Noise filters — history is for EDITORIAL changes:
+        // - CoinGecko titles embed prices that tick every poll; market data,
+        //   not framing.
+        // - A title "change" whose old value matches the new version's
+        //   originalTitle is the translation layer completing, not an edit.
+        let changes =
+          event.source === 'CoinGecko' ? [] : diffEventChanges(existing, doc as GlobalEventDoc);
+        const originalTitle = doc.metadata?.['originalTitle'];
+        if (
+          typeof originalTitle === 'string' &&
+          normalizeTitle(originalTitle) === normalizeTitle(existing.title)
+        ) {
+          changes = changes.filter((c) => c.field !== 'title');
+        }
+        if (changes.length > 0 && this.historyRepo) {
+          try {
+            await this.historyRepo.createMany(
+              changes.map((c) => ({ ...c, eventId: event.id, source: event.source })),
+            );
+          } catch (err) {
+            this.logger.warn(`Event history append failed for ${event.id}: ${err}`);
+          }
+        }
       } else {
         await this.repo.create(doc);
+        // Slim no-TTL archive row on first sight — the long-term memory the
+        // live collection's 7-day TTL deliberately lacks.
+        if (this.archiveRepo) {
+          try {
+            await this.archiveRepo.create({
+              eventId: event.id,
+              title: event.title,
+              source: event.source,
+              category: event.category,
+              severity: event.severity,
+              ownership:
+                typeof event.metadata?.['feedOwnership'] === 'string'
+                  ? (event.metadata['feedOwnership'] as string)
+                  : undefined,
+              audience:
+                typeof event.metadata?.['feedAudience'] === 'string'
+                  ? (event.metadata['feedAudience'] as string)
+                  : undefined,
+              lat: event.location?.lat,
+              lng: event.location?.lng,
+              label: event.location?.label,
+              countryCode: event.location?.countryCode,
+              timestamp: new Date(event.timestamp),
+            });
+          } catch (err) {
+            this.logger.warn(`Event archive append failed for ${event.id}: ${err}`);
+          }
+        }
       }
     } catch (error: unknown) {
       const err = error as Error;

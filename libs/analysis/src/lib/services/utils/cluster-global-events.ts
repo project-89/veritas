@@ -84,7 +84,10 @@ function informativeTokens(title: string): Set<string> {
 export function perspectiveOf(event: GlobalEvent): PerspectiveClass {
   const ownership = event.metadata?.['feedOwnership'];
   const audience = event.metadata?.['feedAudience'];
-  if (ownership === 'state-media') {
+  // 'state-media' (RT, CGTN) and 'state-official' (a ministry's own feed —
+  // US State Dept exactly as a Russian ministry) are both STATE voices; the
+  // classification is structural and bloc-agnostic.
+  if (ownership === 'state-media' || ownership === 'state-official') {
     return audience === 'domestic' ? 'state-domestic' : 'state-international';
   }
   if (ownership === 'public-broadcaster') return 'public-broadcaster';

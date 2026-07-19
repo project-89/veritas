@@ -62,7 +62,7 @@ function timeAgo(iso: string): string {
 function perspectiveOf(e: GlobalEvent): PerspectiveClass {
   const ownership = e.metadata['feedOwnership'];
   const audience = e.metadata['feedAudience'];
-  if (ownership === 'state-media') {
+  if (ownership === 'state-media' || ownership === 'state-official') {
     return audience === 'domestic' ? 'state-domestic' : 'state-international';
   }
   if (ownership === 'public-broadcaster') return 'public-broadcaster';

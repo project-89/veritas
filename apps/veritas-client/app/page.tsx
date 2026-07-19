@@ -404,7 +404,8 @@ export default function CommandHome() {
                   <span className="truncate text-[12px] font-mono text-nerv-text-secondary">
                     {e.title}
                   </span>
-                  {e.metadata['feedOwnership'] === 'state-media' && (
+                  {(e.metadata['feedOwnership'] === 'state-media' ||
+                    e.metadata['feedOwnership'] === 'state-official') && (
                     <span className="shrink-0 px-1 text-[9px] font-mono uppercase tracking-wider border border-nerv-red/40 text-nerv-red/80 rounded-sm">
                       state
                     </span>

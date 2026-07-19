@@ -1,14 +1,29 @@
 /**
  * Editorial ownership/control of a feed. This is PROVENANCE, not a quality
- * score: the platform's job is seeing who says what, so official state
- * mouthpieces are valuable primary sources for narrative attribution — as
- * long as they are never presented as independent reporting.
+ * score, and the criteria are STRUCTURAL and bloc-agnostic — the same rule
+ * applied to Washington, Brussels, Moscow, and Beijing. The platform's job
+ * is seeing who says what; official state voices are valuable primary
+ * sources for narrative attribution as long as they are labeled as such,
+ * whichever state they belong to.
  *
  * - independent:        privately owned, editorially independent
- * - public-broadcaster: state-funded but editorially independent (BBC, DW)
- * - state-media:        state-controlled messaging (Xinhua, RT, Sputnik)
+ * - public-broadcaster: state-funded but editorially independent by charter
+ *                       (BBC, DW, NPR, Al Jazeera)
+ * - state-media:        state-controlled journalism-shaped outlets
+ *                       (Xinhua, RT, Sputnik — and VOA would be tagged the
+ *                       same way if its feeds were alive)
+ * - state-official:     a government's own communications organs — press
+ *                       offices, ministries (US State Dept and DoD carry
+ *                       this exactly as a Russian ministry feed would)
+ *
+ * Intergovernmental bodies (UN News) stay untagged: they are official
+ * institutional voices but not the voice of a state.
  */
-export type FeedOwnership = 'independent' | 'public-broadcaster' | 'state-media';
+export type FeedOwnership =
+  | 'independent'
+  | 'public-broadcaster'
+  | 'state-media'
+  | 'state-official';
 
 export interface RssFeedEntry {
   name: string;
@@ -1115,6 +1130,8 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'us',
+      ownership: 'state-official',
+      audience: 'international',
     },
     {
       name: 'Federal Reserve - Press Releases',
@@ -1123,6 +1140,8 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'us',
+      ownership: 'state-official',
+      audience: 'domestic',
     },
     {
       name: 'SEC - Press Releases',
@@ -1131,6 +1150,8 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'us',
+      ownership: 'state-official',
+      audience: 'domestic',
     },
     {
       name: 'EU Newsroom',
@@ -1139,6 +1160,8 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'europe',
+      ownership: 'state-official',
+      audience: 'international',
     },
     {
       name: 'US Department of Defense',
@@ -1147,6 +1170,8 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 1,
       language: 'en',
       region: 'us',
+      ownership: 'state-official',
+      audience: 'international',
     },
     {
       name: 'UK Government',
@@ -1155,6 +1180,8 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 2,
       language: 'en',
       region: 'uk',
+      ownership: 'state-official',
+      audience: 'domestic',
     },
     {
       name: 'GAO Reports',
@@ -1163,6 +1190,8 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       tier: 2,
       language: 'en',
       region: 'us',
+      ownership: 'state-official',
+      audience: 'domestic',
     },
   ],
 

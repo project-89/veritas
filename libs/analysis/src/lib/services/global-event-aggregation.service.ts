@@ -31,8 +31,8 @@ export interface RssFeedEntry {
   tier: 1 | 2 | 3;
   language: string;
   region?: string;
-  /** Editorial control: independent | public-broadcaster | state-media. */
-  ownership?: 'independent' | 'public-broadcaster' | 'state-media';
+  /** Editorial control (structural, bloc-agnostic — see rss-feed-catalog). */
+  ownership?: 'independent' | 'public-broadcaster' | 'state-media' | 'state-official';
   /** Who the outlet talks to: its own population or the outside world. */
   audience?: 'domestic' | 'international';
 }

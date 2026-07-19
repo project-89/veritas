@@ -94,6 +94,11 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
               State media{audience ? ` · ${audience}` : ''}
             </span>
           )}
+          {ownership === 'state-official' && (
+            <span className="px-2 py-0.5 rounded-sm text-[11px] font-mono uppercase tracking-wider bg-nerv-red/10 border border-nerv-red/30 text-nerv-red/80">
+              Official state source{audience ? ` · ${audience}` : ''}
+            </span>
+          )}
           {ownership === 'public-broadcaster' && (
             <span className="px-2 py-0.5 rounded-sm text-[11px] font-mono uppercase tracking-wider bg-nerv-blue/10 border border-nerv-blue/30 text-nerv-blue/80">
               Public broadcaster
