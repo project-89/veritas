@@ -497,7 +497,8 @@ export function HexTacticalMap({
         {labelled.map((cell) => {
           const ev = cell.events[0];
           if (!ev) return null;
-          const left = cell.cx < vbW / 2;
+          // Labels extend TOWARD the map center so edge cells never clip.
+          const left = cell.cx > vbW / 2;
           return (
             <g key={`lbl-${cell.key}`} pointerEvents="none">
               <line
