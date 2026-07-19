@@ -243,22 +243,6 @@ export function HexTacticalMap({
     .slice()
     .sort((a, b) => (SEV_RANK[b.severity] ?? 0) - (SEV_RANK[a.severity] ?? 0))[0];
 
-  // Top few events get on-map zone labels. Greedy collision skip: a label
-  // whose text row would overlap an already-placed one is dropped in favor of
-  // the next-ranked cell — overlapping text ("HARNEY, OREGONLAKE, MINNESOTA")
-  // is worse than a missing label.
-  const labelled = useMemo(() => {
-    const ranked = [...hot].sort((a, b) => b.topSeverity - a.topSeverity || b.count - a.count);
-    const placed: HexCell[] = [];
-    for (const cell of ranked) {
-      if (placed.length >= 5) break;
-      const collides = placed.some(
-        (p) => Math.abs(p.cy - cell.cy) < 16 && Math.abs(p.cx - cell.cx) < 220,
-      );
-      if (!collides) placed.push(cell);
-    }
-    return placed;
-  }, [hot]);
 
   // Count EVENTS at high/critical (the banner says "events" — zones would
   // undercount a cell holding several severe events).
@@ -493,37 +477,6 @@ export function HexTacticalMap({
           );
         })}
 
-        {/* zone labels for the top events */}
-        {labelled.map((cell) => {
-          const ev = cell.events[0];
-          if (!ev) return null;
-          // Labels extend TOWARD the map center so edge cells never clip.
-          const left = cell.cx > vbW / 2;
-          return (
-            <g key={`lbl-${cell.key}`} pointerEvents="none">
-              <line
-                x1={cell.cx}
-                y1={cell.cy}
-                x2={cell.cx + (left ? -R * 2 : R * 2)}
-                y2={cell.cy - R * 1.4}
-                stroke={AMBER}
-                strokeOpacity={0.5}
-                strokeWidth={0.5}
-              />
-              <text
-                x={cell.cx + (left ? -R * 2.3 : R * 2.3)}
-                y={cell.cy - R * 1.6}
-                textAnchor={left ? 'end' : 'start'}
-                fontSize={6.5}
-                fontFamily="monospace"
-                fill={AMBER_HOT}
-                style={{ letterSpacing: '0.05em' }}
-              >
-                {ev.location.label.slice(0, 22).toUpperCase()}
-              </text>
-            </g>
-          );
-        })}
       </svg>
 
       {/* scanlines */}

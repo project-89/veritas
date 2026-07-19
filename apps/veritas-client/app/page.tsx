@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { NervBadge, NervMetric, NervPanel } from '../components/nerv';
+import { NervBadge, NervMetric, NervPanel, NervTicker } from '../components/nerv';
 import { HexTacticalMap } from '../components/nerv/hex-tactical-map';
 import {
   type ContestedZone,
@@ -94,6 +94,77 @@ export default function CommandHome() {
       cancelled = true;
     };
   }, []);
+
+  // Region-grouped ticker under the tactical map: the map shows WHERE (the
+  // hexes carry geography), the ticker says WHAT per region. Regions come
+  // from the last comma segment of the location label ("Denali, Alaska" →
+  // ALASKA), using the same placement-honesty filter as the map itself.
+  const regionTicker = useMemo(() => {
+    interface Group {
+      key: string;
+      count: number;
+      cats: Map<string, number>;
+      topSev: number;
+      latest: number;
+      latSum: number;
+      lngSum: number;
+    }
+    const rank: Record<string, number> = { critical: 3, high: 2, medium: 1, low: 0 };
+    const groups = new Map<string, Group>();
+    for (const e of events) {
+      const lat = e.location?.lat;
+      const lng = e.location?.lng;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      if (e.location.region === 'global' || e.location.label === 'Global') continue;
+      if (e.source.startsWith('RSS:') && e.location.region !== 'geocoded') continue;
+      const label = e.location.label ?? '';
+      const seg = label.includes(',') ? label.slice(label.lastIndexOf(',') + 1).trim() : label;
+      const key = (seg || 'Unknown').toUpperCase();
+      let g = groups.get(key);
+      if (!g) {
+        g = { key, count: 0, cats: new Map(), topSev: 0, latest: 0, latSum: 0, lngSum: 0 };
+        groups.set(key, g);
+      }
+      g.count++;
+      g.cats.set(e.category, (g.cats.get(e.category) ?? 0) + 1);
+      g.topSev = Math.max(g.topSev, rank[e.severity] ?? 0);
+      g.latest = Math.max(g.latest, new Date(e.timestamp).getTime() || 0);
+      g.latSum += lat;
+      g.lngSum += lng;
+    }
+    const CAT_ABBR: Record<string, string> = {
+      environmental: 'ENV',
+      political: 'POL',
+      economic: 'ECON',
+      media: 'MEDIA',
+    };
+    const sorted = [...groups.values()]
+      .sort((a, b) => b.topSev - a.topSev || b.count - a.count)
+      .slice(0, 20);
+    const coords = new Map<string, { lat: number; lng: number }>();
+    const items = sorted.map((g) => {
+      coords.set(g.key, { lat: g.latSum / g.count, lng: g.lngSum / g.count });
+      const breakdown = [...g.cats.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([c, n]) => `${n} ${CAT_ABBR[c] ?? c.toUpperCase()}`)
+        .join(' · ');
+      return {
+        id: g.key,
+        severity: g.topSev >= 2 ? 'critical' : g.count >= 8 ? 'warning' : 'info',
+        text: `${g.key} — ${breakdown}`,
+        timestamp: g.latest ? new Date(g.latest).toISOString().slice(11, 16) : '',
+      };
+    });
+    return { items, coords };
+  }, [events]);
+
+  const handleRegionTickerClick = useCallback(
+    (id: string) => {
+      const c = regionTicker.coords.get(id);
+      if (c) router.push(`/worldmap?lat=${c.lat.toFixed(3)}&lng=${c.lng.toFixed(3)}`);
+    },
+    [regionTicker, router],
+  );
 
   // Quick launch: create/find the investigation with sensible defaults and
   // drop into the workspace. "configure" (below) is the full search form.
@@ -221,18 +292,21 @@ export default function CommandHome() {
         </div>
 
         {view === 'tactical' ? (
-          <div className="flex min-h-[420px] lg:flex-1 lg:min-h-0">
-            <HexTacticalMap
-              events={events}
-              contested={contested}
-              surge={surge}
-              onSelectContested={(id) => router.push(`/perspectives#${id}`)}
-              onSelectEvent={(e) =>
-                router.push(
-                  `/worldmap?lat=${e.location.lat.toFixed(3)}&lng=${e.location.lng.toFixed(3)}`,
-                )
-              }
-            />
+          <div className="flex flex-col min-h-[420px] lg:flex-1 lg:min-h-0">
+            <div className="flex-1 min-h-0 flex">
+              <HexTacticalMap
+                events={events}
+                contested={contested}
+                surge={surge}
+                onSelectContested={(id) => router.push(`/perspectives#${id}`)}
+                onSelectEvent={(e) =>
+                  router.push(
+                    `/worldmap?lat=${e.location.lat.toFixed(3)}&lng=${e.location.lng.toFixed(3)}`,
+                  )
+                }
+              />
+            </div>
+            <NervTicker items={regionTicker.items} onItemClick={handleRegionTickerClick} />
           </div>
         ) : (
         // Content region — fills the remaining viewport; sections scroll
