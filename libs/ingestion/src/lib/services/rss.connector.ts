@@ -60,6 +60,16 @@ function coerceValidDate(value: unknown): Date | null {
   return null;
 }
 
+/** Publication date recovered from an article URL (/YYYY/MM/DD/). The only
+ *  date source for feeds whose items carry none (e.g. Press TV) — without it
+ *  undated items pass every date filter and read as perpetually fresh. */
+function dateFromItemUrl(link: string): Date | null {
+  const m = link.match(/\/(20\d{2})\/(\d{2})\/(\d{2})(?:\/|$)/);
+  if (!m) return null;
+  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /**
  * RSS/Atom feed connector
  * Handles fetching and processing RSS and Atom feeds
@@ -424,7 +434,10 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
     return items.filter((item) => {
       const itemDate =
         coerceValidDate(this.coerceToText(item.isoDate)) ??
-        coerceValidDate(this.coerceToText(item.pubDate));
+        coerceValidDate(this.coerceToText(item.pubDate)) ??
+        dateFromItemUrl(this.coerceToText(item.link));
+      // No date anywhere (item nor URL): keep it — dropping unknowables would
+      // silently blind us to undated-but-relevant feeds (Nikkei).
       if (!itemDate) return true;
       if (options.startDate && itemDate < options.startDate) return false;
       if (options.endDate && itemDate > options.endDate) return false;

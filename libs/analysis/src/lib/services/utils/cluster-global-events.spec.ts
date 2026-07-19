@@ -122,6 +122,52 @@ describe('clusterGlobalEvents', () => {
     expect(clusterGlobalEvents(events)).toHaveLength(2);
   });
 
+  it('does not bridge different events via generic report language', () => {
+    // "death toll" chained a Venezuela earthquake to a Uganda bus crash live.
+    const events = [
+      makeEvent({
+        id: 'a',
+        title: 'Venezuela earthquake death toll rises to 12',
+        location: { lat: 6.4, lng: -66.6, label: 'Venezuela', region: 'geocoded' },
+      }),
+      makeEvent({
+        id: 'b',
+        title: 'Death toll from Uganda school bus crash rises to 24',
+        location: { lat: 1.4, lng: 32.3, label: 'Uganda', region: 'geocoded' },
+      }),
+    ];
+    expect(clusterGlobalEvents(events)).toHaveLength(2);
+  });
+
+  it('does not bridge different records via breaks/record/world tokens', () => {
+    const events = [
+      makeEvent({ id: 'a', title: 'Kylian Mbappe breaks all-time World Cup scoring record' }),
+      makeEvent({ id: 'b', title: 'Josh Kerr of Britain breaks 27-year-old world record in the mile' }),
+    ];
+    expect(clusterGlobalEvents(events)).toHaveLength(2);
+  });
+
+  it('drops bulletin boilerplate instead of clustering it', () => {
+    const events = [
+      makeEvent({ id: 'a', title: 'Latest news bulletin | July 19th – Morning' }),
+      makeEvent({ id: 'b', title: 'Latest news bulletin | July 18th – Evening' }),
+    ];
+    expect(clusterGlobalEvents(events)).toHaveLength(0);
+  });
+
+  it('ignores trailing segments of composite live-blog headlines', () => {
+    // The Hill's "...; Norman launches bid for Graham seat" segment acted as a
+    // wormhole into an unrelated Senate story.
+    const events = [
+      makeEvent({
+        id: 'hill',
+        title: 'Live updates: 2 US soldiers killed by Iran strikes in Jordan; Norman launches bid for Graham seat',
+      }),
+      makeEvent({ id: 'senate', title: 'Norman throws hat in ring for Graham Senate seat' }),
+    ];
+    expect(clusterGlobalEvents(events)).toHaveLength(2);
+  });
+
   it('prefers a non-state-domestic representative headline', () => {
     const events = [
       makeEvent({

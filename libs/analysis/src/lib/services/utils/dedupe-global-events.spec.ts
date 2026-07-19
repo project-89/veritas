@@ -164,4 +164,70 @@ describe('dedupeGlobalEvents', () => {
     ];
     expect(dedupeGlobalEvents(events)).toHaveLength(2);
   });
+
+  it('collapses one story split across political and media feed categories', () => {
+    // The same DW story arrives as 'political' (DW - Europe) and 'media'
+    // (DW News) — feed taxonomy, not different events.
+    const events = [
+      makeEvent({
+        id: 'a',
+        source: 'RSS:DW News',
+        category: 'media',
+        title: 'Russian ballistic missiles rock Kyiv',
+        location: { lat: 50.4, lng: 30.5, label: 'Ukraine', countryCode: 'UA', region: 'geocoded' },
+      }),
+      makeEvent({
+        id: 'b',
+        source: 'RSS:DW - Europe',
+        category: 'political',
+        title: 'Russian ballistic missiles rock Kyiv',
+        location: { lat: 50.4, lng: 30.5, label: 'Ukraine', countryCode: 'UA', region: 'geocoded' },
+      }),
+    ];
+    expect(dedupeGlobalEvents(events)).toHaveLength(1);
+  });
+
+  it('collapses near-identical titles when a feed-home fallback hides the location', () => {
+    // Anadolu's fallback location is Turkey (where the OUTLET lives) — that
+    // must not block its "Tate brothers arrested in US" from merging with the
+    // same story anchored elsewhere.
+    const events = [
+      makeEvent({
+        id: 'a',
+        source: 'RSS:DW News',
+        category: 'media',
+        title: 'Andrew Tate and brother arrested in Miami on trafficking charges',
+        location: { lat: 20, lng: 0, label: 'Global', region: 'global' },
+      }),
+      makeEvent({
+        id: 'b',
+        source: 'RSS:Anadolu Agency',
+        category: 'media',
+        title: 'Andrew Tate and brother arrested in Miami on trafficking charges, UK seeks extradition',
+        location: { lat: 39.0, lng: 35.2, label: 'Turkey', region: 'turkey' },
+      }),
+    ];
+    expect(dedupeGlobalEvents(events)).toHaveLength(1);
+  });
+
+  it('does not merge merely-topical titles without location evidence', () => {
+    const events = [
+      makeEvent({
+        id: 'a',
+        source: 'RSS:A',
+        category: 'media',
+        title: 'Stock markets rally on tech earnings optimism',
+        location: { lat: 20, lng: 0, label: 'Global', region: 'global' },
+      }),
+      makeEvent({
+        id: 'b',
+        source: 'RSS:B',
+        category: 'media',
+        title: 'Tech layoffs continue as markets waver on earnings',
+        location: { lat: 20, lng: 0, label: 'Global', region: 'global' },
+      }),
+    ];
+    // Related topic, different stories — the no-location threshold (0.7) holds.
+    expect(dedupeGlobalEvents(events)).toHaveLength(2);
+  });
 });

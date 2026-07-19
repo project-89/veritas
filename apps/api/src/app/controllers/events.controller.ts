@@ -174,6 +174,9 @@ export class EventsController {
       const { lat, lng } = e.location ?? {};
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       if (e.location.region === 'global' || e.location.label === 'Global') continue;
+      // Feed-home fallback locations would register the OUTLET's publishing
+      // volume as zone activity (RIA's output surging "in Russia").
+      if (e.source.startsWith('RSS:') && e.location.region !== 'geocoded') continue;
       const ts = new Date(e.timestamp).getTime();
       if (!Number.isFinite(ts)) continue;
 

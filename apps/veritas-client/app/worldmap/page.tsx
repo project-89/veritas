@@ -42,6 +42,11 @@ const ALL_SEVERITIES = new Set<EventSeverity>(['low', 'medium', 'high', 'critica
 function isWorldMapEvent(event: GlobalEvent): boolean {
   if (event.source === 'CoinGecko') return false;
   if (event.metadata.feedCategory === 'crypto') return false;
+  // An RSS event whose headline didn't geocode is anchored at its OUTLET's
+  // home region — a map pin there claims knowledge we don't have (RT's US
+  // story rendered in Russia). Un-geocoded stories live in the feed, not on
+  // the map. Signal sources (USGS, GDACS, EONET...) always carry real coords.
+  if (event.source.startsWith('RSS:') && event.location.region !== 'geocoded') return false;
   return true;
 }
 

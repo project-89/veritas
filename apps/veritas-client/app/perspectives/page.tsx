@@ -182,7 +182,7 @@ export default function PerspectivesPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/events/divergence?limit=20&windowHours=48`);
+      const res = await fetch(`${API_BASE}/events/divergence?limit=50&windowHours=48`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setStories((await res.json()) as StoryCluster[]);
       setError(null);

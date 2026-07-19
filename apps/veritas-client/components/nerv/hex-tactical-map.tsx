@@ -170,6 +170,9 @@ export function HexTacticalMap({
       const lng = ev.location?.lng;
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
       if (ev.location.region === 'global' || ev.location.label === 'Global') continue;
+      // Feed-home fallback locations mark where the OUTLET lives, not the
+      // story — a zone must not light up because a wire service is based there.
+      if (ev.source.startsWith('RSS:') && ev.location.region !== 'geocoded') continue;
       const row = clamp(Math.floor((90 - lat) / ROW_DEG), 0, ROWS - 1);
       const col = clamp(Math.floor((lng + 180) / COL_DEG), 0, COLS - 1);
       const key = `${row},${col}`;
@@ -240,14 +243,22 @@ export function HexTacticalMap({
     .slice()
     .sort((a, b) => (SEV_RANK[b.severity] ?? 0) - (SEV_RANK[a.severity] ?? 0))[0];
 
-  // Top few events get on-map zone labels.
-  const labelled = useMemo(
-    () =>
-      [...hot]
-        .sort((a, b) => b.topSeverity - a.topSeverity || b.count - a.count)
-        .slice(0, 5),
-    [hot],
-  );
+  // Top few events get on-map zone labels. Greedy collision skip: a label
+  // whose text row would overlap an already-placed one is dropped in favor of
+  // the next-ranked cell — overlapping text ("HARNEY, OREGONLAKE, MINNESOTA")
+  // is worse than a missing label.
+  const labelled = useMemo(() => {
+    const ranked = [...hot].sort((a, b) => b.topSeverity - a.topSeverity || b.count - a.count);
+    const placed: HexCell[] = [];
+    for (const cell of ranked) {
+      if (placed.length >= 5) break;
+      const collides = placed.some(
+        (p) => Math.abs(p.cy - cell.cy) < 16 && Math.abs(p.cx - cell.cx) < 220,
+      );
+      if (!collides) placed.push(cell);
+    }
+    return placed;
+  }, [hot]);
 
   // Count EVENTS at high/critical (the banner says "events" — zones would
   // undercount a cell holding several severe events).

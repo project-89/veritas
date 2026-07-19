@@ -60,6 +60,37 @@ const CONTENT_DEDUP_WINDOW_MS = 12 * 60 * 60 * 1000; // 12h: same happening repo
 const CONTENT_DEDUP_OVERLAP = 0.5; // content-token overlap to treat as the same event
 const MAX_CONTENT_SIGNATURES = 5000; // memory bound on the signature store
 
+/** Minimal HTML entity decode for feed titles ("BTS&apos; halftime show"). */
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&apos;|&#0?39;/g, "'")
+    .replace(/&quot;|&#0?34;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ');
+}
+
+/** "south_korea" → "South Korea" — region slugs are not user-facing labels. */
+function humanizeRegion(region: string): string {
+  return region
+    .split(/[_\s]+/)
+    .map((w) => (w.length <= 2 ? w.toUpperCase() : w[0]?.toUpperCase() + w.slice(1)))
+    .join(' ');
+}
+
+/** Publication date recovered from an article URL (many CMSs embed
+ *  /YYYY/MM/DD/). The only date source for feeds whose items carry none
+ *  (e.g. Press TV) — without it those items would re-read as "fresh" and be
+ *  re-timestamped on every poll. */
+function dateFromUrl(link: string | undefined): Date | null {
+  if (!link) return null;
+  const m = link.match(/\/(20\d{2})\/(\d{2})\/(\d{2})(?:\/|$)/);
+  if (!m) return null;
+  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /** Place name for an EONET event: "Wildfire Bear, Denali, Alaska" → "Denali,
  *  Alaska"; nameless titles fall back to a headline geocode, then coordinates. */
 function eonetPlaceLabel(title: string, lat: number, lng: number): string {
@@ -311,11 +342,23 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
           // the feeds themselves were fine.
           const cutoff = now.getTime() - RSS_MAX_AGE_MS;
 
-          // Max 5 per feed. Undated items are assumed recent, not dropped.
-          const fresh = items.slice(0, 5).filter((item) => {
-            const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : now.getTime();
-            return pubDate >= cutoff;
-          });
+          // Resolve each item's publication time: pubDate, else a date embedded
+          // in the article URL, else "now" (undated items are assumed recent,
+          // not dropped). Sort by that BEFORE taking the top 5 — some feeds
+          // (CGTN) are not newest-first, and slicing the raw order was
+          // silently discarding their fresh items in favor of stale ones.
+          const dated = items
+            .map((item) => {
+              const parsed = item.pubDate ? new Date(item.pubDate).getTime() : Number.NaN;
+              const resolved = Number.isFinite(parsed)
+                ? parsed
+                : (dateFromUrl(item.link)?.getTime() ?? now.getTime());
+              return { item, time: resolved };
+            })
+            .sort((a, b) => b.time - a.time);
+
+          // Max 5 per feed, newest first, within the 24h window.
+          const fresh = dated.filter(({ time }) => time >= cutoff).slice(0, 5);
 
           // Domestic-language feeds (RIA Novosti, IRNA, ...): translate the
           // headlines so they geocode and cluster with the rest of the feed.
@@ -324,16 +367,17 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
           let translations: Array<string | null> = fresh.map(() => null);
           if (feed.language !== 'en' && this.translator?.available) {
             translations = await this.translator.translateHeadlines(
-              fresh.map((item) => item.title ?? 'Untitled'),
+              fresh.map(({ item }) => item.title ?? 'Untitled'),
               feed.language,
             );
           }
 
           for (let itemIdx = 0; itemIdx < fresh.length; itemIdx++) {
-            const item = fresh[itemIdx];
-            if (!item) continue;
+            const entry = fresh[itemIdx];
+            if (!entry) continue;
+            const { item, time: itemTime } = entry;
 
-            const originalTitle = item.title ?? 'Untitled';
+            const originalTitle = decodeEntities(item.title ?? 'Untitled');
             const translatedTitle = translations[itemIdx] ?? null;
             const title = translatedTitle ?? originalTitle;
             // Keyed on the ORIGINAL title so the id is stable whether or not
@@ -370,11 +414,14 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
 
             // Deterministic de-overlap jitter derived from the event id, so a
             // given event renders at a STABLE position (region-anchored) rather
-            // than jumping around the map on every reload.
+            // than jumping around the map on every reload. The hash MUST be
+            // abs()ed: `(h*31+c)|0` goes negative, and a negative modulo made
+            // the jitter range asymmetric (down to -12°/-18°), dropping e.g. a
+            // Jordan-geocoded story into the Sudanese desert.
             let h = 0;
             for (let ci = 0; ci < id.length; ci++) h = (h * 31 + id.charCodeAt(ci)) | 0;
-            const jitterLat = ((h % 1000) / 1000 - 0.5) * 8;
-            const jitterLng = (((h >> 10) % 1000) / 1000 - 0.5) * 12;
+            const jitterLat = ((Math.abs(h) % 1000) / 1000 - 0.5) * 8;
+            const jitterLng = ((Math.abs(h >> 10) % 1000) / 1000 - 0.5) * 12;
 
             events.push({
               id,
@@ -388,11 +435,11 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
                 title,
                 `RSS:${feed.name}`,
               ),
-              timestamp: item.pubDate ?? now.toISOString(),
+              timestamp: new Date(itemTime).toISOString(),
               location: {
                 lat: centroid.lat + jitterLat,
                 lng: centroid.lng + jitterLng,
-                label: geo ? geo.label : (feed.region ?? 'Global'),
+                label: geo ? geo.label : humanizeRegion(feed.region ?? 'Global'),
                 region,
                 ...(geo ? { countryCode: geo.code } : {}),
               },

@@ -1027,9 +1027,17 @@ export async function fetchContestedZones(): Promise<ContestedZone[]> {
       location: { lat: number; lng: number };
       perspectives: string[];
     }>
-  >('/api/events/divergence?limit=20&windowHours=48');
+  >('/api/events/divergence?limit=30&windowHours=48');
   return stories
     .filter((s) => Number.isFinite(s.location?.lat) && Number.isFinite(s.location?.lng))
+    // "Contested" on the map means a STATE framing exists against non-state
+    // coverage. Independent + public-broadcaster alone is just normal news
+    // (a lettuce recall covered by NPR and The Hill is not contested).
+    .filter(
+      (s) =>
+        s.perspectives.some((p) => p.startsWith('state-')) &&
+        s.perspectives.some((p) => !p.startsWith('state-')),
+    )
     .map((s) => ({
       id: s.id,
       lat: s.location.lat,

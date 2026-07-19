@@ -111,9 +111,36 @@ export interface DedupeOptions {
   overlapThreshold?: number;
 }
 
+/**
+ * RSS feed categories split one story across 'political' (regional feeds) and
+ * 'media' (world-news feeds) — for dedup purposes they are the same bucket.
+ * Environmental/economic stay distinct: an earthquake and a cyclone at the
+ * same place must not merge.
+ */
+function categoryBucket(category: GlobalEvent['category']): string {
+  return category === 'political' || category === 'media' ? 'news' : category;
+}
+
+/**
+ * Whether an event's location is evidence about the STORY. Signal sources
+ * (USGS, GDACS...) carry real coordinates; RSS events only when the headline
+ * geocoded — a feed-home fallback (Anadolu→Turkey) says where the outlet
+ * lives and must not block "Tate brothers arrested" from merging with its
+ * twin anchored elsewhere.
+ */
+function locationIsEvidence(source: string, location: GeoLocation | undefined | null): boolean {
+  if (!source.startsWith('RSS:')) return true;
+  return location?.region === 'geocoded';
+}
+
+// Without location evidence on both sides the title must carry the match on
+// its own — demand near-identical content, not just topical similarity.
+const NO_LOCATION_OVERLAP = 0.7;
+
 interface KeptSignature {
   tokens: Set<string>;
   location: GeoLocation;
+  locationEvidence: boolean;
   category: GlobalEvent['category'];
   time: number;
   source: string;
@@ -132,6 +159,7 @@ export function dedupeGlobalEvents(
   for (const event of events) {
     const tokens = contentTokens(event.title, event.location?.label);
     const time = new Date(event.timestamp).getTime();
+    const locationEvidence = locationIsEvidence(event.source, event.location);
 
     // With no significant tokens we can't judge similarity — keep it rather than
     // risk collapsing unrelated events.
@@ -142,12 +170,14 @@ export function dedupeGlobalEvents(
         // event). Distinct events from the same structured source — e.g. many
         // separate NASA EONET wildfires with generic titles — must NOT merge.
         if (sig.source === event.source) continue;
-        if (sig.category !== event.category) continue;
-        if (!sameLocation(sig.location, event.location)) continue;
+        if (categoryBucket(sig.category) !== categoryBucket(event.category)) continue;
+        const bothLocated = sig.locationEvidence && locationEvidence;
+        if (bothLocated && !sameLocation(sig.location, event.location)) continue;
         if (Number.isFinite(time) && Number.isFinite(sig.time) && Math.abs(sig.time - time) > windowMs) {
           continue;
         }
-        if (overlapCoefficient(tokens, sig.tokens) >= overlapThreshold) {
+        const threshold = bothLocated ? overlapThreshold : Math.max(overlapThreshold, NO_LOCATION_OVERLAP);
+        if (overlapCoefficient(tokens, sig.tokens) >= threshold) {
           isDuplicate = true;
           break;
         }
@@ -155,7 +185,14 @@ export function dedupeGlobalEvents(
     }
 
     if (isDuplicate) continue;
-    kept.push({ tokens, location: event.location, category: event.category, time, source: event.source });
+    kept.push({
+      tokens,
+      location: event.location,
+      locationEvidence,
+      category: event.category,
+      time,
+      source: event.source,
+    });
     result.push(event);
   }
 

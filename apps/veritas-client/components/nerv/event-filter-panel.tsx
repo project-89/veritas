@@ -104,7 +104,9 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
                   />
                   {CATEGORY_LABELS[cat]}
                 </span>
-                <span className="text-[11px] text-nerv-text-muted tabular-nums">
+                {/* Counts come from the client-side event cache, which can fill
+                    between SSR and hydration — the mismatch is expected. */}
+                <span className="text-[11px] text-nerv-text-muted tabular-nums" suppressHydrationWarning>
                   {categoryCounts[cat]}
                 </span>
               </button>

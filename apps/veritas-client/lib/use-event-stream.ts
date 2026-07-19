@@ -307,7 +307,10 @@ async function fetchRecentEvents(force = false): Promise<GlobalEvent[]> {
     return recentEventsInFlight;
   }
 
-  recentEventsInFlight = fetch(`${API_BASE}/events/recent?limit=200`)
+  // 500, not 200: the environmental layer (EONET) is high-volume, and at 200
+  // the newest-first cut starved whole categories — every non-crypto economic
+  // event ranked below the cutoff and the world map showed ECON 0.
+  recentEventsInFlight = fetch(`${API_BASE}/events/recent?limit=500`)
     .then((r) => r.json())
     .then((data) => {
       const normalized = Array.isArray(data) ? writeRecentEventsCache(data as GlobalEvent[]) : [];

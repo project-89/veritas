@@ -45,6 +45,42 @@ const DEFAULT_WINDOW_MS = 48 * 60 * 60 * 1000;
 const DEFAULT_OVERLAP = 0.34;
 const MIN_SHARED_TOKENS = 2;
 
+// Report-language vocabulary that must never form a bridge between stories:
+// every contaminated cluster in the 2026-07 audit was chained by 2-3 of
+// exactly these tokens ("death toll" merged a Venezuela earthquake with a
+// Uganda bus crash; "breaks world record" merged Mbappé with a miler).
+// Month names + bare years catch datestamped bulletin titles.
+const CLUSTER_NOISE = new Set([
+  'death', 'toll', 'killed', 'kills', 'dead', 'dies', 'died', 'injured',
+  'least', 'people', 'record', 'breaks', 'world', 'final', 'ahead', 'amid',
+  'live', 'updates', 'update', 'news', 'bulletin', 'briefing', 'morning',
+  'evening', 'midday', 'watch', 'video', 'photos', 'says', 'announces',
+  'january', 'february', 'march', 'april', 'june', 'july', 'august',
+  'september', 'october', 'november', 'december',
+]);
+
+/** Boilerplate periodicals ("Latest news bulletin | July 19th – Morning") are
+ *  not real-world events and chain to each other via date tokens. */
+const BOILERPLATE_TITLE = /^(latest news bulletin|morning briefing|evening briefing|news wrap|daily briefing)/i;
+
+/**
+ * Tokens that may count toward a cluster match: significant title words minus
+ * report-language noise and bare year numbers. Composite live-blog headlines
+ * ("2 US soldiers killed…; Norman launches bid for Graham seat") are cut at
+ * the first ';'/'|' — their trailing segments are unrelated stories and were
+ * observed acting as cluster wormholes.
+ */
+function informativeTokens(title: string): Set<string> {
+  const primary = title.split(/[;|]/)[0] ?? title;
+  const out = new Set<string>();
+  for (const token of significantTitleTokens(primary)) {
+    if (CLUSTER_NOISE.has(token)) continue;
+    if (/^20\d\d$/.test(token)) continue;
+    out.add(token);
+  }
+  return out;
+}
+
 export function perspectiveOf(event: GlobalEvent): PerspectiveClass {
   const ownership = event.metadata?.['feedOwnership'];
   const audience = event.metadata?.['feedAudience'];
@@ -87,33 +123,41 @@ export function clusterGlobalEvents(
   const clusters: Member[][] = [];
 
   for (const event of events) {
-    const tokens = significantTitleTokens(event.title);
+    if (BOILERPLATE_TITLE.test(event.title)) continue;
+    const tokens = informativeTokens(event.title);
     if (tokens.size === 0) continue;
     const time = new Date(event.timestamp).getTime();
 
     let placed = false;
     for (const cluster of clusters) {
-      const matches = cluster.some((member) => {
+      // Anti-drift: a candidate must match a MAJORITY of existing members,
+      // not just any single one. Pure single-link let one bad edge
+      // transitively absorb whole unrelated sub-stories (the 31-member
+      // World Cup + wildfire-smoke + politics-op-ed cluster).
+      let matchCount = 0;
+      for (const member of cluster) {
         if (
           Number.isFinite(time) &&
           Number.isFinite(member.time) &&
           Math.abs(member.time - time) > windowMs
         ) {
-          return false;
+          continue;
         }
         if (
           hasConfidentLocation(event) &&
           hasConfidentLocation(member.event) &&
           !sameLocation(event.location, member.event.location)
         ) {
-          return false;
+          continue;
         }
-        return (
+        if (
           overlapCoefficient(tokens, member.tokens) >= overlapThreshold &&
           sharedTokenCount(tokens, member.tokens) >= MIN_SHARED_TOKENS
-        );
-      });
-      if (matches) {
+        ) {
+          matchCount++;
+        }
+      }
+      if (matchCount >= Math.ceil(cluster.length / 2)) {
         cluster.push({ event, tokens, time });
         placed = true;
         break;

@@ -178,7 +178,14 @@ const COUNTRY_NAME_INDEX: ReadonlyArray<{
   .filter((entry) => entry.name.length >= 4)
   .sort((a, b) => b.name.length - a.name.length)
   .map((entry) => ({
-    pattern: new RegExp(`\\b${entry.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'),
+    // "New Mexico" is a US state, not the country — the bare-name pattern
+    // geocoded a Meta data-center story to MX. Same guard shape for any
+    // future ambiguous names (Georgia, Jordan-as-a-person are handled by
+    // requiring whole-word match; the "New "-prefix trap needs a lookbehind).
+    pattern:
+      entry.code === 'MX'
+        ? /(?<!new\s)\bmexico\b/i
+        : new RegExp(`\\b${entry.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'),
     lat: entry.lat,
     lng: entry.lng,
     label: entry.name,
