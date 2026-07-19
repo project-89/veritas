@@ -317,7 +317,7 @@ export default function SearchPage() {
                     type="text"
                     value={caseTitle}
                     onChange={(e) => setCaseTitle(e.target.value)}
-                    placeholder="Rexas Finance Scam Investigation"
+                    placeholder="Pipeline Sabotage Narrative Tracking"
                     className="w-full px-3 py-2.5 font-mono text-sm bg-nerv-bg border border-nerv-border text-nerv-text placeholder:text-nerv-text-muted focus:outline-none focus:border-nerv-orange/50 transition-all"
                   />
                   <span className="block mt-1 text-[10px] font-mono text-nerv-text-muted">

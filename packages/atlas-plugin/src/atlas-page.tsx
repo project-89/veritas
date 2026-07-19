@@ -530,7 +530,7 @@ export function AtlasPage({ api }: AtlasPageProps) {
                   id="atlas-lens-title"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Net Crypto Scam Tradecraft"
+                  placeholder="Influence Op Tradecraft"
                   className="w-full border border-nerv-border bg-nerv-bg-deep px-3 py-2 text-[11px] font-mono text-nerv-text outline-none focus:border-nerv-orange"
                 />
               </div>
@@ -620,7 +620,7 @@ export function AtlasPage({ api }: AtlasPageProps) {
                           onChange={(event) =>
                             updateDraftSource(source.uid, { label: event.target.value })
                           }
-                          placeholder="Net Crypto Rexas Video"
+                          placeholder="Sanctions Evasion Explainer Video"
                           className="w-full border border-nerv-border bg-nerv-bg-deep px-3 py-2 text-[11px] font-mono text-nerv-text outline-none focus:border-nerv-orange"
                         />
                       </div>
