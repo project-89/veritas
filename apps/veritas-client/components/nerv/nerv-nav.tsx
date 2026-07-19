@@ -60,12 +60,18 @@ export function NervNav() {
   const { theme, toggle: toggleTheme } = useTheme();
   const { plugins } = usePluginManifest();
 
-  const navLinks =
-    getTopNavItemsFromPlugins(plugins).map((item) => ({
-      href: item.href,
-      label: item.label,
-    })) || DEFAULT_NAV_LINKS;
-  const resolvedNavLinks = navLinks.length > 0 ? navLinks : DEFAULT_NAV_LINKS;
+  // Plugin nav items EXTEND the core links, they don't replace them — a core
+  // link missing from the plugin manifest (or a failed manifest fetch) must
+  // never make tabs vanish after first paint.
+  const pluginLinks = getTopNavItemsFromPlugins(plugins).map((item) => ({
+    href: item.href,
+    label: item.label,
+  }));
+  const seen = new Set(pluginLinks.map((l) => l.href));
+  const resolvedNavLinks =
+    pluginLinks.length > 0
+      ? [...pluginLinks, ...DEFAULT_NAV_LINKS.filter((l) => !seen.has(l.href))]
+      : DEFAULT_NAV_LINKS;
 
   useEffect(() => {
     let cancelled = false;
