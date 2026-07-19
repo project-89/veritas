@@ -15,6 +15,7 @@ export * from './services/entity-analysis.service';
 export * from './services/evidence-adapters/evidence-adapter.interface';
 export * from './services/genealogy.service';
 export * from './services/global-event-aggregation.service';
+export * from './services/utils/cluster-global-events';
 export * from './services/utils/dedupe-global-events';
 export * from './services/graph-bot-detection.service';
 export * from './services/graph-database.service';

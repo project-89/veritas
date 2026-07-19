@@ -13,6 +13,7 @@ const DEFAULT_NAV_LINKS: ReadonlyArray<{ href: string; label: string }> = [
   { href: '/monitor', label: 'Monitor' },
   { href: '/search', label: 'Search' },
   { href: '/worldmap', label: 'World Map' },
+  { href: '/perspectives', label: 'Perspectives' },
 ];
 
 function UtcClock() {

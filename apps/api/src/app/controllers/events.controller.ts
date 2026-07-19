@@ -7,7 +7,13 @@ import {
   Query,
   Sse,
 } from '@nestjs/common';
-import { dedupeGlobalEvents, GlobalEvent, GlobalEventAggregationService } from '@veritas/analysis';
+import {
+  clusterGlobalEvents,
+  dedupeGlobalEvents,
+  GlobalEvent,
+  GlobalEventAggregationService,
+  type StoryCluster,
+} from '@veritas/analysis';
 import { GlobalEventRepository } from '@veritas/ingestion';
 import { filter, interval, map, merge, Observable } from 'rxjs';
 
@@ -101,6 +107,34 @@ export class EventsController {
     // (repeated GDACS/USGS earthquake reports, etc.) should appear once in the
     // feed, even when the reports land days apart.
     return dedupeGlobalEvents(events, { windowMs: FEED_DEDUP_WINDOW_MS }).slice(0, requested);
+  }
+
+  /**
+   * Divergence view: cluster recent news-feed events into stories covered by
+   * multiple outlets, keeping only stories seen from 2+ perspective classes
+   * (state-domestic / state-international / public-broadcaster / independent).
+   * The framing gap between classes on the same story is the product.
+   */
+  @Get('divergence')
+  async getDivergence(
+    @Query('limit') limit?: string,
+    @Query('windowHours') windowHours?: string,
+  ): Promise<StoryCluster[]> {
+    const requested = Math.min(Number(limit) || 20, 50);
+    const windowMs = (Number(windowHours) || 48) * 60 * 60 * 1000;
+    const since = new Date(Date.now() - windowMs).toISOString();
+
+    const events = await this.eventRepo.getRecentEvents({ limit: 1000, since });
+    // News feeds only — signal sources (USGS, CoinGecko...) have no framing.
+    const newsEvents = events.filter((e) => e.source.startsWith('RSS:'));
+
+    return clusterGlobalEvents(newsEvents, { windowMs })
+      .filter((story) => story.perspectives.length >= 2 && story.events.length >= 2)
+      .sort(
+        (a, b) =>
+          b.perspectives.length - a.perspectives.length || b.events.length - a.events.length,
+      )
+      .slice(0, requested);
   }
 
   /**
