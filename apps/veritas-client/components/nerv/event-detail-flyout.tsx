@@ -28,8 +28,19 @@ function formatTimestamp(ts: string): string {
 export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
   if (!event) return null;
 
+  const ownership = event.metadata['feedOwnership'] as string | undefined;
+  const audience = event.metadata['feedAudience'] as string | undefined;
+  const originalTitle = event.metadata['originalTitle'] as string | undefined;
+  const isTranslated = event.metadata['translated'] === true;
+  const originalLanguage = event.metadata['originalLanguage'] as string | undefined;
+
   const metaEntries = Object.entries(event.metadata).filter(
-    ([, v]) => v !== null && v !== undefined && v !== '',
+    ([k, v]) =>
+      v !== null &&
+      v !== undefined &&
+      v !== '' &&
+      // surfaced as first-class UI above, not raw metadata rows
+      !['feedOwnership', 'feedAudience', 'originalTitle', 'translated', 'originalLanguage'].includes(k),
   );
 
   return (
@@ -75,7 +86,36 @@ export function EventDetailFlyout({ event, onClose }: EventDetailFlyoutProps) {
           >
             {event.category}
           </span>
+
+          {/* Ownership provenance — a state outlet is a primary source for
+              official messaging, never presented as independent reporting */}
+          {ownership === 'state-media' && (
+            <span className="px-2 py-0.5 rounded-sm text-[11px] font-mono uppercase tracking-wider bg-nerv-red/15 border border-nerv-red/40 text-nerv-red">
+              State media{audience ? ` · ${audience}` : ''}
+            </span>
+          )}
+          {ownership === 'public-broadcaster' && (
+            <span className="px-2 py-0.5 rounded-sm text-[11px] font-mono uppercase tracking-wider bg-nerv-blue/10 border border-nerv-blue/30 text-nerv-blue/80">
+              Public broadcaster
+            </span>
+          )}
         </div>
+
+        {/* Translation provenance */}
+        {originalLanguage && (
+          <div className="bg-nerv-bg border border-nerv-border rounded-sm p-2.5">
+            <div className="text-[11px] font-mono uppercase tracking-widest text-nerv-text-muted mb-1">
+              {isTranslated
+                ? `Machine-translated from ${originalLanguage}`
+                : `Untranslated (${originalLanguage})`}
+            </div>
+            {isTranslated && originalTitle && (
+              <div className="text-[12px] font-mono text-nerv-text-secondary leading-snug">
+                {originalTitle}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Source + Timestamp */}
         <div className="space-y-1.5">

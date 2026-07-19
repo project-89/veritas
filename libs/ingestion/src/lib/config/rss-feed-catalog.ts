@@ -19,6 +19,13 @@ export interface RssFeedEntry {
   region?: string;
   /** Defaults to 'independent' when omitted. */
   ownership?: FeedOwnership;
+  /**
+   * Who the outlet talks to. The domestic/international split is the point of
+   * carrying state media at all: what RT tells the world and what RIA Novosti
+   * tells Russians about the same event routinely differ — that divergence is
+   * primary narrative data.
+   */
+  audience?: 'domestic' | 'international';
 }
 
 export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
@@ -1290,6 +1297,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       language: 'en',
       region: 'china',
       ownership: 'state-media',
+      audience: 'international',
     },
     {
       name: 'CGTN - World',
@@ -1299,6 +1307,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       language: 'en',
       region: 'china',
       ownership: 'state-media',
+      audience: 'international',
     },
     {
       name: 'CGTN - China',
@@ -1308,6 +1317,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       language: 'en',
       region: 'china',
       ownership: 'state-media',
+      audience: 'international',
     },
     {
       name: 'RT News',
@@ -1317,6 +1327,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       language: 'en',
       region: 'russia',
       ownership: 'state-media',
+      audience: 'international',
     },
     {
       name: 'Sputnik',
@@ -1326,6 +1337,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       language: 'en',
       region: 'russia',
       ownership: 'state-media',
+      audience: 'international',
     },
     {
       name: 'TASS',
@@ -1335,6 +1347,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       language: 'en',
       region: 'russia',
       ownership: 'state-media',
+      audience: 'international',
     },
     {
       name: 'Press TV',
@@ -1344,6 +1357,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       language: 'en',
       region: 'iran',
       ownership: 'state-media',
+      audience: 'international',
     },
     {
       name: 'teleSUR English',
@@ -1353,6 +1367,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       language: 'en',
       region: 'venezuela',
       ownership: 'state-media',
+      audience: 'international',
     },
     {
       name: 'Anadolu Agency',
@@ -1362,6 +1377,64 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
       language: 'en',
       region: 'turkey',
       ownership: 'state-media',
+      audience: 'international',
+    },
+
+    // -- Domestic-audience feeds (non-English, machine-translated at ingest) --
+    // What these states tell their OWN populations, vs the international feeds
+    // above. TASS appears in both audiences deliberately: one agency, two
+    // messages. All URLs verified live 2026-07-19; headlines dated same-day.
+    // (Chinese domestic RSS is effectively extinct — no working dated feed
+    // found for Xinhua/People's Daily domestic editions.)
+    {
+      name: 'RIA Novosti',
+      url: 'https://ria.ru/export/rss2/archive/index.xml',
+      category: 'state_media',
+      tier: 1,
+      language: 'ru',
+      region: 'russia',
+      ownership: 'state-media',
+      audience: 'domestic',
+    },
+    {
+      name: 'TASS (Russian)',
+      url: 'https://tass.ru/rss/v2.xml',
+      category: 'state_media',
+      tier: 1,
+      language: 'ru',
+      region: 'russia',
+      ownership: 'state-media',
+      audience: 'domestic',
+    },
+    {
+      name: 'Lenta.ru',
+      url: 'https://lenta.ru/rss',
+      category: 'state_media',
+      tier: 1,
+      language: 'ru',
+      region: 'russia',
+      ownership: 'state-media',
+      audience: 'domestic',
+    },
+    {
+      name: 'Rossiyskaya Gazeta',
+      url: 'https://rg.ru/xml/index.xml',
+      category: 'state_media',
+      tier: 1,
+      language: 'ru',
+      region: 'russia',
+      ownership: 'state-media',
+      audience: 'domestic',
+    },
+    {
+      name: 'IRNA',
+      url: 'https://www.irna.ir/rss',
+      category: 'state_media',
+      tier: 1,
+      language: 'fa',
+      region: 'iran',
+      ownership: 'state-media',
+      audience: 'domestic',
     },
   ],
 

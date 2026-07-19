@@ -33,6 +33,7 @@ import {
 } from './services/narrative-analysis.service';
 import { FailureExampleService } from './services/failure-example.service';
 import { PlatformCredibilityService } from './services/platform-credibility.service';
+import { TranslationService } from './services/translation.service';
 import { PropagandaAnalysisService } from './services/propaganda.service';
 import { ReportService } from './services/report.service';
 import { SaturationMetricsService } from './services/saturation-metrics.service';
@@ -77,6 +78,7 @@ import { SourceCredibilityService } from './services/source-credibility.service'
     GlobalEventAggregationService,
     IntelligenceEngineService,
     FailureExampleService,
+    TranslationService,
     {
       provide: ANALYSIS_SERVICE,
       useExisting: AnalysisService,

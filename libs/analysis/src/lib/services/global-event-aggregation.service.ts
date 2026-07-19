@@ -19,6 +19,7 @@ import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
 import { NwsAdapter } from './signal-adapters/nws.adapter';
 import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
 import { UsgsAdapter } from './signal-adapters/usgs.adapter';
+import { TranslationService } from './translation.service';
 /** Injection token for the global event repository (avoids cross-module dependency). */
 export const GLOBAL_EVENT_REPOSITORY = Symbol('GLOBAL_EVENT_REPOSITORY');
 export const GLOBAL_EVENT_RSS_FEEDS = Symbol('GLOBAL_EVENT_RSS_FEEDS');
@@ -32,6 +33,8 @@ export interface RssFeedEntry {
   region?: string;
   /** Editorial control: independent | public-broadcaster | state-media. */
   ownership?: 'independent' | 'public-broadcaster' | 'state-media';
+  /** Who the outlet talks to: its own population or the outside world. */
+  audience?: 'domestic' | 'international';
 }
 
 interface EventRepository {
@@ -117,6 +120,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     private readonly moduleRef: ModuleRef,
     @Optional() @Inject(GLOBAL_EVENT_REPOSITORY) private eventRepo?: EventRepository,
     @Optional() @Inject(GLOBAL_EVENT_RSS_FEEDS) private readonly rssFeeds: RssFeedEntry[] = [],
+    @Optional() private readonly translator?: TranslationService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -294,13 +298,34 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
           // the feeds themselves were fine.
           const cutoff = now.getTime() - RSS_MAX_AGE_MS;
 
-          for (const item of items.slice(0, 5)) {
-            // Max 5 per feed. Undated items are assumed recent, not dropped.
+          // Max 5 per feed. Undated items are assumed recent, not dropped.
+          const fresh = items.slice(0, 5).filter((item) => {
             const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : now.getTime();
-            if (pubDate < cutoff) continue;
+            return pubDate >= cutoff;
+          });
 
-            const title = item.title ?? 'Untitled';
-            const id = `rss-${feed.name}-${title.slice(0, 50).replace(/\W/g, '-').toLowerCase()}`;
+          // Domestic-language feeds (RIA Novosti, IRNA, ...): translate the
+          // headlines so they geocode and cluster with the rest of the feed.
+          // Originals are kept in metadata; a failed translation keeps the
+          // original text visibly untranslated rather than dropping the item.
+          let translations: Array<string | null> = fresh.map(() => null);
+          if (feed.language !== 'en' && this.translator?.available) {
+            translations = await this.translator.translateHeadlines(
+              fresh.map((item) => item.title ?? 'Untitled'),
+              feed.language,
+            );
+          }
+
+          for (let itemIdx = 0; itemIdx < fresh.length; itemIdx++) {
+            const item = fresh[itemIdx];
+            if (!item) continue;
+
+            const originalTitle = item.title ?? 'Untitled';
+            const translatedTitle = translations[itemIdx] ?? null;
+            const title = translatedTitle ?? originalTitle;
+            // Keyed on the ORIGINAL title so the id is stable whether or not
+            // translation succeeded on a given poll.
+            const id = `rss-${feed.name}-${originalTitle.slice(0, 50).replace(/\W/g, '-').toLowerCase()}`;
 
             // Prefer a country named in the headline, so world-news lands on the
             // map instead of the "global" placeholder; else the feed's region.
@@ -367,6 +392,16 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
                 // Never dropped — comparing what state outlets say against
                 // everyone else IS the narrative signal.
                 feedOwnership: feed.ownership ?? 'independent',
+                ...(feed.audience ? { feedAudience: feed.audience } : {}),
+                // Translation provenance: a translated headline is marked as
+                // such with the original alongside — never silently swapped.
+                ...(feed.language !== 'en'
+                  ? {
+                      originalLanguage: feed.language,
+                      originalTitle,
+                      translated: translatedTitle !== null,
+                    }
+                  : {}),
                 link: item.link,
               },
               expiresAt: new Date(Date.now() + DEFAULT_EVENT_TTL_MS).toISOString(),
