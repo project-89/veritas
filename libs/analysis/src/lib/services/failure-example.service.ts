@@ -5,7 +5,7 @@ import type { RawPost } from './deviation.service';
 import { DETERMINISTIC_JSON_CONFIG, extractFirstJsonObject, geminiChatModel } from './utils/llm-config';
 import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
-export const FAILURE_EXAMPLE_PROMPT_VERSION = 1;
+export const FAILURE_EXAMPLE_PROMPT_VERSION = 2;
 
 /**
  * Extracts CONCRETE, documented failure/struggle examples about a subject
@@ -74,6 +74,9 @@ export interface FailureExampleResult {
   vagueComplaintCount: number;
   /** Examples the LLM produced whose evidence excerpt failed verification. */
   ungroundedDropped: number;
+  /** Grounded candidates rejected by the second-pass interaction check
+   *  (post mentions the subject but reports no actual observed use). */
+  verificationRejected: number;
   postsScanned: number;
   modelUsed: string | null;
   promptVersion: number;
@@ -273,15 +276,29 @@ export class FailureExampleService {
       );
     }
 
+    // Second-pass adversarial verification: grounding proves the excerpt is
+    // VERBATIM, not that it's RELEVANT. A comment saying "paste this prompt
+    // into Gemini and see what it says" grounds perfectly yet documents no
+    // interaction. Each survivor is re-judged against its full source post by
+    // a skeptic prompt; failures are dropped and counted, never shipped.
+    let verificationRejected = 0;
+    let verified = examples;
+    if (examples.length > 0 && !budgetExhausted) {
+      const verdicts = await this.verifyExamples(trimmedSubject, examples, posts);
+      verified = examples.filter((_, i) => verdicts[i] !== false);
+      verificationRejected = examples.length - verified.length;
+    }
+
     return {
       status: 'ok',
       statusReason: budgetExhausted
         ? 'LLM token budget was exhausted before all batches ran — results are partial.'
         : undefined,
       subject: trimmedSubject,
-      examples,
+      examples: verified,
       vagueComplaintCount: vagueRefs.size,
       ungroundedDropped,
+      verificationRejected,
       postsScanned: usable.length,
       modelUsed: this.chatModel,
       promptVersion: FAILURE_EXAMPLE_PROMPT_VERSION,
@@ -302,7 +319,14 @@ export class FailureExampleService {
 
     return `You are auditing public posts for CONCRETE, documented examples of "${subject}" (an AI model/product) failing, struggling, or behaving unexpectedly.
 
-A post qualifies as an EXAMPLE only if it describes a specific interaction: what the user asked or did, and how ${subject} failed (wrong answer, hallucinated fact, refused a benign request, broken code, garbled image, ignored instruction, etc.). General praise, vague complaints ("it's gotten worse", "Gemini sucks"), benchmarks without specifics, and news/announcement posts do NOT qualify.
+A post qualifies as an EXAMPLE only if it reports an OBSERVED interaction: someone actually used ${subject}, and the post describes what was asked AND what the model actually did wrong (wrong answer, hallucinated fact, refused a benign request, broken code, garbled image, ignored instruction, etc.).
+
+NOT examples (report nothing for these):
+- Suggestions or invitations with no observed result ("ask ${subject} about X", "paste this prompt into ${subject} and see what it says")
+- Hypotheticals, jokes, or memes where no actual output is described
+- Posts about a different topic that merely mention ${subject} in passing
+- General praise, vague complaints ("it's gotten worse", "${subject} sucks")
+- Benchmarks without specifics, news/announcement posts
 
 Posts:
 ${postBlock}
@@ -349,6 +373,63 @@ Rules:
     }
   }
 
+  /**
+   * Skeptic pass over grounded candidates. Returns one verdict per example
+   * (true = real observed interaction, false = reject). Fails OPEN on LLM
+   * error — a broken verifier shouldn't zero a successfully extracted batch —
+   * but every rejection it does make is enforced.
+   */
+  private async verifyExamples(
+    subject: string,
+    examples: FailureExample[],
+    posts: ExamplePost[],
+  ): Promise<Array<boolean | null>> {
+    if (!this.genAI) return examples.map(() => null);
+    const model = this.genAI.getGenerativeModel({
+      model: this.chatModel,
+      generationConfig: DETERMINISTIC_JSON_CONFIG,
+    });
+
+    const items = examples
+      .map((ex, i) => {
+        const post = posts[ex.postRef];
+        const text = (post?.text ?? '').replace(/\s+/g, ' ').slice(0, POST_TEXT_CAP);
+        return `${i}: CLAIMED FAILURE: ${ex.description}\n   FULL POST: ${text}`;
+      })
+      .join('\n\n');
+
+    const prompt = `You are auditing candidate entries for a corpus of documented ${subject} failures. Your job is to REJECT entries whose source post does not actually report an observed interaction with ${subject}.
+
+Reject (verdict false) when the post:
+- merely suggests or invites trying a prompt ("ask ${subject} X and see what it says") with no result reported
+- is about an unrelated topic and only mentions ${subject} in passing
+- is a hypothetical, joke, or meme with no actual output described
+- describes no concrete model behavior at all
+
+Accept (verdict true) only when the post reports that ${subject} was actually used and describes what it did.
+
+${items}
+
+Return STRICT JSON: {"verdicts": [true|false, ...]} with exactly ${examples.length} entries, in order.`;
+
+    try {
+      const responseText = await LlmGateway.instance.run({
+        model: this.chatModel,
+        promptVersion: `${FAILURE_EXAMPLE_PROMPT_VERSION}-verify`,
+        prompt,
+        contextKey: `failure-examples:${subject.toLowerCase()}`,
+        generate: () => model.generateContent(prompt).then((r) => r.response.text()),
+      });
+      const json = extractFirstJsonObject(responseText);
+      const parsed = json ? (JSON.parse(json) as { verdicts?: unknown[] }) : {};
+      const verdicts = Array.isArray(parsed.verdicts) ? parsed.verdicts : [];
+      return examples.map((_, i) => (typeof verdicts[i] === 'boolean' ? (verdicts[i] as boolean) : null));
+    } catch (err) {
+      this.logger.warn(`Failure-example verification pass failed (failing open): ${err}`);
+      return examples.map(() => null);
+    }
+  }
+
   private emptyResult(
     subject: string,
     status: 'skipped' | 'unavailable',
@@ -361,6 +442,7 @@ Rules:
       examples: [],
       vagueComplaintCount: 0,
       ungroundedDropped: 0,
+      verificationRejected: 0,
       postsScanned: 0,
       modelUsed: this.genAI ? this.chatModel : null,
       promptVersion: FAILURE_EXAMPLE_PROMPT_VERSION,
