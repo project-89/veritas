@@ -248,10 +248,16 @@ export function HexTacticalMap({ events, surge, onSelectEvent }: HexTacticalMapP
       if (!Number.isFinite(zone.lat) || !Number.isFinite(zone.lng)) continue;
       const row = clamp(Math.floor((90 - zone.lat) / ROW_DEG), 0, ROWS - 1);
       const col = clamp(Math.floor((zone.lng + 180) / COL_DEG), 0, COLS - 1);
+      // The surge endpoint counts EVERYTHING in the DB's last 24h; the map
+      // renders the newest deduped slice. A zone whose events all deduped away
+      // or ranked below the fetch cap would get a ring on a DARK hex — the map
+      // must stay self-consistent with what it actually shows, so rings only
+      // land on cells with visible events.
+      if ((bins.get(`${row},${col}`)?.length ?? 0) === 0) continue;
       out.push({ ...cellPx(row, col), factor: zone.factor, recent24h: zone.recent24h });
     }
     return out;
-  }, [surge]);
+  }, [surge, bins]);
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-sm border border-nerv-orange/30 bg-[#0a0603]">
