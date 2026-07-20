@@ -3,8 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NervBadge, NervPanel } from '../../components/nerv';
-import type { ConnectorCapability, Investigation } from '../../lib/api';
-import { createOrGetInvestigation, fetchCapabilities, fetchInvestigations } from '../../lib/api';
+import type { ConnectorCapability, Investigation, QueryRefinement } from '../../lib/api';
+import {
+  createOrGetInvestigation,
+  fetchCapabilities,
+  fetchInvestigations,
+  fetchQueryRefinement,
+} from '../../lib/api';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -93,6 +98,7 @@ const DEPTH_PRESETS = [
 // are matched implicitly: significant words extracted, stopwords dropped,
 // posts must contain most of the remaining terms.
 const TIPS = [
+  'Vague topic? Hit REFINE — it grounds the query in live web results',
   '2–4 specific terms beat long sentences — filler words are dropped',
   'Posts must match most of your significant terms (all, if only 1–2)',
   'Person mode + @handle pulls account timelines across platforms',
@@ -142,6 +148,8 @@ export default function SearchPage() {
   const [loadingInv, setLoadingInv] = useState(true);
   const [selectedInvestigationId, setSelectedInvestigationId] = useState<string>('');
   const [platformOptions, setPlatformOptions] = useState<PlatformOption[]>(FALLBACK_PLATFORMS);
+  const [refining, setRefining] = useState(false);
+  const [refinement, setRefinement] = useState<QueryRefinement | null>(null);
 
   // Auto-focus input
   useEffect(() => {
@@ -197,6 +205,30 @@ export default function SearchPage() {
   const togglePlatform = useCallback((id: string) => {
     setPlatforms((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
   }, []);
+
+  // Vague-query rescue: ground the topic in live web results and let the user
+  // PICK a sharper query. Deliberately never applied silently — we don't scan
+  // something different from what was typed without the user choosing it.
+  const handleRefine = useCallback(async () => {
+    const q = query.trim();
+    if (!q || refining) return;
+    setRefining(true);
+    setRefinement(null);
+    try {
+      setRefinement(await fetchQueryRefinement(q));
+    } catch {
+      setRefinement({
+        query: q,
+        interpretation: null,
+        refinedQueries: [],
+        entities: [],
+        analysisMode: 'unavailable',
+        results: [],
+      });
+    } finally {
+      setRefining(false);
+    }
+  }, [query, refining]);
 
   const handleScan = useCallback(async () => {
     const q = query.trim();
@@ -439,6 +471,15 @@ export default function SearchPage() {
                 />
                 <button
                   type="button"
+                  onClick={handleRefine}
+                  disabled={!query.trim() || refining}
+                  title="Ground a vague topic in live web results and get sharper query suggestions"
+                  className="px-4 py-2.5 border border-nerv-blue/40 text-nerv-blue text-[12px] font-mono uppercase tracking-widest hover:bg-nerv-blue/10 hover:border-nerv-blue/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  {refining ? 'Refining…' : 'Refine'}
+                </button>
+                <button
+                  type="button"
                   onClick={handleScan}
                   disabled={!query.trim() || (caseMode === 'existing' && !selectedInvestigationId)}
                   className="px-6 py-2.5 bg-nerv-orange/20 border border-nerv-orange/50 text-nerv-orange text-[13px] font-mono uppercase tracking-widest hover:bg-nerv-orange/30 hover:border-nerv-orange disabled:opacity-30 disabled:cursor-not-allowed transition-all"
@@ -457,6 +498,66 @@ export default function SearchPage() {
                     ? "Pulls the user's recent timeline across every connector that supports per-user fetches. Starts narrow (3d) — extend depth from the results page."
                     : 'Topic mode is broader and better for campaign or entity discovery.'}
               </div>
+
+              {/* Refinement results — suggestions only; the user picks, we never
+                  silently scan something different from what they typed */}
+              {refinement && (
+                <div className="mt-3 border border-nerv-blue/30 rounded-sm bg-nerv-blue/5 p-3 space-y-2">
+                  {refinement.interpretation ? (
+                    <>
+                      <p className="text-[12px] font-mono text-nerv-text-secondary leading-snug">
+                        <span className="text-nerv-blue uppercase tracking-wider text-[10px] mr-2">
+                          Reads as
+                        </span>
+                        {refinement.interpretation}
+                      </p>
+                      {refinement.refinedQueries.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted mb-1">
+                            Sharper queries — click to use
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {refinement.refinedQueries.map((rq) => (
+                              <button
+                                key={rq}
+                                type="button"
+                                onClick={() => {
+                                  setQuery(rq);
+                                  inputRef.current?.focus();
+                                }}
+                                className="px-2 py-1 text-[12px] font-mono border border-nerv-green/40 text-nerv-green rounded-sm hover:bg-nerv-green/10 transition-colors"
+                              >
+                                {rq}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {refinement.entities.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">
+                            Entities
+                          </span>
+                          {refinement.entities.map((en) => (
+                            <span
+                              key={en}
+                              className="px-1.5 py-0.5 text-[11px] font-mono border border-nerv-border text-nerv-text-secondary rounded-sm"
+                            >
+                              {en}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-[12px] font-mono text-nerv-text-muted leading-snug">
+                      {refinement.results.length > 0
+                        ? 'Refinement needs the LLM (GEMINI_API_KEY) — raw web context found, but no query suggestions were generated.'
+                        : 'No web context found for this topic — try different wording.'}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Advanced toggle */}

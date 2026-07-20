@@ -1096,6 +1096,21 @@ export async function fetchCapabilities(): Promise<SystemCapabilities> {
   return request<SystemCapabilities>('/api/capabilities');
 }
 
+/** Query refinement: vague natural language -> what it currently refers to +
+ *  sharper scan queries, grounded in live web results. */
+export interface QueryRefinement {
+  query: string;
+  interpretation: string | null;
+  refinedQueries: string[];
+  entities: string[];
+  analysisMode: 'llm' | 'unavailable';
+  results: Array<{ title: string; url: string; provider: string }>;
+}
+
+export async function fetchQueryRefinement(query: string): Promise<QueryRefinement> {
+  return request<QueryRefinement>(`/api/web/refine?q=${encodeURIComponent(query)}`);
+}
+
 /**
  * Mark a single alert as read.
  */
