@@ -6,9 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NervBadge, NervMetric, NervPanel, NervTicker } from '../components/nerv';
 import { HexTacticalMap } from '../components/nerv/hex-tactical-map';
 import {
-  type ContestedZone,
   createOrGetInvestigation,
-  fetchContestedZones,
   fetchInvestigations,
   fetchSurgeZones,
   fetchUnreadAlertCount,
@@ -58,7 +56,6 @@ export default function CommandHome() {
   const [query, setQuery] = useState('');
   const [launching, setLaunching] = useState(false);
   const [view, setView] = useState<'command' | 'tactical'>('command');
-  const [contested, setContested] = useState<ContestedZone[]>([]);
   const [surge, setSurge] = useState<SurgeZone[]>([]);
 
   // Remember the last-used home view (Command dashboard vs Tactical hex map).
@@ -78,15 +75,13 @@ export default function CommandHome() {
       fetchUnreadAlertCount().catch(() => 0),
       getRecentScans(8).catch(() => [] as ScanJob[]),
       prefetchRecentEvents().catch(() => [] as GlobalEvent[]),
-      fetchContestedZones().catch(() => [] as ContestedZone[]),
       fetchSurgeZones().catch(() => [] as SurgeZone[]),
-    ]).then(([invs, count, scans, evts, zones, surges]) => {
+    ]).then(([invs, count, scans, evts, surges]) => {
       if (cancelled) return;
       setInvestigations(invs);
       setUnreadCount(count as number);
       setRecentScans(scans);
       setEvents(evts);
-      setContested(zones);
       setSurge(surges);
       setLoading(false);
     });
@@ -296,10 +291,8 @@ export default function CommandHome() {
             <div className="flex-1 min-h-0 flex">
               <HexTacticalMap
                 events={events}
-                contested={contested}
-                surge={surge}
-                onSelectContested={(id) => router.push(`/perspectives#${id}`)}
-                onSelectEvent={(e) =>
+                  surge={surge}
+                  onSelectEvent={(e) =>
                   router.push(
                     `/worldmap?lat=${e.location.lat.toFixed(3)}&lng=${e.location.lng.toFixed(3)}`,
                   )

@@ -97,14 +97,6 @@ interface HexCell {
   count: number;
 }
 
-export interface HexContestedZone {
-  id: string;
-  lat: number;
-  lng: number;
-  title: string;
-  perspectiveCount: number;
-}
-
 export interface HexSurgeZone {
   lat: number;
   lng: number;
@@ -115,26 +107,12 @@ export interface HexSurgeZone {
 
 export interface HexTacticalMapProps {
   events: GlobalEvent[];
-  /** Multi-perspective stories — zones where framings of one event diverge. */
-  contested?: HexContestedZone[];
   /** Zones anomalously active vs their own baseline. */
   surge?: HexSurgeZone[];
   onSelectEvent?: (event: GlobalEvent) => void;
-  /** Click-through from a contested marker to its story on /perspectives. */
-  onSelectContested?: (storyId: string) => void;
 }
 
-// Contested-narrative marker: pale blue-white so it reads as a distinct layer
-// over both the amber terrain and the category-colored hotspots.
-const CONTESTED = '#c9d8ff';
-
-export function HexTacticalMap({
-  events,
-  contested,
-  surge,
-  onSelectEvent,
-  onSelectContested,
-}: HexTacticalMapProps) {
+export function HexTacticalMap({ events, surge, onSelectEvent }: HexTacticalMapProps) {
   const [landSet, setLandSet] = useState<Set<string> | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
@@ -262,37 +240,6 @@ export function HexTacticalMap({
     }
     return [...present];
   }, [hot]);
-
-  // Contested-narrative zones, binned to hex cells (one marker per cell).
-  const contestedCells = useMemo(() => {
-    const byCell = new Map<
-      string,
-      { cx: number; cy: number; titles: string[]; storyId: string; maxPerspectives: number }
-    >();
-    for (const zone of contested ?? []) {
-      if (!Number.isFinite(zone.lat) || !Number.isFinite(zone.lng)) continue;
-      const row = clamp(Math.floor((90 - zone.lat) / ROW_DEG), 0, ROWS - 1);
-      const col = clamp(Math.floor((zone.lng + 180) / COL_DEG), 0, COLS - 1);
-      const key = `${row},${col}`;
-      const existing = byCell.get(key);
-      if (existing) {
-        existing.titles.push(zone.title);
-        if (zone.perspectiveCount > existing.maxPerspectives) {
-          // The most-contested story owns the cell's click-through.
-          existing.maxPerspectives = zone.perspectiveCount;
-          existing.storyId = zone.id;
-        }
-      } else {
-        byCell.set(key, {
-          ...cellPx(row, col),
-          titles: [zone.title],
-          storyId: zone.id,
-          maxPerspectives: zone.perspectiveCount,
-        });
-      }
-    }
-    return [...byCell.values()];
-  }, [contested]);
 
   // Surge zones binned to cells (server bins on the same 6° grid).
   const surgeCells = useMemo(() => {
@@ -433,50 +380,6 @@ export function HexTacticalMap({
           </g>
         ))}
 
-        {/* contested-narrative markers: rotated-square outline over the zone,
-            intensity scaled by how many perspective classes are fighting */}
-        {contestedCells.map((c) => {
-          const intense = c.maxPerspectives >= 3;
-          return (
-            <g
-              key={`contested-${c.cx}-${c.cy}`}
-              opacity={intense ? 1 : 0.75}
-              className={onSelectContested ? 'cursor-pointer' : undefined}
-              onClick={onSelectContested ? () => onSelectContested(c.storyId) : undefined}
-            >
-              <rect
-                x={-R * 0.95}
-                y={-R * 0.95}
-                width={R * 1.9}
-                height={R * 1.9}
-                transform={`translate(${c.cx} ${c.cy}) rotate(45)`}
-                fill={CONTESTED}
-                fillOpacity={0.06}
-                stroke={CONTESTED}
-                strokeWidth={intense ? 1.2 : 0.8}
-              >
-                <title>
-                  Contested narrative ({c.maxPerspectives} perspectives): {c.titles[0]}
-                  {c.titles.length > 1 ? ` (+${c.titles.length - 1} more)` : ''} — click to compare
-                </title>
-              </rect>
-              {intense && (
-                <rect
-                  x={-R * 1.25}
-                  y={-R * 1.25}
-                  width={R * 2.5}
-                  height={R * 2.5}
-                  transform={`translate(${c.cx} ${c.cy}) rotate(45)`}
-                  fill="none"
-                  stroke={CONTESTED}
-                  strokeOpacity={0.35}
-                  strokeWidth={0.5}
-                />
-              )}
-            </g>
-          );
-        })}
-
       </svg>
 
       {/* scanlines */}
@@ -514,17 +417,6 @@ export function HexTacticalMap({
                 </span>
               </span>
             ))}
-            {contestedCells.length > 0 && (
-              <span className="flex items-center gap-1">
-                <span
-                  className="h-1.5 w-1.5 rotate-45 border"
-                  style={{ borderColor: CONTESTED }}
-                />
-                <span className="text-[9px] font-mono uppercase tracking-wider text-nerv-orange/60">
-                  contested narrative
-                </span>
-              </span>
-            )}
             {surgeCells.length > 0 && (
               <span className="flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full border border-nerv-amber animate-nerv-pulse" />

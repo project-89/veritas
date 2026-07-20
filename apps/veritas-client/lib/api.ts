@@ -1004,49 +1004,6 @@ export async function fetchUnreadAlertCount(): Promise<number> {
   return result.count;
 }
 
-/** A story covered from 2+ perspective classes, reduced to what the tactical
- *  map needs to mark the zone as narratively contested. */
-export interface ContestedZone {
-  /** StoryCluster id — used to anchor into the /perspectives page. */
-  id: string;
-  lat: number;
-  lng: number;
-  title: string;
-  perspectiveCount: number;
-}
-
-/**
- * Locations of multi-perspective stories from the divergence endpoint —
- * zones where state and independent framings of the same event split.
- */
-export async function fetchContestedZones(): Promise<ContestedZone[]> {
-  const stories = await request<
-    Array<{
-      id: string;
-      title: string;
-      location: { lat: number; lng: number };
-      perspectives: string[];
-    }>
-  >('/api/events/divergence?limit=30&windowHours=48');
-  return stories
-    .filter((s) => Number.isFinite(s.location?.lat) && Number.isFinite(s.location?.lng))
-    // "Contested" on the map means a STATE framing exists against non-state
-    // coverage. Independent + public-broadcaster alone is just normal news
-    // (a lettuce recall covered by NPR and The Hill is not contested).
-    .filter(
-      (s) =>
-        s.perspectives.some((p) => p.startsWith('state-')) &&
-        s.perspectives.some((p) => !p.startsWith('state-')),
-    )
-    .map((s) => ({
-      id: s.id,
-      lat: s.location.lat,
-      lng: s.location.lng,
-      title: s.title,
-      perspectiveCount: s.perspectives.length,
-    }));
-}
-
 /** A zone whose last-24h activity is anomalously high vs its own baseline. */
 export interface SurgeZone {
   lat: number;
