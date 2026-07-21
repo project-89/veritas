@@ -1,6 +1,19 @@
 {
   "name": "@veritas-nx/source",
   "version": "0.0.0",
+  "description": "Open-source narrative-intelligence OSINT platform — tracks how the same story diverges across state media, public broadcasters, and independent outlets, with evidence-grounded verification and auditable provenance. Sees who says what; doesn't decide what's true.",
+  "keywords": [
+    "osint",
+    "narrative-intelligence",
+    "disinformation",
+    "media-analysis",
+    "state-media",
+    "propaganda-detection",
+    "claim-verification",
+    "nestjs",
+    "nextjs",
+    "mcp"
+  ],
   "license": "MIT",
   "scripts": {
     "bootstrap": "node scripts/bootstrap-workspace.js",

@@ -1,144 +1,143 @@
 # Veritas — Narrative Intelligence Platform
 
-Track, analyze, and visualize how narratives emerge, evolve, and impact the real world across social media platforms. Built as an intelligence tool for the people — using semantic analysis, graph intelligence, evidence-based reasoning, and psychological profiling. Free and open-source.
+Veritas tracks how narratives emerge, diverge, and travel across the open web. It is a free, open-source OSINT platform built on a single principle: **the job is to see who is saying what — not to decide what is true.** Provenance is treated as a structural fact (who controls an outlet, who funds it, who it addresses); allegiance is never assumed. Where the platform makes a factual claim, it grounds it in evidence and shows its work; where it can't, it abstains and says so.
 
-## What Veritas Does
+## What Veritas does
 
-- **Discovers narratives** across 12 connectors (10 social/news platforms, Wikipedia current events, and 177 RSS feeds) by clustering semantically similar content using Gemini embeddings
-- **Investigates actors** with per-user timeline analysis, cross-platform identity discovery (400+ networks via Sherlock), coordination detection, and cui bono analysis
-- **Profiles identities** with the MAGI system — persistent psychological profiles analyzing communication style, beliefs, emotional triggers, influence patterns, and risk indicators
-- **Detects manipulation** through 17 propaganda techniques, evidence-based claim verification (on-chain + financial + social), bot detection, and platform credibility scoring
-- **Maps relationships** with a persistent 3-tier social graph (direct, contextual, bridge connections) that accumulates across investigations
-- **Tracks real-world impact** by correlating narratives with 8 real-world signal sources (markets, conflicts, economics, natural disasters, crypto)
-- **Verifies claims** with multi-source evidence chains from Etherscan, DexScreener, GitHub, SEC EDGAR, and social graph data — generates investigative leads for human-in-the-loop verification
+- **Surfaces narrative divergence** — clusters the same real-world story across outlets and lays its coverage side by side by *perspective class* (state-media domestic, state-media international, public broadcaster, independent). The gap between how a state tells its own population vs. the world vs. how independents report the same event is the signal.
+- **Ingests a live global event feed** — a continuously-polled worldwide stream from 8 signal sources (earthquakes, disasters, weather, conflict, markets, news) and ~160 curated RSS feeds, rendered on an interactive globe and a NERV-style tactical map with per-zone **surge detection** (a zone flagged only when it beats its *own* baseline, not just absolute volume).
+- **Runs targeted scans** across 11 platform connectors, with strict term matching and an LLM **query-refinement** layer that turns a vague topic into sharp, vocabulary-matched queries grounded in live web results.
+- **Extracts evidence-grounded examples** — e.g. a provenance-tracked corpus of real-world AI-model failures. Every entry cites a verbatim excerpt from its source post (mechanically verified) and survives an adversarial skeptic pass that rejects non-interactions.
+- **Investigates actors** — per-user timelines across connectors, cross-platform identity discovery (Sherlock, 400+ networks), coordination and bot detection, and cui-bono reasoning.
+- **Detects manipulation** — 17 propaganda techniques (technique-based, never actor-based), evidence-based claim verification (on-chain / SEC / GitHub / Wayback / Wikipedia), and platform-credibility scoring.
+- **Translates and preserves** — non-English state media (Russian, Persian) is machine-translated at ingest with the original always kept alongside; an append-only history captures editorial edits (stealth retitles) and a no-TTL archive retains framing data for longitudinal analysis.
+- **Is agent-operable** — the whole pipeline is exposed over MCP, so an external agent can scan, analyze, verify, refine queries, and extract examples autonomously.
+
+## Design principles
+
+- **Honest degradation.** Every LLM-backed stage has a defined fallback and says which mode produced a result (semantic vs. hash-fallback embeddings, llm-grounded vs. heuristic verification). Missing a key degrades a feature visibly rather than faking output.
+- **Provenance over opinion.** The ownership taxonomy (`independent` / `public-broadcaster` / `state-media` / `state-official`) is structural and **bloc-agnostic** — the same rule applied to Washington, Brussels, Moscow, and Beijing. A US government feed is tagged `state-official` exactly as a Russian ministry feed is.
+- **No drift.** The UI builds its capability displays (connectors, feed stats, signal sources, LLM status) from a live `/capabilities` endpoint, never hardcoded lists — a connector that goes offline shows as offline everywhere, automatically.
+- **Grounded or silent.** Claims and extracted examples must cite verifiable evidence; unverifiable ones are dropped and *counted*, so outputs state what they filtered rather than silently shrinking.
 
 ## Architecture
 
 ```
-12 Data Connectors → BullMQ Scan Queue → MongoDB
-  → Gemini Embedding Clustering → 19 Analysis Services
-  → 8 Signal Adapters + 5 Evidence Adapters
-  → Memgraph Social Graph → NERV Dashboard (11 viz modes)
+11 platform connectors ─┐
+8 signal sources ────────┼─► BullMQ scan queue ─► MongoDB (live + append-only history/archive)
+~160 RSS feeds ──────────┘        │
+                                  ▼
+        Analysis (libs/analysis): Gemini semantic clustering · claim verification ·
+        propaganda · deep investigation · divergence clustering · failure extraction ·
+        translation · surge aggregation
+                                  │
+        Memgraph (MAGE) social graph ── Redis (queues + scan events)
+                                  ▼
+   NestJS API (apps/api) ─► Next.js NERV dashboard (apps/veritas-client)
+                         └► MCP server (apps/veritas-mcp) for agent control
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full technical architecture.
+**Monorepo (Nx):** `apps/{api, veritas-client, veritas-mcp}` · `libs/{analysis, ingestion, database, shared, content-classification, visualization}` · `packages/atlas-plugin`.
 
-## Data Sources
+## Data sources
 
-### Data Connectors (12)
-| Platform | Method | Auth Required |
-|----------|--------|---------------|
-| Twitter/X | @haruhunab1320/twitter-scraper | Cookies or login |
-| Reddit | Public JSON API | None |
-| Bluesky | Public AppView API | None |
+### Platform connectors (11 registered — see `GET /capabilities` for live status)
+
+| Platform | Method | Auth |
+|----------|--------|------|
+| Twitter/X | `@haruhunab1320/twitter-scraper` | Cookies or login |
+| Bluesky | AT Protocol AppView API | None |
 | 4chan | Public JSON API | None |
-| YouTube | yt-dlp CLI | None |
-| RSS/News | 177 curated feeds across 15 categories | None |
-| Farcaster | Neynar API v2 | Free API key |
-| Telegram | Channel monitoring (t.me web preview scrape) | None |
-| Truth Social | truthbrush CLI | Account required |
-| Facebook | Page monitoring via Jina Reader (`FACEBOOK_PAGE_URLS`) — no search | None |
+| YouTube | yt-dlp CLI (+ transcripts) | None |
+| Farcaster | Neynar API v2 | Free key |
+| Telegram | t.me web-preview scrape | None |
 | Wikipedia | Current Events portal API | None |
-| Web Scraper | Direct article scraping | None |
+| GDELT | GDELT DOC 2.0 API | None |
+| RSS / News | ~160 curated feeds | None |
+| Reddit | Application-only OAuth | `REDDIT_CLIENT_ID` + `SECRET` |
+| Facebook | Page monitoring via Jina Reader | `FACEBOOK_PAGE_URLS` |
 
-### Real-World Signal Adapters (8)
-CoinGecko (crypto), GDELT (news), Yahoo Finance (markets), World Bank (development), FRED (US economy), ACLED (conflicts), USGS (earthquakes), LLM Hypothesis (AI)
+### RSS catalog (~160 feeds, 89 tier-1)
 
-### Evidence Verification Adapters (5)
-Etherscan (on-chain), DexScreener (trading), GitHub (development), SEC EDGAR (filings), Social Graph (internal)
+Independent, plus **19 public broadcasters** (BBC, DW, France 24, NPR, Al Jazeera…) and **14 state-media** outlets (Xinhua/CGTN, RT/Sputnik/TASS, Press TV, Anadolu, teleSUR) tagged with ownership and audience. **9 domestic-audience feeds** in Russian and Persian (RIA Novosti, TASS-ru, Lenta, Rossiyskaya Gazeta, IRNA) are machine-translated at ingest, originals preserved.
 
-## Quick Start
+### Global-event signal sources (8, keyless)
+
+USGS (earthquakes) · GDACS (disasters) · NASA EONET (natural events) · NOAA/NWS (weather alerts) · ACLED (conflict) · GDELT (news) · CoinGecko (markets) · RSS tier-1.
+
+### Evidence & correlation adapters
+
+Claim verification grounds against Etherscan, DexScreener, GitHub, SEC EDGAR, Wayback Machine, and Wikipedia. Downstream-effects correlation adds Yahoo Finance, World Bank, and FRED.
+
+### Web search (keyless)
+
+DuckDuckGo HTML + Google News RSS for query enrichment; Brave Search API used automatically when `BRAVE_SEARCH_API_KEY` is set.
+
+## Quick start
 
 ### Prerequisites
-- Node.js 18+
-- MongoDB
-- Redis (for BullMQ queues)
-- Python 3 (for yt-dlp, truthbrush, sherlock)
-
-### Optional
-- Memgraph (for graph algorithms — `docker run -p 7687:7687 memgraph/memgraph-mage`)
-
-### Setup
+- Node.js 18+, MongoDB, Redis
+- Python 3 (for yt-dlp, sherlock)
+- Optional: Memgraph with MAGE for graph algorithms
 
 ```bash
-# Install dependencies
 npm install
-pip install yt-dlp truthbrush sherlock-project
+pip install yt-dlp sherlock-project
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your API keys (minimum: GEMINI_API_KEY)
+cp .env.example .env          # edit — minimum: GEMINI_API_KEY, MONGODB_URI
 
-# Start services
-docker compose -f docker-compose.dev.yml up -d  # MongoDB, Redis, Memgraph
-npx nx serve api                                  # Backend (port 3000)
-npx nx serve veritas-client                       # Frontend (port 4200)
+docker compose -f docker-compose.dev.yml up -d   # MongoDB, Redis, Memgraph (MAGE)
+npx nx serve api                                  # backend  → :3000
+npx nx serve veritas-client                       # frontend → :4200
 ```
 
-### Required Environment Variables
+### Environment variables
+
+**Required**
 ```
-GEMINI_API_KEY=your-gemini-key
+GEMINI_API_KEY=          # analysis (clustering, verification, translation, refinement)
 MONGODB_URI=mongodb://localhost:27017
 REDIS_HOST=localhost
 REDIS_PORT=6379
 ```
 
-### Optional Environment Variables
+Without `GEMINI_API_KEY` the app still runs — analysis degrades to heuristics/abstention and says so.
+
+**Optional (each unlocks a capability, surfaced in `/capabilities` and the Monitor panel)**
 ```
-TWITTER_USERNAME=       # Twitter/X scraper
-TWITTER_PASSWORD=
-TWITTER_EMAIL=
-NEYNAR_API_KEY=         # Farcaster
-FRED_API_KEY=           # Federal Reserve data
-ETHERSCAN_API_KEY=      # On-chain evidence
-GITHUB_TOKEN=           # GitHub evidence (higher rate limit)
-MEMGRAPH_HOST=          # Graph database
+TWITTER_COOKIES=         # or TWITTER_USERNAME/PASSWORD/EMAIL — Twitter/X
+REDDIT_CLIENT_ID=        # + REDDIT_CLIENT_SECRET — Reddit (free script app)
+NEYNAR_API_KEY=          # Farcaster
+FACEBOOK_PAGE_URLS=      # Facebook page monitoring
+FRED_API_KEY=            # Federal Reserve data
+ETHERSCAN_API_KEY=       # on-chain evidence
+GITHUB_TOKEN=            # GitHub evidence (higher rate limit)
+BRAVE_SEARCH_API_KEY=    # upgrades web search ranking
+MEMGRAPH_HOST=           # graph database
 ```
 
-## Features
+## Dashboard
 
-### Search & Scan
-- Multi-platform concurrent scanning via BullMQ
-- Smart RSS feed selection (177 feeds matched by query keywords)
-- Cross-scan deduplication (87% reduction in redundant scraping)
-- Depth presets: Quick (25/connector), Standard (100), Deep (250), Exhaustive (500)
-- Custom date range support
-- Advanced filters: usernames, hashtags, wallets, subreddits
+- **Command / Tactical** — home dashboard and NERV hex tactical map (category hexes, surge rings, severity radar, region ticker).
+- **World Map** — interactive 3D globe of the live global event feed with category/severity filters and search fly-to.
+- **Perspectives** — narrative-divergence view: master-detail list of the most-contested stories over a selectable window (24h/48h/7d), each split by perspective class.
+- **Search** — capability-driven scan builder with query refinement.
+- **Monitor** — investigations, alerts, and a live system-capabilities panel.
+- **Atlas** — reusable reasoning-lens extraction (plugin).
 
-### Analysis Pipeline
-- Semantic clustering with Gemini embeddings + agglomerative clustering
-- Saturation detection (recommends when you have enough data)
-- 17 propaganda technique detection with educational notes
-- Auto-triggered claim verification with evidence routing
-- Entity extraction from raw post text (handles, hashtags, tickers, names)
-- Causal reasoning agent (gemini-3.1-pro-preview function calling)
+## MCP tools
 
-### Investigation
-- Per-user timeline fetching across all connectors
-- Cross-platform identity discovery via Sherlock
-- MAGI psychological profiler (9 behavioral dimensions with post citations)
-- Persistent identity records (accumulate across investigations)
-- 3-tier social graph intelligence (direct, contextual, bridge)
-- Bot detection (temporal + behavioral + structural scoring)
-- Platform credibility model (credibility vs influence per platform)
-
-### Visualization (11 modes)
-- Temporal heatmap, actor matrix, claims grid, effects chain
-- 3D globe, entity network, genealogy timeline, propagation flow
-- Evidence chains, social graph, narrative radar
+`veritas_scan` · `veritas_wait_for_scan` · `veritas_get_scan(_posts)` · `veritas_analyze_narratives` · `veritas_verify_claim` · `veritas_extract_failure_examples` · `veritas_web_search` · `veritas_refine_query` · `veritas_coverage_probe` · `veritas_recent_scans`.
 
 ## Testing
 
 ```bash
-npx nx test api                    # 187 tests
-npx nx test analysis               # 58+ tests
-npx tsc --noEmit                   # Zero type errors
+npx nx test analysis      # ~560 tests
+npx nx test ingestion     # ~390 tests
+npx nx test api
+npx tsc --noEmit          # type check
 ```
-
-## Development Status
-
-The current hardening roadmap lives in [docs/REMEDIATION-PLAN.md](docs/REMEDIATION-PLAN.md) — it tracks known gaps, security items, and cleanup work in progress.
 
 ## License
 
-See LICENSE file.
+See repository license.
