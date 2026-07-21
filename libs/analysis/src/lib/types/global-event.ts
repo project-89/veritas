@@ -2,7 +2,7 @@
 // GlobalEvent — real-time events from external signal sources (USGS, GDELT, ACLED)
 // ---------------------------------------------------------------------------
 
-export type EventCategory = 'environmental' | 'political' | 'economic' | 'media';
+export type EventCategory = 'environmental' | 'political' | 'economic' | 'media' | 'maritime';
 export type EventSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export interface GeoLocation {

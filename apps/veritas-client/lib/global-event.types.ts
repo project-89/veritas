@@ -1,4 +1,4 @@
-export type EventCategory = 'environmental' | 'political' | 'economic' | 'media';
+export type EventCategory = 'environmental' | 'political' | 'economic' | 'media' | 'maritime';
 export type EventSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export interface GeoLocation {
@@ -28,4 +28,5 @@ export const EVENT_COLORS: Record<EventCategory, string> = {
   political: '#FF1744',
   economic: '#FFD600',
   media: '#2979FF',
+  maritime: '#00E5FF',
 };

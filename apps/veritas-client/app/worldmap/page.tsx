@@ -20,6 +20,7 @@ const CATEGORY_CHIPS: ReadonlyArray<{ key: EventCategory; label: string }> = [
   { key: 'political', label: 'POL' },
   { key: 'economic', label: 'ECON' },
   { key: 'media', label: 'MEDIA' },
+  { key: 'maritime', label: 'SEA' },
 ];
 const SEVERITY_RANK: Record<EventSeverity, number> = { critical: 3, high: 2, medium: 1, low: 0 };
 
@@ -36,7 +37,7 @@ const TIME_RANGE_MS: Record<string, number> = {
   '7d': 7 * 24 * 60 * 60 * 1000,
 };
 
-const ALL_CATEGORIES = new Set<EventCategory>(['environmental', 'political', 'economic', 'media']);
+const ALL_CATEGORIES = new Set<EventCategory>(['environmental', 'political', 'economic', 'media', 'maritime']);
 const ALL_SEVERITIES = new Set<EventSeverity>(['low', 'medium', 'high', 'critical']);
 
 function isWorldMapEvent(event: GlobalEvent): boolean {
@@ -104,6 +105,7 @@ export default function WorldMapPage() {
       political: 0,
       economic: 0,
       media: 0,
+      maritime: 0,
     };
     for (const ev of events) {
       if (!isWorldMapEvent(ev)) continue;

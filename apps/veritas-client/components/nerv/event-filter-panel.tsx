@@ -15,7 +15,7 @@ export interface EventFilterPanelProps {
   onFilterChange: (filters: EventFilters) => void;
 }
 
-const CATEGORIES: EventCategory[] = ['environmental', 'political', 'economic', 'media'];
+const CATEGORIES: EventCategory[] = ['environmental', 'political', 'economic', 'media', 'maritime'];
 const SEVERITIES: EventSeverity[] = ['low', 'medium', 'high', 'critical'];
 const TIME_RANGES = ['1h', '6h', '24h', '7d'] as const;
 
@@ -24,6 +24,7 @@ const CATEGORY_LABELS: Record<EventCategory, string> = {
   political: 'POL',
   economic: 'ECON',
   media: 'MEDIA',
+  maritime: 'SEA',
 };
 
 const SEVERITY_COLORS: Record<EventSeverity, string> = {
@@ -58,6 +59,7 @@ export function EventFilterPanel({ events, filters, onFilterChange }: EventFilte
     political: 0,
     economic: 0,
     media: 0,
+    maritime: 0,
   };
   for (const ev of events) {
     if (categoryCounts[ev.category] !== undefined) {

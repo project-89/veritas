@@ -1,6 +1,7 @@
 export * from './acled.adapter';
 export * from './coingecko.adapter';
 export * from './eonet.adapter';
+export * from './gfw-maritime.adapter';
 export * from './fred.adapter';
 export * from './gdacs.adapter';
 export * from './gdelt.adapter';

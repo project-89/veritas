@@ -57,6 +57,13 @@ export class CapabilitiesController {
         },
       },
       webSearch: { providers: this.webSearch.providers },
+      // Maritime intelligence (Global Fishing Watch) is token-gated: dark
+      // vessels, ship-to-ship encounters, loitering. Inert without a token.
+      maritime: {
+        available: Boolean(process.env['GFW_API_TOKEN']),
+        source: 'Global Fishing Watch',
+        eventTypes: ['encounter', 'loitering', 'gap'],
+      },
       searchModes: ['topic', 'claim', 'person'],
       timeRangeFormats: ['<n>h', '<n>d', '<n>m', 'YYYY-MM-DD_YYYY-MM-DD'],
     };

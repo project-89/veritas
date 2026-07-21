@@ -16,6 +16,7 @@ import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
 import { EonetAdapter } from './signal-adapters/eonet.adapter';
 import { GdacsAdapter } from './signal-adapters/gdacs.adapter';
 import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
+import { GfwMaritimeAdapter } from './signal-adapters/gfw-maritime.adapter';
 import { NwsAdapter } from './signal-adapters/nws.adapter';
 import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
 import { UsgsAdapter } from './signal-adapters/usgs.adapter';
@@ -52,6 +53,7 @@ const COINGECKO_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const GDACS_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const EONET_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes (open events change slowly)
 const NWS_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const GFW_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes (maritime intelligence, token-gated)
 const RSS_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const RSS_MAX_AGE_MS = 24 * 60 * 60 * 1000; // keep feed items from the last 24h
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
@@ -148,6 +150,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   private readonly gdacs = new GdacsAdapter();
   private readonly eonet = new EonetAdapter();
   private readonly nws = new NwsAdapter();
+  private readonly gfw = new GfwMaritimeAdapter();
 
   // Polling handles
   private usgsInterval: ReturnType<typeof setInterval> | null = null;
@@ -157,6 +160,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   private gdacsInterval: ReturnType<typeof setInterval> | null = null;
   private eonetInterval: ReturnType<typeof setInterval> | null = null;
   private nwsInterval: ReturnType<typeof setInterval> | null = null;
+  private gfwInterval: ReturnType<typeof setInterval> | null = null;
   private rssInterval: ReturnType<typeof setInterval> | null = null;
 
   // Deduplication: eventId → timestamp (ms)
@@ -223,6 +227,15 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
       this.logger.log('ACLED polling disabled (set ACLED_ENABLED=true to enable)');
     }
 
+    // GFW maritime intelligence — only when a token is configured.
+    if (this.gfw.available) {
+      this.scheduleInitialPoll(() => void this.pollGfw(), 50_000);
+      this.gfwInterval = setInterval(() => void this.pollGfw(), GFW_INTERVAL_MS);
+      this.gfwInterval.unref?.();
+    } else {
+      this.logger.log('GFW maritime disabled (set GFW_API_TOKEN to enable)');
+    }
+
     // Set up recurring intervals
     this.usgsInterval = setInterval(() => void this.pollUsgs(), USGS_INTERVAL_MS);
     this.usgsInterval.unref?.();
@@ -252,6 +265,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     if (this.acledInterval) clearInterval(this.acledInterval);
     if (this.gdacsInterval) clearInterval(this.gdacsInterval);
     if (this.eonetInterval) clearInterval(this.eonetInterval);
+    if (this.gfwInterval) clearInterval(this.gfwInterval);
     if (this.nwsInterval) clearInterval(this.nwsInterval);
     this.subject.complete();
     this.logger.log('Global event aggregation stopped');
@@ -579,6 +593,24 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     }
   }
 
+  /** Whether the maritime (GFW) layer is active — surfaced by /capabilities. */
+  get maritimeAvailable(): boolean {
+    return this.gfw.available;
+  }
+
+  private async pollGfw(): Promise<void> {
+    try {
+      const signals = await this.gfw.fetchSignals();
+      const events = signals
+        .map((s) => this.normalizeMaritime(s))
+        .filter((e): e is GlobalEvent => e !== null);
+      await this.processEvents(events);
+      this.logger.debug(`GFW maritime poll: ${events.length} events`);
+    } catch (err) {
+      this.logger.error(`GFW maritime poll error: ${err}`);
+    }
+  }
+
   private async pollNws(): Promise<void> {
     try {
       const signals = await this.nws.fetchSignals();
@@ -884,6 +916,37 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   // ---------------------------------------------------------------------------
   // Normalization — NASA EONET
   // ---------------------------------------------------------------------------
+
+  private normalizeMaritime(signal: ExternalSignal): GlobalEvent | null {
+    const coords = signal.metadata['coordinates'] as
+      | { latitude?: number; longitude?: number }
+      | undefined;
+    if (!Number.isFinite(coords?.latitude) || !Number.isFinite(coords?.longitude)) return null;
+    const lat = coords?.latitude ?? 0;
+    const lng = coords?.longitude ?? 0;
+    const eez = (signal.metadata['eez'] as string[] | undefined)?.[0];
+    return {
+      id: signal.id,
+      source: 'Global Fishing Watch',
+      category: 'maritime' as EventCategory,
+      severity: this.magnitudeSeverity(signal.magnitude),
+      title: signal.title,
+      description: this.getEventDescription(signal.description, signal.title, 'Global Fishing Watch'),
+      timestamp: signal.timestamp,
+      location: {
+        lat,
+        lng,
+        // At-sea events rarely have a place name; label with the EEZ if known,
+        // else coordinates (never a category name — the tactical-map lesson).
+        label:
+          eez ??
+          `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? 'N' : 'S'} ${Math.abs(lng).toFixed(1)}°${lng >= 0 ? 'E' : 'W'}`,
+      },
+      magnitude: signal.magnitude,
+      metadata: signal.metadata,
+      expiresAt: new Date(Date.now() + DEFAULT_EVENT_TTL_MS).toISOString(),
+    };
+  }
 
   private normalizeEonet(signal: ExternalSignal): GlobalEvent | null {
     const coords = signal.metadata['coordinates'] as
