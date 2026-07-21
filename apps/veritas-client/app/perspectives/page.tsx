@@ -67,6 +67,16 @@ const WINDOWS = [
   { label: '7d', hours: 168 },
 ] as const;
 
+// Detail grid sizes to the number of perspective classes actually present, so
+// an absent class (state-domestic is often empty) doesn't hold open a dead
+// column. Static strings so Tailwind keeps them.
+const DETAIL_GRID_COLS: Record<number, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-1 sm:grid-cols-2',
+  3: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3',
+  4: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4',
+};
+
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   const h = Math.floor(ms / 3_600_000);
@@ -168,6 +178,8 @@ function StoryRow({
 /** Right-pane detail: the full four-column framing comparison. */
 function StoryDetail({ story }: { story: StoryCluster }) {
   const byPerspective = groupByPerspective(story);
+  // Only render classes with coverage — divergence stories always have >= 2.
+  const present = PERSPECTIVE_ORDER.filter((p) => (byPerspective.get(p)?.length ?? 0) > 0);
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-nerv-border px-4 py-3">
@@ -185,54 +197,54 @@ function StoryDetail({ story }: { story: StoryCluster }) {
         </div>
       </div>
 
-      <div className="grid flex-1 grid-cols-1 gap-px overflow-y-auto bg-nerv-border sm:grid-cols-2 xl:grid-cols-4">
-        {PERSPECTIVE_ORDER.map((p) => {
-          const evs = byPerspective.get(p);
+      <div
+        className={`grid flex-1 gap-px overflow-y-auto bg-nerv-border ${
+          DETAIL_GRID_COLS[present.length] ?? DETAIL_GRID_COLS[4]
+        }`}
+      >
+        {present.map((p) => {
+          const evs = byPerspective.get(p) ?? [];
           const meta = PERSPECTIVE_META[p];
           return (
             <div key={p} className="bg-nerv-bg-panel p-3">
               <div
                 className={`mb-2 inline-block rounded-sm border px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider ${meta.className}`}
               >
-                {meta.label}
+                {meta.label} · {evs.length}
               </div>
-              {evs ? (
-                <ul className="space-y-2.5">
-                  {evs.map((e) => {
-                    const original = e.metadata['originalTitle'] as string | undefined;
-                    const link = e.metadata['link'] as string | undefined;
-                    const feedName = (e.metadata['feedName'] as string) ?? e.source;
-                    return (
-                      <li key={e.id}>
-                        <div className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">
-                          {feedName}
+              <ul className="space-y-2.5">
+                {evs.map((e) => {
+                  const original = e.metadata['originalTitle'] as string | undefined;
+                  const link = e.metadata['link'] as string | undefined;
+                  const feedName = (e.metadata['feedName'] as string) ?? e.source;
+                  return (
+                    <li key={e.id}>
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-nerv-text-muted">
+                        {feedName}
+                      </div>
+                      {link ? (
+                        <a
+                          href={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block text-[12px] font-mono text-nerv-text-secondary leading-snug hover:text-nerv-orange"
+                        >
+                          {e.title}
+                        </a>
+                      ) : (
+                        <div className="text-[12px] font-mono text-nerv-text-secondary leading-snug">
+                          {e.title}
                         </div>
-                        {link ? (
-                          <a
-                            href={link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block text-[12px] font-mono text-nerv-text-secondary leading-snug hover:text-nerv-orange"
-                          >
-                            {e.title}
-                          </a>
-                        ) : (
-                          <div className="text-[12px] font-mono text-nerv-text-secondary leading-snug">
-                            {e.title}
-                          </div>
-                        )}
-                        {e.metadata['translated'] === true && original && (
-                          <div className="mt-0.5 text-[10px] font-mono text-nerv-text-muted/70 leading-snug">
-                            {original}
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <div className="text-[11px] font-mono text-nerv-text-muted/40">no coverage</div>
-              )}
+                      )}
+                      {e.metadata['translated'] === true && original && (
+                        <div className="mt-0.5 text-[10px] font-mono text-nerv-text-muted/70 leading-snug">
+                          {original}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           );
         })}
