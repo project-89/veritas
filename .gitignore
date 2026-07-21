@@ -72,3 +72,5 @@ private-plugins/
 
 .env*.csv
 .env
+.env.*
+*.env.bak
