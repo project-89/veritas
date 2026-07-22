@@ -82,7 +82,17 @@ export class AcledAdapter implements SignalAdapter {
           continue;
         }
         if (!response.ok) {
-          this.logger.warn(`ACLED returned HTTP ${response.status}`);
+          // Surface ACLED's own message — a 403 "Access denied" with a valid
+          // token means the account lacks API/data-access entitlement (grant
+          // it in the myACLED dashboard), NOT a code or credential problem.
+          const body = await response.text().catch(() => '');
+          const detail = body.slice(0, 200);
+          this.logger.warn(
+            `ACLED read HTTP ${response.status}${detail ? ` — ${detail}` : ''}` +
+              (response.status === 403
+                ? ' (token is valid; enable API/data access on the myACLED account)'
+                : ''),
+          );
           return [];
         }
         return this.mapEvents((await response.json()) as AcledResponse);
