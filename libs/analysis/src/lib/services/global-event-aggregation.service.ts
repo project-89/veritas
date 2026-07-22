@@ -224,13 +224,17 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     this.scheduleInitialPoll(() => void this.pollWeather(), 55_000);
 
     // ACLED polling — disabled by default (requires API key setup)
-    const acledEnabled = process.env['ACLED_ENABLED'] === 'true';
+    // Auto-enable when credentials are present (consistent with GFW/AISStream);
+    // ACLED_ENABLED=false can still force it off.
+    const acledEnabled =
+      Boolean(process.env['ACLED_USERNAME'] && process.env['ACLED_PASSWORD']) &&
+      process.env['ACLED_ENABLED'] !== 'false';
     if (acledEnabled) {
       this.scheduleInitialPoll(() => void this.pollAcled(), 90_000);
       this.acledInterval = setInterval(() => void this.pollAcled(), ACLED_INTERVAL_MS);
       this.acledInterval.unref?.();
     } else {
-      this.logger.log('ACLED polling disabled (set ACLED_ENABLED=true to enable)');
+      this.logger.log('ACLED polling disabled (set ACLED_USERNAME + ACLED_PASSWORD to enable)');
     }
 
     // GFW maritime intelligence — only when a token is configured.
@@ -809,22 +813,38 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
 
   private normalizeAcled(signal: ExternalSignal): GlobalEvent | null {
     const country = (signal.metadata['country'] as string) || '';
+    const place = (signal.metadata['location'] as string) || '';
+    const coords = signal.metadata['coordinates'] as
+      | { latitude?: number; longitude?: number }
+      | undefined;
     const resolved = resolveCountryCode(country);
 
-    const location: GeoLocation = resolved
-      ? {
-          lat: resolved.lat,
-          lng: resolved.lng,
-          label: resolved.label,
-          countryCode: country,
-          region: (signal.metadata['region'] as string) || undefined,
-        }
-      : {
-          lat: 0,
-          lng: 0,
-          label: country || 'Unknown',
-          region: (signal.metadata['region'] as string) || undefined,
-        };
+    // Prefer ACLED's exact incident coordinates — a conflict event is a
+    // specific place, not a country centroid. Fall back to the country
+    // centroid only when the event carries no coordinates.
+    const location: GeoLocation =
+      coords && Number.isFinite(coords.latitude) && Number.isFinite(coords.longitude)
+        ? {
+            lat: coords.latitude ?? 0,
+            lng: coords.longitude ?? 0,
+            label: place || country || 'Unknown',
+            countryCode: country || undefined,
+            region: 'geocoded',
+          }
+        : resolved
+          ? {
+              lat: resolved.lat,
+              lng: resolved.lng,
+              label: place || resolved.label,
+              countryCode: country,
+              region: (signal.metadata['region'] as string) || undefined,
+            }
+          : {
+              lat: 0,
+              lng: 0,
+              label: country || 'Unknown',
+              region: (signal.metadata['region'] as string) || undefined,
+            };
 
     const fatalities = (signal.metadata['fatalities'] as number) ?? 0;
 

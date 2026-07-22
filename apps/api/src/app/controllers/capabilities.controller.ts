@@ -56,6 +56,12 @@ export class CapabilitiesController {
           deepInvestigation: llmAvailable,
         },
       },
+      conflict: {
+        // ACLED georeferenced conflict events — free myACLED account
+        // (non-commercial), OAuth-gated.
+        available: Boolean(process.env['ACLED_USERNAME'] && process.env['ACLED_PASSWORD']),
+        source: 'ACLED',
+      },
       webSearch: { providers: this.webSearch.providers },
       // Maritime intelligence (Global Fishing Watch) is token-gated: dark
       // vessels, ship-to-ship encounters, loitering. Inert without a token.
