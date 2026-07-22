@@ -60,9 +60,17 @@ export class CapabilitiesController {
       // Maritime intelligence (Global Fishing Watch) is token-gated: dark
       // vessels, ship-to-ship encounters, loitering. Inert without a token.
       maritime: {
-        available: Boolean(process.env['GFW_API_TOKEN']),
-        source: 'Global Fishing Watch',
-        eventTypes: ['encounter', 'loitering', 'gap'],
+        // Intelligence events (GFW) + live cargo/tanker positions (AISStream),
+        // each free and independently key-gated.
+        events: {
+          available: Boolean(process.env['GFW_API_TOKEN']),
+          source: 'Global Fishing Watch',
+          eventTypes: ['encounter', 'loitering', 'gap'],
+        },
+        vessels: {
+          available: Boolean(process.env['AISSTREAM_API_KEY']),
+          source: 'AISStream (chokepoint cargo + tankers)',
+        },
       },
       searchModes: ['topic', 'claim', 'person'],
       timeRangeFormats: ['<n>h', '<n>d', '<n>m', 'YYYY-MM-DD_YYYY-MM-DD'],

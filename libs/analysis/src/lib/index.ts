@@ -15,6 +15,7 @@ export * from './services/entity-analysis.service';
 export * from './services/evidence-adapters/evidence-adapter.interface';
 export * from './services/genealogy.service';
 export * from './services/global-event-aggregation.service';
+export * from './services/ais-stream.service';
 export * from './services/utils/cluster-global-events';
 export {
   DETERMINISTIC_JSON_CONFIG,
