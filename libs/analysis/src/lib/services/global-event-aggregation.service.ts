@@ -20,6 +20,7 @@ import { GfwMaritimeAdapter } from './signal-adapters/gfw-maritime.adapter';
 import { NwsAdapter } from './signal-adapters/nws.adapter';
 import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
 import { UsgsAdapter } from './signal-adapters/usgs.adapter';
+import { WeatherAdapter } from './signal-adapters/weather.adapter';
 import { TranslationService } from './translation.service';
 /** Injection token for the global event repository (avoids cross-module dependency). */
 export const GLOBAL_EVENT_REPOSITORY = Symbol('GLOBAL_EVENT_REPOSITORY');
@@ -54,6 +55,7 @@ const GDACS_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const EONET_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes (open events change slowly)
 const NWS_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const GFW_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes (maritime intelligence, token-gated)
+const WEATHER_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes (severe-weather conditions)
 const RSS_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const RSS_MAX_AGE_MS = 24 * 60 * 60 * 1000; // keep feed items from the last 24h
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
@@ -74,6 +76,7 @@ export const GLOBAL_EVENT_SIGNAL_SOURCES: ReadonlyArray<{
   { name: 'GDACS Disasters', kind: 'disaster', intervalMinutes: GDACS_INTERVAL_MS / 60_000 },
   { name: 'NASA EONET', kind: 'disaster', intervalMinutes: EONET_INTERVAL_MS / 60_000 },
   { name: 'NOAA/NWS Alerts', kind: 'weather', intervalMinutes: NWS_INTERVAL_MS / 60_000 },
+  { name: 'Open-Meteo Severe Weather', kind: 'weather', intervalMinutes: WEATHER_INTERVAL_MS / 60_000 },
   { name: 'ACLED Conflict', kind: 'conflict', intervalMinutes: ACLED_INTERVAL_MS / 60_000 },
   { name: 'GDELT News', kind: 'news', intervalMinutes: GDELT_INTERVAL_MS / 60_000 },
   { name: 'CoinGecko Markets', kind: 'market', intervalMinutes: COINGECKO_INTERVAL_MS / 60_000 },
@@ -151,6 +154,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   private readonly eonet = new EonetAdapter();
   private readonly nws = new NwsAdapter();
   private readonly gfw = new GfwMaritimeAdapter();
+  private readonly weather = new WeatherAdapter();
 
   // Polling handles
   private usgsInterval: ReturnType<typeof setInterval> | null = null;
@@ -161,6 +165,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   private eonetInterval: ReturnType<typeof setInterval> | null = null;
   private nwsInterval: ReturnType<typeof setInterval> | null = null;
   private gfwInterval: ReturnType<typeof setInterval> | null = null;
+  private weatherInterval: ReturnType<typeof setInterval> | null = null;
   private rssInterval: ReturnType<typeof setInterval> | null = null;
 
   // Deduplication: eventId → timestamp (ms)
@@ -216,6 +221,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     this.scheduleInitialPoll(() => void this.pollGdacs(), 75_000);
     this.scheduleInitialPoll(() => void this.pollEonet(), 30_000);
     this.scheduleInitialPoll(() => void this.pollNws(), 45_000);
+    this.scheduleInitialPoll(() => void this.pollWeather(), 55_000);
 
     // ACLED polling — disabled by default (requires API key setup)
     const acledEnabled = process.env['ACLED_ENABLED'] === 'true';
@@ -245,6 +251,8 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     this.coingeckoInterval.unref?.();
     this.gdacsInterval = setInterval(() => void this.pollGdacs(), GDACS_INTERVAL_MS);
     this.gdacsInterval.unref?.();
+    this.weatherInterval = setInterval(() => void this.pollWeather(), WEATHER_INTERVAL_MS);
+    this.weatherInterval.unref?.();
     this.eonetInterval = setInterval(() => void this.pollEonet(), EONET_INTERVAL_MS);
     this.eonetInterval.unref?.();
     this.nwsInterval = setInterval(() => void this.pollNws(), NWS_INTERVAL_MS);
@@ -266,6 +274,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     if (this.gdacsInterval) clearInterval(this.gdacsInterval);
     if (this.eonetInterval) clearInterval(this.eonetInterval);
     if (this.gfwInterval) clearInterval(this.gfwInterval);
+    if (this.weatherInterval) clearInterval(this.weatherInterval);
     if (this.nwsInterval) clearInterval(this.nwsInterval);
     this.subject.complete();
     this.logger.log('Global event aggregation stopped');
@@ -611,6 +620,19 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
     }
   }
 
+  private async pollWeather(): Promise<void> {
+    try {
+      const signals = await this.weather.fetchSignals();
+      const events = signals
+        .map((s) => this.normalizeWeather(s))
+        .filter((e): e is GlobalEvent => e !== null);
+      await this.processEvents(events);
+      this.logger.debug(`Open-Meteo weather poll: ${events.length} severe conditions`);
+    } catch (err) {
+      this.logger.error(`Open-Meteo weather poll error: ${err}`);
+    }
+  }
+
   private async pollNws(): Promise<void> {
     try {
       const signals = await this.nws.fetchSignals();
@@ -916,6 +938,30 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   // ---------------------------------------------------------------------------
   // Normalization — NASA EONET
   // ---------------------------------------------------------------------------
+
+  private normalizeWeather(signal: ExternalSignal): GlobalEvent | null {
+    const coords = signal.metadata['coordinates'] as
+      | { latitude?: number; longitude?: number }
+      | undefined;
+    if (!Number.isFinite(coords?.latitude) || !Number.isFinite(coords?.longitude)) return null;
+    return {
+      id: signal.id,
+      source: 'Open-Meteo',
+      category: 'environmental' as EventCategory,
+      severity: this.magnitudeSeverity(signal.magnitude),
+      title: signal.title,
+      description: this.getEventDescription(signal.description, signal.title, 'Open-Meteo'),
+      timestamp: signal.timestamp,
+      location: {
+        lat: coords?.latitude ?? 0,
+        lng: coords?.longitude ?? 0,
+        label: (signal.metadata['place'] as string) ?? 'Severe weather',
+      },
+      magnitude: signal.magnitude,
+      metadata: signal.metadata,
+      expiresAt: new Date(Date.now() + DEFAULT_EVENT_TTL_MS).toISOString(),
+    };
+  }
 
   private normalizeMaritime(signal: ExternalSignal): GlobalEvent | null {
     const coords = signal.metadata['coordinates'] as

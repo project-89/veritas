@@ -9,5 +9,6 @@ export * from './llm-hypothesis.adapter';
 export * from './nws.adapter';
 export * from './signal-adapter.interface';
 export * from './usgs.adapter';
+export * from './weather.adapter';
 export * from './worldbank.adapter';
 export * from './yahoo-finance.adapter';
