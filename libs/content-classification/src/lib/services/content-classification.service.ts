@@ -5,6 +5,7 @@ import { afinn165 } from 'afinn-165';
 import nlp from 'compromise';
 import * as francMin from 'franc-min';
 import { NlpServiceResponse } from '../types/content.types';
+import { isMultilingualStopWord, nonLatinScript, tokenizeForTopics } from '../utils/text-tokenize';
 
 /**
  * Maximum number of characters fed to the NER pipeline. Named-entity
@@ -12,6 +13,13 @@ import { NlpServiceResponse } from '../types/content.types';
  * per-call latency predictable on very long content.
  */
 const MAX_NER_CHARS = 10_000;
+
+/**
+ * Below this length franc-min's verdict is not trustworthy enough to act on.
+ * Used to avoid abstaining from topic extraction on short English posts that
+ * were merely misdetected as some other Latin-script language.
+ */
+const FRANC_RELIABLE_MIN_CHARS = 40;
 
 /**
  * Result of content classification including all analysis aspects
@@ -352,17 +360,43 @@ export class ContentClassificationService {
    */
   private classifyLocally(text: string): ContentClassification {
     const normalizedText = text.toLowerCase();
+    const language = this.detectLanguage(normalizedText);
+
+    // The local NLP stack is English-only: `compromise` (NER) is trained on
+    // English, the stopword list is English, and topic frequency assumes
+    // English morphology. Non-English text is expected to arrive already
+    // translated (see TranslationService / the `textEn` ingest contract).
+    // When it hasn't been, we ABSTAIN on the language-dependent fields rather
+    // than emit fragments — an untranslated French headline previously
+    // produced topics like "rentiels" and "les", and Cyrillic/CJK produced
+    // silently empty results that looked like successful classification.
+    //
+    // Abstention requires EVIDENCE, not just a franc verdict: franc-min is
+    // unreliable under ~40 chars, and social posts are routinely shorter than
+    // that. Abstaining on a bare misdetection would silently strip topics from
+    // real English tweets — a worse failure than the one being fixed. So we
+    // only abstain when the detection is corroborated by length or by script.
+    const detectedNonEnglish = language !== 'en';
+    const detectionIsReliable = normalizedText.length >= FRANC_RELIABLE_MIN_CHARS;
+    const englishAnalysable =
+      !detectedNonEnglish || !(detectionIsReliable || nonLatinScript(normalizedText));
+    if (!englishAnalysable) {
+      this.logger.debug(
+        `Abstaining from topic/entity extraction: text detected as '${language}', ` +
+          'not English, and no translation was supplied upstream',
+      );
+    }
 
     return {
       categories: this.detectCategories(normalizedText),
       sentiment: this.analyzeSentiment(normalizedText),
       toxicity: this.calculateToxicity(normalizedText),
       subjectivity: this.calculateSubjectivity(normalizedText),
-      language: this.detectLanguage(normalizedText),
-      topics: this.extractTopics(normalizedText),
+      language,
+      topics: englishAnalysable ? this.extractTopics(normalizedText) : [],
       // Entity extraction needs the original casing (proper nouns), so it
       // receives the un-normalized text rather than the lowercased copy.
-      entities: this.extractEntities(text),
+      entities: englishAnalysable ? this.extractEntities(text) : [],
     };
   }
 
@@ -563,7 +597,7 @@ ${numberedTexts}`;
    * Detect language based on character n-gram frequency profiles
    * Uses franc-min library for accurate language detection
    */
-  private detectLanguage(text: string): string {
+  detectLanguage(text: string): string {
     try {
       // Text needs to be at least a few characters for reliable detection
       if (text.length < 10) {
@@ -955,9 +989,16 @@ ${numberedTexts}`;
   private isValidTopicWord(word: string): boolean {
     if (word.length < 3) return false;
     if (ContentClassificationService.STOP_WORDS.has(word)) return false;
-    // Reject words that are just numbers or contain special characters
-    if (/^\d+$/.test(word)) return false;
-    if (/[^a-z'-]/.test(word)) return false;
+    // Function words from other languages we ingest. Reached when text slips
+    // past the abstention gate (short Latin-script posts); without this,
+    // "les"/"des"/"sont" rank as topics purely on frequency.
+    if (isMultilingualStopWord(word)) return false;
+    // Reject words that are just numbers.
+    if (/^\p{N}+$/u.test(word)) return false;
+    // Reject anything that is not letters/numbers with word-internal
+    // apostrophes or hyphens. Unlike the previous `[^a-z'-]` test this keeps
+    // accented Latin words ("préférentiels") instead of discarding them.
+    if (/[^\p{L}\p{N}'’-]/u.test(word)) return false;
     return true;
   }
 
@@ -965,11 +1006,12 @@ ${numberedTexts}`;
    * Extract main topics from text using frequency analysis of words and bigrams
    */
   private extractTopics(text: string): string[] {
-    // Clean and tokenize: split on non-alpha characters, lowercase
-    const rawWords = text
-      .toLowerCase()
-      .split(/[^a-z'-]+/)
-      .filter(Boolean);
+    // Unicode-aware tokenization. The previous `split(/[^a-z'-]+/)` treated
+    // every accented or non-Latin character as a separator, shattering
+    // "préférentiels" into "pr"/"f"/"rentiels" and reducing Cyrillic and CJK
+    // text to zero tokens.
+    const { tokens: rawWords, usable } = tokenizeForTopics(text);
+    if (!usable) return [];
 
     // Filter to valid candidate words
     const validWords = rawWords.filter((w) => this.isValidTopicWord(w));
