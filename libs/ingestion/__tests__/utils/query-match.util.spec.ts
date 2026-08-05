@@ -106,3 +106,62 @@ describe('buildSearchQuery', () => {
     expect(buildSearchQuery('who is it')).toBe('who is it');
   });
 });
+
+describe('non-Latin and accented queries', () => {
+  describe('extractSignificantTerms', () => {
+    it('extracts terms from Cyrillic queries instead of returning none', () => {
+      // Regression: `split(/[^a-z0-9]+/)` returned [] for any non-Latin query,
+      // and "no significant terms" means "match everything" downstream.
+      expect(extractSignificantTerms('пошлины на импорт')).toEqual([
+        'пошлины',
+        'на',
+        'импорт',
+      ]);
+    });
+
+    it('extracts CJK terms, which carry meaning at 1-2 characters', () => {
+      expect(extractSignificantTerms('关税')).toEqual(['关税']);
+    });
+
+    it('keeps accented Latin words whole', () => {
+      // Previously produced ['tarifs', 'pr', 'rentiels'].
+      expect(extractSignificantTerms('tarifs préférentiels')).toEqual([
+        'tarifs',
+        'préférentiels',
+      ]);
+    });
+
+    it('still drops 1-char Latin noise', () => {
+      expect(extractSignificantTerms('a b tariffs')).toEqual(['tariffs']);
+    });
+  });
+
+  describe('matchesQuery', () => {
+    it('filters on Cyrillic queries rather than matching everything', () => {
+      expect(matchesQuery('Пошлины на импорт стали выросли', 'пошлины импорт')).toBe(true);
+      // The critical half of the regression: an unrelated post must NOT match.
+      expect(matchesQuery('Weather forecast for tomorrow', 'пошлины импорт')).toBe(false);
+    });
+
+    it('matches CJK terms as substrings, since the script has no word breaks', () => {
+      expect(matchesQuery('美国对中国商品加征关税', '关税')).toBe(true);
+      expect(matchesQuery('今天天气很好', '关税')).toBe(false);
+    });
+
+    it('matches accented terms and rejects unrelated text', () => {
+      expect(matchesQuery('Les tarifs préférentiels européens', 'tarifs préférentiels')).toBe(
+        true,
+      );
+      expect(matchesQuery('A story about football', 'tarifs préférentiels')).toBe(false);
+    });
+
+    it('does not match a Cyrillic term inside a longer word', () => {
+      // Boundary semantics must survive: "импорт" should not hit "импортный".
+      expect(matchesQuery('импортный товар здесь', 'импорт')).toBe(false);
+    });
+
+    it('still rejects Latin partial-word matches', () => {
+      expect(matchesQuery('blockchain and maintain', 'ai')).toBe(false);
+    });
+  });
+});

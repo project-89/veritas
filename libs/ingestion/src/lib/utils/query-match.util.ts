@@ -14,6 +14,21 @@
  *
  * This util fixes both: strip stopwords, match on WORD BOUNDARIES, and require
  * enough of the meaningful query terms to be present.
+ *
+ * All of it is Unicode-aware, which it originally was not. The old
+ * `split(/[^a-z0-9]+/)` extracted ZERO terms from any non-Latin query, and
+ * because "no significant terms" means "match everything", a Cyrillic or CJK
+ * query silently disabled relevance filtering in every connector that calls
+ * matchesQuery directly (Telegram, RSS, Reddit, the web scraper) while
+ * returning nothing at all in the ones that guard on term count (4chan). Even
+ * with terms in hand, matching would still have failed: JS `\b` is defined
+ * over [A-Za-z0-9_], so /\bпошлины\b/ does not match "пошлины".
+ *
+ * (`libs/content-classification/.../text-tokenize.ts` solves the neighbouring
+ * problem for topic extraction. Kept separate deliberately: this util is
+ * dependency-free and the two have different rules — query matching wants
+ * substring semantics for unsegmented scripts, topic extraction must abstain
+ * on them.)
  */
 
 const STOPWORDS = new Set([
@@ -36,8 +51,13 @@ const STOPWORDS = new Set([
 export function extractSignificantTerms(query: string): string[] {
   const seen = new Set<string>();
   const terms: string[] = [];
-  for (const raw of query.toLowerCase().split(/[^a-z0-9]+/)) {
-    if (raw.length < 2 || STOPWORDS.has(raw) || seen.has(raw)) continue;
+  for (const raw of query.toLowerCase().split(/[^\p{L}\p{N}]+/u)) {
+    // Unsegmented scripts (Han, Kana, Thai...) have no whitespace between
+    // words, so a "term" here is a whole phrase. A 1-char CJK term is still
+    // meaningful, unlike a 1-char Latin one, so the length floor only applies
+    // to scripts that actually delimit words.
+    const minLength = UNSEGMENTED_SCRIPT.test(raw) ? 1 : 2;
+    if (raw.length < minLength || STOPWORDS.has(raw) || seen.has(raw)) continue;
     seen.add(raw);
     terms.push(raw);
   }
@@ -87,9 +107,29 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Whole-word (boundary) test — "ai" matches "an AI model", not "blockchain". */
+/**
+ * Scripts that do not put whitespace between words. Terms in these scripts are
+ * matched as plain substrings, because there is no boundary to anchor to —
+ * "关税" inside "美国对中国商品加征关税" is a genuine hit, not a partial-word
+ * false positive like "ai" inside "blockchain".
+ */
+const UNSEGMENTED_SCRIPT =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Khmer}\p{Script=Lao}]/u;
+
+/**
+ * Whole-word (boundary) test — "ai" matches "an AI model", not "blockchain".
+ *
+ * Uses Unicode lookarounds rather than `\b`: `\b` is defined over
+ * [A-Za-z0-9_], so it silently fails to match any Cyrillic/Greek/Arabic term
+ * and mis-fires around accented Latin.
+ */
 function containsWord(lowerText: string, term: string): boolean {
-  return new RegExp(`\\b${escapeRegExp(term)}\\b`).test(lowerText);
+  if (UNSEGMENTED_SCRIPT.test(term)) {
+    return lowerText.includes(term);
+  }
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(term)}(?![\\p{L}\\p{N}])`, 'u').test(
+    lowerText,
+  );
 }
 
 /**
