@@ -1,8 +1,12 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Logger } from '@nestjs/common';
+import {
+  DETERMINISTIC_JSON_CONFIG,
+  geminiChatModel,
+  LlmBudgetExceededError,
+  LlmGateway,
+} from '@veritas/content-classification/llm';
 import type { ExternalSignal, SignalAdapter } from './signal-adapter.interface';
-import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from '../utils/llm-config';
-import { LlmBudgetExceededError, LlmGateway } from '../utils/llm-gateway';
 
 /**
  * MVP signal adapter that uses Gemini to hypothesize downstream effects

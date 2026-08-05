@@ -7,10 +7,10 @@ import {
   Optional,
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { TranslationService } from '@veritas/content-classification/llm';
 import { Observable, Subject } from 'rxjs';
 import type { EventCategory, EventSeverity, GeoLocation, GlobalEvent } from '../types/global-event';
 import { geocodeFromText, REGION_CENTROIDS, resolveCountryCode } from '../utils/geocoding';
-import { contentTokens, overlapCoefficient, sameLocation } from './utils/dedupe-global-events';
 import { AcledAdapter } from './signal-adapters/acled.adapter';
 import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
 import { EonetAdapter } from './signal-adapters/eonet.adapter';
@@ -21,7 +21,7 @@ import { NwsAdapter } from './signal-adapters/nws.adapter';
 import type { ExternalSignal } from './signal-adapters/signal-adapter.interface';
 import { UsgsAdapter } from './signal-adapters/usgs.adapter';
 import { WeatherAdapter } from './signal-adapters/weather.adapter';
-import { TranslationService } from './translation.service';
+import { contentTokens, overlapCoefficient, sameLocation } from './utils/dedupe-global-events';
 /** Injection token for the global event repository (avoids cross-module dependency). */
 export const GLOBAL_EVENT_REPOSITORY = Symbol('GLOBAL_EVENT_REPOSITORY');
 export const GLOBAL_EVENT_RSS_FEEDS = Symbol('GLOBAL_EVENT_RSS_FEEDS');
@@ -76,7 +76,11 @@ export const GLOBAL_EVENT_SIGNAL_SOURCES: ReadonlyArray<{
   { name: 'GDACS Disasters', kind: 'disaster', intervalMinutes: GDACS_INTERVAL_MS / 60_000 },
   { name: 'NASA EONET', kind: 'disaster', intervalMinutes: EONET_INTERVAL_MS / 60_000 },
   { name: 'NOAA/NWS Alerts', kind: 'weather', intervalMinutes: NWS_INTERVAL_MS / 60_000 },
-  { name: 'Open-Meteo Severe Weather', kind: 'weather', intervalMinutes: WEATHER_INTERVAL_MS / 60_000 },
+  {
+    name: 'Open-Meteo Severe Weather',
+    kind: 'weather',
+    intervalMinutes: WEATHER_INTERVAL_MS / 60_000,
+  },
   { name: 'ACLED Conflict', kind: 'conflict', intervalMinutes: ACLED_INTERVAL_MS / 60_000 },
   { name: 'GDELT News', kind: 'news', intervalMinutes: GDELT_INTERVAL_MS / 60_000 },
   { name: 'CoinGecko Markets', kind: 'market', intervalMinutes: COINGECKO_INTERVAL_MS / 60_000 },
@@ -92,6 +96,15 @@ function decodeEntities(text: string): string {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&nbsp;/g, ' ');
+}
+
+/**
+ * The body snippet for a feed item: the plain-text summary when present,
+ * otherwise the HTML content with tags stripped. Bounded to 300 chars.
+ * Returns undefined when the item carries no body at all.
+ */
+function rssSnippet(item: { contentSnippet?: string; content?: string }): string | undefined {
+  return item.contentSnippet?.slice(0, 300) ?? item.content?.replace(/<[^>]+>/g, ' ').slice(0, 300);
 }
 
 /** "south_korea" → "South Korea" — region slugs are not user-facing labels. */
@@ -409,12 +422,28 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
           // headlines so they geocode and cluster with the rest of the feed.
           // Originals are kept in metadata; a failed translation keeps the
           // original text visibly untranslated rather than dropping the item.
+          //
+          // Bodies are translated too: the description feeds framing and
+          // propaganda analysis and the /perspectives divergence view, all of
+          // which were previously reading a Russian or Persian snippet while
+          // the title beside it was English.
           let translations: Array<string | null> = fresh.map(() => null);
+          let bodyTranslations: Array<string | null> = fresh.map(() => null);
           if (feed.language !== 'en' && this.translator?.available) {
-            translations = await this.translator.translateHeadlines(
-              fresh.map(({ item }) => item.title ?? 'Untitled'),
-              feed.language,
-            );
+            const rawBodies = fresh.map(({ item }) => rssSnippet(item) ?? '');
+            const [titleResults, bodyResults] = await Promise.all([
+              this.translator.translateTexts(
+                fresh.map(({ item }) => item.title ?? 'Untitled'),
+                feed.language,
+                'headline',
+              ),
+              // Only spend on items that actually carry a body.
+              rawBodies.some((body) => body.length > 0)
+                ? this.translator.translateTexts(rawBodies, feed.language, 'body')
+                : Promise.resolve(rawBodies.map(() => null)),
+            ]);
+            translations = titleResults;
+            bodyTranslations = bodyResults;
           }
 
           for (let itemIdx = 0; itemIdx < fresh.length; itemIdx++) {
@@ -475,8 +504,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
               severity: feed.tier === 1 ? 'medium' : 'low',
               title,
               description: this.getEventDescription(
-                item.contentSnippet?.slice(0, 300) ??
-                  item.content?.replace(/<[^>]+>/g, ' ').slice(0, 300),
+                bodyTranslations[itemIdx] ?? rssSnippet(item),
                 title,
                 `RSS:${feed.name}`,
               ),
@@ -505,6 +533,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
                       originalLanguage: feed.language,
                       originalTitle,
                       translated: translatedTitle !== null,
+                      bodyTranslated: bodyTranslations[itemIdx] !== null,
                     }
                   : {}),
                 link: item.link,
@@ -997,7 +1026,11 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
       category: 'maritime' as EventCategory,
       severity: this.magnitudeSeverity(signal.magnitude),
       title: signal.title,
-      description: this.getEventDescription(signal.description, signal.title, 'Global Fishing Watch'),
+      description: this.getEventDescription(
+        signal.description,
+        signal.title,
+        'Global Fishing Watch',
+      ),
       timestamp: signal.timestamp,
       location: {
         lat,

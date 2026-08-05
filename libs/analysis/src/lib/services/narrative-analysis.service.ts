@@ -1,11 +1,15 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  DETERMINISTIC_JSON_CONFIG,
+  geminiChatModel,
+  LlmBudgetExceededError,
+  LlmGateway,
+} from '@veritas/content-classification/llm';
 import { cosineSimilarity } from '../utils/math';
 import type { SaturationReport } from './saturation-metrics.service';
 import { SaturationMetricsService } from './saturation-metrics.service';
-import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
-import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 /** Injection token for the EmbeddingCacheRepository (optional — provided by app module) */
 export const EMBEDDING_CACHE_STORE = Symbol('EMBEDDING_CACHE_STORE');

@@ -1,4 +1,4 @@
-import { LlmGateway } from './src/lib/services/utils/llm-gateway';
+import { LlmGateway } from '@veritas/content-classification/llm';
 
 /**
  * The LlmGateway is a process-wide singleton with an in-memory response cache

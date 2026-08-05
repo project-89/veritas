@@ -6,6 +6,8 @@ import {
   EmbeddingsService,
   EmbeddingVector,
 } from '@veritas/content-classification';
+import type { TranslatedText } from '@veritas/content-classification/llm';
+import { TranslationService } from '@veritas/content-classification/llm';
 import * as crypto from 'crypto';
 import { NarrativeInsight } from '../../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../../types/social-media.types';
@@ -26,6 +28,7 @@ export class TransformOnIngestService {
     private readonly narrativeRepository: NarrativeRepository,
     private readonly contentClassificationService: ContentClassificationService,
     @Optional() private readonly embeddingsService?: EmbeddingsService,
+    @Optional() private readonly translationService?: TranslationService,
   ) {
     // Get hash salt from config or generate a secure random one
     this.hashSalt =
@@ -53,11 +56,15 @@ export class TransformOnIngestService {
    */
   public async transform(post: SocialMediaPost): Promise<NarrativeInsight> {
     try {
-      // Step 1: Classify the content
-      const classification = await this.contentClassificationService.classifyContent(post.text);
+      // Step 0: Normalize to English BEFORE anything language-bound runs.
+      const [normalized] = await this.normalizeToEnglish([post.text]);
+      const analysisText = normalized?.textEn ?? post.text;
+
+      // Step 1: Classify the content (on the English rendering)
+      const classification = await this.contentClassificationService.classifyContent(analysisText);
 
       // Step 2: Transform with classification
-      const insight = await this.transformWithClassification(post, classification);
+      const insight = await this.transformWithClassification(post, classification, normalized);
 
       // Step 3: Store the insight
       await this.storeInsight(insight);
@@ -71,16 +78,84 @@ export class TransformOnIngestService {
   }
 
   /**
+   * Normalize a batch of post texts to English ahead of classification,
+   * embedding and theme extraction — all three are language-bound, and the
+   * default embedding path is lexical, so an untranslated Russian post lands
+   * nowhere near its English counterpart in the vector space.
+   *
+   * Texts are grouped by detected language so each language costs one batched
+   * translation call. English passes through free. When translation is
+   * unavailable the original text is returned with `translated: false`, so the
+   * degradation is recorded rather than silent.
+   */
+  private async normalizeToEnglish(texts: string[]): Promise<TranslatedText[]> {
+    const detected = texts.map((text) => ({
+      text,
+      language: this.contentClassificationService.detectLanguage(text),
+    }));
+
+    const results: TranslatedText[] = detected.map(({ text, language }) => ({
+      text,
+      textEn: language === 'en' ? text : null,
+      language,
+      translated: false,
+    }));
+
+    if (!this.translationService?.available) {
+      const untranslated = results.filter((r) => r.language !== 'en').length;
+      if (untranslated > 0) {
+        this.logger.warn(
+          `${untranslated} non-English post(s) will be analysed untranslated — ` +
+            'translation unavailable (no GEMINI_API_KEY). Themes and entities ' +
+            'will be abstained on downstream.',
+        );
+      }
+      return results;
+    }
+
+    // One batched call per language.
+    const byLanguage = new Map<string, number[]>();
+    results.forEach((r, i) => {
+      if (r.language === 'en') return;
+      const bucket = byLanguage.get(r.language);
+      if (bucket) bucket.push(i);
+      else byLanguage.set(r.language, [i]);
+    });
+
+    await Promise.all(
+      Array.from(byLanguage.entries()).map(async ([language, indices]) => {
+        const translations = await this.translationService?.translateTexts(
+          indices.map((i) => results[i]?.text ?? ''),
+          language,
+          'post',
+        );
+        indices.forEach((resultIndex, batchIndex) => {
+          const translated = translations?.[batchIndex] ?? null;
+          const target = results[resultIndex];
+          if (!target || translated === null) return;
+          target.textEn = translated;
+          target.translated = true;
+        });
+      }),
+    );
+
+    return results;
+  }
+
+  /**
    * Transform and store a batch of social media posts
    * Returns the transformed insights
    */
   public async transformBatch(posts: SocialMediaPost[]): Promise<NarrativeInsight[]> {
     try {
-      // Step 1: Extract all texts for batch classification
-      const texts = posts.map((post) => post.text);
+      // Step 1: Normalize every post to English first — classification,
+      // embedding and theme extraction downstream are all English-bound.
+      const normalized = await this.normalizeToEnglish(posts.map((post) => post.text));
 
-      // Step 2: Perform batch classification
-      const classifications = await this.contentClassificationService.batchClassify(texts);
+      // Step 2: Perform batch classification on the English renderings
+      const classifications = await this.contentClassificationService.batchClassify(
+        normalized.map((n, i) => n.textEn ?? posts[i]?.text ?? ''),
+      );
 
       // Step 3: Transform each post with its classification
       const insights = await Promise.all(
@@ -88,6 +163,7 @@ export class TransformOnIngestService {
           this.transformWithClassification(
             post,
             classifications[index] ?? this.buildDefaultClassification(),
+            normalized[index],
           ),
         ),
       );
@@ -111,6 +187,7 @@ export class TransformOnIngestService {
   private async transformWithClassification(
     post: SocialMediaPost,
     classification: ContentClassification,
+    normalized?: TranslatedText,
   ): Promise<NarrativeInsight> {
     // Step 1: Create content hash (deterministic but non-reversible)
     const contentHash = this.hashContent(post.text, post.timestamp);
@@ -129,7 +206,10 @@ export class TransformOnIngestService {
     let embedding: EmbeddingVector | undefined;
     if (this.embeddingsService) {
       try {
-        embedding = await this.embeddingsService.generateEmbedding(post.text);
+        // Embed the English rendering: the default embedding path is lexical
+        // (hash-of-words), so embedding raw foreign text puts the same claim
+        // in two unrelated regions of the vector space.
+        embedding = await this.embeddingsService.generateEmbedding(normalized?.textEn ?? post.text);
         this.logger.debug(`Generated embedding for content: ${contentHash.substring(0, 8)}`);
       } catch (error) {
         const err = error as Error;
@@ -160,6 +240,10 @@ export class TransformOnIngestService {
       processedAt: new Date(),
       expiresAt,
       embedding, // Include the embedding vector if available
+      // Language provenance: which text the themes/entities/embedding above
+      // were actually derived from. Without this, a post whose translation
+      // failed is indistinguishable from a native-English one.
+      ...(normalized ? { language: normalized.language, translated: normalized.translated } : {}),
     };
   }
 

@@ -1,9 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  DETERMINISTIC_JSON_CONFIG,
+  extractFirstJsonObject,
+  geminiChatModel,
+  LlmBudgetExceededError,
+  LlmGateway,
+} from '@veritas/content-classification/llm';
 import type { RawPost } from './deviation.service';
-import { DETERMINISTIC_JSON_CONFIG, extractFirstJsonObject, geminiChatModel } from './utils/llm-config';
-import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 export const FAILURE_EXAMPLE_PROMPT_VERSION = 2;
 
@@ -126,10 +131,7 @@ export function normalizeForGrounding(text: string): string {
  * the evidence excerpt must actually appear in that post's text. Provenance
  * fields are then taken from the post itself, never from the model.
  */
-export function groundFailureExample(
-  raw: LlmExample,
-  posts: ExamplePost[],
-): FailureExample | null {
+export function groundFailureExample(raw: LlmExample, posts: ExamplePost[]): FailureExample | null {
   const ref = raw.postRef;
   if (typeof ref !== 'number' || ref < 0 || ref >= posts.length) return null;
   const post = posts[ref];
@@ -423,7 +425,9 @@ Return STRICT JSON: {"verdicts": [true|false, ...]} with exactly ${examples.leng
       const json = extractFirstJsonObject(responseText);
       const parsed = json ? (JSON.parse(json) as { verdicts?: unknown[] }) : {};
       const verdicts = Array.isArray(parsed.verdicts) ? parsed.verdicts : [];
-      return examples.map((_, i) => (typeof verdicts[i] === 'boolean' ? (verdicts[i] as boolean) : null));
+      return examples.map((_, i) =>
+        typeof verdicts[i] === 'boolean' ? (verdicts[i] as boolean) : null,
+      );
     } catch (err) {
       this.logger.warn(`Failure-example verification pass failed (failing open): ${err}`);
       return examples.map(() => null);

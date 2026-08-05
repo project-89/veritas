@@ -1,10 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  geminiChatModel,
+  LlmBudgetExceededError,
+  LlmGateway,
+} from '@veritas/content-classification/llm';
 import type { DeepInvestigationResult } from './deep-investigation.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
-import { geminiChatModel } from './utils/llm-config';
-import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 // ---------------------------------------------------------------------------
 // Types

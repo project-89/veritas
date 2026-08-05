@@ -6,6 +6,7 @@ import {
   ContentClassificationService,
   EmbeddingsService,
 } from '@veritas/content-classification';
+import { TRANSLATION_CACHE_STORE } from '@veritas/content-classification/llm';
 import { DatabaseModule, DatabaseService } from '@veritas/database';
 import { AnalysisJobController } from './controllers/analysis-job.controller';
 import { IngestionController } from './controllers/ingestion.controller';
@@ -30,6 +31,7 @@ import { AlertRepository } from './repositories/alert.repository';
 import { AnalysisJobRepository } from './repositories/analysis-job.repository';
 import { ConnectorFetchCacheRepository } from './repositories/connector-fetch-cache.repository';
 import { EmbeddingCacheRepository } from './repositories/embedding-cache.repository';
+import { TranslationCacheRepository } from './repositories/translation-cache.repository';
 import { GlobalEventRepository } from './repositories/global-event.repository';
 import { IdentityRecordRepository } from './repositories/identity-record.repository';
 import { InvestigationRepository } from './repositories/investigation.repository';
@@ -174,6 +176,13 @@ export class IngestionModule {
     if (!options?.contentClassificationProvider) {
       imports.push(
         ContentClassificationModule.forRoot({
+          // Backs TranslationService's in-process LRU with a durable cache so
+          // deploys don't re-buy translations already paid for. Registered
+          // inside that module because that is where TranslationService lives.
+          translationCacheStore: {
+            provide: TRANSLATION_CACHE_STORE,
+            useClass: TranslationCacheRepository,
+          },
           // Pass through embedding options if embeddings are enabled
           enableEmbeddings: options?.enableEmbeddings || false,
           embeddingsOptions: options?.enableEmbeddings

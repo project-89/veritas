@@ -1,14 +1,15 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { BotScore } from './graph-bot-detection.service';
-import type { SourceCredibilityScore } from './source-credibility.service';
 import {
   DETERMINISTIC_JSON_CONFIG,
   extractFirstJsonObject,
   geminiChatModel,
-} from './utils/llm-config';
-import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
+  LlmBudgetExceededError,
+  LlmGateway,
+} from '@veritas/content-classification/llm';
+import type { BotScore } from './graph-bot-detection.service';
+import type { SourceCredibilityScore } from './source-credibility.service';
 
 // ---------------------------------------------------------------------------
 // Types

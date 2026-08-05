@@ -2,22 +2,26 @@ import { createHash } from 'node:crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  DETERMINISTIC_JSON_CONFIG,
+  geminiChatModel,
+  LlmBudgetExceededError,
+  LlmGateway,
+} from '@veritas/content-classification/llm';
 import type { CausalReasoningService } from './causal-reasoning.service';
 import type { RawPost } from './deviation.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
 import { AcledAdapter } from './signal-adapters/acled.adapter';
 import { CoinGeckoAdapter } from './signal-adapters/coingecko.adapter';
+import { EonetAdapter } from './signal-adapters/eonet.adapter';
 import { FredAdapter } from './signal-adapters/fred.adapter';
 import { GdacsAdapter } from './signal-adapters/gdacs.adapter';
 import { GdeltAdapter } from './signal-adapters/gdelt.adapter';
 import { LlmHypothesisAdapter } from './signal-adapters/llm-hypothesis.adapter';
-import { EonetAdapter } from './signal-adapters/eonet.adapter';
 import type { ExternalSignal, SignalAdapter } from './signal-adapters/signal-adapter.interface';
 import { UsgsAdapter } from './signal-adapters/usgs.adapter';
 import { WorldBankAdapter } from './signal-adapters/worldbank.adapter';
 import { YahooFinanceAdapter } from './signal-adapters/yahoo-finance.adapter';
-import { DETERMINISTIC_JSON_CONFIG, geminiChatModel } from './utils/llm-config';
-import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 /** Injection token for the causal reasoning service (avoids circular dependency). */
 export const CAUSAL_REASONING_SERVICE = Symbol('CAUSAL_REASONING_SERVICE');

@@ -5,6 +5,7 @@ import {
   ContentClassificationService,
   EmbeddingsService,
 } from '@veritas/content-classification';
+import { TranslationService } from '@veritas/content-classification/llm';
 import { NarrativeRepository } from '../../../src/lib/repositories/narrative-insight.repository';
 import { TransformOnIngestService } from '../../../src/lib/services/transform/transform-on-ingest.service';
 import { NarrativeInsight } from '../../../src/types/narrative-insight.interface';
@@ -61,14 +62,15 @@ describe('TransformOnIngestService', () => {
 
   // Mock the content classification service
   const mockContentClassificationService = {
-    classifyContent: jest
-      .fn()
-      .mockImplementation(async () => Promise.resolve(mockClassification)),
+    classifyContent: jest.fn().mockImplementation(async () => Promise.resolve(mockClassification)),
     batchClassify: jest
       .fn()
       .mockImplementation(async (texts) =>
         Promise.resolve(Array(texts.length).fill(mockClassification)),
       ),
+    // Used by the ingest-time normalization step to decide what needs
+    // translating before classification/embedding run.
+    detectLanguage: jest.fn().mockReturnValue('en'),
   };
 
   // Mock the embeddings service
@@ -125,6 +127,125 @@ describe('TransformOnIngestService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('normalization to English before analysis', () => {
+    const russianPost: SocialMediaPost = {
+      ...mockSocialMediaPost,
+      id: 'post-ru',
+      text: 'Пошлины на импорт стали выросли на этой неделе',
+    };
+
+    /** Builds a service with a translation service wired in. */
+    const buildWithTranslator = async (translator: {
+      available: boolean;
+      translateTexts: jest.Mock;
+    }): Promise<TransformOnIngestService> => {
+      const module = await Test.createTestingModule({
+        providers: [
+          TransformOnIngestService,
+          { provide: ConfigService, useValue: mockConfigService },
+          { provide: NarrativeRepository, useValue: mockNarrativeRepository },
+          {
+            provide: ContentClassificationService,
+            useValue: mockContentClassificationService,
+          },
+          { provide: EmbeddingsService, useValue: mockEmbeddingsService },
+          { provide: TranslationService, useValue: translator },
+        ],
+      }).compile();
+      return module.get<TransformOnIngestService>(TransformOnIngestService);
+    };
+
+    it('classifies and embeds the TRANSLATION, not the original foreign text', async () => {
+      mockContentClassificationService.detectLanguage.mockReturnValue('ru');
+      const translateTexts = jest
+        .fn()
+        .mockResolvedValue(['Import tariffs on steel rose this week']);
+
+      const svc = await buildWithTranslator({ available: true, translateTexts });
+      const insight = await svc.transform(russianPost);
+
+      // The whole point of the layer: downstream analysis sees English.
+      expect(mockContentClassificationService.classifyContent).toHaveBeenCalledWith(
+        'Import tariffs on steel rose this week',
+      );
+      expect(mockEmbeddingsService.generateEmbedding).toHaveBeenCalledWith(
+        'Import tariffs on steel rose this week',
+      );
+      expect(insight.language).toBe('ru');
+      expect(insight.translated).toBe(true);
+    });
+
+    it('records translated:false and falls back to the original when translation fails', async () => {
+      mockContentClassificationService.detectLanguage.mockReturnValue('ru');
+      // Translation unavailable for this item (null per the service contract).
+      const translateTexts = jest.fn().mockResolvedValue([null]);
+
+      const svc = await buildWithTranslator({ available: true, translateTexts });
+      const insight = await svc.transform(russianPost);
+
+      // Degrade honestly: the item still flows, but the data records that its
+      // themes/embedding came from untranslated text.
+      expect(mockContentClassificationService.classifyContent).toHaveBeenCalledWith(
+        russianPost.text,
+      );
+      expect(insight.language).toBe('ru');
+      expect(insight.translated).toBe(false);
+    });
+
+    it('does not pay for translation on English posts', async () => {
+      mockContentClassificationService.detectLanguage.mockReturnValue('en');
+      const translateTexts = jest.fn();
+
+      const svc = await buildWithTranslator({ available: true, translateTexts });
+      const insight = await svc.transform(mockSocialMediaPost);
+
+      expect(translateTexts).not.toHaveBeenCalled();
+      expect(insight.language).toBe('en');
+      expect(insight.translated).toBe(false);
+    });
+
+    it('batches one translation call per language', async () => {
+      mockContentClassificationService.detectLanguage.mockImplementation((text: string) =>
+        /[Ѐ-ӿ]/.test(text) ? 'ru' : /é|è|ê/.test(text) ? 'fr' : 'en',
+      );
+      const translateTexts = jest
+        .fn()
+        .mockImplementation(async (texts: string[]) => texts.map((_, i) => `translated-${i}`));
+
+      const svc = await buildWithTranslator({ available: true, translateTexts });
+      await svc.transformBatch([
+        { ...mockSocialMediaPost, id: 'a', text: 'Пошлины выросли' },
+        { ...mockSocialMediaPost, id: 'b', text: 'Импорт стали' },
+        { ...mockSocialMediaPost, id: 'c', text: 'Les tarifs préférentiels' },
+        { ...mockSocialMediaPost, id: 'd', text: 'plain english post' },
+      ]);
+
+      // Two non-English languages => exactly two batched calls, not four.
+      expect(translateTexts).toHaveBeenCalledTimes(2);
+      const languagesRequested = translateTexts.mock.calls.map((call) => call[1]).sort();
+      expect(languagesRequested).toEqual(['fr', 'ru']);
+      // Both Russian posts travel in a single call.
+      const russianCall = translateTexts.mock.calls.find((call) => call[1] === 'ru');
+      expect(russianCall?.[0]).toEqual(['Пошлины выросли', 'Импорт стали']);
+    });
+
+    it('proceeds untranslated when no translation service is configured', async () => {
+      mockContentClassificationService.detectLanguage.mockReturnValue('ru');
+
+      // `service` from the outer beforeEach has no TranslationService provider.
+      const insight = await service.transform(russianPost);
+
+      expect(mockContentClassificationService.classifyContent).toHaveBeenCalledWith(
+        russianPost.text,
+      );
+      expect(insight.translated).toBe(false);
+    });
+
+    afterEach(() => {
+      mockContentClassificationService.detectLanguage.mockReturnValue('en');
+    });
   });
 
   describe('transform', () => {

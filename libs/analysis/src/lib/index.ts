@@ -1,7 +1,16 @@
+export {
+  DETERMINISTIC_JSON_CONFIG,
+  extractFirstJsonObject,
+  geminiChatModel,
+  geminiReasoningModel,
+  LlmBudgetExceededError,
+  LlmGateway,
+} from '@veritas/content-classification/llm';
 export * from './analysis.controller';
 export * from './analysis.module';
 export * from './analysis.types';
 export * from './interfaces/analysis-service.interface';
+export * from './services/ais-stream.service';
 export * from './services/analysis.service';
 export * from './services/causal-reasoning.service';
 export * from './services/causal-tool-definitions';
@@ -15,16 +24,6 @@ export * from './services/entity-analysis.service';
 export * from './services/evidence-adapters/evidence-adapter.interface';
 export * from './services/genealogy.service';
 export * from './services/global-event-aggregation.service';
-export * from './services/ais-stream.service';
-export * from './services/utils/cluster-global-events';
-export {
-  DETERMINISTIC_JSON_CONFIG,
-  extractFirstJsonObject,
-  geminiChatModel,
-  geminiReasoningModel,
-} from './services/utils/llm-config';
-export { LlmBudgetExceededError, LlmGateway } from './services/utils/llm-gateway';
-export * from './services/utils/dedupe-global-events';
 export * from './services/graph-bot-detection.service';
 export * from './services/graph-database.service';
 export * from './services/intelligence-engine.service';
@@ -38,4 +37,6 @@ export * from './services/signal-adapters/llm-hypothesis.adapter';
 export * from './services/signal-adapters/signal-adapter.interface';
 export * from './services/social-graph-intelligence.service';
 export * from './services/source-credibility.service';
+export * from './services/utils/cluster-global-events';
+export * from './services/utils/dedupe-global-events';
 export * from './types/global-event';

@@ -1,14 +1,15 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { RawPost } from './deviation.service';
-import type { AnalyzedNarrative } from './narrative-analysis.service';
 import {
   DETERMINISTIC_JSON_CONFIG,
   extractFirstJsonObject,
   geminiChatModel,
-} from './utils/llm-config';
-import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
+  LlmBudgetExceededError,
+  LlmGateway,
+} from '@veritas/content-classification/llm';
+import type { RawPost } from './deviation.service';
+import type { AnalyzedNarrative } from './narrative-analysis.service';
 
 // ---------------------------------------------------------------------------
 // Versioning

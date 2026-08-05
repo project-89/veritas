@@ -18,6 +18,11 @@ import { FunctionCallingMode, GoogleGenerativeAI } from '@google/generative-ai';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  geminiReasoningModel,
+  LlmBudgetExceededError,
+  LlmGateway,
+} from '@veritas/content-classification/llm';
+import {
   CAUSAL_TOOLS,
   type CausalChainSubmission,
   type RejectedCorrelation,
@@ -32,8 +37,6 @@ import type {
 import { SIGNAL_CACHE_STORE, type SignalCacheStore } from './downstream-effects.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
 import type { ExternalSignal, SignalAdapter } from './signal-adapters/signal-adapter.interface';
-import { geminiReasoningModel } from './utils/llm-config';
-import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -353,8 +356,7 @@ export class CausalReasoningService {
     contextKey: string,
   ): Promise<Awaited<ReturnType<typeof chat.sendMessage>>> {
     this.turnCounter++;
-    const promptForAccounting =
-      typeof message === 'string' ? message : JSON.stringify(message);
+    const promptForAccounting = typeof message === 'string' ? message : JSON.stringify(message);
     let captured: Awaited<ReturnType<typeof chat.sendMessage>> | undefined;
 
     await LlmGateway.instance.run({

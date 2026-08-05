@@ -6,6 +6,7 @@ import { getContentModel } from './models';
 import { ContentService } from './services/content.service';
 import { ContentClassificationService } from './services/content-classification.service';
 import { EmbeddingsService } from './services/embeddings.service';
+import { TranslationService } from './services/translation.service';
 
 /**
  * Database provider options
@@ -80,6 +81,18 @@ export interface ContentClassificationModuleOptions {
    * @default false
    */
   isGlobal?: boolean;
+
+  /**
+   * Optional provider for the TRANSLATION_CACHE_STORE token, giving
+   * TranslationService a durable cache.
+   *
+   * Passed in rather than constructed here because the implementation needs a
+   * database and this lib deliberately does not depend on one. It must be
+   * registered INSIDE this module: Nest resolves a provider's dependencies in
+   * its own module context, so a store provided by the importing module would
+   * be invisible to TranslationService.
+   */
+  translationCacheStore?: Provider;
 }
 
 /**
@@ -88,8 +101,8 @@ export interface ContentClassificationModuleOptions {
  */
 @Module({
   controllers: [ContentController],
-  providers: [ContentClassificationService, ContentService],
-  exports: [ContentClassificationService, ContentService],
+  providers: [ContentClassificationService, ContentService, TranslationService],
+  exports: [ContentClassificationService, ContentService, TranslationService],
 })
 export class ContentClassificationModule {
   /**
@@ -158,7 +171,14 @@ export class ContentClassificationModule {
         useExisting: ContentClassificationService,
       },
       ContentService,
+      // Normalization to English has to be available at ingest, ahead of
+      // clustering/embedding/topic extraction.
+      TranslationService,
     ];
+
+    if (options.translationCacheStore) {
+      providers.push(options.translationCacheStore);
+    }
 
     // If database is specified, add database provider
     if (options?.providerType && options.providerOptions) {
@@ -206,6 +226,7 @@ export class ContentClassificationModule {
       exports: [
         'ContentClassificationService',
         ContentService,
+        TranslationService,
         ...(options.enableEmbeddings ? [EmbeddingsService] : []),
       ],
       global: options.isGlobal,

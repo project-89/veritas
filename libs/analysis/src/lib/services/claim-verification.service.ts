@@ -2,6 +2,13 @@ import { createHash } from 'node:crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  DETERMINISTIC_JSON_CONFIG,
+  extractFirstJsonObject,
+  geminiChatModel,
+  LlmBudgetExceededError,
+  LlmGateway,
+} from '@veritas/content-classification/llm';
 import { DexScreenerEvidenceAdapter } from './evidence-adapters/dexscreener.evidence-adapter';
 import { EtherscanEvidenceAdapter } from './evidence-adapters/etherscan.evidence-adapter';
 import type {
@@ -18,12 +25,6 @@ import {
 import { WaybackEvidenceAdapter } from './evidence-adapters/wayback.evidence-adapter';
 import { PlatformCredibilityService } from './platform-credibility.service';
 import type { AnalysisMode, ExtractedClaim } from './propaganda.service';
-import {
-  DETERMINISTIC_JSON_CONFIG,
-  extractFirstJsonObject,
-  geminiChatModel,
-} from './utils/llm-config';
-import { LlmBudgetExceededError, LlmGateway } from './utils/llm-gateway';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -280,7 +281,7 @@ export class ClaimVerificationService {
     // One budget scope per batch: every claim in a verification run shares a
     // context so a large batch can't fan out into unbounded LLM spend.
     const contextKey = `claim-batch:${createHash('sha256')
-      .update(verifiable.map((c) => c.claim).join(' '))
+      .update(verifiable.map((c) => c.claim).join('\0'))
       .digest('hex')
       .slice(0, 16)}`;
 

@@ -1,6 +1,10 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import {
+  TRANSLATION_CACHE_STORE,
+  type TranslationCacheStore,
+} from './translation-cache.port';
 import { DETERMINISTIC_JSON_CONFIG, extractFirstJsonObject, geminiChatModel } from './utils/llm-config';
 import { LlmGateway } from './utils/llm-gateway';
 
@@ -62,7 +66,12 @@ export class TranslationService {
   private readonly cache = new Map<string, string>();
   private static readonly CACHE_MAX = 2000;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Optional()
+    @Inject(TRANSLATION_CACHE_STORE)
+    private readonly persistentCache?: TranslationCacheStore,
+  ) {
     const geminiKey =
       this.configService.get<string>('GEMINI_API_KEY') || process.env['GEMINI_API_KEY'];
     if (geminiKey) {
@@ -117,15 +126,46 @@ export class TranslationService {
     kind: TranslationKind = 'post',
   ): Promise<Array<string | null>> {
     if (texts.length === 0) return [];
-    if (!this.genAI) return texts.map(() => null);
 
     const results: Array<string | null> = texts.map(
       (t) => this.cache.get(cacheKey(t, kind)) ?? null,
     );
+
+    // Second-level lookup: translations survive restarts, so only pay Gemini
+    // for text nobody has translated before.
+    //
+    // Deliberately BEFORE the availability check. A previously-cached
+    // translation is still a valid translation when the API key is absent —
+    // returning null there would discard work already paid for.
+    if (this.persistentCache) {
+      await Promise.all(
+        results.map(async (hit, index) => {
+          if (hit !== null) return;
+          const text = texts[index];
+          if (text === undefined) return;
+          const key = cacheKey(text, kind);
+          try {
+            const stored = await this.persistentCache?.get(key);
+            if (stored) {
+              results[index] = stored;
+              this.writeCache(key, stored);
+            }
+          } catch (err) {
+            // A cache miss and a broken cache are the same thing to the caller.
+            this.logger.debug(`Persistent translation cache read failed: ${err}`);
+          }
+        }),
+      );
+    }
+
     const pending = texts
       .map((text, index) => ({ text, index }))
       .filter(({ index }) => results[index] === null);
     if (pending.length === 0) return results;
+
+    // Everything below needs the model. Whatever the caches produced still
+    // stands; the rest stay null.
+    if (!this.genAI) return results;
 
     const model = this.genAI.getGenerativeModel({
       model: this.chatModel,
@@ -157,8 +197,15 @@ Return STRICT JSON: {"translations": ["<english text for 0>", "<for 1>", ...]} w
       pending.forEach(({ text, index }, i) => {
         const t = translations[i];
         if (typeof t === 'string' && t.trim().length > 0) {
-          results[index] = t.trim();
-          this.writeCache(cacheKey(text, kind), t.trim());
+          const value = t.trim();
+          const key = cacheKey(text, kind);
+          results[index] = value;
+          this.writeCache(key, value);
+          // Fire-and-forget: persisting is an optimization, and a failed write
+          // must never fail the translation that already succeeded.
+          void this.persistentCache?.set(key, value).catch((err) => {
+            this.logger.debug(`Persistent translation cache write failed: ${err}`);
+          });
         }
       });
     } catch (err) {

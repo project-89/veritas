@@ -116,4 +116,21 @@ export interface NarrativeInsight {
    * This is optional as it depends on the embeddings service availability
    */
   embedding?: number[];
+
+  /**
+   * Detected ISO 639-1 language of the ORIGINAL post ('en', 'ru', 'fr', ...).
+   */
+  language?: string;
+
+  /**
+   * True when themes/entities/embedding were derived from an English
+   * translation rather than the original text.
+   *
+   * Recorded because the alternative is indistinguishable in the data: a
+   * non-English post whose translation FAILED still produces an insight, but
+   * one whose themes and embedding are untrustworthy (the NER stack and the
+   * default lexical embedder are both English-only). Consumers that need to
+   * trust themes should check `language === 'en' || translated`.
+   */
+  translated?: boolean;
 }

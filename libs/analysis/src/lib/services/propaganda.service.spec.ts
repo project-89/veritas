@@ -1,8 +1,8 @@
 import { ConfigService } from '@nestjs/config';
+import { geminiChatModel } from '@veritas/content-classification/llm';
 import type { RawPost } from './deviation.service';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
 import { PROPAGANDA_PROMPT_VERSION, PropagandaAnalysisService } from './propaganda.service';
-import { geminiChatModel } from './utils/llm-config';
 
 // ---------------------------------------------------------------------------
 // Gemini mock (only used by tests that construct the service WITH an API key)
