@@ -5,6 +5,7 @@ import { NarrativeInsight } from '../../types/narrative-insight.interface';
 import { SocialMediaPost } from '../../types/social-media.types';
 import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
+import { extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SubprocessUtil } from './utils/subprocess.util';
 
@@ -301,7 +302,32 @@ export class TruthSocialFreeConnector implements DataConnector, OnModuleInit, On
         });
       }
 
-      return posts.slice(0, limit).map((p) => this.transformToSocialMediaPost(p));
+      const transformed = posts.map((p) => this.transformToSocialMediaPost(p));
+
+      // Relevance safety-net, matching Twitter/Bluesky/Farcaster. truthbrush
+      // returns whatever Truth Social's own search decides is a match, and
+      // platform search is loose enough that off-topic posts come back — an
+      // unfiltered connector is exactly how crypto whale-alert spam once
+      // reached the narrative stage. Applied BEFORE the limit slice so the cap
+      // counts relevant posts instead of being spent on discarded ones.
+      //
+      // Skipped for bare handle lookups (whose posts legitimately need not
+      // contain the handle as a word) and for queries with no significant
+      // terms, where matchesQuery matches everything anyway.
+      const isHandleQuery = !/\s/.test(query.trim());
+      const relevant =
+        isHandleQuery || extractSignificantTerms(query).length === 0
+          ? transformed
+          : transformed.filter((p) => matchesQuery(p.text, query));
+
+      if (relevant.length < transformed.length) {
+        this.logger.debug(
+          `Truth Social: dropped ${transformed.length - relevant.length}/${transformed.length} ` +
+            `off-topic posts for "${query}"`,
+        );
+      }
+
+      return relevant.slice(0, limit);
     } catch (error) {
       this.logger.error('Error searching Truth Social:', error);
       const message = error instanceof Error ? error.message : String(error);
