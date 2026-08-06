@@ -1230,8 +1230,12 @@ describe('Section 4: Analysis Service Contracts', () => {
         expect(score).toHaveProperty('temporalScore');
         expect(score).toHaveProperty('behavioralScore');
         expect(score).toHaveProperty('detectedPatterns');
-        expect(score.botProbability).toBeGreaterThanOrEqual(0);
-        expect(score.botProbability).toBeLessThanOrEqual(1);
+        // botProbability is `number | null`: null is the deliberate
+        // data-insufficiency abstention, never a confident 0.
+        if (score.botProbability !== null) {
+          expect(score.botProbability).toBeGreaterThanOrEqual(0);
+          expect(score.botProbability).toBeLessThanOrEqual(1);
+        }
       }
       expect(typeof result.graphEnhanced).toBe('boolean');
     });
@@ -1735,8 +1739,11 @@ describe('Section 5: Data Flow Validation', () => {
     ]);
     expect(botResult.scores.length).toBe(1);
     const botScore = botResult.scores[0]!;
-    expect(botScore.botProbability).toBeGreaterThanOrEqual(0);
-    expect(botScore.botProbability).toBeLessThanOrEqual(1);
+    // Abstains (null) on thin data rather than reporting a confident 0.
+    if (botScore.botProbability !== null) {
+      expect(botScore.botProbability).toBeGreaterThanOrEqual(0);
+      expect(botScore.botProbability).toBeLessThanOrEqual(1);
+    }
   });
 
   it('monitor service detects alerts from snapshot diffs', () => {
