@@ -1,0 +1,10 @@
+{
+  "query-relevance": {
+    "f1": 1,
+    "accuracy": 1
+  },
+  "language-abstention": {
+    "f1": 1,
+    "accuracy": 1
+  }
+}

@@ -44,7 +44,9 @@
     "clean:build": "find . -type f -name \"*.js\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -not -path \"*/scripts/*\" -not -name \"jest.config.js\" -not -name \"jest.preset.js\" -not -name \"*.config.js\" -delete && find . -type f -name \"*.d.ts\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -not -path \"*/types/*\" -delete && find . -type f -name \"*.js.map\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -delete && find . -type f -name \"*.tsbuildinfo\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -delete",
     "mongodb:up": "docker-compose -f docker-compose.mongodb.yml up -d",
     "mongodb:down": "docker-compose -f docker-compose.mongodb.yml down",
-    "mongodb:reset": "docker-compose -f docker-compose.mongodb.yml down && rm -rf ./mongodb_data && docker-compose -f docker-compose.mongodb.yml up -d"
+    "mongodb:reset": "docker-compose -f docker-compose.mongodb.yml down && rm -rf ./mongodb_data && docker-compose -f docker-compose.mongodb.yml up -d",
+    "eval": "tsx scripts/eval/run-eval.ts",
+    "eval:check": "tsx scripts/eval/run-eval.ts --check"
   },
   "private": true,
   "devDependencies": {

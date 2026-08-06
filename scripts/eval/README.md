@@ -1,0 +1,96 @@
+# Ground-truth evaluation harness
+
+Measures whether analysis capabilities are actually **correct**, against cases a
+human labelled — as opposed to the unit suite, which checks that code does what
+it was written to do.
+
+That distinction is the whole point. This system's characteristic failure is
+being *confidently wrong*: producing plausible, well-formed, entirely incorrect
+output. Two real relevance bugs found in August 2026 both passed the full unit
+suite while silently corrupting results:
+
+- `extractTopics` shattered `"préférentiels"` into `pr` / `f` / `rentiels` and
+  surfaced the fragments as topics; non-Latin text produced *zero* topics while
+  looking like a successful classification.
+- `matchesQuery` extracted zero terms from any non-Latin query, and since "no
+  significant terms" means "match everything", relevance filtering was silently
+  **disabled** in four connectors.
+
+Neither was catchable by a unit test, because the code did exactly what it said.
+
+## Usage
+
+```bash
+pnpm eval                 # run all suites, print precision / recall / F1
+pnpm eval:check           # exit 1 if any suite regressed against baseline.json
+tsx scripts/eval/run-eval.ts --json
+tsx scripts/eval/run-eval.ts --update-baseline
+```
+
+`--check` is the CI-facing entry point. It compares F1 (falling back to accuracy
+when F1 is undefined) against `baseline.json` and fails on any drop.
+
+## Layout
+
+```
+scripts/eval/
+  run-eval.ts       runner, reporting, baseline comparison
+  metrics.ts        precision / recall / F1 (pure, dependency-free)
+  suites.ts         one entry per capability
+  baseline.json     recorded scores, regenerate with --update-baseline
+  corpora/*.jsonl   labelled cases, one JSON object per line
+```
+
+## Adding a case
+
+Append a line to the relevant corpus. Every case needs a stable `id` and a
+`note` explaining *why* it is labelled that way — a corpus without rationale
+rots into unjustifiable expectations. Cases drawn from real incidents should say
+so; several here are verbatim posts from the contaminated 2026-07-10 scan.
+
+## Adding a suite
+
+Export a `Suite` from `suites.ts` with a `run()` returning `Prediction[]`, and
+add it to `SUITES`. Suites must be **offline and deterministic** — no network,
+no API keys — so `--check` can gate CI.
+
+## Coverage, and what is deliberately missing
+
+| Capability | Status |
+|---|---|
+| Query relevance (`matchesQuery`) | ✅ 18 cases |
+| Language abstention (topic/entity extraction) | ✅ 9 cases |
+| Bot detection | ❌ not covered |
+| Propaganda detection | ❌ not covered |
+| Claim verification | ❌ not covered |
+| Causal inference | ❌ blocked — layer not built (see `docs/development/causal-inference-layer.md` §7) |
+
+The covered two are deterministic and offline, which is why they exist first:
+they gate CI at zero cost and they are where the known bugs were.
+
+The uncovered three are LLM-dependent and therefore non-deterministic and
+expensive to evaluate. They need a different design — fixed seeds or recorded
+fixtures, plus a tolerance band rather than exact match — and bot detection in
+particular should be validated against a public bot dataset rather than
+hand-labelled cases. **Do not read a green run as "analysis quality is
+verified."** It means the two measured capabilities did not regress.
+
+## A caution, learned here
+
+The first version of the language suite stubbed the `franc-min` module
+directly. That stub **silently did nothing** — an ESM namespace object is
+frozen, so the assignment was a no-op and the forced-misdetection cases were
+passing for the wrong reason. A measurement tool that is quietly broken is
+worse than no tool, because it manufactures confidence.
+
+The suite now overrides the service's own `detectLanguage` method, which is a
+seam we control. Prefer seams you own over patching third-party modules, and
+verify a stub actually took effect before trusting a green result.
+
+## Findings so far
+
+- **`ru-forced-en`** — non-Latin script was only checked *after* the detector
+  returned a non-English verdict. Since `detectLanguage()` returns `'en'` for
+  any text under 10 characters, short Cyrillic posts reached the English
+  pipeline and emitted Cyrillic tokens as "topics" while reporting language
+  `'en'`. Fixed by making script evidence stand on its own.

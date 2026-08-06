@@ -1,6 +1,6 @@
 # Causal Inference Layer — Design & Development Plan
 
-**Status:** Proposed (not started)
+**Status:** Phase 0 shipped (2026-08-06, `c873f32`); Phases 1-5 not started
 **Owner decision required:** yes — see [Open Decisions](#open-decisions)
 **Related:** [`REMEDIATION-PLAN.md`](../REMEDIATION-PLAN.md) · [`forensic-intelligence-roadmap.md`](./forensic-intelligence-roadmap.md)
 
@@ -211,7 +211,7 @@ interface CausalEvidence {
 
 Each phase ships independently and leaves the system in a better state than it found it.
 
-**Phase 0 — Stop asserting (small, do first, unblocks nothing else).**
+**Phase 0 — Stop asserting (small, do first, unblocks nothing else). ✅ SHIPPED `c873f32`.**
 Remove the ordering-based causal labels (§2.1). Everything becomes `coincident` until earned. Drop `signal.magnitude` from the ranking score. Raise/remove the `> 0.1` filter. Surface `analysisMode: 'heuristic'` on this path so the client can mark it unvalidated. *This alone removes the credibility liability, before any statistics exist.*
 
 **Phase 1 — Baseline engine.**

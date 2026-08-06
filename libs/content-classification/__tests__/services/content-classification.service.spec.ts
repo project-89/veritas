@@ -202,6 +202,20 @@ describe('ContentClassificationService', () => {
       expect(classification.entities).toEqual([]);
     });
 
+    it('abstains on non-Latin script even when the detector claims English', async () => {
+      // detectLanguage() returns 'en' for anything under 10 chars, so short
+      // Cyrillic/CJK posts reached the English pipeline and emitted non-Latin
+      // tokens as "topics" while reporting language 'en'. Script is direct
+      // evidence and must stand on its own, not be gated behind the detector.
+      // Found by the ground-truth harness (scripts/eval, case `ru-forced-en`).
+      (francMin.franc as jest.Mock).mockReturnValue('eng');
+
+      const classification = await service.classifyContent('Пошлины на импорт стали выросли');
+
+      expect(classification.topics).toEqual([]);
+      expect(classification.entities).toEqual([]);
+    });
+
     it('still analyses short English text that franc misdetects as another Latin language', async () => {
       // franc-min is unreliable under ~40 chars. Abstaining on a bare
       // misdetection would silently strip topics from real English posts,

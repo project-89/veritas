@@ -1,0 +1,9 @@
+{"id":"en-long-real","text":"Machine learning algorithms are transforming artificial intelligence research across many universities this year","expectAbstain":false,"note":"REAL detector end-to-end: clear English must produce topics"}
+{"id":"fr-long-real","text":"Les tarifs douaniers préférentiels de l'Union européenne sont vivement contestés par plusieurs États membres cette semaine à Bruxelles","expectAbstain":true,"note":"REAL detector end-to-end: confident French must abstain, not emit 'rentiels'"}
+{"id":"ru-short-real","text":"Пошлины на импорт","expectAbstain":true,"note":"REAL detector: non-Latin script is evidence even below the length floor"}
+{"id":"zh-short-real","text":"美国对中国商品加征关税","expectAbstain":true,"note":"REAL detector: unsegmented script, previously produced silently empty results"}
+{"id":"ar-short-real","text":"الرسوم الجمركية على الواردات","expectAbstain":true,"note":"REAL detector: non-Latin script"}
+{"id":"en-accents-real","text":"The café hosted a naïve résumé workshop for students interested in machine learning careers","expectAbstain":false,"note":"REAL detector: accented loanwords in English must not trigger abstention"}
+{"id":"en-short-misdetected","text":"tariffs on steel imports","detectedLanguage":"fr","expectAbstain":false,"note":"FORCED misdetection: franc is unreliable under 40 chars, so a bare non-English verdict on short Latin text must NOT strip topics from real English"}
+{"id":"en-long-misdetected","text":"Machine learning algorithms are transforming artificial intelligence research across many universities","detectedLanguage":"fr","expectAbstain":true,"note":"FORCED: above the length floor the verdict IS trusted, so this correctly abstains — the deliberate cost of the length rule"}
+{"id":"ru-forced-en","text":"Пошлины на импорт стали выросли на этой неделе","detectedLanguage":"en","expectAbstain":true,"note":"FORCED: even if the detector claims English, non-Latin script overrides it"}

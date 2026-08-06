@@ -378,8 +378,15 @@ export class ContentClassificationService {
     // only abstain when the detection is corroborated by length or by script.
     const detectedNonEnglish = language !== 'en';
     const detectionIsReliable = normalizedText.length >= FRANC_RELIABLE_MIN_CHARS;
-    const englishAnalysable =
-      !detectedNonEnglish || !(detectionIsReliable || nonLatinScript(normalizedText));
+    // Non-Latin script is DIRECT evidence and stands on its own — it must not
+    // be gated behind the detector agreeing. detectLanguage() returns 'en' for
+    // anything under 10 characters, so a short Cyrillic post was reaching the
+    // English pipeline and emitting Cyrillic tokens as "topics" while
+    // reporting language 'en'. Found by the ground-truth harness
+    // (scripts/eval, case `ru-forced-en`).
+    const mustAbstain =
+      nonLatinScript(normalizedText) || (detectedNonEnglish && detectionIsReliable);
+    const englishAnalysable = !mustAbstain;
     if (!englishAnalysable) {
       this.logger.debug(
         `Abstaining from topic/entity extraction: text detected as '${language}', ` +

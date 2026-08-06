@@ -1,0 +1,18 @@
+{"id":"en-exact","query":"Is AI conscious?","text":"Is AI conscious? Nobody agrees on the answer","expected":true,"note":"plain on-topic English"}
+{"id":"en-paraphrase","query":"Is AI conscious?","text":"Fascinating thread on whether AI is conscious and what sentience means","expected":true,"note":"on-topic, different phrasing"}
+{"id":"en-partial-one-term","query":"Is AI conscious?","text":"New AI model released today with better benchmarks","expected":false,"note":"only one of two required terms"}
+{"id":"crypto-whale-alert","query":"Is AI conscious?","text":"🚨 1,043 $BTC (65,962,637 USD) transferred from #OKEX to unknown wallet","expected":false,"note":"real post from the 2026-07-10 contaminated scan"}
+{"id":"crypto-usdt","query":"Is AI conscious?","text":"🚨 170,000,000 $USDT transferred from unknown wallet to Poloniex","expected":false,"note":"real post from the contaminated scan"}
+{"id":"substring-blockchain","query":"AI","text":"blockchain infrastructure for supply chain logistics","expected":false,"note":"'ai' must not substring-match chain/blockchain"}
+{"id":"substring-maintain","query":"AI","text":"we need to maintain the available pairs","expected":false,"note":"'ai' inside maintain/available/pair"}
+{"id":"ai-standalone","query":"AI","text":"an AI model was released","expected":true,"note":"AI as a standalone word"}
+{"id":"stopword-is","query":"is","text":"this crisis list is long","expected":true,"note":"query is all stopwords -> no significant terms -> matches everything by contract"}
+{"id":"fr-accented-match","query":"tarifs préférentiels","text":"Les tarifs préférentiels de l'Union européenne sont contestés","expected":true,"note":"accented French must not shatter into fragments"}
+{"id":"fr-accented-nonmatch","query":"tarifs préférentiels","text":"A story about football and the weekend results","expected":false,"note":"unrelated text, accented query"}
+{"id":"ru-match","query":"пошлины импорт","text":"Пошлины на импорт стали выросли","expected":true,"note":"Cyrillic query must actually match"}
+{"id":"ru-nonmatch","query":"пошлины импорт","text":"Weather forecast for tomorrow looks clear","expected":false,"note":"CRITICAL: non-Latin query once disabled filtering entirely, matching everything"}
+{"id":"ru-partial-word","query":"импорт","text":"импортный товар здесь","expected":false,"note":"Cyrillic boundary: must not match inside a longer word"}
+{"id":"zh-match","query":"关税","text":"美国对中国商品加征关税","expected":true,"note":"CJK substring semantics: no word breaks to anchor to"}
+{"id":"zh-nonmatch","query":"关税","text":"今天天气很好","expected":false,"note":"CJK query must still discriminate"}
+{"id":"multi-term-half","query":"alberta separatist movement canada","text":"The Alberta separatist movement is growing in Canada","expected":true,"note":"4 terms, all present"}
+{"id":"multi-term-below-half","query":"alberta separatist movement canada","text":"Canada announced new trade rules today","expected":false,"note":"4 terms, only 1 present -> below the half threshold"}
