@@ -132,14 +132,30 @@ export interface TransmissionChain {
   overallConfidence: number;
 }
 
-/** A correlation between a narrative and external signals. */
+/**
+ * A narrative paired with external signals that occurred near it.
+ *
+ * "Correlation" here is historical naming, not a statistical claim: nothing in
+ * this file measures a base rate, so none of these numbers can say whether an
+ * overlap exceeds chance. See docs/development/causal-inference-layer.md for
+ * the planned grounding work.
+ */
 export interface NarrativeCorrelation {
   narrativeId: string;
   narrativeSummary: string;
   correlatedSignals: Array<{
     signal: ExternalSignal;
+    /** Heuristic proximity score (temporal + shared vocabulary), 0-1. */
     correlationStrength: number;
+    /** Shared-vocabulary component alone, 0-1. Surfaced because temporal
+     *  proximity on its own is near-guaranteed and carries little signal. */
+    keywordScore?: number;
     temporalOffset: string;
+    /**
+     * The deterministic path only ever emits 'coincident' — it has no basis
+     * for a directional claim. 'caused' / 'caused_by' / 'amplified' remain in
+     * the union for the agentic path and for stored historical results.
+     */
     possibleRelationship: 'caused_by' | 'caused' | 'coincident' | 'amplified';
   }>;
   transmissionChains: TransmissionChain[];
@@ -605,32 +621,38 @@ export class DownstreamEffectsService {
               )
             : 0;
 
-        // Combined correlation strength
-        const correlationStrength =
-          temporalScore * 0.4 + keywordScore * 0.3 + signal.magnitude * 0.3;
+        // Combined heuristic proximity score.
+        //
+        // `signal.magnitude` used to contribute 30% here, which meant a large
+        // earthquake scored as MORE "correlated" with an arbitrary narrative
+        // than a small one — magnitude says nothing about whether the two are
+        // related. Removed; the remaining two terms are renormalized.
+        //
+        // Despite the field name this is NOT a correlation in any statistical
+        // sense: there is no base rate, so it cannot say whether the overlap
+        // exceeds chance. It only ranks candidates for the reasoning agent.
+        // See docs/development/causal-inference-layer.md.
+        const correlationStrength = temporalScore * 0.5 + keywordScore * 0.5;
 
         // Determine temporal offset and relationship
         const offsetDays = (signalTs - narrativeMidpoint) / msPerDay;
         const temporalOffset =
           offsetDays >= 0 ? `+${Math.round(offsetDays)} days` : `${Math.round(offsetDays)} days`;
 
-        let possibleRelationship: 'caused_by' | 'caused' | 'coincident' | 'amplified';
-        if (Math.abs(offsetDays) < 1) {
-          possibleRelationship = 'coincident';
-        } else if (offsetDays > 0) {
-          possibleRelationship = 'caused'; // signal came after narrative
-        } else {
-          possibleRelationship = 'caused_by'; // signal came before narrative
-        }
-
-        // Upgrade to "amplified" if correlation is strong and temporal is close
-        if (correlationStrength > 0.6 && Math.abs(offsetDays) < 3) {
-          possibleRelationship = 'amplified';
-        }
+        // This heuristic path CANNOT establish direction. It previously
+        // labelled a signal `caused` purely because it happened afterwards —
+        // post hoc ergo propter hoc — and `amplified` on a score that was
+        // partly just signal magnitude. Both are unearned without a base rate
+        // and a pre-declared lag window, so everything here is `coincident`.
+        // Only the statistical layer described in
+        // docs/development/causal-inference-layer.md may promote a pair.
+        const possibleRelationship: 'caused_by' | 'caused' | 'coincident' | 'amplified' =
+          'coincident';
 
         return {
           signal,
           correlationStrength,
+          keywordScore,
           temporalOffset,
           possibleRelationship,
         };
@@ -638,7 +660,10 @@ export class DownstreamEffectsService {
 
       // Sort by correlation strength and keep meaningful ones
       const sorted = correlatedSignals
-        .filter((c) => c.correlationStrength > 0.1)
+        // Was `> 0.1`, which signal magnitude alone cleared. Requires real
+        // shared vocabulary now: temporal proximity by itself is not evidence
+        // when the event feed carries thousands of items per week.
+        .filter((c) => c.keywordScore > 0 && c.correlationStrength > 0.35)
         .sort((a, b) => b.correlationStrength - a.correlationStrength);
 
       return {

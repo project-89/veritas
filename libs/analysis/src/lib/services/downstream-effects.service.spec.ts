@@ -272,8 +272,66 @@ describe('DownstreamEffectsService', () => {
       ];
 
       const correlations = service.correlateSignals(narratives, signals);
-      // Signal should be filtered out (below 0.1 threshold) due to time distance
+      // Signal should be filtered out (below the proximity threshold) due to time distance
       expect(correlations[0]!.correlatedSignals.length).toBe(0);
+    });
+
+    it('never claims causal direction from temporal ordering alone', () => {
+      // Regression: a signal was labelled `caused` purely because it happened
+      // after the narrative, and `caused_by` when before. Without a base rate
+      // and a pre-declared lag window neither is earned.
+      const narratives = [makeNarrative({ id: 'n-0', summary: 'Oil supply fears' })];
+      const signals = [
+        {
+          id: 'before',
+          domain: 'economic' as const,
+          source: 'Test',
+          title: 'Oil supply shock',
+          description: 'Oil supply tightens',
+          timestamp: '2025-06-01T00:00:00Z',
+          magnitude: 0.5,
+          metadata: {},
+        },
+        {
+          id: 'after',
+          domain: 'economic' as const,
+          source: 'Test',
+          title: 'Oil supply rebound',
+          description: 'Oil supply recovers',
+          timestamp: '2025-06-07T00:00:00Z',
+          magnitude: 0.5,
+          metadata: {},
+        },
+      ];
+
+      const correlated = service.correlateSignals(narratives, signals)[0]!.correlatedSignals;
+
+      expect(correlated.length).toBeGreaterThan(0);
+      for (const c of correlated) {
+        expect(c.possibleRelationship).toBe('coincident');
+      }
+    });
+
+    it('does not let signal magnitude alone create a correlation', () => {
+      // Magnitude was 30% of the score, so a large earthquake outranked a small
+      // one for the same narrative despite neither being related to it.
+      const narratives = [makeNarrative({ id: 'n-0', summary: 'Oil supply fears' })];
+      const signals = [
+        {
+          id: 'huge-but-unrelated',
+          domain: 'social' as const,
+          source: 'Test',
+          title: 'Major earthquake',
+          description: 'Seismic event recorded',
+          timestamp: '2025-06-04T00:00:00Z',
+          magnitude: 1,
+          metadata: {},
+        },
+      ];
+
+      const correlated = service.correlateSignals(narratives, signals)[0]!.correlatedSignals;
+
+      expect(correlated).toEqual([]);
     });
   });
 
@@ -289,8 +347,13 @@ describe('DownstreamEffectsService', () => {
           id: 'sig-0',
           domain: 'economic' as const,
           source: 'Test',
-          title: 'Economic impact',
-          description: 'Economic consequences',
+          // Must share vocabulary with the narrative ("Oil supply fears").
+          // This fixture previously said "Economic impact" and correlated only
+          // because signal magnitude made up 30% of the score — exactly the
+          // behaviour Phase 0 removed. The test is about chain generation, so
+          // the pair now has to actually be related.
+          title: 'Oil supply disruption',
+          description: 'Oil supply constraints worsen',
           timestamp: '2025-06-04T00:00:00Z',
           magnitude: 0.6,
           metadata: {},
