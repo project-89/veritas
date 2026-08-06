@@ -209,3 +209,83 @@ describe('LlmGateway', () => {
     });
   });
 });
+
+describe('LlmGateway persistent cache', () => {
+  afterEach(() => LlmGateway.setInstance(null));
+
+  it('serves a durable hit without calling the model', async () => {
+    const gateway = new LlmGateway();
+    const store = {
+      get: jest.fn().mockResolvedValue('cached answer'),
+      set: jest.fn().mockResolvedValue(undefined),
+    };
+    gateway.setPersistentCache(store);
+    const generate = jest.fn();
+
+    const out = await gateway.run({ model: 'm', promptVersion: 1, prompt: 'p', generate });
+
+    expect(out).toBe('cached answer');
+    expect(generate).not.toHaveBeenCalled();
+    expect(store.set).not.toHaveBeenCalled();
+  });
+
+  it('promotes a durable hit into the in-memory cache', async () => {
+    const gateway = new LlmGateway();
+    const store = {
+      get: jest.fn().mockResolvedValue('cached answer'),
+      set: jest.fn().mockResolvedValue(undefined),
+    };
+    gateway.setPersistentCache(store);
+    const generate = jest.fn();
+
+    await gateway.run({ model: 'm', promptVersion: 1, prompt: 'p', generate });
+    await gateway.run({ model: 'm', promptVersion: 1, prompt: 'p', generate });
+
+    // Second call must not re-hit the store — it is now in memory.
+    expect(store.get).toHaveBeenCalledTimes(1);
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it('persists a freshly generated response', async () => {
+    const gateway = new LlmGateway();
+    const store = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(undefined),
+    };
+    gateway.setPersistentCache(store);
+
+    const out = await gateway.run({
+      model: 'm',
+      promptVersion: 2,
+      prompt: 'fresh',
+      generate: async () => 'generated',
+    });
+
+    expect(out).toBe('generated');
+    // Fire-and-forget write; let the microtask queue drain.
+    await Promise.resolve();
+    expect(store.set).toHaveBeenCalledWith(expect.any(String), 'generated');
+  });
+
+  it('treats a broken store as a miss rather than failing the call', async () => {
+    const gateway = new LlmGateway();
+    gateway.setPersistentCache({
+      get: jest.fn().mockRejectedValue(new Error('mongo down')),
+      set: jest.fn().mockRejectedValue(new Error('mongo down')),
+    });
+
+    await expect(
+      gateway.run({ model: 'm', promptVersion: 1, prompt: 'p', generate: async () => 'ok' }),
+    ).resolves.toBe('ok');
+  });
+
+  it('behaves exactly as before when no store is attached', async () => {
+    const gateway = new LlmGateway();
+    const generate = jest.fn().mockResolvedValue('ok');
+
+    await gateway.run({ model: 'm', promptVersion: 1, prompt: 'p', generate });
+    await gateway.run({ model: 'm', promptVersion: 1, prompt: 'p', generate });
+
+    expect(generate).toHaveBeenCalledTimes(1); // in-memory cache still works
+  });
+});

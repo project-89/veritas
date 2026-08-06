@@ -31,6 +31,7 @@ import { AlertRepository } from './repositories/alert.repository';
 import { AnalysisJobRepository } from './repositories/analysis-job.repository';
 import { ConnectorFetchCacheRepository } from './repositories/connector-fetch-cache.repository';
 import { EmbeddingCacheRepository } from './repositories/embedding-cache.repository';
+import { LlmResponseCacheRepository } from './repositories/llm-response-cache.repository';
 import { TranslationCacheRepository } from './repositories/translation-cache.repository';
 import { GlobalEventRepository } from './repositories/global-event.repository';
 import { IdentityRecordRepository } from './repositories/identity-record.repository';
@@ -224,6 +225,9 @@ export class IngestionModule {
       EmbeddingCacheRepository,
       RssCacheRepository,
       ConnectorFetchCacheRepository,
+      // Attaches itself to the DI-free LlmGateway singleton on init, giving its
+      // response cache durable backing across restarts.
+      LlmResponseCacheRepository,
     ];
 
     // Configure repository

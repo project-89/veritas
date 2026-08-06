@@ -20,4 +20,6 @@ export {
   geminiReasoningModel,
 } from './lib/services/utils/llm-config';
 export type { LlmGatewayConfig, LlmRunParams } from './lib/services/utils/llm-gateway';
+export type { LlmResponseCacheStore } from './lib/services/utils/llm-response-cache.port';
+export { LLM_RESPONSE_CACHE_STORE } from './lib/services/utils/llm-response-cache.port';
 export { LlmBudgetExceededError, LlmGateway } from './lib/services/utils/llm-gateway';

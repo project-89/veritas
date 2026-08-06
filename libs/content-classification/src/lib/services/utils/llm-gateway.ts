@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Logger } from '@nestjs/common';
+import type { LlmResponseCacheStore } from './llm-response-cache.port';
 
 /**
  * Process-wide cost/concurrency governor for ALL Gemini generateContent calls
@@ -109,6 +110,15 @@ export class LlmGateway {
     LlmGateway._instance = gateway;
   }
 
+  /**
+   * Attach (or clear) durable backing for the response cache. Called once at
+   * bootstrap by the module that owns a database connection. Without it the
+   * gateway behaves exactly as before: in-memory only.
+   */
+  setPersistentCache(store: LlmResponseCacheStore | null): void {
+    this.persistentCache = store;
+  }
+
   private readonly logger = new Logger(LlmGateway.name);
   private readonly config: LlmGatewayConfig;
 
@@ -121,6 +131,10 @@ export class LlmGateway {
 
   // Per-context token spend
   private readonly contexts = new Map<string, ContextSpend>();
+
+  // Optional durable second level behind the in-memory cache. Attached at
+  // bootstrap rather than injected: this class is deliberately DI-free.
+  private persistentCache: LlmResponseCacheStore | null = null;
 
   constructor(overrides?: Partial<LlmGatewayConfig>) {
     this.config = { ...defaultConfig(), ...overrides };
@@ -145,6 +159,24 @@ export class LlmGateway {
       return cached;
     }
 
+    // 1b. Durable cache — survives restarts, so a deploy does not re-buy
+    // answers already paid for. Checked before the budget gate and before a
+    // concurrency slot is taken, exactly like the in-memory hit above: a hit
+    // costs nothing and should not queue behind in-flight calls.
+    if (this.persistentCache) {
+      try {
+        const stored = await this.persistentCache.get(key);
+        if (stored !== null) {
+          this.logger.debug(`LLM persistent cache hit (${model}) — skipping Gemini call`);
+          this.writeCache(key, stored);
+          return stored;
+        }
+      } catch (err) {
+        // A broken cache and a miss are the same thing to the caller.
+        this.logger.debug(`Persistent LLM cache read failed: ${err}`);
+      }
+    }
+
     // 2. Budget gate (contextless calls are exempt).
     if (contextKey !== undefined) {
       this.enforceBudget(contextKey);
@@ -160,6 +192,11 @@ export class LlmGateway {
         this.recordSpend(contextKey, estimateTokens(prompt) + estimateTokens(text));
       }
       this.writeCache(key, text);
+      // Fire-and-forget: persisting is an optimization and must never fail a
+      // call that already succeeded.
+      void this.persistentCache?.set(key, text).catch((err) => {
+        this.logger.debug(`Persistent LLM cache write failed: ${err}`);
+      });
       return text;
     } finally {
       // 5. Release slot.
