@@ -14,7 +14,9 @@
     },
     "build": {
       "executor": "@nx/webpack:webpack",
-      "outputs": ["{options.outputPath}"],
+      "outputs": [
+        "{options.outputPath}"
+      ],
       "defaultConfiguration": "production",
       "options": {
         "target": "node",
@@ -22,7 +24,8 @@
         "outputPath": "dist/apps/veritas-mcp",
         "main": "apps/veritas-mcp/src/main.ts",
         "tsConfig": "apps/veritas-mcp/tsconfig.app.json",
-        "generatePackageJson": true
+        "generatePackageJson": true,
+        "webpackConfig": "apps/veritas-mcp/webpack.config.js"
       },
       "configurations": {
         "development": {},
