@@ -28,6 +28,9 @@ interface SuiteResult {
   positiveMeans: string;
   metrics: Metrics;
   failed: Array<{ id: string; expected: boolean; actual: boolean; note?: string }>;
+  /** True when the suite could not run here (e.g. no API key). */
+  skipped?: boolean;
+  skipReason?: string;
 }
 
 async function main(): Promise<void> {
@@ -35,6 +38,17 @@ async function main(): Promise<void> {
   const results: SuiteResult[] = [];
 
   for (const suite of SUITES) {
+    if (suite.available && !suite.available()) {
+      results.push({
+        name: suite.name,
+        positiveMeans: suite.positiveMeans,
+        metrics: computeMetrics([]),
+        failed: [],
+        skipped: true,
+        skipReason: suite.unavailableReason ?? 'unavailable in this environment',
+      });
+      continue;
+    }
     const predictions = await suite.run();
     results.push({
       name: suite.name,
@@ -57,7 +71,9 @@ async function main(): Promise<void> {
 
   if (args.has('--update-baseline')) {
     const baseline = Object.fromEntries(
-      results.map((r) => [r.name, { f1: r.metrics.f1, accuracy: r.metrics.accuracy }]),
+      results
+        .filter((r) => !r.skipped)
+        .map((r) => [r.name, { f1: r.metrics.f1, accuracy: r.metrics.accuracy }]),
     );
     writeFileSync(BASELINE_PATH, `${JSON.stringify(baseline, null, 2)}\n`);
     console.log(`\nBaseline written to ${BASELINE_PATH}`);
@@ -76,6 +92,10 @@ function report(results: SuiteResult[]): void {
   console.log('-'.repeat(head.length));
 
   for (const r of results) {
+    if (r.skipped) {
+      console.log(`${r.name.padEnd(24)}${'SKIPPED'.padStart(6)}   ${r.skipReason}`);
+      continue;
+    }
     const m = r.metrics;
     console.log(
       r.name.padEnd(24) +
@@ -94,6 +114,13 @@ function report(results: SuiteResult[]): void {
       console.log(`    ✗ ${f.id}: expected ${f.expected}, got ${f.actual}`);
       if (f.note) console.log(`        ${f.note}`);
     }
+  }
+
+  const skipped = results.filter((r) => r.skipped);
+  if (skipped.length > 0) {
+    console.log(
+      `\n${skipped.length} suite(s) skipped — those capabilities are NOT verified by this run.`,
+    );
   }
 
   const totalFailed = results.reduce((n, r) => n + r.failed.length, 0);
@@ -117,6 +144,7 @@ function checkAgainstBaseline(results: SuiteResult[]): boolean {
   let ok = true;
   const TOLERANCE = 1e-9;
   for (const r of results) {
+    if (r.skipped) continue;
     const prior = baseline[r.name];
     if (!prior) {
       console.log(`  (new suite "${r.name}" — not in baseline)`);

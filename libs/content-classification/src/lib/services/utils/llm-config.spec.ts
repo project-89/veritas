@@ -1,4 +1,4 @@
-import { extractFirstJsonObject } from './llm-config';
+import { extractFirstJsonObject, parseLlmJsonObject } from './llm-config';
 
 describe('extractFirstJsonObject', () => {
   it('extracts a clean JSON object', () => {
@@ -34,5 +34,47 @@ describe('extractFirstJsonObject', () => {
   it('returns null when there is no object', () => {
     expect(extractFirstJsonObject('no json here')).toBeNull();
     expect(extractFirstJsonObject('{"unterminated": true')).toBeNull();
+  });
+});
+
+describe('parseLlmJsonObject', () => {
+  it('parses a well-formed object', () => {
+    expect(parseLlmJsonObject('{"a": 1}')).toEqual({ a: 1 });
+  });
+
+  it('repairs a missing closing brace', () => {
+    // Real gemini-3.5-flash response shape, finishReason STOP:
+    // the outer object was never closed.
+    const raw = '{\n "stances": [\n  {"stance":"favor","confidence":0.9},\n  {"stance":"against","confidence":0.99}\n ]';
+    expect(parseLlmJsonObject(raw)).toEqual({
+      stances: [
+        { stance: 'favor', confidence: 0.9 },
+        { stance: 'against', confidence: 0.99 },
+      ],
+    });
+  });
+
+  it('ignores an extra trailing brace', () => {
+    expect(parseLlmJsonObject('{"a": 1}}')).toEqual({ a: 1 });
+  });
+
+  it('ignores reasoning text appended after the object', () => {
+    expect(parseLlmJsonObject('{"a": 1}\nThe reasoning here is...')).toEqual({ a: 1 });
+  });
+
+  it('is not fooled by braces inside strings', () => {
+    expect(parseLlmJsonObject('{"a": "}{ not structural"}')).toEqual({ a: '}{ not structural' });
+  });
+
+  it('repairs a truncated nested structure', () => {
+    expect(parseLlmJsonObject('{"a": {"b": [1, 2')).toEqual({ a: { b: [1, 2] } });
+  });
+
+  it('returns null when there is no object at all', () => {
+    expect(parseLlmJsonObject('no json here')).toBeNull();
+  });
+
+  it('returns null rather than guessing on unsalvageable input', () => {
+    expect(parseLlmJsonObject('{"a": ')).toBeNull();
   });
 });

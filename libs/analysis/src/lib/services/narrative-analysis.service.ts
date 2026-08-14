@@ -109,6 +109,20 @@ export interface AnalyzeResult {
    */
   embeddingSource: 'gemini' | 'hash-fallback' | 'mixed';
   summarySource: 'llm' | 'first-post' | 'mixed';
+  /**
+   * Whether stance-aware clustering actually ran.
+   *   'llm'         — classified; opposing narratives were kept apart
+   *   'skipped'     — no target supplied, or no classifier configured
+   *   'unavailable' — a target WAS supplied and classification failed
+   *
+   * 'unavailable' matters: a transient API failure makes every post `unclear`,
+   * which silently reverts clustering to similarity-only. Without this flag
+   * that degradation is invisible — the results look normal, just with
+   * opposing narratives merged back together.
+   */
+  stanceSource: 'llm' | 'skipped' | 'unavailable';
+  /** Posts that received a confident stance, when stanceSource is 'llm'. */
+  stanceCoverage?: { classified: number; total: number };
 }
 
 /**
@@ -220,7 +234,13 @@ export class NarrativeAnalysisService {
     },
   ): Promise<AnalyzeResult> {
     if (posts.length === 0) {
-      return { narratives: [], unclustered: [], embeddingSource: 'gemini', summarySource: 'llm' };
+      return {
+        narratives: [],
+        unclustered: [],
+        embeddingSource: 'gemini',
+        summarySource: 'llm',
+        stanceSource: 'skipped',
+      };
     }
 
     this.logger.log(`Analyzing ${posts.length} posts...`);
@@ -243,15 +263,30 @@ export class NarrativeAnalysisService {
       stance: 'unclear' as const,
       confidence: 0,
     }));
+    let stanceSource: AnalyzeResult['stanceSource'] = 'skipped';
+    let stanceCoverage: AnalyzeResult['stanceCoverage'];
     if (stanceTarget && this.stanceService?.available) {
       stances = await this.stanceService.classify(
         posts.map((p) => p.text),
         stanceTarget,
       );
       const decided = stances.filter((st) => st.stance !== 'unclear').length;
-      this.logger.log(
-        `Stance vs "${stanceTarget}": ${decided}/${posts.length} posts took a position`,
-      );
+      // Every post coming back `unclear` on a non-trivial batch means the
+      // classifier failed, not that nobody took a position. Treat it as
+      // unavailable so the degradation is visible rather than silent.
+      stanceSource = decided === 0 && posts.length >= 3 ? 'unavailable' : 'llm';
+      stanceCoverage = { classified: decided, total: posts.length };
+      if (stanceSource === 'unavailable') {
+        this.logger.warn(
+          `Stance classification returned no positions for ${posts.length} posts on ` +
+            `"${stanceTarget}" — treating as unavailable; clustering falls back to ` +
+            'similarity-only and opposing narratives may merge.',
+        );
+      } else {
+        this.logger.log(
+          `Stance vs "${stanceTarget}": ${decided}/${posts.length} posts took a position`,
+        );
+      }
     }
 
     // Step 2: Build EmbeddedPost array
@@ -349,6 +384,8 @@ export class NarrativeAnalysisService {
       unclustered,
       embeddingSource,
       summarySource,
+      stanceSource,
+      ...(stanceCoverage ? { stanceCoverage } : {}),
       ...(saturation ? { saturation } : {}),
     };
   }

@@ -58,8 +58,10 @@ no API keys — so `--check` can gate CI.
 
 | Capability | Status |
 |---|---|
-| Query relevance (`matchesQuery`) | ✅ 18 cases |
-| Language abstention (topic/entity extraction) | ✅ 9 cases |
+| Query relevance (`matchesQuery`) | ✅ 18 cases, offline |
+| Language abstention (topic/entity extraction) | ✅ 9 cases, offline |
+| Stance classification | ✅ 22 cases, **needs `GEMINI_API_KEY`** — skipped without one |
+| Stance opposition (the split decision) | ✅ 46 pairs, **needs `GEMINI_API_KEY`** — skipped without one |
 | Bot detection | ❌ not covered |
 | Propaganda detection | ❌ not covered |
 | Claim verification | ❌ not covered |
@@ -87,7 +89,29 @@ The suite now overrides the service's own `detectLanguage` method, which is a
 seam we control. Prefer seams you own over patching third-party modules, and
 verify a stub actually took effect before trusting a green result.
 
+## LLM-backed suites
+
+The stance suites call Gemini and are SKIPPED without an API key — reported as
+`SKIPPED`, never silently passed, so a green CI run without a key does not
+imply they were verified. `--check` compares only suites that actually ran.
+
+They are stable in practice (temperature 0, verified identical across three
+consecutive fresh-process runs) but they cost tokens and need network, so they
+cannot gate CI the way the offline suites do.
+
 ## Findings so far
+
+- **Malformed LLM JSON silently voiding whole batches** — gemini-3.x JSON mode
+  intermittently emits a truncated object (missing the outer `}`) or an extra
+  trailing `}`, *with `finishReason: STOP`*, so nothing signals an error.
+  `extractFirstJsonObject` requires balance, found none, and returned null —
+  which the stance service could not distinguish from "the model found
+  nothing". Every post in the batch became `unclear`, silently reverting
+  clustering to similarity-only. This is why stance scored 100% on one run and
+  68% on the next. Fixed with `parseLlmJsonObject` (repairs both shapes) plus a
+  `stanceSource: 'unavailable'` flag so the degradation is visible.
+  **The intermittency is the lesson: a single green run proves nothing about a
+  non-deterministic dependency.**
 
 - **`ru-forced-en`** — non-Latin script was only checked *after* the detector
   returned a non-English verdict. Since `detectLanguage()` returns `'en'` for

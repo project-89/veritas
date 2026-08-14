@@ -43,6 +43,7 @@ describe('NarrativeAnalysisController', () => {
     unclustered: [3],
     embeddingSource: 'gemini',
     summarySource: 'llm',
+  stanceSource: 'skipped',
   };
 
   beforeEach(async () => {

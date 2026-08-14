@@ -3,9 +3,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   DETERMINISTIC_JSON_CONFIG,
-  extractFirstJsonObject,
   geminiChatModel,
   LlmGateway,
+  parseLlmJsonObject,
 } from '@veritas/content-classification/llm';
 
 export const STANCE_PROMPT_VERSION = 1;
@@ -98,9 +98,17 @@ export class StanceService {
           contextKey: 'stance-detection',
           generate: () => model.generateContent(prompt).then((r) => r.response.text()),
         });
-        const json = extractFirstJsonObject(raw);
-        const parsed = json ? (JSON.parse(json) as { stances?: unknown[] }) : {};
+        // Lenient parse: gemini-3.x JSON mode intermittently emits a
+        // truncated or over-braced object even at finishReason STOP, which
+        // would otherwise silently void the whole batch to `unclear`.
+        const parsed = (parseLlmJsonObject(raw) ?? {}) as { stances?: unknown[] };
         const list = Array.isArray(parsed.stances) ? parsed.stances : [];
+        if (list.length === 0) {
+          this.logger.warn(
+            `Stance response for "${target}" contained no parseable stances ` +
+              `(${batch.length} posts affected)`,
+          );
+        }
         list.forEach((entry, i) => {
           const idx = start + i;
           if (idx >= results.length) return;

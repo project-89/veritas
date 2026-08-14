@@ -16,6 +16,7 @@ export { TRANSLATION_PROMPT_VERSION, TranslationService } from './lib/services/t
 export {
   DETERMINISTIC_JSON_CONFIG,
   extractFirstJsonObject,
+  parseLlmJsonObject,
   geminiChatModel,
   geminiReasoningModel,
 } from './lib/services/utils/llm-config';

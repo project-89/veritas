@@ -1,0 +1,22 @@
+{"id":"gc-favor-plain","target":"gun control","text":"We need universal background checks on every firearm sale. It is long overdue.","expected":"favor","note":"plain pro-target"}
+{"id":"gc-against-plain","target":"gun control","text":"Disarming law-abiding citizens does nothing to stop criminals. Leave the Second Amendment alone.","expected":"against","note":"plain anti-target"}
+{"id":"gc-favor-angry","target":"gun control","text":"Absolutely furious that Congress STILL hasn't passed background checks. How many more?!","expected":"favor","note":"TRAP: strongly negative tone, pro-target position — sentiment would misread this"}
+{"id":"gc-against-calm","target":"gun control","text":"The research on assault weapon bans is mixed at best; the 1994 ban showed little measurable effect.","expected":"against","note":"TRAP: calm, measured tone, anti-target position"}
+{"id":"gc-against-negsubject","target":"gun control","text":"This ruling is a disaster for gun-control advocates and a win for the rest of us.","expected":"against","note":"TRAP: negative sentiment about the target's supporters = anti-target stance"}
+{"id":"gc-neutral-report","target":"gun control","text":"The Senate is scheduled to vote on the background-check bill Thursday afternoon.","expected":"neutral","note":"reporting without a position"}
+{"id":"gc-unclear-offtopic","target":"gun control","text":"Anyone know a good place for brunch downtown this weekend?","expected":"unclear","note":"does not address the target at all"}
+{"id":"gc-quoting-opposition","target":"gun control","text":"They keep saying 'nobody is coming for your guns' and then propose exactly that. Don't buy it.","expected":"against","note":"quotes the opposing side to reject it — must not be read as favor"}
+{"id":"vax-favor","target":"vaccine mandates","text":"Mandates work. Hospitals with them saw far fewer outbreaks among staff.","expected":"favor","note":"plain pro-target"}
+{"id":"vax-against","target":"vaccine mandates","text":"Forcing people to take a medical product to keep their job is coercion, full stop.","expected":"against","note":"plain anti-target"}
+{"id":"vax-neutral","target":"vaccine mandates","text":"The policy takes effect on 1 March and applies to all federal contractors.","expected":"neutral","note":"factual reporting"}
+{"id":"vax-favor-negtone","target":"vaccine mandates","text":"Sick of employers dragging their feet on this. Just require it already.","expected":"favor","note":"TRAP: irritated tone, pro-target position"}
+{"id":"nato-favor","target":"NATO expansion","text":"Finland and Sweden joining makes the alliance stronger and the region safer.","expected":"favor","note":"plain pro-target"}
+{"id":"nato-against","target":"NATO expansion","text":"Pushing the alliance eastward was always going to provoke a response. It was reckless.","expected":"against","note":"plain anti-target"}
+{"id":"nato-unclear","target":"NATO expansion","text":"Watched a great documentary about Cold War submarines last night.","expected":"unclear","note":"adjacent topic, no position on the target"}
+{"id":"tariff-favor","target":"steel tariffs","text":"Protecting domestic mills is worth it. These jobs don't come back once they're gone.","expected":"favor","note":"plain pro-target"}
+{"id":"tariff-against","target":"steel tariffs","text":"Every downstream manufacturer just got more expensive. Consumers eat this cost.","expected":"against","note":"plain anti-target"}
+{"id":"tariff-neutral","target":"steel tariffs","text":"The rate rises from 10% to 25% effective next quarter, per the announcement.","expected":"neutral","note":"factual reporting"}
+{"id":"tariff-sarcasm","target":"steel tariffs","text":"Oh brilliant, another tax on everything we build. Genius economics as always.","expected":"against","note":"sarcasm — surface words read positive, position is anti-target"}
+{"id":"ai-favor","target":"AI regulation","text":"Some guardrails before these systems are everywhere seems like basic prudence.","expected":"favor","note":"plain pro-target"}
+{"id":"ai-against","target":"AI regulation","text":"Regulating this now just locks in the incumbents and kills every small lab.","expected":"against","note":"plain anti-target"}
+{"id":"ai-unclear-mention","target":"AI regulation","text":"Is AI conscious? Nobody agrees on the answer.","expected":"unclear","note":"mentions AI but takes no position on regulation — target-relative, not topic-relative"}
