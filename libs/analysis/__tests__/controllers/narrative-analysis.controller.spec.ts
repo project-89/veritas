@@ -225,7 +225,7 @@ describe('NarrativeAnalysisController', () => {
 
       const result = await controller.analyze({ posts });
 
-      expect(service.analyze).toHaveBeenCalledWith(posts);
+      expect(service.analyze).toHaveBeenCalledWith(posts, { stanceTarget: undefined });
       expect(result).toEqual(mockAnalyzeResult);
     });
 
@@ -237,7 +237,7 @@ describe('NarrativeAnalysisController', () => {
 
       const result = await controller.analyze({ posts: [] });
 
-      expect(service.analyze).toHaveBeenCalledWith([]);
+      expect(service.analyze).toHaveBeenCalledWith([], { stanceTarget: undefined });
       expect(result.narratives).toEqual([]);
       expect(result.unclustered).toEqual([]);
     });
@@ -250,7 +250,7 @@ describe('NarrativeAnalysisController', () => {
 
       await controller.analyze({ posts: undefined as any });
 
-      expect(service.analyze).toHaveBeenCalledWith([]);
+      expect(service.analyze).toHaveBeenCalledWith([], { stanceTarget: undefined });
     });
 
     it('should return narratives with all required fields', async () => {

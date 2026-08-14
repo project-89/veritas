@@ -38,6 +38,7 @@ import { TranslationService } from '@veritas/content-classification/llm';
 import { PropagandaAnalysisService } from './services/propaganda.service';
 import { ReportService } from './services/report.service';
 import { SaturationMetricsService } from './services/saturation-metrics.service';
+import { StanceService } from './services/stance.service';
 import { SocialGraphIntelligenceService } from './services/social-graph-intelligence.service';
 import { SourceCredibilityService } from './services/source-credibility.service';
 
@@ -80,6 +81,7 @@ import { SourceCredibilityService } from './services/source-credibility.service'
     IntelligenceEngineService,
     FailureExampleService,
     TranslationService,
+    StanceService,
     AisStreamService,
     {
       provide: ANALYSIS_SERVICE,

@@ -449,4 +449,65 @@ describe('NarrativeAnalysisService', () => {
       expect(batchEmbedContents).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('stance-aware clustering', () => {
+    type Post = { stance: { stance: string; confidence: number } };
+    const adjust = (a: Post, b: Post, cosine: number): number =>
+      (
+        service as unknown as {
+          adjustNarrativeSimilarity(a: unknown, b: unknown, c: number): number;
+        }
+      ).adjustNarrativeSimilarity(
+        { claimFacets: [], sentimentScore: 0, ...a },
+        { claimFacets: [], sentimentScore: 0, ...b },
+        cosine,
+      );
+
+    it('hard-splits confidently opposed posts even at near-identical similarity', () => {
+      // The motivating case: "we must ban assault weapons" vs "banning assault
+      // weapons is tyranny" share topic, entities and most vocabulary, so the
+      // embedding puts them very close. They are opposite narratives.
+      const merged = adjust(
+        { stance: { stance: 'favor', confidence: 0.9 } },
+        { stance: { stance: 'against', confidence: 0.9 } },
+        0.95,
+      );
+
+      expect(merged).toBe(0);
+    });
+
+    it('leaves agreeing posts untouched', () => {
+      const same = adjust(
+        { stance: { stance: 'favor', confidence: 0.9 } },
+        { stance: { stance: 'favor', confidence: 0.9 } },
+        0.9,
+      );
+
+      expect(same).toBeCloseTo(0.9, 10);
+    });
+
+    it('does not split on low-confidence opposition', () => {
+      // A false split fragments a real narrative — worse than the merge it
+      // would prevent — so uncertainty must never split.
+      const out = adjust(
+        { stance: { stance: 'favor', confidence: 0.3 } },
+        { stance: { stance: 'against', confidence: 0.9 } },
+        0.9,
+      );
+
+      expect(out).toBeGreaterThan(0);
+    });
+
+    it('does not split when stance is unavailable', () => {
+      // No API key means every post is `unclear` at confidence 0. Clustering
+      // must degrade to similarity-only, not fragment everything.
+      const out = adjust(
+        { stance: { stance: 'unclear', confidence: 0 } },
+        { stance: { stance: 'unclear', confidence: 0 } },
+        0.9,
+      );
+
+      expect(out).toBeCloseTo(0.9, 10);
+    });
+  });
 });

@@ -10,6 +10,7 @@ import {
 import { cosineSimilarity } from '../utils/math';
 import type { SaturationReport } from './saturation-metrics.service';
 import { SaturationMetricsService } from './saturation-metrics.service';
+import { type StanceResult, StanceService, stancesOppose } from './stance.service';
 
 /** Injection token for the EmbeddingCacheRepository (optional — provided by app module) */
 export const EMBEDDING_CACHE_STORE = Symbol('EMBEDDING_CACHE_STORE');
@@ -49,6 +50,11 @@ interface EmbeddedPost {
   engagement: number;
   embedding: number[];
   claimFacets: string[];
+  /**
+   * Position toward the analysis target. `unclear` at confidence 0 means the
+   * classifier was unavailable or undecided — never treat that as agreement.
+   */
+  stance: StanceResult;
 }
 
 /**
@@ -135,6 +141,7 @@ export class NarrativeAnalysisService {
     @Optional()
     @Inject(EMBEDDING_CACHE_STORE)
     private readonly embeddingCache?: EmbeddingCacheStore,
+    @Optional() private readonly stanceService?: StanceService,
   ) {
     this.embeddingModel =
       this.configService.get<string>('GEMINI_EMBEDDING_MODEL') ||
@@ -202,6 +209,15 @@ export class NarrativeAnalysisService {
       sentiment?: { score: number; label: string };
       engagement?: { likes: number; comments: number; shares: number };
     }>,
+    options?: {
+      /**
+       * What posts take a position on — normally the scan query. Enables
+       * stance-aware clustering, which stops "ban X" and "banning X is
+       * tyranny" collapsing into one narrative. Omitted means stance is
+       * skipped entirely and clustering is similarity-only.
+       */
+      stanceTarget?: string;
+    },
   ): Promise<AnalyzeResult> {
     if (posts.length === 0) {
       return { narratives: [], unclustered: [], embeddingSource: 'gemini', summarySource: 'llm' };
@@ -218,6 +234,26 @@ export class NarrativeAnalysisService {
     // Step 1: Generate embeddings
     const embeddings = await this.batchEmbed(posts.map((p) => p.text));
 
+    // Step 2a: Stance toward the analysis target, before clustering — it is a
+    // clustering INPUT, not a post-hoc annotation. Skipped when no target was
+    // supplied or the classifier is unavailable; every post then carries
+    // `unclear`, which never splits anything.
+    const stanceTarget = options?.stanceTarget?.trim() ?? '';
+    let stances: StanceResult[] = posts.map(() => ({
+      stance: 'unclear' as const,
+      confidence: 0,
+    }));
+    if (stanceTarget && this.stanceService?.available) {
+      stances = await this.stanceService.classify(
+        posts.map((p) => p.text),
+        stanceTarget,
+      );
+      const decided = stances.filter((st) => st.stance !== 'unclear').length;
+      this.logger.log(
+        `Stance vs "${stanceTarget}": ${decided}/${posts.length} posts took a position`,
+      );
+    }
+
     // Step 2: Build EmbeddedPost array
     const embedded: EmbeddedPost[] = posts.map((p, i) => ({
       index: i,
@@ -232,6 +268,7 @@ export class NarrativeAnalysisService {
         (p.engagement?.likes ?? 0) + (p.engagement?.comments ?? 0) + (p.engagement?.shares ?? 0),
       embedding: embeddings[i] ?? [],
       claimFacets: this.extractClaimFacets(p.text),
+      stance: stances[i] ?? { stance: 'unclear', confidence: 0 },
     }));
 
     // Step 3: Cluster
@@ -763,6 +800,23 @@ export class NarrativeAnalysisService {
   }
 
   private adjustNarrativeSimilarity(a: EmbeddedPost, b: EmbeddedPost, cosine: number): number {
+    // Confidently opposed stance toward the same target is a HARD split, not a
+    // discount. This is the case embedding similarity cannot see: "we must ban
+    // assault weapons" and "banning assault weapons is tyranny" share topic,
+    // entities and most vocabulary, so cosine puts them close together — but
+    // they are opposite narratives and merging them destroys the signal.
+    //
+    // A multiplier would not do. At cosine 0.95 even a 0.68 penalty leaves
+    // 0.65, and with a low enough threshold they still merge. For a signal
+    // this strong and this well-defined, a boolean is the right instrument.
+    //
+    // Deliberately strict (see stancesOppose): only favor-vs-against, only
+    // above the confidence floor, and `unclear` never splits. A false split
+    // fragments a real narrative, which is worse than the merge it prevents.
+    if (stancesOppose(a.stance, b.stance)) {
+      return 0;
+    }
+
     let adjusted = cosine;
 
     const aFacets = new Set(a.claimFacets);
@@ -791,6 +845,15 @@ export class NarrativeAnalysisService {
     return Math.max(0, Math.min(1, adjusted));
   }
 
+  /**
+   * Crypto-specific opposition heuristic, retained as a FALLBACK for when
+   * stance detection is unavailable (no API key) or undecided.
+   *
+   * It generalises to nothing — a political, health or conflict narrative
+   * matches none of these patterns, so the opposition rule below never fires
+   * for them. It also keys on sentiment, which is tone rather than position.
+   * Stance is the general mechanism; this is a domain patch that predates it.
+   */
   private extractClaimFacets(text: string): string[] {
     const lower = text.toLowerCase();
     const facets = new Set<string>();

@@ -1,6 +1,6 @@
 # Analysis Quality Plan
 
-**Status:** Phase A shipped (2026-08-14); Phases B–F not started
+**Status:** Phases A and B shipped (2026-08-14); Phases C–F not started
 **Scope:** every interpretive layer — bot/coordination detection, narrative grouping, credibility, causal suggestion
 **Related:** [`causal-inference-layer.md`](./causal-inference-layer.md) · [`../../scripts/eval/README.md`](../../scripts/eval/README.md) · [`../REMEDIATION-PLAN.md`](../REMEDIATION-PLAN.md)
 
@@ -164,7 +164,7 @@ Ordered so each phase is independently shippable and earlier phases de-risk late
 **Phase A — Stop over-claiming (small). ✅ SHIPPED.**
 Rename `botProbability` to an honest anomaly score, or split into coordination/automation with the existing signals. Surface `analysisMode`-style provenance on bot, credibility and deviation outputs, matching propaganda and claims. No new detection, just honest labelling. *Removes the credibility liability immediately.*
 
-**Phase B — Stance axis.**
+**Phase B — Stance axis. ✅ SHIPPED.**
 Target extraction, stance classification, stance-aware clustering, retire crypto facets. Add the stance and clustering-pair corpora. Highest user-visible quality gain in the plan.
 
 **Phase C — Parameter control.**
@@ -193,7 +193,7 @@ Public labelled dataset, fit, validate, report calibrated probabilities with int
 ## 8. Open decisions
 
 1. **Do we keep a single headline bot number?** Splitting into coordination + automation is more honest but harder to render. Recommendation: split, and let the UI show the stronger of the two with the other one click away.
-2. **Stance classifier: zero-shot NLI or LLM call?** LLM is more accurate and costs per post; NLI is free and weaker. Recommendation: LLM with the persistent cache (now durable), falling back to NLI when unavailable.
-3. **Hard stance split, or steep penalty?** The user's boolean instinct favours hard. Recommendation: hard split on *confident* opposing stance, `unclear` never splitting.
+2. ~~**Stance classifier: zero-shot NLI or LLM call?**~~ **RESOLVED (Phase B): LLM**, batched 20/call, through the now-durable response cache. No NLI fallback yet — unavailable means `unclear`, which never splits.
+3. ~~**Hard stance split, or steep penalty?**~~ **RESOLVED (Phase B): hard split.** A multiplier is insufficient — at cosine 0.95 even a 0.68 penalty leaves 0.65, which still merges under a low enough threshold. Gated on confidence >= 0.6; `unclear` and `neutral` never split.
 4. **Which public bot dataset?** Determines what "calibrated" means and how much it transfers to our platforms.
 5. **Do tuned parameters persist per investigation, or reset to harness-optimal defaults?** Persisting aids reproducibility; resetting resists motivated tuning.

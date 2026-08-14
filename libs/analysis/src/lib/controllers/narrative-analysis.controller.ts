@@ -316,9 +316,15 @@ export class NarrativeAnalysisController {
    * Returns semantically grouped narratives with LLM-generated summaries.
    */
   @Post('analyze')
-  async analyze(@Body() body: { posts: AnalyzeRequestPost[] }): Promise<AnalyzeResult> {
+  async analyze(
+    @Body() body: { posts: AnalyzeRequestPost[]; stanceTarget?: string },
+  ): Promise<AnalyzeResult> {
     this.logger.log(`Analyzing ${body.posts?.length ?? 0} posts`);
-    return this.narrativeAnalysis.analyze(body.posts ?? []);
+    // The scan query is the natural stance target: it is what the posts were
+    // gathered around, so it is what they take a position on. Omitted means
+    // similarity-only clustering, exactly as before.
+    const stanceTarget = typeof body.stanceTarget === 'string' ? body.stanceTarget : undefined;
+    return this.narrativeAnalysis.analyze(body.posts ?? [], { stanceTarget });
   }
 
   /**
