@@ -51,8 +51,12 @@ so; several here are verbatim posts from the contaminated 2026-07-10 scan.
 ## Adding a suite
 
 Export a `Suite` from `suites.ts` with a `run()` returning `Prediction[]`, and
-add it to `SUITES`. Suites must be **offline and deterministic** — no network,
-no API keys — so `--check` can gate CI.
+add it to `SUITES`.
+
+Prefer **offline and deterministic** suites — no network, no API keys — because
+only those can gate CI unconditionally. A suite that needs a key must declare
+`available()` and `unavailableReason` so it reports SKIPPED rather than
+silently passing (see *LLM-backed suites* below).
 
 ## Coverage, and what is deliberately missing
 
@@ -67,15 +71,16 @@ no API keys — so `--check` can gate CI.
 | Claim verification | ❌ not covered |
 | Causal inference | ❌ blocked — layer not built (see `docs/development/causal-inference-layer.md` §7) |
 
-The covered two are deterministic and offline, which is why they exist first:
-they gate CI at zero cost and they are where the known bugs were.
+The first two are deterministic and offline, which is why they exist first:
+they gate CI at zero cost, and they are where the known bugs were. The stance
+suites need a key and are skipped without one.
 
-The uncovered three are LLM-dependent and therefore non-deterministic and
-expensive to evaluate. They need a different design — fixed seeds or recorded
-fixtures, plus a tolerance band rather than exact match — and bot detection in
-particular should be validated against a public bot dataset rather than
-hand-labelled cases. **Do not read a green run as "analysis quality is
-verified."** It means the two measured capabilities did not regress.
+The three uncovered capabilities are all LLM-dependent. Bot detection in
+particular should be validated against a public labelled dataset rather than
+hand-written cases, since calibration is the goal there (see the analysis
+quality plan, Phase F). **Do not read a green run as "analysis quality is
+verified."** It means the capabilities that actually ran did not regress —
+check the SKIPPED lines before concluding anything else.
 
 ## A caution, learned here
 
