@@ -275,4 +275,35 @@ describe('RSSConnector', () => {
       );
     });
   });
+
+  describe('searchWithRawData', () => {
+    it('returns posts alongside insights so the scan can store them', async () => {
+      // Regression: without this method ScanProcessor falls back to
+      // searchAndTransform and hardcodes `posts: []`, silently discarding
+      // every RSS item from the scan while reporting status "done".
+      const posts = [{ id: 'p1', text: 'nuclear power output cut', platform: 'rss' }];
+      (transformService.transformBatch as jest.Mock).mockResolvedValueOnce([
+        { id: 'insight-1', contentHash: 'h1' },
+      ]);
+      jest
+        .spyOn(connector as unknown as { searchContent: () => Promise<unknown> }, 'searchContent')
+        .mockResolvedValue(posts as never);
+
+      const result = await connector.searchWithRawData('nuclear power');
+
+      expect(result.posts).toHaveLength(1);
+      expect(result.insights).toHaveLength(1);
+    });
+
+    it('short-circuits without transforming when nothing matched', async () => {
+      jest
+        .spyOn(connector as unknown as { searchContent: () => Promise<unknown> }, 'searchContent')
+        .mockResolvedValue([] as never);
+
+      const result = await connector.searchWithRawData('nothing matches this');
+
+      expect(result).toEqual({ posts: [], insights: [] });
+      expect(transformService.transformBatch).not.toHaveBeenCalled();
+    });
+  });
 });

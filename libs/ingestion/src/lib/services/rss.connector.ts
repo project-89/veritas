@@ -255,6 +255,36 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
    * Enhanced searchAndTransform method that returns anonymized insights
    * Implements TransformOnIngestConnector interface
    */
+  /**
+   * Search and return BOTH the posts and their insights.
+   *
+   * Without this method `ScanProcessor` takes its `searchAndTransform`
+   * fallback branch, which hardcodes `posts: []` — and since only `posts` are
+   * serialized into scan_posts, every RSS item was silently discarded from
+   * every scan. The connector logged "Transformed 19 RSS items into
+   * anonymized insights" and the scan recorded 0, reported as `status: done`,
+   * which is indistinguishable from "no matches found".
+   *
+   * That silently dropped the most curated source in the system: 160
+   * provenance-tagged feeds, and the only path that exercises the
+   * translation layer.
+   *
+   * The same gap affects wikipedia-events, web-scraper and facebook-jina.
+   * twitter-free is unaffected because it extends BaseSocialMediaConnector,
+   * which supplies this method — which is the concrete cost of the
+   * "all connectors should share one base" item on the remediation plan.
+   */
+  async searchWithRawData(
+    query: string,
+    options?: SearchOptions,
+  ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> {
+    const posts = await this.searchContent(query, options);
+    if (posts.length === 0) return { posts: [], insights: [] };
+    const insights = await this.transformService.transformBatch(posts);
+    this.logger.log(`RSS: ${posts.length} posts, ${insights.length} insights`);
+    return { posts, insights };
+  }
+
   async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     try {
       this.logger.log(`Searching RSS feeds for: ${query}`);
