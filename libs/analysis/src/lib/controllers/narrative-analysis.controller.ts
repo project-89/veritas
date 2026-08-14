@@ -70,14 +70,22 @@ function coerceBotScores(value: unknown): BotScore[] {
   return value
     .filter((score): score is Record<string, unknown> => score != null && typeof score === 'object')
     .map((score) => {
-      // Preserve null botProbability (insufficient data) — do not coerce to 0.
+      // Preserve nulls (insufficient data / no graph evidence) — never coerce
+      // to 0, which would read as "assessed and clean".
       const rawProb = score['botProbability'];
       const botProbability = typeof rawProb === 'number' ? rawProb : null;
+      const rawAutomation = score['automationScore'];
+      const rawCoordination = score['coordinationScore'];
       const sufficiency = score['dataSufficiency'];
       return {
         handle: asString(score['handle']),
         platform: asString(score['platform']),
         botProbability,
+        // Fall back to the legacy blended value for documents stored before
+        // the automation/coordination split.
+        automationScore: typeof rawAutomation === 'number' ? rawAutomation : botProbability,
+        coordinationScore: typeof rawCoordination === 'number' ? rawCoordination : null,
+        scoreType: 'anomaly-score' as const,
         structuralScore: asNumber(score['structuralScore']),
         temporalScore: asNumber(score['temporalScore']),
         behavioralScore: asNumber(score['behavioralScore']),
@@ -130,6 +138,17 @@ function coerceBotDetectionResult(value: unknown): BotDetectionResult {
     structuralPatterns: coerceStructuralPatterns(source['structuralPatterns']),
     graphEnhanced: typeof source['graphEnhanced'] === 'boolean' ? source['graphEnhanced'] : false,
     summary: asString(source['summary']),
+    // Legacy documents predate the flag; 'heuristic' is the safe assumption
+    // since it is the weaker claim.
+    analysisMode:
+      source['analysisMode'] === 'graph' ||
+      source['analysisMode'] === 'heuristic' ||
+      source['analysisMode'] === 'abstained'
+        ? source['analysisMode']
+        : 'heuristic',
+    ...(typeof source['analysisModeReason'] === 'string'
+      ? { analysisModeReason: source['analysisModeReason'] }
+      : {}),
   };
 }
 

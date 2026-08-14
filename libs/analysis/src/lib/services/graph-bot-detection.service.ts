@@ -10,11 +10,40 @@ export interface BotScore {
   handle: string;
   platform: string;
   /**
-   * Combined bot probability 0-1 (higher = more likely bot), or `null` when
-   * there was too little data to assess. NULL IS NOT ZERO: a user with a
-   * handful of posts and no graph signal is "unknown", not "clean human".
+   * @deprecated Misleading name kept for API and stored-data compatibility.
+   * Read {@link automationScore} instead, and {@link scoreType} for what it
+   * actually is. Identical value to `automationScore`.
    */
   botProbability: number | null;
+  /**
+   * Account-level ANOMALY SCORE, 0-1, or null when there was too little data.
+   * NULL IS NOT ZERO: a user with a handful of posts and no graph signal is
+   * "unknown", not "clean human".
+   *
+   * This is NOT a probability. Nothing maps it to "of accounts scoring 0.8,
+   * what fraction are automated" — that requires calibration against a
+   * labelled dataset, which has not been done (see the plan doc, Phase F).
+   * Treat it as a ranking, not a likelihood.
+   *
+   * It also cannot establish automation. Machine-like cadence and template
+   * reuse are equally achievable by a coordinated human team, which is why
+   * {@link coordinationScore} is reported separately.
+   */
+  automationScore: number | null;
+  /**
+   * Network-level coordination evidence, 0-1, or null when no graph signal was
+   * available. Derived from structural patterns shared across ACCOUNTS
+   * (stars, chains, cliques), so unlike `automationScore` it says something
+   * about a group rather than an individual.
+   *
+   * This is the more defensible of the two signals: coordination is
+   * observable from outside a platform, whereas automation is not. A set of
+   * accounts posting in lockstep is a finding regardless of whether any of
+   * them is scripted.
+   */
+  coordinationScore: number | null;
+  /** What kind of number the scores are. Never 'calibrated-probability' yet. */
+  scoreType: 'anomaly-score';
   /** Structural anomaly score from graph patterns */
   structuralScore: number;
   /** Temporal anomaly score from posting behavior */
@@ -27,7 +56,7 @@ export interface BotScore {
   postsAnalyzed: number;
   /** Whether there was enough data to produce a meaningful score. */
   dataSufficiency: 'sufficient' | 'insufficient';
-  /** 0-1 confidence in `botProbability` (scales with post volume / signals). */
+  /** 0-1 confidence in the scores (scales with post volume / signals). */
   confidence: number;
 }
 
@@ -47,6 +76,17 @@ export interface BotDetectionResult {
   summary: string;
   /** Whether graph-based detection was used (vs heuristic-only) */
   graphEnhanced: boolean;
+  /**
+   * How this result was produced, matching the honesty flag already on
+   * propaganda and claim-verification results:
+   *   'graph'     — structural coordination signal available (strongest)
+   *   'heuristic' — account-level cadence/content signals only, no graph
+   *   'abstained' — nothing had enough data to score
+   * The client must not present 'heuristic' output as equivalent to 'graph'.
+   */
+  analysisMode: 'graph' | 'heuristic' | 'abstained';
+  /** Plain-language note on what limited the analysis, when anything did. */
+  analysisModeReason?: string;
 }
 
 export interface StructuralPattern {
@@ -124,7 +164,7 @@ export class GraphBotDetectionService {
 
     // Recompute combined probability after structural boost
     for (const score of scores) {
-      score.botProbability = this.combineProbabilities(score);
+      this.applyScores(score);
     }
 
     // Sort by bot probability (most suspicious first); abstained (null) users last.
@@ -141,19 +181,34 @@ export class GraphBotDetectionService {
     const summary = [
       `Assessed ${assessed.length}/${users.length} users`,
       graphAvailable ? ' with graph-enhanced detection' : ' with heuristic-only detection',
-      `— ${highProbCount} high-probability bot(s)`,
-      medProbCount > 0 ? `, ${medProbCount} medium-probability` : '',
+      // "high-anomaly", not "high-probability": these are ranked anomaly
+      // scores, not calibrated likelihoods, and the wording must not imply
+      // otherwise to whoever reads the summary.
+      `— ${highProbCount} high-anomaly account(s)`,
+      medProbCount > 0 ? `, ${medProbCount} medium-anomaly` : '',
       insufficientCount > 0 ? `, ${insufficientCount} with insufficient data to score` : '',
       structuralPatterns.length > 0
         ? `, ${structuralPatterns.length} structural pattern(s) found`
         : '',
     ].join('');
 
+    const analysisMode: BotDetectionResult['analysisMode'] =
+      assessed.length === 0 ? 'abstained' : graphAvailable ? 'graph' : 'heuristic';
+    const analysisModeReason =
+      analysisMode === 'abstained'
+        ? 'No user had enough post history or graph signal to score.'
+        : analysisMode === 'heuristic'
+          ? 'Graph unavailable — account-level cadence and content signals only. ' +
+            'Coordination between accounts could not be assessed.'
+          : undefined;
+
     return {
       scores,
       structuralPatterns,
       summary,
       graphEnhanced: graphAvailable,
+      analysisMode,
+      ...(analysisModeReason ? { analysisModeReason } : {}),
     };
   }
 
@@ -283,6 +338,9 @@ export class GraphBotDetectionService {
       handle: user.handle,
       platform: user.platform,
       botProbability: null,
+      automationScore: null,
+      coordinationScore: null,
+      scoreType: 'anomaly-score',
       structuralScore,
       temporalScore,
       behavioralScore,
@@ -293,7 +351,7 @@ export class GraphBotDetectionService {
       confidence: sufficient ? (enoughPosts ? Math.min(1, postsAnalyzed / 30) : 0.3) : 0,
     };
 
-    score.botProbability = this.combineProbabilities(score);
+    this.applyScores(score);
     return score;
   }
 
@@ -724,16 +782,40 @@ export class GraphBotDetectionService {
     return count;
   }
 
-  private combineProbabilities(score: BotScore): number | null {
+  /**
+   * Populate the split scores plus the deprecated combined alias.
+   *
+   * The split is along what each signal can actually support:
+   *   automation   — temporal + behavioural, i.e. how THIS account behaves
+   *   coordination — structural, i.e. what this account shares with OTHERS
+   *
+   * They are deliberately not blended into one another. Merging them was the
+   * old behaviour and it destroyed the distinction that matters: a coordinated
+   * network is a finding regardless of whether any member is scripted, and a
+   * single odd-looking account is not evidence of a network.
+   *
+   * The weights below remain hand-tuned and uncalibrated — see
+   * docs/development/analysis-quality-plan.md, Phase F.
+   */
+  private applyScores(score: BotScore): void {
     // Abstain when there wasn't enough data — never launder "unknown" into 0.
     if (score.dataSufficiency === 'insufficient') {
-      return null;
+      score.automationScore = null;
+      score.coordinationScore = null;
+      score.botProbability = null;
+      return;
     }
-    // Weighted combination: structural gets more weight when graph is available
+
+    score.automationScore = score.temporalScore * 0.5 + score.behavioralScore * 0.5;
+    // Structural signal only exists when the graph supplied one; 0 here means
+    // "no graph evidence", which is an absence of information, not innocence.
+    score.coordinationScore = score.structuralScore > 0 ? score.structuralScore : null;
+
+    // Deprecated alias. Preserves the previous blended value so stored
+    // documents and existing client code keep working unchanged.
     const hasGraph = score.structuralScore > 0;
-    if (hasGraph) {
-      return score.temporalScore * 0.3 + score.behavioralScore * 0.3 + score.structuralScore * 0.4;
-    }
-    return score.temporalScore * 0.5 + score.behavioralScore * 0.5;
+    score.botProbability = hasGraph
+      ? score.temporalScore * 0.3 + score.behavioralScore * 0.3 + score.structuralScore * 0.4
+      : score.temporalScore * 0.5 + score.behavioralScore * 0.5;
   }
 }

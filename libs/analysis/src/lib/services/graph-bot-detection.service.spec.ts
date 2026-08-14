@@ -290,4 +290,70 @@ describe('GraphBotDetectionService', () => {
       expect(edgeTypes).toContain('CO_NARRATIVE');
     });
   });
+
+  describe('honest score semantics (Phase A)', () => {
+    let service: GraphBotDetectionService;
+
+    beforeEach(() => {
+      service = new GraphBotDetectionService(makeGraphService(false));
+    });
+
+    const burstUser = () => ({
+      handle: 'burstbot',
+      platform: 'twitter',
+      posts: Array.from({ length: 20 }, (_, i) =>
+        makePost({
+          text: `Spam message ${i} about scam`,
+          timestamp: new Date(Date.now() - (20 - i) * 10 * 1000).toISOString(),
+          engagement: { likes: 0, comments: 0, shares: 0 },
+        }),
+      ),
+    });
+
+    it('labels the scores as anomaly scores, not calibrated probabilities', async () => {
+      const result = await service.detectBots([burstUser()]);
+      expect(result.scores[0]!.scoreType).toBe('anomaly-score');
+    });
+
+    it('separates account-level automation from network-level coordination', async () => {
+      // Without a graph there is no cross-account evidence, so coordination
+      // must be null (absence of information) rather than 0 (innocence).
+      const result = await service.detectBots([burstUser()]);
+      const score = result.scores[0]!;
+
+      expect(score.automationScore).not.toBeNull();
+      expect(score.coordinationScore).toBeNull();
+    });
+
+    it('reports analysisMode so heuristic output is never mistaken for graph output', async () => {
+      const result = await service.detectBots([burstUser()]);
+      expect(result.analysisMode).toBe('heuristic');
+      expect(result.analysisModeReason).toMatch(/graph unavailable/i);
+    });
+
+    it('abstains across the board when nothing has enough data', async () => {
+      const thin = { handle: 'quiet', platform: 'twitter', posts: [makePost({ text: 'hi' })] };
+      const result = await service.detectBots([thin]);
+      const score = result.scores[0]!;
+
+      expect(score.dataSufficiency).toBe('insufficient');
+      expect(score.automationScore).toBeNull();
+      expect(score.coordinationScore).toBeNull();
+      expect(score.botProbability).toBeNull();
+      expect(result.analysisMode).toBe('abstained');
+    });
+
+    it('keeps botProbability as a working alias for stored data and the client', async () => {
+      const result = await service.detectBots([burstUser()]);
+      const score = result.scores[0]!;
+      // Deprecated but must not break: without a graph the old blended value
+      // and the new automation score coincide.
+      expect(score.botProbability).toBeCloseTo(score.automationScore as number, 10);
+    });
+
+    it('does not describe accounts as "high-probability" in the summary', async () => {
+      const result = await service.detectBots([burstUser()]);
+      expect(result.summary).not.toMatch(/probability/i);
+    });
+  });
 });

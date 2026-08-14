@@ -57,6 +57,9 @@ function makeBotScore(
     handle,
     platform: 'twitter',
     botProbability,
+    automationScore: overrides.automationScore ?? botProbability,
+    coordinationScore: overrides.coordinationScore ?? null,
+    scoreType: 'anomaly-score',
     structuralScore: overrides.structuralScore ?? botProbability * 0.8,
     temporalScore: overrides.temporalScore ?? botProbability * 0.7,
     behavioralScore: overrides.behavioralScore ?? botProbability * 0.6,
@@ -97,6 +100,7 @@ function makeBotResult(scores: BotScore[], patterns: StructuralPattern[] = []): 
   return {
     scores,
     structuralPatterns: patterns,
+    analysisMode: 'heuristic',
     summary: 'test',
     graphEnhanced: false,
   };

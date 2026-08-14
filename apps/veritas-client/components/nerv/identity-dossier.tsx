@@ -237,26 +237,49 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
         {credHistory.length > 1 && <NervSparkline data={credHistory} color="#00FF41" height={20} />}
       </div>
       <div className="p-2 border border-nerv-border rounded-sm">
-        <div className="text-[10px] font-mono uppercase text-nerv-text-muted mb-1">
-          Bot Probability
+        <div
+          className="text-[10px] font-mono uppercase text-nerv-text-muted mb-1"
+          title="Relative anomaly score from posting cadence and content patterns. A ranking, not a likelihood — and coordinated humans produce the same signals as automation."
+        >
+          Anomaly Score
         </div>
-        <div className="flex items-center gap-2">
-          <NervBar
-            value={identity.currentBotProbability ?? 0}
-            color={
-              (identity.currentBotProbability ?? 0) > 0.7
-                ? '#e94560'
-                : (identity.currentBotProbability ?? 0) > 0.4
-                  ? '#f59e0b'
-                  : '#00FF41'
-            }
-            height={6}
-          />
-          <span className="text-[12px] font-mono text-nerv-text tabular-nums w-8 text-right">
-            {((identity.currentBotProbability ?? 0) * 100).toFixed(0)}%
-          </span>
-        </div>
-        {botHistory.length > 1 && <NervSparkline data={botHistory} color="#e94560" height={20} />}
+        {/*
+          `?? 0` here used to render "unknown" as a confident 0% — laundering
+          an abstention into a clean bill of health, which is exactly what the
+          backend's `null` exists to prevent. Absence of assessment is now
+          shown as absence.
+        */}
+        {identity.currentBotProbability === null ||
+        identity.currentBotProbability === undefined ? (
+          <div
+            className="text-[12px] font-mono text-nerv-text-muted/60 italic"
+            title="Not assessed — too few posts or no graph signal. Not the same as 'assessed and clean'."
+          >
+            not assessed
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <NervBar
+                value={identity.currentBotProbability}
+                color={
+                  identity.currentBotProbability > 0.7
+                    ? '#e94560'
+                    : identity.currentBotProbability > 0.4
+                      ? '#f59e0b'
+                      : '#00FF41'
+                }
+                height={6}
+              />
+              <span className="text-[12px] font-mono text-nerv-text tabular-nums w-8 text-right">
+                {(identity.currentBotProbability * 100).toFixed(0)}
+              </span>
+            </div>
+            {botHistory.length > 1 && (
+              <NervSparkline data={botHistory} color="#e94560" height={20} />
+            )}
+          </>
+        )}
       </div>
     </div>
   );

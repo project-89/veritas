@@ -1,6 +1,6 @@
 # Analysis Quality Plan
 
-**Status:** Proposed
+**Status:** Phase A shipped (2026-08-14); Phases B–F not started
 **Scope:** every interpretive layer — bot/coordination detection, narrative grouping, credibility, causal suggestion
 **Related:** [`causal-inference-layer.md`](./causal-inference-layer.md) · [`../../scripts/eval/README.md`](../../scripts/eval/README.md) · [`../REMEDIATION-PLAN.md`](../REMEDIATION-PLAN.md)
 
@@ -161,7 +161,7 @@ Nothing in this plan is worth building without measurement, and the measurement 
 
 Ordered so each phase is independently shippable and earlier phases de-risk later ones.
 
-**Phase A — Stop over-claiming (small).**
+**Phase A — Stop over-claiming (small). ✅ SHIPPED.**
 Rename `botProbability` to an honest anomaly score, or split into coordination/automation with the existing signals. Surface `analysisMode`-style provenance on bot, credibility and deviation outputs, matching propaganda and claims. No new detection, just honest labelling. *Removes the credibility liability immediately.*
 
 **Phase B — Stance axis.**

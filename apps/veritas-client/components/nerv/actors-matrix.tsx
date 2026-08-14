@@ -187,7 +187,11 @@ export function ActorsMatrix({
       },
       {
         key: 'botProbability',
-        label: 'Bot Prob',
+        // NOT "Bot Prob". The backend value is an uncalibrated anomaly score,
+        // not a probability — nothing maps 0.8 to "80% likely a bot". Labelling
+        // it as a probability invited exactly the wrong reading.
+        // See docs/development/analysis-quality-plan.md.
+        label: 'Anomaly',
         sortable: true,
         width: '100px',
         render: (val: unknown) => {
@@ -196,7 +200,7 @@ export function ActorsMatrix({
             return (
               <span
                 className="text-[10px] font-mono text-nerv-text-muted/50 italic"
-                title="Insufficient data to assess (not investigated, or too few posts)"
+                title="Insufficient data to assess (not investigated, or too few posts). Not the same as \u2018assessed and clean\u2019."
               >
                 n/a
               </span>
@@ -204,7 +208,10 @@ export function ActorsMatrix({
           }
           const color = v < 0.3 ? '#00FF41' : v < 0.7 ? '#f59e0b' : '#e94560';
           return (
-            <div className={v > 0.7 ? 'animate-nerv-pulse' : ''}>
+            <div
+              className={v > 0.7 ? 'animate-nerv-pulse' : ''}
+              title="Relative anomaly score from posting cadence and content patterns. A ranking, not a likelihood \u2014 and coordinated humans produce the same signals as automation."
+            >
               <NervBar value={v} color={color} showLabel height={5} />
             </div>
           );
