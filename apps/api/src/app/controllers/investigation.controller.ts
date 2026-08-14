@@ -355,10 +355,10 @@ export class InvestigationController {
       if (cred) {
         userResult.flags.push(...cred.flags.filter((f) => !userResult.flags.includes(f)));
       }
-      // botProbability is null when detection abstained (insufficient data) —
+      // automationScore is null when detection abstained (insufficient data) —
       // only flag on a real score above threshold.
-      if (bot && bot.botProbability !== null && bot.botProbability > 0.5) {
-        userResult.flags.push(`Bot probability: ${Math.round(bot.botProbability * 100)}%`);
+      if (bot && bot.automationScore !== null && bot.automationScore > 0.5) {
+        userResult.flags.push(`Bot probability: ${Math.round(bot.automationScore * 100)}%`);
         userResult.flags.push(...bot.detectedPatterns.filter((p) => !userResult.flags.includes(p)));
       }
     }
@@ -405,7 +405,7 @@ export class InvestigationController {
             postCount: userResult.user.topicPosts.length + userResult.user.historicalPosts.length,
             platforms: userResult.user.profile.patterns.platformPresence,
             credibilityScore: cred?.overallScore ?? null,
-            botProbability: bot?.botProbability ?? null,
+            automationScore: bot?.automationScore ?? null,
             flags: userResult.flags,
             influenceScore: userResult.influenceScore,
           },
@@ -421,7 +421,7 @@ export class InvestigationController {
           profileImageUrl: profile?.avatar ?? null,
           bannerImageUrl: profile?.banner ?? null,
           credibilityScore: cred?.overallScore ?? null,
-          botProbability: bot?.botProbability ?? null,
+          automationScore: bot?.automationScore ?? null,
           flags: userResult.flags,
           observedPosts: [
             ...(userResult.user.topicPosts ?? []),

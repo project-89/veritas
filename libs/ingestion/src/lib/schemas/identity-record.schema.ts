@@ -99,7 +99,7 @@ class InvestigationSnapshotEmbed {
   credibilityScore!: number | null;
 
   @Prop({ type: Number, default: null })
-  botProbability!: number | null;
+  automationScore!: number | null;
 
   @Prop({ type: [String], default: [] })
   flags!: string[];
@@ -314,13 +314,13 @@ export class IdentityRecordSchema {
   currentCredibility!: number | null;
 
   @Prop({ type: Number, default: null })
-  currentBotProbability!: number | null;
+  currentAnomalyScore!: number | null;
 
   @Prop({ type: [ScoreHistoryEmbed], default: [] })
   credibilityHistory!: ScoreHistoryEmbed[];
 
   @Prop({ type: [ScoreHistoryEmbed], default: [] })
-  botProbabilityHistory!: ScoreHistoryEmbed[];
+  anomalyScoreHistory!: ScoreHistoryEmbed[];
 
   // Investigation history
   @Prop({ type: [InvestigationSnapshotEmbed], default: [] })
@@ -404,7 +404,7 @@ export interface InvestigationSnapshot {
   postCount: number;
   platforms: string[];
   credibilityScore: number | null;
-  botProbability: number | null;
+  automationScore: number | null;
   flags: string[];
   influenceScore: number;
 }
@@ -504,9 +504,9 @@ export interface IdentityRecord {
   profileImages: ProfileImage[];
   bannerImages: ProfileImage[];
   currentCredibility: number | null;
-  currentBotProbability: number | null;
+  currentAnomalyScore: number | null;
   credibilityHistory: ScoreHistory[];
-  botProbabilityHistory: ScoreHistory[];
+  anomalyScoreHistory: ScoreHistory[];
   investigations: InvestigationSnapshot[];
   totalInvestigations: number;
   firstInvestigatedAt: Date | null;

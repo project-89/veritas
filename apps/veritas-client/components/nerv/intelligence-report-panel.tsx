@@ -246,7 +246,7 @@ function CampaignReportView({ report }: { report: CoordinatedCampaignReport }) {
                       />
                     </td>
                     <td className="py-1 pr-2 text-right tabular-nums text-nerv-text-muted">
-                      {(actor.botProbability * 100).toFixed(0)}%
+                      {(actor.automationScore * 100).toFixed(0)}%
                     </td>
                     <td className="py-1 text-right tabular-nums text-nerv-text-muted">
                       {(actor.influenceScore * 100).toFixed(0)}%

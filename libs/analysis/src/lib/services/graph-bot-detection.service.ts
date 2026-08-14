@@ -10,12 +10,6 @@ export interface BotScore {
   handle: string;
   platform: string;
   /**
-   * @deprecated Misleading name kept for API and stored-data compatibility.
-   * Read {@link automationScore} instead, and {@link scoreType} for what it
-   * actually is. Identical value to `automationScore`.
-   */
-  botProbability: number | null;
-  /**
    * Account-level ANOMALY SCORE, 0-1, or null when there was too little data.
    * NULL IS NOT ZERO: a user with a handful of posts and no graph signal is
    * "unknown", not "clean human".
@@ -168,14 +162,14 @@ export class GraphBotDetectionService {
     }
 
     // Sort by bot probability (most suspicious first); abstained (null) users last.
-    scores.sort((a, b) => (b.botProbability ?? -1) - (a.botProbability ?? -1));
+    scores.sort((a, b) => (b.automationScore ?? -1) - (a.automationScore ?? -1));
 
     // Summary — count only users we could actually assess.
-    const assessed = scores.filter((s) => s.botProbability !== null);
+    const assessed = scores.filter((s) => s.automationScore !== null);
     const insufficientCount = scores.length - assessed.length;
-    const highProbCount = assessed.filter((s) => (s.botProbability ?? 0) > 0.7).length;
+    const highProbCount = assessed.filter((s) => (s.automationScore ?? 0) > 0.7).length;
     const medProbCount = assessed.filter(
-      (s) => (s.botProbability ?? 0) > 0.4 && (s.botProbability ?? 0) <= 0.7,
+      (s) => (s.automationScore ?? 0) > 0.4 && (s.automationScore ?? 0) <= 0.7,
     ).length;
 
     const summary = [
@@ -337,7 +331,6 @@ export class GraphBotDetectionService {
     const score: BotScore = {
       handle: user.handle,
       platform: user.platform,
-      botProbability: null,
       automationScore: null,
       coordinationScore: null,
       scoreType: 'anomaly-score',
@@ -783,7 +776,7 @@ export class GraphBotDetectionService {
   }
 
   /**
-   * Populate the split scores plus the deprecated combined alias.
+   * Populate the split scores.
    *
    * The split is along what each signal can actually support:
    *   automation   — temporal + behavioural, i.e. how THIS account behaves
@@ -802,7 +795,6 @@ export class GraphBotDetectionService {
     if (score.dataSufficiency === 'insufficient') {
       score.automationScore = null;
       score.coordinationScore = null;
-      score.botProbability = null;
       return;
     }
 
@@ -810,12 +802,5 @@ export class GraphBotDetectionService {
     // Structural signal only exists when the graph supplied one; 0 here means
     // "no graph evidence", which is an absence of information, not innocence.
     score.coordinationScore = score.structuralScore > 0 ? score.structuralScore : null;
-
-    // Deprecated alias. Preserves the previous blended value so stored
-    // documents and existing client code keep working unchanged.
-    const hasGraph = score.structuralScore > 0;
-    score.botProbability = hasGraph
-      ? score.temporalScore * 0.3 + score.behavioralScore * 0.3 + score.structuralScore * 0.4
-      : score.temporalScore * 0.5 + score.behavioralScore * 0.5;
   }
 }

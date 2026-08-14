@@ -190,7 +190,7 @@ export interface BotScore {
   handle: string;
   platform: string;
   /** null = too little data to assess (NOT the same as 0 / clean). */
-  botProbability: number | null;
+  automationScore: number | null;
   structuralScore: number;
   temporalScore: number;
   behavioralScore: number;
@@ -1948,16 +1948,16 @@ export interface IdentityRecord {
   profileImages: ProfileImage[];
   bannerImages: ProfileImage[];
   currentCredibility: number | null;
-  currentBotProbability: number | null;
+  currentAnomalyScore: number | null;
   credibilityHistory: Array<{ value: number; timestamp: string; investigationQuery: string }>;
-  botProbabilityHistory: Array<{ value: number; timestamp: string; investigationQuery: string }>;
+  anomalyScoreHistory: Array<{ value: number; timestamp: string; investigationQuery: string }>;
   investigations: Array<{
     query: string;
     timestamp: string;
     postCount: number;
     platforms: string[];
     credibilityScore: number | null;
-    botProbability: number | null;
+    automationScore: number | null;
     flags: string[];
     influenceScore: number;
   }>;
@@ -2032,7 +2032,7 @@ export interface CampaignActor {
   handle: string;
   platform: string;
   role: 'orchestrator' | 'amplifier' | 'bot' | 'organic';
-  botProbability: number;
+  automationScore: number;
   adoptionTimestamp: string | null;
   influenceScore: number;
   flags: string[];

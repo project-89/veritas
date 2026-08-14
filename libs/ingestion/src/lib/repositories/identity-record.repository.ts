@@ -137,7 +137,7 @@ export class IdentityRecordRepository implements OnModuleInit {
     profileImageUrl?: string | null;
     bannerImageUrl?: string | null;
     credibilityScore?: number | null;
-    botProbability?: number | null;
+    automationScore?: number | null;
     flags?: string[];
     observedPosts?: ObservedPost[];
   }): Promise<IdentityRecord> {
@@ -163,7 +163,7 @@ export class IdentityRecordRepository implements OnModuleInit {
     profileImageUrl?: string | null;
     bannerImageUrl?: string | null;
     credibilityScore?: number | null;
-    botProbability?: number | null;
+    automationScore?: number | null;
     flags?: string[];
     observedPosts?: ObservedPost[];
   }): Promise<IdentityRecord> {
@@ -214,7 +214,7 @@ export class IdentityRecordRepository implements OnModuleInit {
       profileImages,
       bannerImages,
       currentCredibility: params.credibilityScore ?? null,
-      currentBotProbability: params.botProbability ?? null,
+      currentAnomalyScore: params.automationScore ?? null,
       credibilityHistory:
         params.credibilityScore != null
           ? [
@@ -225,11 +225,11 @@ export class IdentityRecordRepository implements OnModuleInit {
               },
             ]
           : [],
-      botProbabilityHistory:
-        params.botProbability != null
+      anomalyScoreHistory:
+        params.automationScore != null
           ? [
               {
-                value: params.botProbability,
+                value: params.automationScore,
                 timestamp: now,
                 investigationQuery: params.snapshot.query,
               },
@@ -262,7 +262,7 @@ export class IdentityRecordRepository implements OnModuleInit {
       profileImageUrl?: string | null;
       bannerImageUrl?: string | null;
       credibilityScore?: number | null;
-      botProbability?: number | null;
+      automationScore?: number | null;
       flags?: string[];
       observedPosts?: ObservedPost[];
     },
@@ -326,7 +326,7 @@ export class IdentityRecordRepository implements OnModuleInit {
       profileImages,
       bannerImages,
       currentCredibility: params.credibilityScore ?? existing.currentCredibility,
-      currentBotProbability: params.botProbability ?? existing.currentBotProbability,
+      currentAnomalyScore: params.automationScore ?? existing.currentAnomalyScore,
       credibilityHistory:
         params.credibilityScore != null
           ? [
@@ -338,17 +338,17 @@ export class IdentityRecordRepository implements OnModuleInit {
               },
             ]
           : existing.credibilityHistory,
-      botProbabilityHistory:
-        params.botProbability != null
+      anomalyScoreHistory:
+        params.automationScore != null
           ? [
-              ...existing.botProbabilityHistory,
+              ...existing.anomalyScoreHistory,
               {
-                value: params.botProbability,
+                value: params.automationScore,
                 timestamp: now,
                 investigationQuery: params.snapshot.query,
               },
             ]
-          : existing.botProbabilityHistory,
+          : existing.anomalyScoreHistory,
       investigations: [...existing.investigations, params.snapshot],
       totalInvestigations: existing.totalInvestigations + 1,
       lastInvestigatedAt: now,

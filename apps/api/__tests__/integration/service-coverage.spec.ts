@@ -1225,16 +1225,16 @@ describe('Section 4: Analysis Service Contracts', () => {
       for (const score of result.scores) {
         expect(score).toHaveProperty('handle');
         expect(score).toHaveProperty('platform');
-        expect(score).toHaveProperty('botProbability');
+        expect(score).toHaveProperty('automationScore');
         expect(score).toHaveProperty('structuralScore');
         expect(score).toHaveProperty('temporalScore');
         expect(score).toHaveProperty('behavioralScore');
         expect(score).toHaveProperty('detectedPatterns');
-        // botProbability is `number | null`: null is the deliberate
+        // automationScore is `number | null`: null is the deliberate
         // data-insufficiency abstention, never a confident 0.
-        if (score.botProbability !== null) {
-          expect(score.botProbability).toBeGreaterThanOrEqual(0);
-          expect(score.botProbability).toBeLessThanOrEqual(1);
+        if (score.automationScore !== null) {
+          expect(score.automationScore).toBeGreaterThanOrEqual(0);
+          expect(score.automationScore).toBeLessThanOrEqual(1);
         }
       }
       expect(typeof result.graphEnhanced).toBe('boolean');
@@ -1740,9 +1740,9 @@ describe('Section 5: Data Flow Validation', () => {
     expect(botResult.scores.length).toBe(1);
     const botScore = botResult.scores[0]!;
     // Abstains (null) on thin data rather than reporting a confident 0.
-    if (botScore.botProbability !== null) {
-      expect(botScore.botProbability).toBeGreaterThanOrEqual(0);
-      expect(botScore.botProbability).toBeLessThanOrEqual(1);
+    if (botScore.automationScore !== null) {
+      expect(botScore.automationScore).toBeGreaterThanOrEqual(0);
+      expect(botScore.automationScore).toBeLessThanOrEqual(1);
     }
   });
 

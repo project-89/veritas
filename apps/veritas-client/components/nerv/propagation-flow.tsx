@@ -115,7 +115,7 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
           : 0.5
         : (t - minT) / timeRange;
       const isOrigin = u.user.handle === origin?.firstMover;
-      const isBot = u.flags.includes('potential_bot') || (u.botScore?.botProbability ?? 0) > 0.6;
+      const isBot = u.flags.includes('potential_bot') || (u.botScore?.automationScore ?? 0) > 0.6;
       const baseR = 8 + Math.min(u.influenceScore * 20, 20);
 
       handleIndex.set(u.user.handle, nodeList.length);

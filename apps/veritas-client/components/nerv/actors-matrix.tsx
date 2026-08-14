@@ -17,7 +17,7 @@ interface ActorRow {
   platform: string;
   credibility: number;
   /** null = not assessed / insufficient data (not the same as 0). */
-  botProbability: number | null;
+  automationScore: number | null;
   influence: number;
   postCount: number;
   flags: string[];
@@ -48,7 +48,7 @@ export function ActorsMatrix({
       handle: u.user.handle,
       platform: u.user.platform,
       credibility: u.credibility?.overallScore ?? 0.5,
-      botProbability: u.botScore?.botProbability ?? null,
+      automationScore: u.botScore?.automationScore ?? null,
       influence: u.influenceScore,
       postCount: posts.filter((p) => norm(p.authorHandle ?? '') === norm(u.user.handle)).length,
       flags: u.flags,
@@ -95,7 +95,7 @@ export function ActorsMatrix({
       platform: a.platform,
       credibility: 0.5,
       // Not investigated → bot probability is unknown, not zero.
-      botProbability: null as number | null,
+      automationScore: null as number | null,
       influence: 0,
       postCount: a.postCount,
       flags: [] as string[],
@@ -170,7 +170,7 @@ export function ActorsMatrix({
         render: (val: unknown, row: ActorRow) => {
           const v = val as number;
           const color = v > 0.6 ? '#00FF41' : v > 0.3 ? '#f59e0b' : '#e94560';
-          const isDefault = v === 0.5 && row.botProbability === null;
+          const isDefault = v === 0.5 && row.automationScore === null;
           return (
             <div className="relative group">
               <NervBar value={v} color={color} showLabel height={5} />
@@ -186,7 +186,7 @@ export function ActorsMatrix({
         },
       },
       {
-        key: 'botProbability',
+        key: 'automationScore',
         // NOT "Bot Prob". The backend value is an uncalibrated anomaly score,
         // not a probability — nothing maps 0.8 to "80% likely a bot". Labelling
         // it as a probability invited exactly the wrong reading.

@@ -50,19 +50,18 @@ function makeUser(
 
 function makeBotScore(
   handle: string,
-  botProbability: number,
+  automationScore: number,
   overrides: Partial<BotScore> = {},
 ): BotScore {
   return {
     handle,
     platform: 'twitter',
-    botProbability,
-    automationScore: overrides.automationScore ?? botProbability,
+    automationScore,
     coordinationScore: overrides.coordinationScore ?? null,
     scoreType: 'anomaly-score',
-    structuralScore: overrides.structuralScore ?? botProbability * 0.8,
-    temporalScore: overrides.temporalScore ?? botProbability * 0.7,
-    behavioralScore: overrides.behavioralScore ?? botProbability * 0.6,
+    structuralScore: overrides.structuralScore ?? automationScore * 0.8,
+    temporalScore: overrides.temporalScore ?? automationScore * 0.7,
+    behavioralScore: overrides.behavioralScore ?? automationScore * 0.6,
     detectedPatterns: overrides.detectedPatterns ?? [],
     postsAnalyzed: overrides.postsAnalyzed ?? 20,
     dataSufficiency: overrides.dataSufficiency ?? 'sufficient',
@@ -351,7 +350,7 @@ describe('IntelligenceEngineService', () => {
       const report = service.detectCoordinatedCampaign(botResult, investigation);
 
       expect(report.campaignDetected).toBe(false);
-      expect(report.actors.every((a) => a.botProbability === 0)).toBe(true);
+      expect(report.actors.every((a) => a.automationScore === 0)).toBe(true);
     });
   });
 

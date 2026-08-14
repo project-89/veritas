@@ -212,7 +212,7 @@ function CrossPlatformMap({ identity }: { identity: IdentityRecord }) {
 
 function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
   const credHistory = identity.credibilityHistory.map((h) => h.value);
-  const botHistory = identity.botProbabilityHistory.map((h) => h.value);
+  const botHistory = identity.anomalyScoreHistory.map((h) => h.value);
 
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -249,8 +249,8 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
           backend's `null` exists to prevent. Absence of assessment is now
           shown as absence.
         */}
-        {identity.currentBotProbability === null ||
-        identity.currentBotProbability === undefined ? (
+        {identity.currentAnomalyScore === null ||
+        identity.currentAnomalyScore === undefined ? (
           <div
             className="text-[12px] font-mono text-nerv-text-muted/60 italic"
             title="Not assessed — too few posts or no graph signal. Not the same as 'assessed and clean'."
@@ -261,18 +261,18 @@ function ScoreDashboard({ identity }: { identity: IdentityRecord }) {
           <>
             <div className="flex items-center gap-2">
               <NervBar
-                value={identity.currentBotProbability}
+                value={identity.currentAnomalyScore}
                 color={
-                  identity.currentBotProbability > 0.7
+                  identity.currentAnomalyScore > 0.7
                     ? '#e94560'
-                    : identity.currentBotProbability > 0.4
+                    : identity.currentAnomalyScore > 0.4
                       ? '#f59e0b'
                       : '#00FF41'
                 }
                 height={6}
               />
               <span className="text-[12px] font-mono text-nerv-text tabular-nums w-8 text-right">
-                {(identity.currentBotProbability * 100).toFixed(0)}
+                {(identity.currentAnomalyScore * 100).toFixed(0)}
               </span>
             </div>
             {botHistory.length > 1 && (

@@ -527,11 +527,11 @@ function ActorDossier({
               <span className="text-[12px] font-mono text-nerv-text-secondary w-32">Overall</span>
               <div className="flex-1">
                 <NervBar
-                  value={user.botScore.botProbability}
+                  value={user.botScore.automationScore}
                   color={
-                    user.botScore.botProbability > 0.7
+                    user.botScore.automationScore > 0.7
                       ? '#e94560'
-                      : user.botScore.botProbability > 0.4
+                      : user.botScore.automationScore > 0.4
                         ? '#f59e0b'
                         : '#00FF41'
                   }

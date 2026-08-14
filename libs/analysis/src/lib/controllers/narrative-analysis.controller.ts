@@ -72,18 +72,13 @@ function coerceBotScores(value: unknown): BotScore[] {
     .map((score) => {
       // Preserve nulls (insufficient data / no graph evidence) — never coerce
       // to 0, which would read as "assessed and clean".
-      const rawProb = score['botProbability'];
-      const botProbability = typeof rawProb === 'number' ? rawProb : null;
-      const rawAutomation = score['automationScore'];
+      const rawProb = score['automationScore'];
       const rawCoordination = score['coordinationScore'];
       const sufficiency = score['dataSufficiency'];
       return {
         handle: asString(score['handle']),
         platform: asString(score['platform']),
-        botProbability,
-        // Fall back to the legacy blended value for documents stored before
-        // the automation/coordination split.
-        automationScore: typeof rawAutomation === 'number' ? rawAutomation : botProbability,
+        automationScore: typeof rawProb === 'number' ? rawProb : null,
         coordinationScore: typeof rawCoordination === 'number' ? rawCoordination : null,
         scoreType: 'anomaly-score' as const,
         structuralScore: asNumber(score['structuralScore']),
@@ -98,7 +93,7 @@ function coerceBotScores(value: unknown): BotScore[] {
         dataSufficiency:
           sufficiency === 'sufficient' || sufficiency === 'insufficient'
             ? sufficiency
-            : botProbability === null
+            : rawProb === null || typeof rawProb !== 'number'
               ? ('insufficient' as const)
               : ('sufficient' as const),
         confidence: asNumber(score['confidence']),
@@ -138,8 +133,8 @@ function coerceBotDetectionResult(value: unknown): BotDetectionResult {
     structuralPatterns: coerceStructuralPatterns(source['structuralPatterns']),
     graphEnhanced: typeof source['graphEnhanced'] === 'boolean' ? source['graphEnhanced'] : false,
     summary: asString(source['summary']),
-    // Legacy documents predate the flag; 'heuristic' is the safe assumption
-    // since it is the weaker claim.
+    // Default to 'heuristic' when absent — it is the weaker claim, so it is
+    // the safe assumption.
     analysisMode:
       source['analysisMode'] === 'graph' ||
       source['analysisMode'] === 'heuristic' ||

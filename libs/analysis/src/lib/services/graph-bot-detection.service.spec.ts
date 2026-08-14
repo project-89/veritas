@@ -61,7 +61,7 @@ describe('GraphBotDetectionService', () => {
       const result = await service.detectBots([burstUser]);
 
       expect(result.scores).toHaveLength(1);
-      expect(result.scores[0]!.botProbability).toBeGreaterThan(0);
+      expect(result.scores[0]!.automationScore).toBeGreaterThan(0);
       expect(result.graphEnhanced).toBe(false);
     });
 
@@ -83,7 +83,7 @@ describe('GraphBotDetectionService', () => {
 
       const result = await service.detectBots([normalUser]);
 
-      expect(result.scores[0]!.botProbability).toBeLessThan(0.5);
+      expect(result.scores[0]!.automationScore).toBeLessThan(0.5);
     });
 
     it('should detect repetitive content as behavioral anomaly', async () => {
@@ -119,7 +119,7 @@ describe('GraphBotDetectionService', () => {
       expect(result.summary).toContain('Assessed 0/1 users');
       expect(result.summary).toContain('insufficient data');
       expect(result.summary).toContain('heuristic-only detection');
-      expect(result.scores[0]!.botProbability).toBeNull();
+      expect(result.scores[0]!.automationScore).toBeNull();
       expect(result.scores[0]!.dataSufficiency).toBe('insufficient');
     });
   });
@@ -339,16 +339,19 @@ describe('GraphBotDetectionService', () => {
       expect(score.dataSufficiency).toBe('insufficient');
       expect(score.automationScore).toBeNull();
       expect(score.coordinationScore).toBeNull();
-      expect(score.botProbability).toBeNull();
+      expect(score.automationScore).toBeNull();
       expect(result.analysisMode).toBe('abstained');
     });
 
-    it('keeps botProbability as a working alias for stored data and the client', async () => {
+    it('derives automationScore from account-level signals only', async () => {
+      // It must NOT absorb structuralScore — that is what the old blended
+      // botProbability did, and it is why a single odd account could look
+      // like a network (and vice versa).
       const result = await service.detectBots([burstUser()]);
       const score = result.scores[0]!;
-      // Deprecated but must not break: without a graph the old blended value
-      // and the new automation score coincide.
-      expect(score.botProbability).toBeCloseTo(score.automationScore as number, 10);
+      const expected = score.temporalScore * 0.5 + score.behavioralScore * 0.5;
+
+      expect(score.automationScore).toBeCloseTo(expected, 10);
     });
 
     it('does not describe accounts as "high-probability" in the summary', async () => {

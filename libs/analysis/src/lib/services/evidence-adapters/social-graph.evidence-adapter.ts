@@ -11,7 +11,7 @@ export interface IdentityRecordLookup {
     primaryHandle: string;
     primaryPlatform: string;
     currentCredibility?: number | null;
-    currentBotProbability?: number | null;
+    currentAnomalyScore?: number | null;
     totalInvestigations: number;
     aggregatedFlags: string[];
     totalPostsAnalyzed: number;
@@ -26,7 +26,7 @@ export interface IdentityRecordLookup {
       primaryHandle: string;
       primaryPlatform: string;
       currentCredibility?: number | null;
-      currentBotProbability?: number | null;
+      currentAnomalyScore?: number | null;
       totalInvestigations: number;
       aggregatedFlags: string[];
       totalPostsAnalyzed: number;
@@ -103,7 +103,7 @@ export class SocialGraphEvidenceAdapter implements EvidenceAdapter {
       primaryHandle: string;
       primaryPlatform: string;
       currentCredibility?: number | null;
-      currentBotProbability?: number | null;
+      currentAnomalyScore?: number | null;
       totalInvestigations: number;
       aggregatedFlags: string[];
       totalPostsAnalyzed: number;
@@ -114,7 +114,7 @@ export class SocialGraphEvidenceAdapter implements EvidenceAdapter {
   ): EvidenceSource {
     const flags = record.aggregatedFlags;
     const credibility = record.currentCredibility;
-    const botProb = record.currentBotProbability;
+    const botProb = record.currentAnomalyScore;
 
     const excerptParts: string[] = [`@${record.primaryHandle} (${record.primaryPlatform})`];
     if (credibility != null) excerptParts.push(`credibility: ${(credibility * 100).toFixed(0)}%`);
@@ -139,7 +139,7 @@ export class SocialGraphEvidenceAdapter implements EvidenceAdapter {
         handle: record.primaryHandle,
         platform: record.primaryPlatform,
         credibility,
-        botProbability: botProb,
+        automationScore: botProb,
         totalInvestigations: record.totalInvestigations,
         totalPostsAnalyzed: record.totalPostsAnalyzed,
         crossPlatformAccounts: crossPlatform,

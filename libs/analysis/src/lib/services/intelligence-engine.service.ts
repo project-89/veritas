@@ -34,7 +34,7 @@ export interface CampaignActor {
   handle: string;
   platform: string;
   role: 'orchestrator' | 'amplifier' | 'bot' | 'organic';
-  botProbability: number;
+  automationScore: number;
   adoptionTimestamp: string | null;
   influenceScore: number;
   flags: string[];
@@ -200,13 +200,13 @@ export class IntelligenceEngineService {
     // --- Classify actors ---
     const actors: CampaignActor[] = investigation.users.map((u) => {
       const bs = botScoreMap.get(u.user.handle.toLowerCase());
-      const botProb = bs?.botProbability ?? 0;
+      const botProb = bs?.automationScore ?? 0;
       const role = this.classifyActorRole(u, botProb, investigation);
       return {
         handle: u.user.handle,
         platform: u.user.platform,
         role,
-        botProbability: botProb,
+        automationScore: botProb,
         adoptionTimestamp: u.adoptionTimestamp,
         influenceScore: u.influenceScore,
         flags: [...u.flags, ...(bs?.detectedPatterns ?? [])],
@@ -214,7 +214,7 @@ export class IntelligenceEngineService {
     });
 
     // --- Bot network signal ---
-    const highBotActors = actors.filter((a) => a.botProbability >= 0.7);
+    const highBotActors = actors.filter((a) => a.automationScore >= 0.7);
     if (highBotActors.length >= 2) {
       signals.push({
         type: 'bot_network',
@@ -341,11 +341,11 @@ export class IntelligenceEngineService {
 
   private classifyActorRole(
     user: UserInvestigationResult,
-    botProbability: number,
+    automationScore: number,
     investigation: DeepInvestigationResult,
   ): CampaignActor['role'] {
     // Bots first
-    if (botProbability >= 0.7) return 'bot';
+    if (automationScore >= 0.7) return 'bot';
 
     // Orchestrator: first mover or high influence + flags
     const isFirstMover =
@@ -739,8 +739,8 @@ export class IntelligenceEngineService {
         evidence.push(`Late adopter — position ${i + 1} in propagation chain`);
       }
 
-      if (botScore && botScore.botProbability != null && botScore.botProbability >= 0.6) {
-        evidence.push(`High bot probability: ${(botScore.botProbability * 100).toFixed(0)}%`);
+      if (botScore && botScore.automationScore != null && botScore.automationScore >= 0.6) {
+        evidence.push(`High bot probability: ${(botScore.automationScore * 100).toFixed(0)}%`);
       }
       if (userResult && userResult.influenceScore >= 0.7) {
         evidence.push(`High influence score: ${(userResult.influenceScore * 100).toFixed(0)}%`);
@@ -800,7 +800,7 @@ export class IntelligenceEngineService {
       attributionChain.length >= 3 &&
       attributionChain.some((n) => n.role === 'originator') &&
       (attributionChain.some((n) => n.role === 'amplifier') ||
-        botResult.scores.some((s) => s.botProbability != null && s.botProbability >= 0.6));
+        botResult.scores.some((s) => s.automationScore != null && s.automationScore >= 0.6));
 
     const confidence = operationDetected
       ? Math.min(

@@ -377,8 +377,8 @@ export class AnalysisProcessor extends WorkerHost {
         for (const userResult of investigationResult.users) {
           const bot = botMap.get(userResult.user.handle);
           userResult['botScore'] = bot ?? null;
-          if (typeof bot?.botProbability === 'number' && bot.botProbability > 0.5) {
-            userResult.flags.push(`Bot probability: ${Math.round(bot.botProbability * 100)}%`);
+          if (typeof bot?.automationScore === 'number' && bot.automationScore > 0.5) {
+            userResult.flags.push(`Bot probability: ${Math.round(bot.automationScore * 100)}%`);
             if (bot.detectedPatterns) {
               userResult.flags.push(
                 ...bot.detectedPatterns.filter((p: string) => !userResult.flags.includes(p)),
@@ -408,12 +408,12 @@ export class AnalysisProcessor extends WorkerHost {
               (userResult.user.historicalPosts?.length ?? 0),
             platforms: userResult.user.profile?.patterns?.platformPresence ?? [],
             credibilityScore: cred?.overallScore ?? null,
-            botProbability: bot?.botProbability ?? null,
+            automationScore: bot?.automationScore ?? null,
             flags: userResult.flags ?? [],
             influenceScore: userResult.influenceScore ?? 0,
           },
           credibilityScore: cred?.overallScore ?? null,
-          botProbability: bot?.botProbability ?? null,
+          automationScore: bot?.automationScore ?? null,
           flags: userResult.flags ?? [],
           observedPosts: [
             ...(userResult.user.topicPosts ?? []),
