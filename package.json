@@ -46,7 +46,8 @@
     "mongodb:down": "docker-compose -f docker-compose.mongodb.yml down",
     "mongodb:reset": "docker-compose -f docker-compose.mongodb.yml down && rm -rf ./mongodb_data && docker-compose -f docker-compose.mongodb.yml up -d",
     "eval": "tsx scripts/eval/run-eval.ts",
-    "eval:check": "tsx scripts/eval/run-eval.ts --check"
+    "eval:check": "tsx scripts/eval/run-eval.ts --check",
+    "check:sources": "tsx scripts/check-sources.ts"
   },
   "private": true,
   "devDependencies": {

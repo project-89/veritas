@@ -1029,7 +1029,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
     },
     {
       name: 'RAND',
-      url: 'https://www.rand.org/news.xml',
+      url: 'https://www.rand.org/content/rand/news.xml',
       category: 'think_tanks',
       tier: 1,
       language: 'en',
@@ -1210,7 +1210,7 @@ export const RSS_FEED_CATALOG: Record<string, RssFeedEntry[]> = {
     },
     {
       name: 'PolitiFact',
-      url: 'https://www.politifact.com/rss/all/',
+      url: 'https://www.politifact.com/rss/factchecks/',
       category: 'fact_check',
       tier: 1,
       language: 'en',
