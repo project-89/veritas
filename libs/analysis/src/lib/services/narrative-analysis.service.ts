@@ -6,6 +6,7 @@ import {
   geminiChatModel,
   LlmBudgetExceededError,
   LlmGateway,
+  parseLlmJsonArray,
 } from '@veritas/content-classification/llm';
 import { cosineSimilarity } from '../utils/math';
 import type { SaturationReport } from './saturation-metrics.service';
@@ -38,6 +39,43 @@ function hashText(text: string): string {
 /**
  * A post with its embedding, used internally during clustering.
  */
+/**
+ * Default cosine similarity for merging posts into one narrative.
+ *
+ * 0.65, chosen from measurement rather than intuition. Run
+ * `tsx scripts/eval/threshold-sweep.ts <scanId>` to reproduce.
+ *
+ * The previous 0.75 discarded most of every scan. On two real "nuclear power"
+ * scans:
+ *
+ *   scan          0.65                        0.75
+ *   28 posts      6 narratives, 23 clustered  3 narratives,  7 clustered (21 unclustered)
+ *   17 posts      4 narratives, 15 clustered  7 narratives, 10 clustered (mostly singletons)
+ *
+ * At 0.65 the clusters are coherent and distinct (heat-driven plant
+ * shutdowns; policy extensions; emergency-alert confusion; naval propulsion).
+ * At 0.75 three quarters of the posts fell out as noise.
+ *
+ * The likely cause of the bad default: its original comment justified 0.75 in
+ * terms of `gemini-embedding-2-preview`, but the configured model is
+ * `gemini-embedding-001` (see the constructor). Similarity distributions do
+ * not transfer between embedding models, so the number was calibrated against
+ * a model that is not the one running.
+ *
+ * CAVEAT: two scans on one topic. This is evidence, not an optimisation. A
+ * labelled same-narrative pair corpus is what would make it one — see
+ * docs/development/analysis-quality-plan.md §5.
+ */
+export const DEFAULT_SIMILARITY_THRESHOLD = 0.65;
+
+/** Keep a caller-supplied threshold inside the range where clustering is meaningful. */
+function clampThreshold(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_SIMILARITY_THRESHOLD;
+  }
+  return Math.max(0.3, Math.min(0.99, value));
+}
+
 interface EmbeddedPost {
   index: number;
   text: string;
@@ -231,6 +269,15 @@ export class NarrativeAnalysisService {
        * skipped entirely and clustering is similarity-only.
        */
       stanceTarget?: string;
+      /**
+       * Cosine similarity required to merge two posts into one narrative.
+       * Higher = tighter, more numerous, more specific narratives; lower =
+       * broader groupings that risk merging distinct stories.
+       *
+       * Parameterized so it can be SWEPT against labelled data rather than
+       * guessed. The default is DEFAULT_SIMILARITY_THRESHOLD.
+       */
+      similarityThreshold?: number;
     },
   ): Promise<AnalyzeResult> {
     if (posts.length === 0) {
@@ -306,14 +353,12 @@ export class NarrativeAnalysisService {
       stance: stances[i] ?? { stance: 'unclear', confidence: 0 },
     }));
 
-    // Step 3: Cluster
-    // Cosine similarity threshold for clustering.
-    // Higher = tighter clusters (fewer, more specific narratives).
-    // Lower = looser clusters (more, broader narratives).
-    // gemini-embedding-2-preview produces 3072-dim embeddings where posts about the
-    // same topic often have 0.6-0.85 similarity. Using 0.75 forces the algorithm to
-    // split posts into distinct sub-narratives within a topic.
-    const { clusters, emerging, noise } = this.agglomerativeCluster(embedded, 0.75);
+    // Step 3: Cluster.
+    // Higher threshold = tighter, more numerous narratives; lower = broader
+    // groupings. See DEFAULT_SIMILARITY_THRESHOLD for how the default was
+    // measured, and scripts/eval/threshold-sweep.ts to re-measure it.
+    const similarityThreshold = clampThreshold(options?.similarityThreshold);
+    const { clusters, emerging, noise } = this.agglomerativeCluster(embedded, similarityThreshold);
     this.logger.log(
       `Clustered into ${clusters.length} narratives (+${emerging.length} emerging, ${noise.length} unclustered)`,
     );
@@ -1049,12 +1094,12 @@ ${sections.join('\n\n')}`;
         prompt,
         generate: () => model.generateContent(prompt).then((r) => r.response.text()),
       });
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      // Lenient parse — a greedy /\[[\s\S]*\]/ spans to the last bracket in the
+      // response and breaks on appended reasoning or truncation, silently
+      // dropping every summary to raw post text.
+      const summaries = (parseLlmJsonArray(responseText) ?? []) as string[];
 
-      if (jsonMatch) {
-        // Fix common LLM JSON issues: trailing commas
-        const cleaned = jsonMatch[0].replace(/,\s*]/g, ']').replace(/,\s*}/g, '}');
-        const summaries = JSON.parse(cleaned) as string[];
+      if (summaries.length > 0) {
         for (let i = 0; i < Math.min(summaries.length, narratives.length); i++) {
           const summary = summaries[i];
           if (typeof summary === 'string' && summary.length > 0) {

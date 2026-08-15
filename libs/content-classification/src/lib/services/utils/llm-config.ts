@@ -117,7 +117,13 @@ export function parseLlmJsonObject(raw: string): unknown | null {
       const open = stack[stack.length - 1];
       if ((ch === '}' && open === '{') || (ch === ']' && open === '[')) {
         stack.pop();
-        if (stack.length === 0) lastGood = i;
+        if (stack.length === 0) {
+          // First complete top-level structure wins. Continuing would let a
+          // LATER bracket in appended reasoning overwrite this and drag the
+          // slice across the prose between them.
+          lastGood = i;
+          break;
+        }
       } else {
         // Unbalanced closer (the extra-brace case) — stop; what precedes it is
         // the salvageable region.
@@ -149,4 +155,74 @@ export function parseLlmJsonObject(raw: string): unknown | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Array counterpart to {@link parseLlmJsonObject}.
+ *
+ * Call sites were using a greedy `/\[[\s\S]*\]/`, which is the exact failure
+ * this module's other helpers exist to avoid: it spans from the first `[` to
+ * the LAST `]` anywhere in the response, so appended reasoning containing a
+ * bracket silently corrupts the match, and a truncated response fails to match
+ * at all. Either way the caller falls back — for narrative summaries that
+ * means raw post text is shown where an LLM summary should be, with nothing
+ * but a provenance flag to reveal it.
+ */
+export function parseLlmJsonArray(raw: string): unknown[] | null {
+  const start = raw.indexOf('[');
+  if (start === -1) return null;
+
+  let inString = false;
+  let escaped = false;
+  const stack: string[] = [];
+  let lastGood = -1;
+
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i] as string;
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '[' || ch === '{') stack.push(ch);
+    else if (ch === ']' || ch === '}') {
+      const open = stack[stack.length - 1];
+      if ((ch === ']' && open === '[') || (ch === '}' && open === '{')) {
+        stack.pop();
+        if (stack.length === 0) {
+          // First complete top-level array wins — see the note above.
+          lastGood = i;
+          break;
+        }
+      } else break;
+    }
+  }
+
+  const attempt = (text: string): unknown[] | null => {
+    try {
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
+  if (lastGood !== -1) return attempt(raw.slice(start, lastGood + 1));
+
+  if (stack.length === 0) return null;
+  const closers = stack
+    .reverse()
+    .map((open) => (open === '[' ? ']' : '}'))
+    .join('');
+  // Drop a dangling comma or half-written trailing element before closing.
+  const body = raw.slice(start).replace(/,\s*$/, '');
+  return attempt(body + closers) ?? attempt(`${body.replace(/,[^,\]}]*$/, '')}${closers}`);
 }

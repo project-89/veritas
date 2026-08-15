@@ -1,4 +1,4 @@
-import { extractFirstJsonObject, parseLlmJsonObject } from './llm-config';
+import { extractFirstJsonObject, parseLlmJsonArray, parseLlmJsonObject } from './llm-config';
 
 describe('extractFirstJsonObject', () => {
   it('extracts a clean JSON object', () => {
@@ -76,5 +76,43 @@ describe('parseLlmJsonObject', () => {
 
   it('returns null rather than guessing on unsalvageable input', () => {
     expect(parseLlmJsonObject('{"a": ')).toBeNull();
+  });
+});
+
+describe('parseLlmJsonArray', () => {
+  it('parses a well-formed array', () => {
+    expect(parseLlmJsonArray('["a", "b"]')).toEqual(['a', 'b']);
+  });
+
+  it('does not span to a bracket in appended reasoning', () => {
+    // The greedy /\[[\s\S]*\]/ this replaces would match through to the last
+    // ']' and fail to parse, dropping every summary.
+    expect(parseLlmJsonArray('["a", "b"]\nI chose these because [see above]')).toEqual(['a', 'b']);
+  });
+
+  it('repairs a truncated array', () => {
+    expect(parseLlmJsonArray('["a", "b"')).toEqual(['a', 'b']);
+  });
+
+  it('drops a half-written trailing element rather than failing', () => {
+    expect(parseLlmJsonArray('["a", "b", "unfinis')).toEqual(['a', 'b']);
+  });
+
+  it('is not fooled by brackets inside strings', () => {
+    expect(parseLlmJsonArray('["a ] b", "c"]')).toEqual(['a ] b', 'c']);
+  });
+
+  it('returns null when there is no array', () => {
+    expect(parseLlmJsonArray('{"a": 1}')).toBeNull();
+  });
+});
+
+describe('first-complete-structure semantics', () => {
+  it('object parser stops at the first complete object', () => {
+    expect(parseLlmJsonObject('{"a": 1}\n{"b": 2}')).toEqual({ a: 1 });
+  });
+
+  it('array parser stops at the first complete array', () => {
+    expect(parseLlmJsonArray('["a"]\n["b"]')).toEqual(['a']);
   });
 });
