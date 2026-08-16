@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type { ExternalSignal, SignalAdapter } from './signal-adapter.interface';
 
-const USER_AGENT = 'veritas-osint/2.0 (contact: veritas@oneirocom.dev)';
+const USER_AGENT = 'veritas-osint/2.0 (+https://github.com/project-89/veritas)';
 
 const SEVERITY_MAGNITUDE: Record<string, number> = {
   Extreme: 0.95,

@@ -133,7 +133,7 @@ interface RetrievedSnippet {
 // Constants
 // ---------------------------------------------------------------------------
 
-const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
+const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/project-89/veritas)';
 
 const WIKIPEDIA_API = 'https://en.wikipedia.org/w/api.php';
 const GDELT_API = 'https://api.gdeltproject.org/api/v2/doc/doc';

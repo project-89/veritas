@@ -124,7 +124,7 @@ export class SecEdgarEvidenceAdapter implements EvidenceAdapter {
       try {
         const response = await fetch(url, {
           headers: {
-            'User-Agent': 'Veritas/2.0 (research@oneirocom.com)',
+            'User-Agent': 'Veritas/2.0 (research@project-89.org)',
             Accept: 'application/json',
           },
           signal: AbortSignal.timeout(15_000),

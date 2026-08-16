@@ -240,17 +240,20 @@ describe('RSSConnector', () => {
         .spyOn((connector as any).parser, 'parseString')
         .mockResolvedValue({ items: [] } as any);
 
-      mockedAxios.get.mockRejectedValue(
-        Object.assign(new Error('Not found'), {
-          isAxiosError: true,
-          response: { status: 404 },
-        }),
-      );
+      // Transport is fetch now (conditional requests), not axios.
+      const fetchMock = jest.fn().mockResolvedValue({
+        status: 404,
+        ok: false,
+        headers: { get: () => null },
+        text: async () => '',
+      });
+      global.fetch = fetchMock as unknown as typeof fetch;
 
       await (connector as any).fetchFeedItems('https://example.com/feed.xml');
       await (connector as any).fetchFeedItems('https://example.com/feed.xml');
 
-      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+      // Second attempt is suppressed by the failure-backoff state.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(parseString).not.toHaveBeenCalled();
     });
 
@@ -264,9 +267,13 @@ describe('RSSConnector', () => {
         ],
       } as any);
 
-      mockedAxios.get.mockResolvedValue({
-        data: '\uFEFFnoise before xml<rss><channel><item><title>A & B</title></item></channel></rss>',
-      } as any);
+      global.fetch = jest.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        headers: { get: () => null },
+        text: async () =>
+          '\uFEFFnoise before xml<rss><channel><item><title>A & B</title></item></channel></rss>',
+      }) as unknown as typeof fetch;
 
       await (connector as any).fetchFeedItems('https://example.com/feed.xml');
 

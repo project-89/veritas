@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { TranslationService } from '@veritas/content-classification/llm';
+import { conditionalFeedFetch, type FeedValidators } from '@veritas/shared/utils';
 import { Observable, Subject } from 'rxjs';
 import type { EventCategory, EventSeverity, GeoLocation, GlobalEvent } from '../types/global-event';
 import { geocodeFromText, REGION_CENTROIDS, resolveCountryCode } from '../utils/geocoding';
@@ -39,6 +40,15 @@ export interface RssFeedEntry {
   audience?: 'domestic' | 'international';
 }
 
+/** The subset of an rss-parser item this poller reads. */
+interface PolledFeedItem {
+  title?: string;
+  link?: string;
+  pubDate?: string;
+  content?: string;
+  contentSnippet?: string;
+}
+
 interface EventRepository {
   upsertEvent(event: GlobalEvent): Promise<unknown>;
 }
@@ -56,7 +66,22 @@ const EONET_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes (open events change slow
 const NWS_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const GFW_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes (maritime intelligence, token-gated)
 const WEATHER_INTERVAL_MS = 60 * 60 * 1000; // 60 minutes (severe-weather conditions)
-const RSS_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+/**
+ * Ambient tier-1 feed poll cadence.
+ *
+ * Was a hardcoded 10 minutes, which meant refetching every tier-1 feed IN FULL
+ * 144 times a day whether or not anything changed. Tier-1 news feeds do not
+ * update meaningfully faster than half-hourly, and the ingest window here is
+ * 24h wide, so nothing is lost by slowing down — while the request volume
+ * drops threefold before conditional requests are even considered.
+ *
+ * Override with RSS_POLL_INTERVAL_MINUTES.
+ */
+const RSS_INTERVAL_MS = (() => {
+  const raw = Number(process.env['RSS_POLL_INTERVAL_MINUTES']);
+  const minutes = Number.isFinite(raw) && raw >= 5 ? raw : 30;
+  return minutes * 60 * 1000;
+})();
 const RSS_MAX_AGE_MS = 24 * 60 * 60 * 1000; // keep feed items from the last 24h
 const DEDUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const DEFAULT_EVENT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -157,6 +182,16 @@ function eonetPlaceLabel(title: string, lat: number, lng: number): string {
 @Injectable()
 export class GlobalEventAggregationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(GlobalEventAggregationService.name);
+
+  /**
+   * Per-feed HTTP cache validators plus the items last parsed from that feed.
+   * In-memory is adequate here: this poller runs continuously, so a restart
+   * costs exactly one full fetch per feed and nothing else.
+   */
+  private readonly feedValidators = new Map<
+    string,
+    { validators: FeedValidators; items: PolledFeedItem[] }
+  >();
 
   // Adapters (stateless — instantiated directly)
   private readonly usgs = new UsgsAdapter();
@@ -380,11 +415,39 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
         const results = await Promise.allSettled(
           batch.map(async (feed) => {
             try {
+              // Conditional fetch: send the validators from last time so an
+              // unchanged feed costs a ~200-byte 304 instead of a full
+              // re-download. `parseURL` sent no user-agent at all and always
+              // refetched in full, which is the behaviour publishers block.
+              const cached = this.feedValidators.get(feed.url);
+              const result = await conditionalFeedFetch(feed.url, cached?.validators ?? {});
+
+              if (result.status === 'not-modified') {
+                // Reuse what we parsed last time — same items, no work, no bytes.
+                return { feed, items: cached?.items ?? [] };
+              }
+              if (result.status === 'rate-limited') {
+                this.logger.warn(
+                  `RSS poll: ${feed.name} asked us to back off` +
+                    (result.retryAfterMs ? ` for ${Math.round(result.retryAfterMs / 1000)}s` : ''),
+                );
+                return { feed, items: [] };
+              }
+              if (result.status === 'error') {
+                // Previously swallowed entirely, so a permanently dead feed
+                // looked identical to one with no recent items.
+                this.logger.debug(`RSS poll: ${feed.name} failed — ${result.detail}`);
+                return { feed, items: [] };
+              }
+
               const Parser = (await import('rss-parser')).default;
               const parser = new Parser({ timeout: 10000 });
-              const parsed = await parser.parseURL(feed.url);
-              return { feed, items: parsed.items ?? [] };
-            } catch {
+              const parsed = await parser.parseString(result.body);
+              const items = (parsed.items ?? []) as PolledFeedItem[];
+              this.feedValidators.set(feed.url, { validators: result.validators, items });
+              return { feed, items };
+            } catch (err) {
+              this.logger.debug(`RSS poll: ${feed.name} parse failed — ${err}`);
               return { feed, items: [] };
             }
           }),

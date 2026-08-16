@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SourceNode } from '@veritas/shared/types';
+import { conditionalFeedFetch } from '@veritas/shared/utils';
 import axios from 'axios';
 import { EventEmitter } from 'events';
 import Parser from 'rss-parser';
@@ -11,6 +12,7 @@ import {
 } from '../interfaces/social-media-connector.interface';
 import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
 import { RssCacheRepository } from '../repositories/rss-cache.repository';
+import { SourceRateLimiter } from './utils/source-rate-limiter';
 import type { RssCacheItem } from '../schemas/rss-cache.schema';
 import type { FeedFailureState } from '../schemas/rss-feed-state.schema';
 import { matchesQuery } from '../utils/query-match.util';
@@ -415,14 +417,67 @@ export class RSSConnector implements TransformOnIngestConnector, OnModuleInit, O
     }
   }
 
+  /**
+   * Per-feed HTTP cache validators plus the body they belong to, so an
+   * unchanged feed costs a ~200-byte 304 instead of a full re-download.
+   * Bounded by the catalog size (160 feeds).
+   */
+  private readonly feedCache = new Map<
+    string,
+    { etag?: string; lastModified?: string; body: string }
+  >();
+
+  /**
+   * Fetch a feed body — paced by SourceRateLimiter, validated conditionally.
+   *
+   * Both were missing. The limiter already had an `rss` entry
+   * (minIntervalMs 100, maxConcurrent 10) but this connector never called it,
+   * so that configuration was inert. And every fetch was unconditional, so
+   * feeds that had not changed were re-downloaded in full on every poll —
+   * the behaviour publishers rate-limit and block.
+   *
+   * A 304 returns the previously fetched body rather than throwing: an
+   * unchanged feed is a SUCCESS, and surfacing it as an error would trip the
+   * failure-suppression logic and eventually disable a perfectly healthy feed.
+   */
   private async fetchFeedXml(feedUrl: string): Promise<string> {
+    return SourceRateLimiter.instance.schedule('rss', async () => {
+      const cached = this.feedCache.get(feedUrl);
+      const result = await conditionalFeedFetch(
+        feedUrl,
+        { ...(cached?.etag ? { etag: cached.etag } : {}), ...(cached?.lastModified ? { lastModified: cached.lastModified } : {}) },
+        { timeoutMs: RSSConnector.FEED_FETCH_TIMEOUT_MS },
+      );
+
+      switch (result.status) {
+        case 'modified': {
+          // Sanitize BEFORE caching, so the 304 path returns the same
+          // normalized document the 200 path does.
+          const xml = this.sanitizeFeedXml(feedUrl, result.body);
+          this.feedCache.set(feedUrl, { ...result.validators, body: xml });
+          return xml;
+        }
+        case 'not-modified':
+          this.logger.debug(`Feed unchanged (304): ${feedUrl}`);
+          return cached?.body ?? '';
+        case 'rate-limited':
+          SourceRateLimiter.instance.notifyRateLimited('rss', result.retryAfterMs);
+          throw new Error(`Feed rate-limited: ${feedUrl}`);
+        default:
+          throw new Error(`Feed fetch failed (${result.detail}): ${feedUrl}`);
+      }
+    });
+  }
+
+  /** @deprecated Unconditional axios fetch, kept only until callers migrate. */
+  private async fetchFeedXmlLegacy(feedUrl: string): Promise<string> {
     const response = await axios.get<string>(feedUrl, {
       responseType: 'text',
       timeout: RSSConnector.FEED_FETCH_TIMEOUT_MS,
       headers: {
         'User-Agent':
           this.configService.get<string>('RSS_USER_AGENT') ??
-          'Mozilla/5.0 (compatible; VeritasRSS/1.0; +https://oneirocom.com)',
+          'Mozilla/5.0 (compatible; VeritasRSS/1.0; +https://github.com/project-89/veritas)',
         Accept:
           'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',

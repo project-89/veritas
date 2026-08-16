@@ -124,7 +124,7 @@ export class WaybackEvidenceAdapter implements EvidenceAdapter {
 
     try {
       const response = await fetch(url.toString(), {
-        headers: { 'User-Agent': 'Veritas/2.0 (+https://github.com/oneirocom/veritas)' },
+        headers: { 'User-Agent': 'Veritas/2.0 (+https://github.com/project-89/veritas)' },
         signal: AbortSignal.timeout(15_000),
       });
       if (!response.ok) {

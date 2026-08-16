@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type { ExternalSignal, SignalAdapter } from './signal-adapter.interface';
 
-const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
+const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/project-89/veritas)';
 const OAUTH_URL = 'https://acleddata.com/oauth/token';
 const READ_URL = 'https://acleddata.com/api/acled/read';
 const CLIENT_ID = 'acled';

@@ -6,7 +6,7 @@ import type { SourceNode } from '../schemas';
 import { extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 
-const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
+const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/project-89/veritas)';
 
 /**
  * Event categories that Wikipedia uses on the Current Events portal.

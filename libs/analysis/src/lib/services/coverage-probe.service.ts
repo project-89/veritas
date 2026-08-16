@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 
 const GDELT_DOC_API = 'https://api.gdeltproject.org/api/v2/doc/doc';
-const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
+const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/project-89/veritas)';
 
 export interface CoverageBucket {
   /** ISO date (start of the bucket). */

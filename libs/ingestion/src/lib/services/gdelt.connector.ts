@@ -9,7 +9,7 @@ import { buildSearchQuery, extractSignificantTerms } from '../utils/query-match.
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 
-const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/oneirocom/veritas)';
+const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/project-89/veritas)';
 const GDELT_DOC_API = 'https://api.gdeltproject.org/api/v2/doc/doc';
 
 interface GdeltArticle {
