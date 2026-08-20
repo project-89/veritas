@@ -2,6 +2,7 @@
 
 **Status:** Phase 0 shipped (2026-08-06, `c873f32`); Phases 1-5 not started
 **Owner decision required:** yes — see [Open Decisions](#open-decisions)
+**Governed by:** [`detection-methodology.md`](./detection-methodology.md)
 **Related:** [`REMEDIATION-PLAN.md`](../REMEDIATION-PLAN.md) · [`forensic-intelligence-roadmap.md`](./forensic-intelligence-roadmap.md)
 
 ---

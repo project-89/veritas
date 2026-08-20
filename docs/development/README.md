@@ -24,6 +24,7 @@ This directory contains technical documentation for developers working on the Ve
 - [Transform-on-Ingest Architecture](./transform-on-ingest-consolidated.md) - Comprehensive documentation of the transform-on-ingest architecture
 - [Narrative Repository Pattern](./narrative-repository-pattern.md) - Explains the repository pattern used for narrative insights
 - [Data Deletion Strategy](./data-deletion-strategy.md) - Data retention and deletion strategy
+- [Detection Methodology](./detection-methodology.md) - **Governing standard**: every detector must be a deterministic method over evidence, grounded in an established statistical or journalistic technique and measured against ground truth. The LLM may participate; it may not be the method.
 - [Analysis Quality Plan](./analysis-quality-plan.md) - **Proposed**: bot/coordination detection, stance-aware narrative grouping, interactive parameter control, and calibration across every interpretive layer
 - [Causal Inference Layer](./causal-inference-layer.md) - **Proposed**: replacing assertion-by-temporal-ordering in downstream effects with base-rate-grounded, lag-constrained, FDR-corrected inference that abstains on thin data
 - [GraphQL Integration](./transform-on-ingest-graphql.md) - Historical: the GraphQL API has been removed; the API is now REST-only

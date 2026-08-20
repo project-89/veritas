@@ -2,6 +2,7 @@
 
 **Status:** Phases A and B shipped (2026-08-14); Phases C–F not started
 **Scope:** every interpretive layer — bot/coordination detection, narrative grouping, credibility, causal suggestion
+**Governed by:** [`detection-methodology.md`](./detection-methodology.md)
 **Related:** [`causal-inference-layer.md`](./causal-inference-layer.md) · [`../../scripts/eval/README.md`](../../scripts/eval/README.md) · [`../REMEDIATION-PLAN.md`](../REMEDIATION-PLAN.md)
 
 ---
