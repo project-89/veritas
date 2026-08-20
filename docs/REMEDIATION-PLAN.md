@@ -138,7 +138,7 @@ Audit verdict: uneven. Clustering and bot detection are real; several "detection
 - [x] `package.json.original` — pre-Nx leftover
 
 **Decide (owner call):**
-- [ ] `libs/visualization` — 22+ components, zero imports from the client, zero tests. Wire into dashboard or delete. (Deferred — revisit during the Phase 4 client rework, since dashboard redesign may want these.)
+- [x] `libs/visualization` — **deleted 2026-08-19.** 8 components / ~4,700 lines with zero imports from anywhere, zero tests. Superseded by the NERV dashboard's own components (`propagation-flow`, `social-graph-panel`, `temporal-heatmap`, `narrative-globe`, `event-globe`, `hex-tactical-map`), which cover the same ground against real data. Recoverable from git if the narrative-timeline work wants a starting point.
 - [x] **GraphQL layer** — DECIDED 2026-07-06 (owner) and REMOVED 2026-07-07: resolvers, GraphQL-only DTOs, schema.gql, and all 7 graphql/apollo dependencies deleted; shared classes kept with decorators stripped. Client was 100% REST; this closes an unauthenticated duplicate mutation surface.
 - [ ] k8s/terraform — templates reference Kafka (doesn't exist in code) and placeholder image registries. Update or mark as reference-only.
 

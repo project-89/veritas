@@ -1,7 +1,7 @@
 {
   "name": "@veritas-nx/source",
   "version": "0.0.0",
-  "description": "Open-source narrative-intelligence OSINT platform — tracks how the same story diverges across state media, public broadcasters, and independent outlets, with evidence-grounded verification and auditable provenance. Sees who says what; doesn't decide what's true.",
+  "description": "Open-source narrative-intelligence OSINT platform \u2014 tracks how the same story diverges across state media, public broadcasters, and independent outlets, with evidence-grounded verification and auditable provenance. Sees who says what; doesn't decide what's true.",
   "keywords": [
     "osint",
     "narrative-intelligence",
@@ -20,7 +20,6 @@
     "postinstall": "node scripts/bootstrap-workspace.js",
     "plugins:sync": "node scripts/generate-plugin-registry.js",
     "test": "env -u NO_COLOR NX_DAEMON=false NODE_OPTIONS=--require=./scripts/test-process-bootstrap.cjs node scripts/run-nx.js run-many --target=test --all --parallel=1",
-    "test:visualization": "env -u NO_COLOR NX_DAEMON=false NODE_OPTIONS=--require=./scripts/test-process-bootstrap.cjs nx test visualization",
     "test:api": "env -u NO_COLOR NX_DAEMON=false NODE_OPTIONS=--require=./scripts/test-process-bootstrap.cjs nx test api",
     "test:analysis": "env -u NO_COLOR NX_DAEMON=false NODE_OPTIONS=--require=./scripts/test-process-bootstrap.cjs nx test analysis",
     "test:types": "env -u NO_COLOR NX_DAEMON=false NODE_OPTIONS=--require=./scripts/test-process-bootstrap.cjs nx test types",
@@ -30,7 +29,6 @@
     "test:coverage": "env -u NO_COLOR NX_DAEMON=false NODE_OPTIONS=--require=./scripts/test-process-bootstrap.cjs node scripts/run-nx.js run-many --target=test --all --parallel=3 --coverage",
     "test:affected": "env -u NO_COLOR NX_DAEMON=false NODE_OPTIONS=--require=./scripts/test-process-bootstrap.cjs node scripts/run-nx.js affected --target=test",
     "build": "pnpm plugins:sync && nx run-many --target=build --all",
-    "build:visualization": "nx build visualization",
     "build:api": "nx build api",
     "build:veritas-client": "nx build veritas-client",
     "lint": "nx run-many --target=lint --all",
@@ -38,7 +36,6 @@
     "biome:check": "biome check --write .",
     "biome:lint": "biome check .",
     "serve:api": "nx serve api",
-    "serve:visualization": "nx serve visualization",
     "serve:veritas-client": "nx serve veritas-client",
     "dev": "pnpm plugins:sync && nx run-many --target=serve --projects=api,veritas-client --parallel=2",
     "clean:build": "find . -type f -name \"*.js\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -not -path \"*/scripts/*\" -not -name \"jest.config.js\" -not -name \"jest.preset.js\" -not -name \"*.config.js\" -delete && find . -type f -name \"*.d.ts\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -not -path \"*/types/*\" -delete && find . -type f -name \"*.js.map\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -delete && find . -type f -name \"*.tsbuildinfo\" -not -path \"*/node_modules/*\" -not -path \"*/dist/*\" -delete",

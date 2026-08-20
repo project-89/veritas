@@ -10,7 +10,6 @@ This directory contains the documentation for the Veritas system. It's organized
 |---------|-------------|
 | [Development](./development/README.md) | Technical documentation for developers |
 | [User](./user/README.md) | End-user guides and tutorials |
-| [Visualization](./visualization/README.md) | Documentation for visualization components |
 | [Narrative Analysis](./narrative-analysis/README.md) | Documentation for narrative analysis features |
 | [Deployment](./deployment/README.md) | Deployment and operations guides |
 | [Assets](./assets/) | Images, diagrams, and other assets used in documentation |
@@ -31,8 +30,6 @@ This directory contains the documentation for the Veritas system. It's organized
 
 ### For Visualization
 
-- [Visualization Components](./visualization/README.md) - Overview of visualization components
-- [Integration Guide](./visualization/integration-guide.md) - Guide for integrating visualization components
 
 ## Documentation Status
 

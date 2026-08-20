@@ -37,7 +37,7 @@ Veritas tracks how narratives emerge, diverge, and travel across the open web. I
                          └► MCP server (apps/veritas-mcp) for agent control
 ```
 
-**Monorepo (Nx):** `apps/{api, veritas-client, veritas-mcp}` · `libs/{analysis, ingestion, database, shared, content-classification, visualization}` · `packages/atlas-plugin`.
+**Monorepo (Nx):** `apps/{api, veritas-client, veritas-mcp}` · `libs/{analysis, ingestion, database, shared, content-classification}` · `packages/atlas-plugin`.
 
 ## Data sources
 

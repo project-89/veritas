@@ -26,7 +26,6 @@
       "@/app.module": ["apps/api/src/app/app.module.ts"],
       "@/modules/*": ["apps/api/src/app/modules/*"],
       "@/services/*": ["apps/api/src/app/services/*"],
-      "@veritas-nx/visualization": ["libs/visualization/src/index.ts"],
       "@veritas/analysis": ["libs/analysis/src/index.ts"],
       "@veritas/client/api": ["apps/veritas-client/lib/api.ts"],
       "@veritas/client/nerv/*": ["apps/veritas-client/components/nerv/*"],
