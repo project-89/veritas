@@ -21,3 +21,9 @@ export {
 export type { DuplicateCluster, DuplicationResult } from './duplication';
 export { measureTemporal } from './temporal';
 export type { TemporalResult } from './temporal';
+export { compareToNull } from './null-model';
+export type { NullComparison } from './null-model';
+export { benjaminiHochberg } from './multiple-comparisons';
+export type { CorrectedResult, CorrectionSummary } from './multiple-comparisons';
+export { BASE_RATE_STORE, BaseRateService } from './base-rate.service';
+export type { ArchivedEvent, BaseRateOptions, BaseRateStore } from './base-rate.service';

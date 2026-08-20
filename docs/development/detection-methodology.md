@@ -144,7 +144,11 @@ Every one is computable from data already stored. None needs an LLM.
 
 ### 5.3 Honest constraint
 
-We have **no platform interaction graph** — the only modelled edges are `CO_NARRATIVE` and `CO_TIMED`, so true retweet/reply cascades are not available. Co-activity networks built from co-timing, co-URL and co-duplicate-text are the right substitute and are what the coordination literature actually uses, but amplification-path claims (who amplified whom) are **out of reach** until interaction data exists. That limit gets stated rather than approximated.
+We have no platform interaction graph today — the only modelled edges are `CO_NARRATIVE` and `CO_TIMED`. Co-activity networks built from co-timing, co-URL and co-duplicate-text are the right substitute, and are what the coordination literature actually uses.
+
+But this is a CAPTURE GAP, not a hard limit, and the first draft of this doc overstated it. We store interaction COUNTS (`repostCount`, `replyCount`) and discard the EDGES — which several platforms do expose: AT Proto returns `reply.parent.uri` on every post, Reddit returns `parent_id`, 4chan has `>>` references, Farcaster casts carry parent refs. `SocialMediaPost` simply has no field to put them in. Real amplification cascades are one capture change away for those four.
+
+Telegram is the genuine exception: forwards are not available via the web-preview approach its connector uses.
 
 ---
 

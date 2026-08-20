@@ -9,6 +9,7 @@ import {
   CrossPlatformIdentityService,
   DeepInvestigationService,
   DownstreamEffectsService,
+  BASE_RATE_STORE,
   FOLD_JOURNAL_SINK,
   GLOBAL_EVENT_REPOSITORY,
   GraphBotDetectionService,
@@ -24,6 +25,7 @@ import {
   CROSS_PLATFORM_SERVICE,
   DEEP_INVESTIGATION_SERVICE,
   DOWNSTREAM_EFFECTS_SERVICE,
+  BaseRateRepository,
   FoldJournalRepository,
   GlobalEventRepository,
   GRAPH_BOT_DETECTION_SERVICE,
@@ -138,6 +140,8 @@ import { SchedulerService } from './services/scheduler.service';
     // Fold emission is a side channel: consumers read the journal, nothing in
     // Veritas depends on it.
     { provide: FOLD_JOURNAL_SINK, useExisting: FoldJournalRepository },
+    // Base rates answer "compared to what?" for every detector.
+    { provide: BASE_RATE_STORE, useExisting: BaseRateRepository },
     // Bridge analysis services to ingestion's AnalysisProcessor tokens
     { provide: PROPAGANDA_SERVICE, useExisting: PropagandaAnalysisService },
     { provide: CLAIM_VERIFICATION_SERVICE, useExisting: ClaimVerificationService },

@@ -32,6 +32,7 @@ import { AlertRepository } from './repositories/alert.repository';
 import { AnalysisJobRepository } from './repositories/analysis-job.repository';
 import { ConnectorFetchCacheRepository } from './repositories/connector-fetch-cache.repository';
 import { EmbeddingCacheRepository } from './repositories/embedding-cache.repository';
+import { BaseRateRepository } from './repositories/base-rate.repository';
 import { FoldJournalRepository } from './repositories/fold-journal.repository';
 import { LlmResponseCacheRepository } from './repositories/llm-response-cache.repository';
 import { TranslationCacheRepository } from './repositories/translation-cache.repository';
@@ -230,6 +231,7 @@ export class IngestionModule {
       // Attaches itself to the DI-free LlmGateway singleton on init, giving its
       // response cache durable backing across restarts.
       LlmResponseCacheRepository,
+      BaseRateRepository,
       FoldJournalRepository,
     ];
 
@@ -346,6 +348,7 @@ export class IngestionModule {
       ConnectorFetchCacheRepository,
       // Exported so the API module can bind it to FOLD_JOURNAL_SINK.
       FoldJournalRepository,
+      BaseRateRepository,
       BullModule,
       // Only export EmbeddingsService if it's enabled
       ...(options?.enableEmbeddings ? [EmbeddingsService] : []),

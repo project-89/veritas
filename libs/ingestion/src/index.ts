@@ -93,3 +93,5 @@ export * from './types/social-media.types';
 
 export { FoldJournalRepository } from './lib/repositories/fold-journal.repository';
 export type { FoldCursor, FoldReadOptions } from './lib/repositories/fold-journal.repository';
+
+export { BaseRateRepository } from './lib/repositories/base-rate.repository';
