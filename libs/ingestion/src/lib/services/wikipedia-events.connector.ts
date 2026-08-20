@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import type { NarrativeInsight } from '../../types/narrative-insight.interface';
+import type { SocialMediaPost } from '../../types/social-media.types';
 import type { ConnectorSearchOptions, DataConnector } from '../interfaces/data-connector.interface';
 import type { SourceNode } from '../schemas';
 import { extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
@@ -57,28 +58,80 @@ export class WikipediaEventsConnector implements DataConnector {
   /**
    * Search current events and transform into anonymised NarrativeInsight objects.
    */
+  /**
+   * Search and return BOTH posts and insights.
+   *
+   * Without this, ScanProcessor falls back to `searchAndTransform` and
+   * hardcodes `posts: []`. Only posts are serialized into scan_posts, so every
+   * event this connector found was silently discarded while the scan reported
+   * `status: done, postCount: 0` — indistinguishable from "no matches". Same
+   * defect that was dropping the entire RSS catalog (0695ee7).
+   *
+   * SEPARATE KNOWN LIMITATION, deliberately not changed here: unlike the other
+   * connectors this one hand-builds its insights rather than going through
+   * TransformOnIngestService, so its items get `sentiment: neutral`, no
+   * entities, and `themes: [category]` — they bypass classification, entity
+   * extraction, translation and embeddings entirely. Wiring it to the real
+   * pipeline is a behaviour change, not a bug fix, so it is left for its own
+   * change.
+   */
+  async searchWithRawData(
+    query: string,
+    options?: ConnectorSearchOptions,
+  ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> {
+    // ONE fetch builds both, so posts and insights are guaranteed to describe
+    // the same events. Calling searchAndTransform and then re-fetching would
+    // double the requests and could pair mismatched sets if the portal page
+    // changed between them.
+    const events = await this.fetchAndParse(query, options?.limit);
+    const { posts, insights } = this.buildFromEvents(events);
+    this.logger.log(`Wikipedia: ${posts.length} posts, ${insights.length} insights`);
+    return { posts, insights };
+  }
+
+  /** Build the paired post/insight pair for one event list. Index-aligned. */
+  private buildFromEvents(events: ParsedEvent[]): {
+    posts: SocialMediaPost[];
+    insights: NarrativeInsight[];
+  } {
+    const now = new Date();
+    const posts: SocialMediaPost[] = events.map((ev, i) => ({
+      id: `wiki-${i}-${this.simpleHash(ev.text)}`,
+      text: ev.text,
+      timestamp: now,
+      platform: 'wikipedia',
+      authorId: 'wikipedia-portal',
+      authorName: 'Wikipedia Current Events',
+      authorHandle: 'wikipedia',
+      url: ev.url,
+      engagementMetrics: { likes: 0, shares: 0, comments: 0, reach: 0, viralityScore: 0 },
+    }));
+
+    const insights: NarrativeInsight[] = events.map((ev, i) => ({
+      id: `wiki-insight-${i}-${now.getTime()}`,
+      contentHash: this.simpleHash(ev.text),
+      sourceHash: this.simpleHash('wikipedia-portal'),
+      platform: 'wikipedia',
+      timestamp: now,
+      themes: [ev.category],
+      entities: [],
+      sentiment: { score: 0, label: 'neutral' as const, confidence: 0.5 },
+      engagement: { total: 0, breakdown: {} },
+      narrativeScore: 0.4,
+      processedAt: now,
+      expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+    }));
+
+    return { posts, insights };
+  }
+
   async searchAndTransform(
     query: string,
     options?: ConnectorSearchOptions,
   ): Promise<NarrativeInsight[]> {
     try {
       const events = await this.fetchAndParse(query, options?.limit);
-      const now = new Date();
-
-      return events.map((ev, i) => ({
-        id: `wiki-insight-${i}-${Date.now()}`,
-        contentHash: this.simpleHash(ev.text),
-        sourceHash: this.simpleHash('wikipedia-portal'),
-        platform: 'wikipedia',
-        timestamp: now,
-        themes: [ev.category],
-        entities: [],
-        sentiment: { score: 0, label: 'neutral' as const, confidence: 0.5 },
-        engagement: { total: 0, breakdown: {} },
-        narrativeScore: 0.4,
-        processedAt: now,
-        expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
-      }));
+      return this.buildFromEvents(events).insights;
     } catch (err) {
       this.logger.error(`Wikipedia searchAndTransform failed: ${err}`);
       throw new Error(

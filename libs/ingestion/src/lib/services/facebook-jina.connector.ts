@@ -92,6 +92,26 @@ export class FacebookJinaConnector implements DataConnector, OnModuleInit, OnMod
     this.streamConnections.clear();
   }
 
+  /**
+   * Search and return BOTH posts and insights.
+   *
+   * Without this, ScanProcessor falls back to `searchAndTransform` and
+   * hardcodes `posts: []`. Only posts are serialized into scan_posts, so every
+   * item this connector found was silently discarded while the scan reported
+   * `status: done, postCount: 0` — indistinguishable from "no matches". Same
+   * defect that was dropping the entire RSS catalog (0695ee7).
+   */
+  async searchWithRawData(
+    query: string,
+    options?: SearchOptions,
+  ): Promise<{ posts: SocialMediaPost[]; insights: NarrativeInsight[] }> {
+    const posts = await this.searchContent(query, options);
+    if (posts.length === 0) return { posts: [], insights: [] };
+    const insights = await this.transformService.transformBatch(posts);
+    this.logger.log(`Facebook: ${posts.length} posts, ${insights.length} insights`);
+    return { posts, insights };
+  }
+
   async searchAndTransform(query: string, options?: SearchOptions): Promise<NarrativeInsight[]> {
     try {
       this.logger.log(`Reading Facebook pages (API-free) for: ${query}`);

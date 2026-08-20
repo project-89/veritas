@@ -114,4 +114,53 @@ describe('WikipediaEventsConnector', () => {
       expect(insights).toEqual([]);
     });
   });
+
+  describe('searchWithRawData', () => {
+    it('returns posts alongside insights so the scan can store them', async () => {
+      // Regression: without this, ScanProcessor hardcodes posts: [] and every
+      // Wikipedia event was silently discarded from the scan.
+      const fetchSpy = jest
+        .spyOn(connector as unknown as { fetchAndParse: () => Promise<unknown> }, 'fetchAndParse')
+        .mockResolvedValue([
+          { text: 'Romania shuts down a reactor', url: 'https://x/1', category: 'Disasters' },
+          { text: 'Second event happened', url: 'https://x/2', category: 'Politics' },
+        ] as never);
+
+      const result = await connector.searchWithRawData('reactor');
+
+      expect(result.posts).toHaveLength(2);
+      expect(result.insights).toHaveLength(2);
+      expect(result.posts[0]!.text).toBe('Romania shuts down a reactor');
+      expect(result.posts[0]!.platform).toBe('wikipedia');
+      // ONE fetch — pairing two separate fetches could mismatch if the portal
+      // page changed between them.
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps posts and insights index-aligned', async () => {
+      jest
+        .spyOn(connector as unknown as { fetchAndParse: () => Promise<unknown> }, 'fetchAndParse')
+        .mockResolvedValue([
+          { text: 'alpha', url: 'https://x/a', category: 'A' },
+          { text: 'beta', url: 'https://x/b', category: 'B' },
+        ] as never);
+
+      const { posts, insights } = await connector.searchWithRawData('anything');
+
+      expect(insights[0]!.themes).toEqual(['A']);
+      expect(insights[1]!.themes).toEqual(['B']);
+      expect(posts[1]!.text).toBe('beta');
+    });
+
+    it('returns empty pairs when nothing matched', async () => {
+      jest
+        .spyOn(connector as unknown as { fetchAndParse: () => Promise<unknown> }, 'fetchAndParse')
+        .mockResolvedValue([] as never);
+
+      await expect(connector.searchWithRawData('nothing')).resolves.toEqual({
+        posts: [],
+        insights: [],
+      });
+    });
+  });
 });
