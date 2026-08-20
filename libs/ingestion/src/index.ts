@@ -90,3 +90,6 @@ export * from './types/narrative-insight.interface';
 export * from './types/narrative-trend.interface';
 // Types
 export * from './types/social-media.types';
+
+export { FoldJournalRepository } from './lib/repositories/fold-journal.repository';
+export type { FoldCursor, FoldReadOptions } from './lib/repositories/fold-journal.repository';

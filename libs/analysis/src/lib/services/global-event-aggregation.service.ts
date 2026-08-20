@@ -8,7 +8,8 @@ import {
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { TranslationService } from '@veritas/content-classification/llm';
-import { conditionalFeedFetch, type FeedValidators } from '@veritas/shared/utils';
+import { conditionalFeedFetch, type FeedValidators, type FoldEvent } from '@veritas/shared/utils';
+import { globalEventToFold } from './fold-emit/global-event-to-fold';
 import { Observable, Subject } from 'rxjs';
 import type { EventCategory, EventSeverity, GeoLocation, GlobalEvent } from '../types/global-event';
 import { geocodeFromText, REGION_CENTROIDS, resolveCountryCode } from '../utils/geocoding';
@@ -25,6 +26,18 @@ import { WeatherAdapter } from './signal-adapters/weather.adapter';
 import { contentTokens, overlapCoefficient, sameLocation } from './utils/dedupe-global-events';
 /** Injection token for the global event repository (avoids cross-module dependency). */
 export const GLOBAL_EVENT_REPOSITORY = Symbol('GLOBAL_EVENT_REPOSITORY');
+
+/** Injection token for the optional Fold journal sink. */
+export const FOLD_JOURNAL_SINK = Symbol('FOLD_JOURNAL_SINK');
+
+/**
+ * Minimal port for emitting Fold change records — decoupled from the ingestion
+ * repository so this lib takes no dependency on it (and no build cycle).
+ */
+export interface FoldJournalSink {
+  readonly enabled: boolean;
+  append(events: FoldEvent[]): Promise<number>;
+}
 export const GLOBAL_EVENT_RSS_FEEDS = Symbol('GLOBAL_EVENT_RSS_FEEDS');
 
 export interface RssFeedEntry {
@@ -238,6 +251,7 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
   constructor(
     private readonly moduleRef: ModuleRef,
     @Optional() @Inject(GLOBAL_EVENT_REPOSITORY) private eventRepo?: EventRepository,
+    @Optional() @Inject(FOLD_JOURNAL_SINK) private foldJournal?: FoldJournalSink,
     @Optional() @Inject(GLOBAL_EVENT_RSS_FEEDS) private readonly rssFeeds: RssFeedEntry[] = [],
     @Optional() private readonly translator?: TranslationService,
   ) {}
@@ -257,8 +271,23 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
       }
     }
 
+    // Same cross-module lookup as the repository above. The sink is bound in
+    // AppModule but this service is constructed in AnalysisModule, so plain
+    // @Inject resolves to undefined — silently, which is how the first cut
+    // emitted nothing while reporting healthy.
+    if (!this.foldJournal) {
+      try {
+        this.foldJournal = this.moduleRef.get<FoldJournalSink>(FOLD_JOURNAL_SINK, {
+          strict: false,
+        });
+      } catch {
+        // Emission is a side channel; the pipeline runs fine without it.
+      }
+    }
+
     this.logger.log(
-      `Starting global event aggregation (persistence: ${this.eventRepo ? 'enabled' : 'DISABLED — GLOBAL_EVENT_REPOSITORY not injected'})`,
+      `Starting global event aggregation (persistence: ${this.eventRepo ? 'enabled' : 'DISABLED — GLOBAL_EVENT_REPOSITORY not injected'}` +
+        `, fold emit: ${this.foldJournal?.enabled ? 'enabled' : 'DISABLED'})`,
     );
 
     // Stagger initial polls to avoid thundering herd / rate limits
@@ -764,6 +793,16 @@ export class GlobalEventAggregationService implements OnModuleInit, OnModuleDest
           await this.eventRepo.upsertEvent(normalizedEvent);
         } catch (err) {
           this.logger.warn(`Failed to persist event ${normalizedEvent.id}: ${err}`);
+        }
+      }
+
+      // Emit to the Fold journal. A side channel: consumers read it, nothing
+      // in Veritas depends on it, and a failure here must never affect ingest.
+      if (this.foldJournal?.enabled) {
+        try {
+          await this.foldJournal.append([globalEventToFold(normalizedEvent)]);
+        } catch (err) {
+          this.logger.debug(`Fold emit failed for ${normalizedEvent.id}: ${err}`);
         }
       }
     }

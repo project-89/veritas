@@ -9,6 +9,7 @@ import {
   CrossPlatformIdentityService,
   DeepInvestigationService,
   DownstreamEffectsService,
+  FOLD_JOURNAL_SINK,
   GLOBAL_EVENT_REPOSITORY,
   GraphBotDetectionService,
   PropagandaAnalysisService,
@@ -23,6 +24,7 @@ import {
   CROSS_PLATFORM_SERVICE,
   DEEP_INVESTIGATION_SERVICE,
   DOWNSTREAM_EFFECTS_SERVICE,
+  FoldJournalRepository,
   GlobalEventRepository,
   GRAPH_BOT_DETECTION_SERVICE,
   getAllFeeds,
@@ -133,6 +135,9 @@ import { SchedulerService } from './services/scheduler.service';
     // Bridge ingestion repositories to analysis tokens
     { provide: SIGNAL_CACHE_STORE, useExisting: SignalCacheRepository },
     { provide: GLOBAL_EVENT_REPOSITORY, useExisting: GlobalEventRepository },
+    // Fold emission is a side channel: consumers read the journal, nothing in
+    // Veritas depends on it.
+    { provide: FOLD_JOURNAL_SINK, useExisting: FoldJournalRepository },
     // Bridge analysis services to ingestion's AnalysisProcessor tokens
     { provide: PROPAGANDA_SERVICE, useExisting: PropagandaAnalysisService },
     { provide: CLAIM_VERIFICATION_SERVICE, useExisting: ClaimVerificationService },

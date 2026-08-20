@@ -9,6 +9,7 @@ import {
 import { TRANSLATION_CACHE_STORE } from '@veritas/content-classification/llm';
 import { DatabaseModule, DatabaseService } from '@veritas/database';
 import { AnalysisJobController } from './controllers/analysis-job.controller';
+import { FoldJournalController } from './controllers/fold-journal.controller';
 import { IngestionController } from './controllers/ingestion.controller';
 import { InvestigationController } from './controllers/investigation.controller';
 import { NarrativeController } from './controllers/narrative.controller';
@@ -31,6 +32,7 @@ import { AlertRepository } from './repositories/alert.repository';
 import { AnalysisJobRepository } from './repositories/analysis-job.repository';
 import { ConnectorFetchCacheRepository } from './repositories/connector-fetch-cache.repository';
 import { EmbeddingCacheRepository } from './repositories/embedding-cache.repository';
+import { FoldJournalRepository } from './repositories/fold-journal.repository';
 import { LlmResponseCacheRepository } from './repositories/llm-response-cache.repository';
 import { TranslationCacheRepository } from './repositories/translation-cache.repository';
 import { GlobalEventRepository } from './repositories/global-event.repository';
@@ -228,6 +230,7 @@ export class IngestionModule {
       // Attaches itself to the DI-free LlmGateway singleton on init, giving its
       // response cache durable backing across restarts.
       LlmResponseCacheRepository,
+      FoldJournalRepository,
     ];
 
     // Configure repository
@@ -341,6 +344,8 @@ export class IngestionModule {
       EmbeddingCacheRepository,
       RssCacheRepository,
       ConnectorFetchCacheRepository,
+      // Exported so the API module can bind it to FOLD_JOURNAL_SINK.
+      FoldJournalRepository,
       BullModule,
       // Only export EmbeddingsService if it's enabled
       ...(options?.enableEmbeddings ? [EmbeddingsService] : []),
@@ -355,6 +360,7 @@ export class IngestionModule {
         InvestigationController,
         ScanController,
         AnalysisJobController,
+        FoldJournalController,
       ],
       providers,
       exports,
