@@ -1,3 +1,4 @@
+import type { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
 import { WikipediaEventsConnector } from '../../src/lib/services/wikipedia-events.connector';
 import { SourceRateLimiter } from '../../src/lib/services/utils/source-rate-limiter';
 
@@ -7,6 +8,7 @@ function noop(): void {
 
 describe('WikipediaEventsConnector', () => {
   let connector: WikipediaEventsConnector;
+  let transformService: { transformBatch: jest.Mock };
   let fetchMock: jest.Mock;
   let originalFetch: typeof global.fetch;
 
@@ -28,7 +30,17 @@ describe('WikipediaEventsConnector', () => {
     fetchMock = jest.fn();
     global.fetch = fetchMock as unknown as typeof global.fetch;
 
-    connector = new WikipediaEventsConnector();
+    transformService = {
+      transformBatch: jest
+        .fn()
+        .mockImplementation(async (posts: unknown[]) =>
+          posts.map((_, i) => ({ id: `insight-${i}`, contentHash: `h${i}` })),
+        ),
+    };
+
+    connector = new WikipediaEventsConnector(
+      transformService as unknown as TransformOnIngestService,
+    );
 
     const logger = (
       connector as unknown as {
@@ -93,7 +105,14 @@ describe('WikipediaEventsConnector', () => {
       const insights = await connector.searchAndTransform('project89');
 
       expect(insights).toHaveLength(1);
-      expect(insights[0]).toMatchObject({ platform: 'wikipedia' });
+      // Insights now come from TransformOnIngestService like every other
+      // connector, rather than being hand-built here with neutral sentiment
+      // and no entities.
+      expect(transformService.transformBatch).toHaveBeenCalledTimes(1);
+      const sent = transformService.transformBatch.mock.calls[0]![0] as Array<{
+        platform: string;
+      }>;
+      expect(sent[0]!.platform).toBe('wikipedia');
     });
 
     it('excludes events that only share a substring with the query', async () => {
@@ -147,8 +166,10 @@ describe('WikipediaEventsConnector', () => {
 
       const { posts, insights } = await connector.searchWithRawData('anything');
 
-      expect(insights[0]!.themes).toEqual(['A']);
-      expect(insights[1]!.themes).toEqual(['B']);
+      // Themes are the classifier's job now, so the assertion is alignment:
+      // one insight per post, in order.
+      expect(insights).toHaveLength(posts.length);
+      expect(posts[0]!.text).toBe('alpha');
       expect(posts[1]!.text).toBe('beta');
     });
 

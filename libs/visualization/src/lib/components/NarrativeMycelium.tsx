@@ -15,9 +15,11 @@ export const generateSampleData = (): MyceliumData => {
   const clusters: NarrativeCluster[] = [];
 
   // Create clusters
-  const clusterColors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#8F44AD'];
+  // `as const` makes this a non-empty tuple, so [0] is known to exist and the
+  // fallback below is genuinely a string rather than string | undefined.
+  const clusterColors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#8F44AD'] as const;
   for (let i = 0; i < 5; i++) {
-    const clusterColor = clusterColors[i] ?? clusterColors[0];
+    const clusterColor: string = clusterColors[i % clusterColors.length] ?? clusterColors[0];
     clusters.push({
       id: `cluster-${i}`,
       name: `Narrative Cluster ${i + 1}`,

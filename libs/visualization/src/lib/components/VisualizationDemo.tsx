@@ -23,7 +23,10 @@ type VisualizationType =
   | 'narrativeFlow';
 
 // Define styles as React CSSProperties objects
-const styles: Record<string, CSSProperties> = {
+// Not Record<string, CSSProperties>: that makes every lookup possibly-undefined
+// under noUncheckedIndexedAccess, so `styles.button` failed to typecheck at its
+// use sites. `satisfies` keeps the per-key literal types AND the value check.
+const styles = {
   visualizationDemo: {
     fontFamily:
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif",
@@ -77,7 +80,7 @@ const styles: Record<string, CSSProperties> = {
     maxWidth: '800px',
     color: '#555',
   },
-};
+} satisfies Record<string, CSSProperties>;
 
 export const VisualizationDemo: React.FC = () => {
   const [activeViz, setActiveViz] = useState<VisualizationType>('mycelium');

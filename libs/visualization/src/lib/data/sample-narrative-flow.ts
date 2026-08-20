@@ -6,7 +6,11 @@ import {
 
 const connectionTypes = ['merge', 'split', 'influence', 'conflict'] as const;
 
-const getArrayItem = <T,>(values: T[], index: number, fallback: T): T => values[index] ?? fallback;
+// `readonly T[]`: callers pass `as const` tuples, which are not assignable to a
+// mutable T[]. Without this, T was inferred from the fallback literal instead
+// of the array, so a 4-member union collapsed to just 'merge'.
+const getArrayItem = <T,>(values: readonly T[], index: number, fallback: T): T =>
+  values[index] ?? fallback;
 
 /**
  * Generates sample data for the Narrative Flow visualization

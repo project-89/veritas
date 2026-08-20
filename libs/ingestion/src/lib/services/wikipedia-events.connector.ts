@@ -5,6 +5,7 @@ import type { SocialMediaPost } from '../../types/social-media.types';
 import type { ConnectorSearchOptions, DataConnector } from '../interfaces/data-connector.interface';
 import type { SourceNode } from '../schemas';
 import { extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
+import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { SourceRateLimiter } from './utils/source-rate-limiter';
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/project-89/veritas)';
@@ -38,6 +39,8 @@ interface ParsedEvent {
  */
 @Injectable()
 export class WikipediaEventsConnector implements DataConnector {
+  constructor(private readonly transformService: TransformOnIngestService) {}
+
   platform = 'wikipedia' as const;
 
   private readonly logger = new Logger(WikipediaEventsConnector.name);
@@ -84,16 +87,24 @@ export class WikipediaEventsConnector implements DataConnector {
     // double the requests and could pair mismatched sets if the portal page
     // changed between them.
     const events = await this.fetchAndParse(query, options?.limit);
-    const { posts, insights } = this.buildFromEvents(events);
+    const { posts, insights } = await this.buildFromEvents(events);
     this.logger.log(`Wikipedia: ${posts.length} posts, ${insights.length} insights`);
     return { posts, insights };
   }
 
-  /** Build the paired post/insight pair for one event list. Index-aligned. */
-  private buildFromEvents(events: ParsedEvent[]): {
+  /**
+   * Build the index-aligned post/insight pair for one event list.
+   *
+   * Insights now come from TransformOnIngestService like every other
+   * connector. They used to be hand-built here with `sentiment: neutral`,
+   * `entities: []` and `themes: [category]` — which meant Wikipedia content
+   * silently skipped classification, entity extraction, translation and
+   * embeddings, and then clustered against posts that had all of them.
+   */
+  private async buildFromEvents(events: ParsedEvent[]): Promise<{
     posts: SocialMediaPost[];
     insights: NarrativeInsight[];
-  } {
+  }> {
     const now = new Date();
     const posts: SocialMediaPost[] = events.map((ev, i) => ({
       id: `wiki-${i}-${this.simpleHash(ev.text)}`,
@@ -107,21 +118,8 @@ export class WikipediaEventsConnector implements DataConnector {
       engagementMetrics: { likes: 0, shares: 0, comments: 0, reach: 0, viralityScore: 0 },
     }));
 
-    const insights: NarrativeInsight[] = events.map((ev, i) => ({
-      id: `wiki-insight-${i}-${now.getTime()}`,
-      contentHash: this.simpleHash(ev.text),
-      sourceHash: this.simpleHash('wikipedia-portal'),
-      platform: 'wikipedia',
-      timestamp: now,
-      themes: [ev.category],
-      entities: [],
-      sentiment: { score: 0, label: 'neutral' as const, confidence: 0.5 },
-      engagement: { total: 0, breakdown: {} },
-      narrativeScore: 0.4,
-      processedAt: now,
-      expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
-    }));
-
+    if (posts.length === 0) return { posts: [], insights: [] };
+    const insights = await this.transformService.transformBatch(posts);
     return { posts, insights };
   }
 
@@ -131,7 +129,7 @@ export class WikipediaEventsConnector implements DataConnector {
   ): Promise<NarrativeInsight[]> {
     try {
       const events = await this.fetchAndParse(query, options?.limit);
-      return this.buildFromEvents(events).insights;
+      return (await this.buildFromEvents(events)).insights;
     } catch (err) {
       this.logger.error(`Wikipedia searchAndTransform failed: ${err}`);
       throw new Error(
