@@ -47,7 +47,12 @@ const CONNECTOR_ACCEPT =
 
 /** Beyond this, a feed is technically alive but contributes nothing current. */
 const STALE_AFTER_DAYS = 30;
-const TIMEOUT_MS = 15000;
+/**
+ * 15s reported GDELT as "unreachable" — but GDELT genuinely takes 11-16s under
+ * load, so the checker was timing out and blaming the source. A health check
+ * whose timeout is tighter than the real latency manufactures outages.
+ */
+const TIMEOUT_MS = 35000;
 const CONCURRENCY = 12;
 
 function allFeeds(): RssFeedEntry[] {

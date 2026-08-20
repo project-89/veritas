@@ -4,7 +4,11 @@ import { GdeltConnector } from '../../src/lib/services/gdelt.connector';
 jest.mock('axios');
 
 // Pass-through the rate limiter so tests don't incur the 5.5s pacing delay.
-jest.mock('../../src/lib/services/utils/source-rate-limiter', () => ({
+// Only the limiter is stubbed — requireActual keeps the rest of the module
+// (conditionalFeedFetch, http identity, ...) real, since other specs in the
+// same run depend on it.
+jest.mock('@veritas/shared/utils', () => ({
+  ...jest.requireActual('@veritas/shared/utils'),
   SourceRateLimiter: {
     instance: {
       schedule: (_platform: string, fn: () => unknown) => fn(),

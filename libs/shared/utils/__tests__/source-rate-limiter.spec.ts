@@ -1,7 +1,7 @@
 import {
   SourceRateLimiter,
   type PlatformRateConfig,
-} from '../../src/lib/services/utils/source-rate-limiter';
+} from '@veritas/shared/utils';
 
 describe('SourceRateLimiter', () => {
   afterEach(() => {

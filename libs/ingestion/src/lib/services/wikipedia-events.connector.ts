@@ -6,7 +6,7 @@ import type { ConnectorSearchOptions, DataConnector } from '../interfaces/data-c
 import type { SourceNode } from '../schemas';
 import { extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { SourceRateLimiter } from './utils/source-rate-limiter';
+import { SourceRateLimiter } from '@veritas/shared/utils';
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/project-89/veritas)';
 

@@ -1,6 +1,18 @@
 import type { GdeltResponse } from './gdelt.adapter';
 import { GdeltAdapter } from './gdelt.adapter';
 
+// Pass-through the limiter so tests don't wait out the real 15s GDELT pacing.
+// requireActual keeps the rest of the module real for other specs in the run.
+jest.mock('@veritas/shared/utils', () => ({
+  ...jest.requireActual('@veritas/shared/utils'),
+  SourceRateLimiter: {
+    instance: {
+      schedule: (_platform: string, fn: () => unknown) => fn(),
+      notifyRateLimited: jest.fn(),
+    },
+  },
+}));
+
 // ---------------------------------------------------------------------------
 // Mock fetch
 // ---------------------------------------------------------------------------

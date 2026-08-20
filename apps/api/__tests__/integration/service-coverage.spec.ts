@@ -131,6 +131,19 @@ import { YahooFinanceAdapter } from '../../../../libs/analysis/src/lib/services/
 import { SocialGraphIntelligenceService } from '../../../../libs/analysis/src/lib/services/social-graph-intelligence.service';
 import { SourceCredibilityService } from '../../../../libs/analysis/src/lib/services/source-credibility.service';
 
+// Pass-through the source rate limiter. GDELT is paced at 15s in production
+// (its real enforced limit); without this the adapter contract tests wait out
+// that delay and time out.
+jest.mock('@veritas/shared/utils', () => ({
+  ...jest.requireActual('@veritas/shared/utils'),
+  SourceRateLimiter: {
+    instance: {
+      schedule: (_platform: string, fn: () => unknown) => fn(),
+      notifyRateLimited: jest.fn(),
+    },
+  },
+}));
+
 // ---------------------------------------------------------------------------
 // Test data factories
 // ---------------------------------------------------------------------------

@@ -12,7 +12,7 @@ import {
 } from '../interfaces/social-media-connector.interface';
 import { TransformOnIngestConnector } from '../interfaces/transform-on-ingest-connector.interface';
 import { RssCacheRepository } from '../repositories/rss-cache.repository';
-import { SourceRateLimiter } from './utils/source-rate-limiter';
+import { SourceRateLimiter } from '@veritas/shared/utils';
 import type { RssCacheItem } from '../schemas/rss-cache.schema';
 import type { FeedFailureState } from '../schemas/rss-feed-state.schema';
 import { matchesQuery } from '../utils/query-match.util';

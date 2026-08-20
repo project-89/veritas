@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter } from 'events';
 import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
 import { TwitterFreeConnector } from '../../src/lib/services/twitter-free.connector';
-import { SourceRateLimiter } from '../../src/lib/services/utils/source-rate-limiter';
+import { SourceRateLimiter } from '@veritas/shared/utils';
 
 // Mock the scraper module
 const mockSearchTweets = jest.fn();

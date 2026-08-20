@@ -8,7 +8,7 @@ import { SourceNode } from '../schemas';
 import { matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
 import { JinaReaderService } from './utils/jina-reader.service';
-import { SourceRateLimiter } from './utils/source-rate-limiter';
+import { SourceRateLimiter } from '@veritas/shared/utils';
 
 interface SearchOptions {
   startDate?: Date;

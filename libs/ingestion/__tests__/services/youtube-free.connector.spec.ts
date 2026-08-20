@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
-import { SourceRateLimiter } from '../../src/lib/services/utils/source-rate-limiter';
+import { SourceRateLimiter } from '@veritas/shared/utils';
 import { SubprocessUtil } from '../../src/lib/services/utils/subprocess.util';
 import { YouTubeFreeConnector } from '../../src/lib/services/youtube-free.connector';
 

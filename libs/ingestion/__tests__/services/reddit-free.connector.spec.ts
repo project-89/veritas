@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { RedditFreeConnector } from '../../src/lib/services/reddit-free.connector';
 import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
-import { SourceRateLimiter } from '../../src/lib/services/utils/source-rate-limiter';
+import { SourceRateLimiter } from '@veritas/shared/utils';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;

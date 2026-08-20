@@ -7,7 +7,7 @@ import { SourceNode } from '../schemas';
 import { buildSearchQuery, extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { BaseSocialMediaConnector } from './base-social-media.connector';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { SourceRateLimiter } from './utils/source-rate-limiter';
+import { SourceRateLimiter } from '@veritas/shared/utils';
 
 /** Photo/video attachments from a scraped tweet as normalized PostMedia. */
 function extractTweetMedia(tweet: Tweet): PostMedia[] {

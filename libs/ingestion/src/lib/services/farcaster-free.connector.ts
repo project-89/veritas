@@ -7,7 +7,7 @@ import { DataConnector } from '../interfaces/data-connector.interface';
 import { SourceNode } from '../schemas';
 import { buildSearchQuery, extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { SourceRateLimiter } from './utils/source-rate-limiter';
+import { SourceRateLimiter } from '@veritas/shared/utils';
 
 interface SearchOptions {
   startDate?: Date;

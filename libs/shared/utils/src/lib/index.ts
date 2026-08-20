@@ -1,3 +1,4 @@
+export * from './source-rate-limiter';
 export * from './fold-event.types';
 export * from './conditional-feed-fetch';
 export * from './http-identity';

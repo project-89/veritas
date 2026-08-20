@@ -1,6 +1,8 @@
 import { Logger } from '@nestjs/common';
 import type { ExternalSignal, SignalAdapter } from './signal-adapter.interface';
 
+import { parseRetryAfter, SourceRateLimiter } from '@veritas/shared/utils';
+
 const USER_AGENT = 'Mozilla/5.0 (compatible; Veritas/2.0; +https://github.com/project-89/veritas)';
 
 /**
@@ -37,13 +39,32 @@ export class GdeltAdapter implements SignalAdapter {
     url.searchParams.set('startdatetime', startDt);
     url.searchParams.set('enddatetime', endDt);
 
-    // Retry once on timeout (GDELT can be slow)
+    // Retry once on timeout (GDELT can be slow — 11-16s is normal under load,
+    // so the timeout must exceed that or every call looks like an outage).
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const response = await fetch(url.toString(), {
-          headers: { 'User-Agent': USER_AGENT },
-          signal: AbortSignal.timeout(15_000),
-        });
+        // Paced through the shared limiter. This adapter previously called
+        // fetch directly while the scan-path connector went through the
+        // limiter — two independent code paths hitting the same API, only one
+        // of them counting. GDELT publishes "one request every 5 seconds" and
+        // enforces it per-IP, so an unpaced second caller 429s BOTH.
+        const response = await SourceRateLimiter.instance.schedule('gdelt', () =>
+          fetch(url.toString(), {
+            headers: { 'User-Agent': USER_AGENT },
+            signal: AbortSignal.timeout(30_000),
+          }),
+        );
+
+        if (response.status === 429) {
+          // Feed the backoff to the limiter so every GDELT caller in the
+          // process waits, not just this one.
+          const retryAfterMs = parseRetryAfter(response.headers.get('retry-after'));
+          SourceRateLimiter.instance.notifyRateLimited('gdelt', retryAfterMs);
+          this.logger.warn(
+            `GDELT rate-limited (429)${retryAfterMs ? `, backing off ${Math.round(retryAfterMs / 1000)}s` : ''}`,
+          );
+          return [];
+        }
 
         if (!response.ok) {
           this.logger.warn(`GDELT returned HTTP ${response.status}`);

@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TelegramFreeConnector } from '../../src/lib/services/telegram-free.connector';
 import { TransformOnIngestService } from '../../src/lib/services/transform/transform-on-ingest.service';
-import { SourceRateLimiter } from '../../src/lib/services/utils/source-rate-limiter';
+import { SourceRateLimiter } from '@veritas/shared/utils';
 
 function noop(): void {
   // Intentional no-op for logger spies in negative-path tests.

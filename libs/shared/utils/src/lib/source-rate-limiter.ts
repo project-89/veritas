@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 
 /**
  * Process-wide, per-platform rate limiter for ALL outbound requests to
@@ -51,7 +50,10 @@ const PLATFORM_DEFAULTS: Record<string, PlatformRateConfig> = {
   truthsocial: { minIntervalMs: 2000, maxConcurrent: 1 },
   wikipedia: { minIntervalMs: 300, maxConcurrent: 2 },
   web: { minIntervalMs: 1000, maxConcurrent: 2 },
-  gdelt: { minIntervalMs: 5500, maxConcurrent: 1 }, // GDELT DOC API: max 1 req / 5s
+  // GDELT states "one request every 5 seconds", but measured behaviour is
+  // stricter: spaced probes ~20s apart still returned 429, and a single call
+  // takes 11-16s under load. 15s is the empirical floor, not their stated one.
+  gdelt: { minIntervalMs: 15_000, maxConcurrent: 1 },
 };
 
 const ENV_OVERRIDE_VAR = 'SOURCE_RATE_LIMITS';
@@ -71,7 +73,6 @@ export class SourceRateLimiter {
     SourceRateLimiter._instance = limiter;
   }
 
-  private readonly logger = new Logger(SourceRateLimiter.name);
   private readonly platforms = new Map<string, PlatformState>();
   private readonly overrides: Record<string, Partial<PlatformRateConfig>>;
 
@@ -106,9 +107,6 @@ export class SourceRateLimiter {
     const until = Date.now() + cooldown;
     if (until > state.cooldownUntil) {
       state.cooldownUntil = until;
-      this.logger.warn(
-        `${platform} signaled rate limiting — cooling down for ${Math.round(cooldown / 1000)}s`,
-      );
     }
   }
 
@@ -181,9 +179,11 @@ export class SourceRateLimiter {
       const parsed = JSON.parse(raw) as Record<string, Partial<PlatformRateConfig>>;
       return typeof parsed === 'object' && parsed !== null ? parsed : {};
     } catch {
-      new Logger(SourceRateLimiter.name).warn(
-        `Ignoring malformed ${ENV_OVERRIDE_VAR} env var (expected JSON object)`,
-      );
+      // Framework-free by design (this lives in shared/utils), so no Nest
+      // Logger here — but a malformed override must not vanish silently, or
+      // the limiter would run on defaults while the operator believed
+      // otherwise.
+      console.warn(`Ignoring malformed ${ENV_OVERRIDE_VAR} env var (expected JSON object)`);
       return {};
     }
   }

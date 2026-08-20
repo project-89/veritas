@@ -14,7 +14,7 @@ import {
 } from '../utils/query-intent.util';
 import { buildSearchQuery, extractSignificantTerms, matchesQuery } from '../utils/query-match.util';
 import { TransformOnIngestService } from './transform/transform-on-ingest.service';
-import { SourceRateLimiter } from './utils/source-rate-limiter';
+import { SourceRateLimiter } from '@veritas/shared/utils';
 import { SubprocessUtil } from './utils/subprocess.util';
 
 interface SearchOptions {
