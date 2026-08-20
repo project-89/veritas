@@ -3,7 +3,7 @@ import {
   nonLatinScript,
   tokenizeForTopics,
   tokenizeWords,
-} from './text-tokenize';
+} from '../src/lib/text-tokenize';
 
 describe('tokenizeWords', () => {
   it('keeps accented Latin words intact instead of shattering them', () => {

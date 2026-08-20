@@ -1,3 +1,4 @@
+export * from './statistics';
 export {
   DETERMINISTIC_JSON_CONFIG,
   extractFirstJsonObject,

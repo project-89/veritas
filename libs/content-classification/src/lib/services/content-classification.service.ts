@@ -5,7 +5,7 @@ import { afinn165 } from 'afinn-165';
 import nlp from 'compromise';
 import * as francMin from 'franc-min';
 import { NlpServiceResponse } from '../types/content.types';
-import { isMultilingualStopWord, nonLatinScript, tokenizeForTopics } from '../utils/text-tokenize';
+import { isMultilingualStopWord, nonLatinScript, tokenizeForTopics } from '@veritas/shared/utils';
 
 /**
  * Maximum number of characters fed to the NER pipeline. Named-entity

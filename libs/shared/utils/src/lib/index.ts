@@ -1,3 +1,4 @@
+export * from './text-tokenize';
 export * from './source-rate-limiter';
 export * from './fold-event.types';
 export * from './conditional-feed-fetch';
