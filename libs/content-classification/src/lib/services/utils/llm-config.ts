@@ -8,12 +8,18 @@
  * markdown-fence-stripping failure mode.
  */
 
-// Chat = gemini-3.5-flash (high-volume summaries/propaganda/sentiment);
+// Chat = gemini-3.6-flash (high-volume summaries/propaganda/sentiment/stance);
 // reasoning = gemini-3.1-pro-preview (heavy: claim verification, causal
 // reasoning, deep investigation). Env-overridable so a model swap is one
 // deployment change.
 export function geminiChatModel(): string {
-  return process.env['GEMINI_CHAT_MODEL'] ?? 'gemini-3.5-flash';
+  // Verified against the live ListModels endpoint AND a real generateContent
+  // call through the SDK before switching — a model ID that merely appears in
+  // ListModels is not proof it works. Listing advertises `generateContent` for
+  // models this key cannot reach, and a bad ID here does not fail loudly: the
+  // gemini-2.0-flash deprecation silently degraded every LLM capability
+  // app-wide until clustering provenance flags exposed it.
+  return process.env['GEMINI_CHAT_MODEL'] ?? 'gemini-3.6-flash';
 }
 
 export function geminiReasoningModel(): string {
