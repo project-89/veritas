@@ -1170,7 +1170,7 @@ export interface PropagandaAnalysisResult {
   claims: ExtractedClaim[];
   frames: NarrativeFrame[];
   overallAssessment: {
-    manipulationLikelihood: 'low' | 'medium' | 'high';
+    manipulationLikelihood: 'low' | 'medium' | 'high' | 'insufficient-data';
     confidence: number;
     reasoning: string;
     caveats: string[];

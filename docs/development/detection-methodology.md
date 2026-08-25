@@ -1,6 +1,6 @@
 # Detection Methodology
 
-**Status:** Governing standard — the causal and analysis-quality plans answer to this doc
+**Status:** Governing standard — the causal and analysis-quality plans answer to this doc. §5 Layer 1 shipped 2026-08-25 (campaign signals + deterministic assessment); Layer 2 reliability protocol and base-rate integration pending.
 **Related:** [`causal-inference-layer.md`](./causal-inference-layer.md) · [`analysis-quality-plan.md`](./analysis-quality-plan.md) · [`../../scripts/eval/README.md`](../../scripts/eval/README.md)
 
 ---

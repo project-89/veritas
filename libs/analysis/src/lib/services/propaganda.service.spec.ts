@@ -127,20 +127,27 @@ describe('PropagandaAnalysisService', () => {
       service = makeServiceWithoutKey();
     });
 
-    it('marks the result unavailable instead of returning a silent empty finding', async () => {
+    it('degrades to deterministic signals — never a silent empty finding', async () => {
+      // Old contract: no key meant the whole capability died ('unavailable',
+      // everything empty). New contract: the Layer 1 campaign signals need no
+      // LLM, so they still run; only the technique CODING is lost.
       const narratives = [makeNarrative({ id: 'n-0' })];
       const posts = makePosts(5);
       const result = await service.analyze(narratives, posts);
 
-      expect(result.analysisMode).toBe('unavailable');
+      expect(result.analysisMode).toBe('heuristic');
       expect(result.analysisModeReason).toContain('GEMINI_API_KEY');
-      expect(result.techniques).toEqual([]);
-      expect(result.coordinationIndicators).toEqual([]);
-      expect(result.claims).toEqual([]);
-      expect(result.frames).toEqual([]);
-      expect(result.overallAssessment.manipulationLikelihood).toBe('low');
-      expect(result.overallAssessment.confidence).toBe(0);
+      expect(result.techniques).toEqual([]); // coder did not run
+      expect(result.campaignSignals).toBeDefined();
+      expect(result.campaignSignals?.postCount).toBe(5);
+      // 5 posts clears duplication's floor (4) but not temporal (8) or
+      // concentration (10) — so the instrument is partly usable and the
+      // declared rule yields a verdict, with confidence reflecting how much
+      // of the instrument ran (1 of 4 signals = 0.25).
+      expect(result.overallAssessment.manipulationLikelihood).not.toBe('insufficient-data');
+      expect(result.overallAssessment.confidence).toBeCloseTo(0.25, 5);
       expect(result.overallAssessment.caveats.length).toBeGreaterThan(0);
+      expect(result.overallAssessment.caveats.join(' ')).toMatch(/unmeasured/);
     });
 
     it('stamps promptVersion and model even on unavailable results', async () => {
@@ -172,13 +179,14 @@ describe('PropagandaAnalysisService', () => {
       expect(result.model).toBe(geminiChatModel());
     });
 
-    it('returns empty result for single narrative with no API key', async () => {
+    it('abstains on a single post with no API key', async () => {
       const narratives = [makeNarrative({ id: 'n-0', postIndices: [0] })];
       const posts = makePosts(1);
       const result = await service.analyze(narratives, posts);
 
       expect(result.techniques).toEqual([]);
-      expect(result.overallAssessment.manipulationLikelihood).toBe('low');
+      // One post cannot exhibit a campaign; a confident 'low' would overclaim.
+      expect(result.overallAssessment.manipulationLikelihood).toBe('insufficient-data');
     });
   });
 
@@ -469,13 +477,17 @@ describe('PropagandaAnalysisService', () => {
       expect(prompt).toContain('CONFIDENCE RUBRIC');
     });
 
-    it('returns unavailable (not a clean finding) when the LLM call fails', async () => {
+    it('keeps the deterministic signals when the LLM call fails', async () => {
       mockGenerateContent.mockRejectedValue(new Error('quota exceeded'));
       const service = makeServiceWithKey();
       const result = await service.analyze(narratives, posts);
 
-      expect(result.analysisMode).toBe('unavailable');
+      // The coder failing must not delete the campaign-level measurement —
+      // that coupling is exactly what made the old design brittle.
+      expect(result.analysisMode).toBe('heuristic');
+      expect(result.analysisModeReason).toContain('LLM call failed');
       expect(result.techniques).toEqual([]);
+      expect(result.campaignSignals).toBeDefined();
       expect(result.promptVersion).toBe(PROPAGANDA_PROMPT_VERSION);
       expect(result.model).toBe(geminiChatModel());
     });

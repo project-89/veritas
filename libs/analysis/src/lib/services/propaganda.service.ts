@@ -9,6 +9,7 @@ import {
   LlmGateway,
 } from '@veritas/content-classification/llm';
 import type { RawPost } from './deviation.service';
+import { type CampaignSignalsResult, measureCampaignSignals } from '../statistics/campaign-signals';
 import type { AnalyzedNarrative } from './narrative-analysis.service';
 
 // ---------------------------------------------------------------------------
@@ -74,8 +75,15 @@ export interface PropagandaAnalysisResult {
   coordinationIndicators: PropagandaTechnique[];
   claims: ExtractedClaim[];
   frames: NarrativeFrame[];
+  /**
+   * Deterministic Layer 1: distributional signals over ALL posts (repetition,
+   * synchrony, concentration, infrastructure). Present whenever posts were
+   * supplied — including when the LLM coder was unavailable, because these
+   * need no LLM. See docs/development/detection-methodology.md §5.
+   */
+  campaignSignals?: CampaignSignalsResult;
   overallAssessment: {
-    manipulationLikelihood: 'low' | 'medium' | 'high';
+    manipulationLikelihood: 'low' | 'medium' | 'high' | 'insufficient-data';
     confidence: number;
     reasoning: string;
     caveats: string[];
@@ -275,11 +283,23 @@ export class PropagandaAnalysisService {
       return this.emptyResult('skipped', 'No narratives to analyze.');
     }
 
+    // Layer 1 first, over ALL posts — the campaign signals need no LLM and
+    // must not be lost to an LLM outage. Sampling is forbidden here: the
+    // distribution IS the signal.
+    const campaignSignals = measureCampaignSignals(
+      posts.map((p) => ({
+        text: p.text,
+        authorHandle: p.authorHandle,
+        platform: p.platform,
+        timestamp: p.timestamp,
+      })),
+    );
+
     if (!this.genAI) {
-      this.logger.warn('No Gemini key -- propaganda analysis unavailable');
-      return this.emptyResult(
-        'unavailable',
-        'GEMINI_API_KEY is not configured — propaganda analysis did not run.',
+      this.logger.warn('No Gemini key — technique coding unavailable; campaign signals only');
+      return this.signalsOnlyResult(
+        campaignSignals,
+        'GEMINI_API_KEY is not configured — deterministic campaign signals only; no technique coding.',
       );
     }
 
@@ -331,17 +351,21 @@ export class PropagandaAnalysisService {
         prompt,
         generate: () => model.generateContent(prompt).then((r) => r.response.text()),
       });
-      return this.parseResponse(responseText, sampledPosts);
+      const parsed = this.parseResponse(responseText, sampledPosts);
+      return this.withDeterministicAssessment(parsed, campaignSignals);
     } catch (err) {
       if (err instanceof LlmBudgetExceededError) {
-        this.logger.warn(`Propaganda analysis skipped — ${err.message}`);
-        return this.emptyResult(
-          'unavailable',
-          'LLM token budget for this run was exhausted — propaganda analysis did not run.',
+        this.logger.warn(`Propaganda technique coding skipped — ${err.message}`);
+        return this.signalsOnlyResult(
+          campaignSignals,
+          'LLM token budget exhausted — deterministic campaign signals only; no technique coding.',
         );
       }
-      this.logger.error(`Propaganda analysis LLM call failed: ${err}`);
-      return this.emptyResult('unavailable', 'LLM call failed — propaganda analysis did not run.');
+      this.logger.error(`Propaganda technique coding failed: ${err}`);
+      return this.signalsOnlyResult(
+        campaignSignals,
+        'LLM call failed — deterministic campaign signals only; no technique coding.',
+      );
     }
   }
 
@@ -721,6 +745,113 @@ Rules for the JSON:
 
   private clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
+  }
+
+  /**
+   * Layer 3: the assessment is a DECLARED RULE over measured signals, not the
+   * model's adjective. The LLM's grounded techniques corroborate; they do not
+   * decide.
+   *
+   * Rules (declared, calibration pending — Phase F):
+   *   >=3 elevated signals                        -> high
+   *    2 elevated                                 -> medium
+   *    1 elevated + >=3 grounded techniques       -> medium
+   *   otherwise, with signals measurable          -> low
+   *   nothing measurable                          -> insufficient-data
+   *
+   * Confidence reports how much of the instrument was usable
+   * (measurable/4), NOT certainty of manipulation — stated in the caveats.
+   */
+  private assessFromSignals(
+    signals: CampaignSignalsResult,
+    groundedTechniques: number,
+    coderNote: string,
+  ): PropagandaAnalysisResult['overallAssessment'] {
+    const anomalies = [
+      signals.repetition,
+      signals.synchrony,
+      signals.concentration,
+      signals.infrastructure,
+    ];
+    const measured = anomalies.filter((a) => a.measured);
+    const elevated = measured.filter((a) => a.elevated);
+
+    if (measured.length === 0) {
+      return {
+        manipulationLikelihood: 'insufficient-data',
+        confidence: 0,
+        reasoning:
+          `No campaign signal was measurable over ${signals.postCount} post(s): ` +
+          anomalies.map((a) => a.evidence).join('; '),
+        caveats: [
+          'Too little data to distinguish a campaign from a conversation. This is not a "no propaganda" finding.',
+        ],
+      };
+    }
+
+    let likelihood: PropagandaAnalysisResult['overallAssessment']['manipulationLikelihood'];
+    if (elevated.length >= 3) likelihood = 'high';
+    else if (elevated.length === 2) likelihood = 'medium';
+    else if (elevated.length === 1 && groundedTechniques >= 3) likelihood = 'medium';
+    else likelihood = 'low';
+
+    const reasoningParts = [
+      `${elevated.length}/${measured.length} measurable campaign signals elevated.`,
+      ...elevated.map((a) => a.evidence),
+      groundedTechniques > 0
+        ? `${groundedTechniques} rhetoric technique(s) with verbatim-grounded quotes corroborate.`
+        : 'No grounded rhetoric techniques available to corroborate.',
+      signals.crossPlatform.measured ? `Propagation: ${signals.crossPlatform.evidence}.` : '',
+      coderNote,
+    ].filter(Boolean);
+
+    return {
+      manipulationLikelihood: likelihood,
+      confidence: measured.length / anomalies.length,
+      reasoning: reasoningParts.join(' '),
+      caveats: [
+        'Confidence reflects how many signals were measurable, not certainty of manipulation.',
+        'Signal thresholds are declared constants, not yet calibrated against labelled campaigns.',
+        ...anomalies.filter((a) => !a.measured).map((a) => a.evidence),
+      ],
+    };
+  }
+
+  /** LLM coder unavailable — Layer 1 still stands on its own. */
+  private signalsOnlyResult(
+    signals: CampaignSignalsResult,
+    reason: string,
+  ): PropagandaAnalysisResult {
+    return {
+      analysisMode: 'heuristic',
+      analysisModeReason: reason,
+      techniques: [],
+      coordinationIndicators: [],
+      claims: [],
+      frames: [],
+      campaignSignals: signals,
+      overallAssessment: this.assessFromSignals(signals, 0, reason),
+      promptVersion: PROPAGANDA_PROMPT_VERSION,
+      model: this.chatModel,
+    };
+  }
+
+  /** Replace the model's self-reported assessment with the declared rule. */
+  private withDeterministicAssessment(
+    parsed: PropagandaAnalysisResult,
+    signals: CampaignSignalsResult,
+  ): PropagandaAnalysisResult {
+    const grounded = parsed.techniques.filter((t) => t.examples.length > 0).length;
+    // The coder's own read survives as a note inside the reasoning — context,
+    // not verdict.
+    const coderNote = parsed.overallAssessment.reasoning
+      ? `Coder note: ${parsed.overallAssessment.reasoning}`
+      : '';
+    return {
+      ...parsed,
+      campaignSignals: signals,
+      overallAssessment: this.assessFromSignals(signals, grounded, coderNote),
+    };
   }
 
   private emptyResult(mode: AnalysisMode, reason: string): PropagandaAnalysisResult {

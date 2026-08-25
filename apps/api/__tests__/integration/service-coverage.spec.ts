@@ -1408,7 +1408,11 @@ describe('Section 4: Analysis Service Contracts', () => {
       expect(Array.isArray(result.techniques)).toBe(true);
       expect(Array.isArray(result.claims)).toBe(true);
       expect(Array.isArray(result.frames)).toBe(true);
-      expect(['low', 'medium', 'high']).toContain(result.overallAssessment.manipulationLikelihood);
+      // 'insufficient-data' is the honest abstention when no campaign signal
+      // clears its floor — a valid verdict, not a missing one.
+      expect(['low', 'medium', 'high', 'insufficient-data']).toContain(
+        result.overallAssessment.manipulationLikelihood,
+      );
     });
 
     it('returns fallback result when Gemini unavailable', async () => {
