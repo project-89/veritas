@@ -14,5 +14,9 @@
   "stance-opposition": {
     "f1": 1,
     "accuracy": 1
+  },
+  "technique-coding": {
+    "f1": 0.947,
+    "accuracy": 0.991
   }
 }

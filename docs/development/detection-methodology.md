@@ -1,6 +1,6 @@
 # Detection Methodology
 
-**Status:** Governing standard — the causal and analysis-quality plans answer to this doc. §5 Layer 1 shipped 2026-08-25 (campaign signals + deterministic assessment); Layer 2 reliability protocol and base-rate integration pending.
+**Status:** Governing standard — the causal and analysis-quality plans answer to this doc. §5 Layers 1–3 shipped; Layer 2 coder reliability measured 2026-08-26 (Krippendorff α = 0.94 vs human gold over 108 decisions). Coordination detection (§3.5) shipped with a label-permutation null. Campaign-signal threshold calibration remains Phase F.
 **Related:** [`causal-inference-layer.md`](./causal-inference-layer.md) · [`analysis-quality-plan.md`](./analysis-quality-plan.md) · [`../../scripts/eval/README.md`](../../scripts/eval/README.md)
 
 ---

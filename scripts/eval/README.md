@@ -66,7 +66,9 @@ silently passing (see *LLM-backed suites* below).
 | Language abstention (topic/entity extraction) | ✅ 9 cases, offline |
 | Stance classification | ✅ 22 cases, **needs `GEMINI_API_KEY`** — skipped without one |
 | Stance opposition (the split decision) | ✅ 46 pairs, **needs `GEMINI_API_KEY`** — skipped without one |
-| Bot detection | ❌ not covered |
+| Technique coding (LLM-as-coder) | ✅ 108 decisions, **α = 0.94**, needs `GEMINI_API_KEY` |
+| Coordination detection | ✅ unit-level (permutation null, synthetic rings + negative controls) |
+| Bot detection | ❌ automation side not covered (needs a public labelled dataset — Phase F) |
 | Propaganda detection | ❌ not covered |
 | Claim verification | ❌ not covered |
 | Causal inference | ❌ blocked — layer not built (see `docs/development/causal-inference-layer.md` §7) |

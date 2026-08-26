@@ -29,3 +29,7 @@ export { BASE_RATE_STORE, BaseRateService } from './base-rate.service';
 export type { ArchivedEvent, BaseRateOptions, BaseRateStore } from './base-rate.service';
 export { measureCampaignSignals } from './campaign-signals';
 export type { CampaignSignal, CampaignSignalsResult, PostForSignals } from './campaign-signals';
+export { detectCoordination } from './coordination';
+export type { CoordinatedGroup, CoordinationPost, CoordinationResult } from './coordination';
+export { krippendorffAlpha } from './krippendorff';
+export type { AlphaResult } from './krippendorff';

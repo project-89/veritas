@@ -1,6 +1,6 @@
 # Analysis Quality Plan
 
-**Status:** Phases A and B shipped (2026-08-14); Phases C–F not started
+**Status:** Phases A, B and D shipped (D 2026-08-26: permutation-tested co-activity coordination, wired into bot detection); C, E, F not started
 **Scope:** every interpretive layer — bot/coordination detection, narrative grouping, credibility, causal suggestion
 **Governed by:** [`detection-methodology.md`](./detection-methodology.md)
 **Related:** [`causal-inference-layer.md`](./causal-inference-layer.md) · [`../../scripts/eval/README.md`](../../scripts/eval/README.md) · [`../REMEDIATION-PLAN.md`](../REMEDIATION-PLAN.md)
@@ -171,7 +171,7 @@ Target extraction, stance classification, stance-aware clustering, retire crypto
 **Phase C — Parameter control.**
 Thread clustering parameters through the API, build the live re-clustering endpoint, ship the slider UI with harness feedback attached. Depends on B being in place so the stance toggle has something to toggle.
 
-**Phase D — Coordination detection.**
+**Phase D — Coordination detection. ✅ SHIPPED (corpus co-activity + label-permutation null; graph-edge expansion pending interaction capture).**
 Co-activity graph over multiple edge types, null-model thresholding, network-level output. Reuses the base-rate machinery the causal layer needs — build once, use twice.
 
 **Phase E — Signal families.**

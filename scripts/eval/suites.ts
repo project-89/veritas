@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ContentClassificationService } from '../../libs/content-classification/src/lib/services/content-classification.service';
+import { PropagandaAnalysisService } from '../../libs/analysis/src/lib/services/propaganda.service';
+import type { AnalyzedNarrative } from '../../libs/analysis/src/lib/services/narrative-analysis.service';
+import type { RawPost } from '../../libs/analysis/src/lib/services/deviation.service';
+import { krippendorffAlpha } from '../../libs/analysis/src/lib/statistics/krippendorff';
 import { StanceService, stancesOppose } from '../../libs/analysis/src/lib/services/stance.service';
 import { matchesQuery } from '../../libs/ingestion/src/lib/utils/query-match.util';
 import type { Prediction } from './metrics';
@@ -242,9 +246,134 @@ const stanceOpposition: Suite = {
   },
 };
 
+
+// ---------------------------------------------------------------------------
+// Technique coding (LLM-as-coder, with measured reliability)
+// ---------------------------------------------------------------------------
+
+interface TechniqueCase {
+  id: string;
+  text: string;
+  gold: string[];
+  note?: string;
+}
+
+/**
+ * The intercoder-reliability protocol from detection-methodology §3.4: the LLM
+ * is ONE CODER, and this measures its agreement with human gold labels over
+ * every (post × technique) decision — reported as Krippendorff's alpha
+ * alongside the harness's P/R/F1.
+ *
+ * Alpha matters here because the decision matrix is heavily skewed toward
+ * "absent": a coder that never labels anything scores high accuracy and
+ * alpha ≈ 0. Accuracy flatters; alpha does not.
+ *
+ * The corpus runs through the REAL PropagandaAnalysisService — same sampler,
+ * same prompt, same grounding — because the seam users get is the one worth
+ * measuring (the franc-stub lesson). Engagement and timestamps are arranged so
+ * the 4+4+4 stratified sampler provably selects all 12 posts.
+ */
+const techniqueCoding: Suite = {
+  name: 'technique-coding',
+  positiveMeans: 'technique present in post (per post × technique decision)',
+  available: () => Boolean(process.env['GEMINI_API_KEY']),
+  unavailableReason: 'GEMINI_API_KEY not set — LLM technique coding not verified',
+  async run(): Promise<Prediction[]> {
+    const cases = loadCorpus<TechniqueCase>('techniques.jsonl');
+    const base = Date.UTC(2026, 5, 1, 12, 0, 0);
+
+    const posts: RawPost[] = cases.map((c, i) => ({
+      id: `post-${i}`,
+      text: c.text,
+      platform: 'twitter',
+      authorName: `Author ${i}`,
+      authorHandle: `author${i}`,
+      // Posts 4-7 newest so they fill the recency stratum; 0-3 take the
+      // engagement stratum below; 8-11 are the exact remainder.
+      timestamp: new Date(
+        base + (i >= 4 && i <= 7 ? 1000 * 60 * 60 : 0) + i * 60_000,
+      ).toISOString(),
+      engagement: { likes: i <= 3 ? 100 - i : 0, shares: 0, comments: 0 },
+    }));
+
+    const narrative = {
+      id: 'technique-eval-n0',
+      summary: 'Debate over the fictional Valley City reservoir ordinance',
+      postIndices: posts.map((_, i) => i),
+      avgSentiment: 0,
+      sentimentTrajectory: [],
+      platforms: { twitter: posts.length },
+      authors: [],
+      firstSeen: posts[0]?.timestamp ?? new Date(base).toISOString(),
+      lastSeen: posts[posts.length - 1]?.timestamp ?? new Date(base).toISOString(),
+      totalEngagement: 0,
+      velocity: { postsPerHour: 0, trend: 'stable', acceleration: 0 },
+      centroidEmbedding: [],
+      supportLevel: 'clustered',
+    } as unknown as AnalyzedNarrative;
+
+    const service = new PropagandaAnalysisService({
+      get: () => process.env['GEMINI_API_KEY'],
+    } as never);
+    const result = await service.analyze([narrative], posts);
+
+    if (result.analysisMode !== 'llm') {
+      // Coder did not run — report every gold decision as failed rather than
+      // silently passing, and say why.
+      return cases.map((c) => ({
+        id: c.id,
+        expected: true,
+        actual: false,
+        note: `coder did not run: ${result.analysisModeReason ?? result.analysisMode}`,
+      }));
+    }
+
+    // Model's per-post assignments, from grounded post refs (tags are P<index>).
+    const assigned = new Map<number, Set<string>>();
+    for (const t of result.techniques) {
+      for (const ref of t.postRefs) {
+        const idx = Number(ref.replace(/^P/i, ''));
+        if (!Number.isInteger(idx)) continue;
+        const set = assigned.get(idx) ?? new Set<string>();
+        set.add(t.id);
+        assigned.set(idx, set);
+      }
+    }
+
+    // Evaluate over the techniques the gold corpus actually uses.
+    const evaluated = [...new Set(cases.flatMap((c) => c.gold))].sort();
+    const predictions: Prediction[] = [];
+    const pairs: Array<{ a: string; b: string }> = [];
+    cases.forEach((c, i) => {
+      for (const tech of evaluated) {
+        const expected = c.gold.includes(tech);
+        const actual = assigned.get(i)?.has(tech) ?? false;
+        pairs.push({ a: String(expected), b: String(actual) });
+        predictions.push({
+          id: `${c.id}:${tech}`,
+          expected,
+          actual,
+          note: c.note ?? '',
+        });
+      }
+    });
+
+    const alpha = krippendorffAlpha(pairs);
+    console.log(
+      `  technique-coding intercoder reliability: alpha=${
+        alpha.alpha === null ? `n/a (${alpha.insufficientReason})` : alpha.alpha.toFixed(3)
+      } over ${alpha.pairedItems} decisions ` +
+        '(>=0.8 conclusive, >=0.667 tentative — Krippendorff)',
+    );
+
+    return predictions;
+  },
+};
+
 export const SUITES: Suite[] = [
   queryRelevance,
   languageAbstention,
   stanceClassification,
   stanceOpposition,
+  techniqueCoding,
 ];

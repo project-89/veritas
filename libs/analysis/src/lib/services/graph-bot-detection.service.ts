@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { UserPost } from './deep-investigation.service';
+import { detectCoordination } from '../statistics/coordination';
 import { GraphDatabaseService } from './graph-database.service';
 
 // ---------------------------------------------------------------------------
@@ -138,6 +139,34 @@ export class GraphBotDetectionService {
     } else {
       // Heuristic structural detection without graph
       structuralPatterns = this.detectHeuristicPatterns(users);
+    }
+
+    // Step 3b: Corpus-based coordination — permutation-tested, so it carries
+    // its own null model instead of a hand-tuned threshold. Runs with or
+    // without Memgraph: label-permutation evidence (who pairs with whom beyond
+    // what random assignment of these same posts would produce) is
+    // complementary to graph-edge patterns, and it is the only network-level
+    // signal available when the graph is down. Groups surface as 'clique'
+    // patterns with confidence = 1 - p, and flow through the same structural
+    // boost as every other pattern.
+    const pooled = users.flatMap((u) =>
+      u.posts.map((post) => ({
+        text: post.text,
+        authorHandle: u.handle,
+        timestamp: post.timestamp,
+      })),
+    );
+    const coordination = detectCoordination(pooled);
+    for (const group of coordination.groups) {
+      structuralPatterns.push({
+        type: 'clique',
+        members: group.members,
+        description: `Coordinated posting: ${group.evidence}`,
+        confidence: 1 - group.pValue,
+      });
+    }
+    if (coordination.insufficientReason) {
+      this.logger.debug(`Corpus coordination not assessed: ${coordination.insufficientReason}`);
     }
 
     // Step 4: Boost scores for users involved in structural patterns. A user

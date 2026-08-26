@@ -359,4 +359,73 @@ describe('GraphBotDetectionService', () => {
       expect(result.summary).not.toMatch(/probability/i);
     });
   });
+
+  describe('corpus-based coordination (no graph)', () => {
+    let service: GraphBotDetectionService;
+
+    beforeEach(() => {
+      service = new GraphBotDetectionService(makeGraphService(false));
+    });
+
+    const T0 = Date.UTC(2026, 5, 1, 12, 0, 0);
+    const at = (s: number) => new Date(T0 + s * 1000).toISOString();
+
+    /** Organic bystanders: unique text, spread timing. */
+    const bystander = (n: number) => ({
+      handle: `citizen${n}`,
+      platform: 'twitter',
+      posts: Array.from({ length: 3 }, (_, k) =>
+        makePost({
+          text: `personal thought number ${n}-${k} about the local situation with my own words here`,
+          timestamp: at(n * 900 + k * 300),
+        }),
+      ),
+    });
+
+    /** Ring member: near-identical template posted in lockstep waves. */
+    const ringMember = (name: string, offsetMs: number) => ({
+      handle: name,
+      platform: 'twitter',
+      posts: Array.from({ length: 4 }, (_, k) =>
+        makePost({
+          text: `AMPLIFY THIS the hidden report proves everything wake up people #${k}`,
+          timestamp: new Date(T0 + 5_000_000 + k * 10_000 + offsetMs).toISOString(),
+        }),
+      ),
+    });
+
+    it('gives ring members a coordinationScore without any graph', async () => {
+      const users = [
+        ...Array.from({ length: 8 }, (_, i) => bystander(i)),
+        ringMember('ringA', 0),
+        ringMember('ringB', 200),
+        ringMember('ringC', 400),
+      ];
+      const result = await service.detectBots(users);
+
+      const ringScores = result.scores.filter((s) => s.handle.startsWith('ring'));
+      expect(ringScores).toHaveLength(3);
+      for (const s of ringScores) {
+        // Network-level evidence present even though Memgraph is down.
+        expect(s.coordinationScore).not.toBeNull();
+        expect(s.detectedPatterns.join(' ')).toMatch(/Coordinated posting/);
+      }
+
+      const clique = result.structuralPatterns.find((p) =>
+        p.description.includes('Coordinated posting'),
+      );
+      expect(clique?.members.sort()).toEqual(['ringA', 'ringB', 'ringC']);
+      // Permutation-tested: confidence is 1 - p, not a hand-tuned constant.
+      expect(clique?.confidence).toBeGreaterThan(0.95);
+    });
+
+    it('does not manufacture coordination among organic users', async () => {
+      const users = Array.from({ length: 10 }, (_, i) => bystander(i));
+      const result = await service.detectBots(users);
+
+      expect(
+        result.structuralPatterns.some((p) => p.description.includes('Coordinated posting')),
+      ).toBe(false);
+    });
+  });
 });
