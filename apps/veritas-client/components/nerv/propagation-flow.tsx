@@ -160,14 +160,29 @@ export function PropagationFlow({ investigation }: PropagationFlowProps) {
       }
     }
 
-    // Coordination clusters
-    const clusters = (coordination?.clusters ?? []).map((c) => ({
+    // Coordination clusters — two sources, one channel:
+    //  - deep investigation's temporal-only heuristic (labels itself as such)
+    //  - bot detection's corpus coordination, which is permutation-tested and
+    //    carries its own p-value in the description. Previously these were
+    //    computed and then rendered NOWHERE; a finding that never reaches a
+    //    screen may as well not exist.
+    const heuristicClusters = (coordination?.clusters ?? []).map((c) => ({
       userIndices: c.users
         .map((u) => handleIndex.get(u))
         .filter((i): i is number => i !== undefined),
       pattern: c.pattern,
       confidence: c.confidence,
     }));
+    const testedClusters = (investigation.botDetection?.structuralPatterns ?? [])
+      .filter((p) => p.description.includes('Coordinated posting'))
+      .map((p) => ({
+        userIndices: p.members
+          .map((u) => handleIndex.get(u))
+          .filter((i): i is number => i !== undefined),
+        pattern: p.description,
+        confidence: p.confidence,
+      }));
+    const clusters = [...testedClusters, ...heuristicClusters];
 
     return {
       nodes: nodeList,

@@ -332,7 +332,10 @@ export function EvidenceChainPanel({
                   ? 'red'
                   : propaganda.overallAssessment.manipulationLikelihood === 'medium'
                     ? 'amber'
-                    : 'green'
+                    : propaganda.overallAssessment.manipulationLikelihood === 'insufficient-data'
+                      ? // "couldn't tell" must not wear the clean-green badge
+                        'muted'
+                      : 'green'
               }
               size="sm"
             />

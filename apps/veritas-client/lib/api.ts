@@ -1161,9 +1161,33 @@ export interface NarrativeFrame {
  */
 export type AnalysisMode = 'llm' | 'heuristic' | 'skipped' | 'unavailable';
 
+/** One deterministic campaign signal, computed over ALL posts (no LLM). */
+export interface CampaignSignal {
+  measured: boolean;
+  elevated: boolean;
+  /** Quotable, numeric statement of what was found — render verbatim. */
+  evidence: string;
+}
+
+/**
+ * Distributional campaign signals — the deterministic layer beneath the
+ * technique coding. Present even when the LLM coder was unavailable.
+ */
+export interface CampaignSignalsResult {
+  repetition: CampaignSignal;
+  synchrony: CampaignSignal;
+  concentration: CampaignSignal;
+  infrastructure: CampaignSignal;
+  crossPlatform: CampaignSignal;
+  measurableCount: number;
+  elevatedCount: number;
+  postCount: number;
+}
+
 export interface PropagandaAnalysisResult {
   analysisMode?: AnalysisMode;
   analysisModeReason?: string;
+  campaignSignals?: CampaignSignalsResult;
   techniques: PropagandaTechnique[];
   /** Network-level coordination signals, separate from per-text rhetoric (prompt v2+). */
   coordinationIndicators?: PropagandaTechnique[];

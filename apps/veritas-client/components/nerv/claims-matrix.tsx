@@ -7,6 +7,7 @@ import type {
   PropagandaAnalysisResult,
   VerificationResult,
 } from '../../lib/api';
+import { CampaignSignalsPanel } from './campaign-signals-panel';
 import { NervBadge } from './nerv-badge';
 import { NervBar } from './nerv-bar';
 import type { NervTableColumn } from './nerv-table';
@@ -217,7 +218,11 @@ export function ClaimsMatrix({
               ? 'bg-nerv-red/10 border-nerv-red/30 text-nerv-red'
               : propaganda.overallAssessment.manipulationLikelihood === 'medium'
                 ? 'bg-nerv-amber/10 border-nerv-amber/30 text-nerv-amber'
-                : 'bg-nerv-green/10 border-nerv-green/30 text-nerv-green',
+                : propaganda.overallAssessment.manipulationLikelihood === 'insufficient-data'
+                  ? // NOT the green branch: "too little data to tell" must never
+                    // wear the same color as "checked and clean".
+                    'bg-nerv-surface/50 border-nerv-border text-nerv-text-muted'
+                  : 'bg-nerv-green/10 border-nerv-green/30 text-nerv-green',
           ].join(' ')}
         >
           MANIPULATION LIKELIHOOD:{' '}
@@ -230,6 +235,17 @@ export function ClaimsMatrix({
             {propaganda.techniques.length} techniques / {propaganda.claims.length} claims /{' '}
             {propaganda.frames.length} frames
           </span>
+          {propaganda.analysisMode === 'heuristic' && propaganda.analysisModeReason && (
+            <div className="mt-1 text-[10px] text-nerv-text-muted normal-case">
+              ⚠ {propaganda.analysisModeReason}
+            </div>
+          )}
+        </div>
+      )}
+
+      {propaganda.campaignSignals && (
+        <div className="p-3 border-b border-nerv-border">
+          <CampaignSignalsPanel signals={propaganda.campaignSignals} />
         </div>
       )}
 
